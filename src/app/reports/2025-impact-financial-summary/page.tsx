@@ -1,5 +1,15 @@
 import { Logo } from '@/components/Logo';
 import Link from 'next/link';
+import type { Metadata } from 'next';
+
+export const metadata: Metadata = {
+  title: "2025 Impact & Financial Summary",
+  description: "One-page overview of 2025 outcomes and financials. 700+ medical outreach, 60 women trained, 96.7% program allocation. All reports independently reviewed and publicly available.",
+  openGraph: {
+    title: "2025 Impact & Financial Summary | Be A Number",
+    description: "2025 outcomes: 700+ patients, 60 women trained, 96.7% program allocation. Independently reviewed financial summary.",
+  },
+};
 
 export default function ImpactFinancialSummary() {
   return (

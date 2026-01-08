@@ -1,6 +1,17 @@
 import { Logo } from '@/components/Logo';
 import Link from 'next/link';
 import Image from 'next/image';
+import type { Metadata } from 'next';
+
+export const metadata: Metadata = {
+  title: "Partnerships",
+  description: "Be A Number partners with University of Worcester (UK), Youth Development Organization (YDO), and Rotary Clubs to ensure program quality, accountability, and replicability across post-conflict regions.",
+  openGraph: {
+    title: "Partnerships | Be A Number, International",
+    description: "Academic and local partnerships ensuring program quality and scalability. University of Worcester, YDO, and Rotary Club collaborations.",
+    images: ["/images/partnerships/sewing-classroom-training.jpg"],
+  },
+};
 
 export default function Partnerships() {
   return (

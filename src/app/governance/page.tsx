@@ -1,6 +1,17 @@
 import { Logo } from '@/components/Logo';
 import Link from 'next/link';
 import Image from 'next/image';
+import type { Metadata } from 'next';
+
+export const metadata: Metadata = {
+  title: "Governance & Financials",
+  description: "Be A Number, International is a 501(c)(3) public charity (EIN: 93-1948872). In 2025, 96.7% of funding directly supported programs. View our financial stewardship and governance structure.",
+  openGraph: {
+    title: "Governance & Financials | Be A Number, International",
+    description: "501(c)(3) public charity with 96.7% program allocation. Transparent governance and financial stewardship.",
+    images: ["/images/governance/planning-notebook.jpg"],
+  },
+};
 
 export default function Governance() {
   return (

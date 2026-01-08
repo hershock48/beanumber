@@ -1,6 +1,17 @@
 import { Logo } from '@/components/Logo';
 import Link from 'next/link';
 import Image from 'next/image';
+import type { Metadata } from 'next';
+
+export const metadata: Metadata = {
+  title: "2025 Impact - Measured Outcomes",
+  description: "In 2025, Be A Number delivered measurable impact: 700+ medical outreach served, 60 women trained, 68 adults trained, 15 students supported, and 30 local jobs created in Northern Uganda.",
+  openGraph: {
+    title: "2025 Impact - Measured Outcomes | Be A Number",
+    description: "700+ patients served, 60 women trained, 68 adults trained, 15 students supported. Measured outcomes from our integrated community development model.",
+    images: ["/images/impact-page/lead-image.jpg"],
+  },
+};
 
 export default function Impact() {
   return (

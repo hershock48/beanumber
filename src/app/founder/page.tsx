@@ -1,6 +1,17 @@
 import { Logo } from '@/components/Logo';
 import Link from 'next/link';
 import Image from 'next/image';
+import type { Metadata } from 'next';
+
+export const metadata: Metadata = {
+  title: "Kevin C. Hershock - Founder & Executive Director",
+  description: "Kevin Hershock is a founder-led social entrepreneur with over 15 years of cross-cultural development experience focused on post-conflict community recovery in East Africa. Founded Be A Number in 2010.",
+  openGraph: {
+    title: "Kevin C. Hershock - Founder & Executive Director | Be A Number",
+    description: "Founder-led social entrepreneur with 15+ years of experience building sustainable community systems in Northern Uganda.",
+    images: ["/images/founder/hero-sewing-classroom.jpg"],
+  },
+};
 
 export default function Founder() {
   return (

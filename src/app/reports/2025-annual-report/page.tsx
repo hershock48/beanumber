@@ -1,5 +1,15 @@
 import { Logo } from '@/components/Logo';
 import Link from 'next/link';
+import type { Metadata } from 'next';
+
+export const metadata: Metadata = {
+  title: "2025 Annual Report",
+  description: "Full narrative report on Be A Number's 2025 impact in Northern Uganda. Model in action, infrastructure built, partnerships, and 5-year goal to reach 20,000+ lives.",
+  openGraph: {
+    title: "2025 Annual Report | Be A Number, International",
+    description: "Complete annual report documenting sustainable community systems, measurable outcomes, and long-term vision for post-conflict community recovery.",
+  },
+};
 
 export default function AnnualReport() {
   return (

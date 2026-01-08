@@ -3,6 +3,17 @@ import { CountUpNumber } from '@/components/CountUpNumber';
 import { StickyDonateButton } from '@/components/StickyDonateButton';
 import { DonationSection } from '@/components/DonationSection';
 import Image from 'next/image';
+import type { Metadata } from 'next';
+
+export const metadata: Metadata = {
+  title: "Home",
+  description: "Be A Number partners with local leadership in Northern Uganda to build sustainable community systems. In 2025, we reached 700+ patients, 60 women, and 15 students. Our goal: reach 20,000+ lives within five years.",
+  openGraph: {
+    title: "Be A Number, International | Rebuilding Post-War Societies",
+    description: "Be A Number partners with local leadership in Northern Uganda to build sustainable community systems — healthcare, education, workforce development, and economic infrastructure.",
+    images: ["/images/homepage/hero-community-group.jpg"],
+  },
+};
 
 export default function Home() {
   return (
@@ -69,7 +80,7 @@ export default function Home() {
             <p className="text-base sm:text-lg text-white/90 mb-6 leading-[1.8]">
               In 2025 alone, our work reached 700+ patients, 60 women, and 15 students, demonstrating how durable institutions, when owned and led by the community, generate measurable outcomes and lasting transformation.
             </p>
-            <p className="text-lg text-white/90 mb-10 leading-[1.8]">
+            <p className="text-base sm:text-lg text-white/90 mb-10 leading-[1.8]">
               Each system is built to sustain itself through earned income and local ownership, ensuring long-term operations beyond initial investment and enabling replication across post-conflict regions.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 mb-6">
