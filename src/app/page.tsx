@@ -193,34 +193,40 @@ export default function Home() {
       <section className="py-20 px-6 bg-white border-y border-gray-200">
         <div className="max-w-6xl mx-auto">
           <h2 className="text-lg font-semibold text-gray-900 mb-12 text-center">How it works</h2>
-          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-8 relative">
-            {/* Timeline connector line */}
+          <div className="flex flex-col md:flex-row items-center md:items-start justify-between gap-8 md:gap-4 relative">
+            {/* Timeline connector line - desktop */}
             <div className="hidden md:block absolute top-6 left-1/4 right-1/4 h-0.5 bg-gray-300 -z-10"></div>
             
             {/* Step 1 */}
-            <div className="flex-1 text-center md:text-left">
+            <div className="flex-1 w-full md:w-auto text-center md:text-left">
               <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-gray-900 text-white mb-4 text-xl font-bold">
                 1
               </div>
               <p className="text-gray-900 font-semibold text-lg">Community-led planning</p>
             </div>
             
-            {/* Arrow */}
-            <div className="hidden md:block text-gray-400 text-2xl">→</div>
+            {/* Arrow - desktop */}
+            <div className="hidden md:block text-gray-400 text-2xl flex-shrink-0">→</div>
+            
+            {/* Arrow - mobile */}
+            <div className="md:hidden text-gray-400 text-2xl py-2">↓</div>
             
             {/* Step 2 */}
-            <div className="flex-1 text-center md:text-left">
+            <div className="flex-1 w-full md:w-auto text-center md:text-left">
               <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-gray-900 text-white mb-4 text-xl font-bold">
                 2
               </div>
               <p className="text-gray-900 font-semibold text-lg">Build foundational community systems</p>
             </div>
             
-            {/* Arrow */}
-            <div className="hidden md:block text-gray-400 text-2xl">→</div>
+            {/* Arrow - desktop */}
+            <div className="hidden md:block text-gray-400 text-2xl flex-shrink-0">→</div>
+            
+            {/* Arrow - mobile */}
+            <div className="md:hidden text-gray-400 text-2xl py-2">↓</div>
             
             {/* Step 3 */}
-            <div className="flex-1 text-center md:text-left">
+            <div className="flex-1 w-full md:w-auto text-center md:text-left">
               <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-gray-900 text-white mb-4 text-xl font-bold">
                 3
               </div>
