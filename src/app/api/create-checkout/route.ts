@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
+import type Stripe from 'stripe';
 
 // Initialize Stripe lazily using dynamic import to avoid issues during build
 async function getStripe() {
-  const Stripe = (await import('stripe')).default;
+  const StripeModule = (await import('stripe')).default;
   const secretKey = process.env.STRIPE_SECRET_KEY;
   if (!secretKey) {
     throw new Error('STRIPE_SECRET_KEY is not set');
   }
-  return new Stripe(secretKey, {
+  return new StripeModule(secretKey, {
     apiVersion: '2025-12-15.clover',
   });
 }
