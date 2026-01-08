@@ -51,12 +51,14 @@ export default async function SponsorPage({ params }: { params: { code: string }
             </Link>
             <div className="flex items-center gap-4">
               <span className="text-sm text-gray-600">Sponsor Code: {params.code}</span>
-              <Link
-                href="/sponsor/login"
-                className="text-sm text-gray-600 hover:text-gray-900"
-              >
-                Logout
-              </Link>
+              <form action="/api/sponsor/logout" method="POST">
+                <button
+                  type="submit"
+                  className="text-sm text-gray-600 hover:text-gray-900"
+                >
+                  Logout
+                </button>
+              </form>
             </div>
           </div>
         </div>
