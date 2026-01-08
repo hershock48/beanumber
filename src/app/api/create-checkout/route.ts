@@ -18,54 +18,27 @@ export async function POST(request: NextRequest) {
     const stripe = await getStripe();
     const { amount, email, name, isMonthly } = await request.json();
 
-    // Get base URL from the actual request - most reliable method
-    // This ensures we use the exact domain the user is currently on
-    let baseUrl = process.env.NEXT_PUBLIC_BASE_URL;
+    // SIMPLE FIX: Get the exact domain from the request URL
+    // This is the most reliable method - use the actual request URL
+    let baseUrl: string;
     
-    if (!baseUrl) {
-      // Parse the request URL directly - this is the most reliable
-      try {
-        const requestUrl = new URL(request.url);
-        // Use the host from the request URL
-        const host = request.headers.get('host') || requestUrl.host;
-        const protocol = request.headers.get('x-forwarded-proto') || requestUrl.protocol.replace(':', '') || 'https';
-        baseUrl = `${protocol}://${host}`;
-      } catch (e) {
-        // Fallback: try headers
-        const origin = request.headers.get('origin');
-        const referer = request.headers.get('referer');
-        const host = request.headers.get('host') || request.headers.get('x-forwarded-host');
-        const protocol = request.headers.get('x-forwarded-proto') || 'https';
-        
-        if (origin) {
-          baseUrl = origin;
-        } else if (referer) {
-          try {
-            const refererUrl = new URL(referer);
-            baseUrl = `${refererUrl.protocol}//${refererUrl.host}`;
-          } catch (e2) {
-            baseUrl = host ? `${protocol}://${host}` : 'https://beanumber.org';
-          }
-        } else if (host) {
-          baseUrl = `${protocol}://${host}`;
-        } else {
-          baseUrl = 'https://beanumber.org';
-        }
-      }
+    try {
+      const requestUrl = new URL(request.url);
+      const host = request.headers.get('host') || requestUrl.host;
+      const protocol = request.headers.get('x-forwarded-proto') || 'https';
+      baseUrl = `${protocol}://${host}`;
+    } catch (e) {
+      // If that fails, use environment variable or fallback
+      baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 
+                process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 
+                'https://beanumber.org';
     }
     
-    // Remove trailing slash
+    // Clean up the URL
     baseUrl = baseUrl.replace(/\/$/, '');
-    
-    // Ensure protocol is https (required for Stripe)
     if (!baseUrl.startsWith('http')) {
       baseUrl = `https://${baseUrl}`;
     }
-    
-    // Log for debugging
-    console.log('[Stripe Checkout] Request URL:', request.url);
-    console.log('[Stripe Checkout] Detected base URL:', baseUrl);
-    console.log('[Stripe Checkout] Success URL:', `${baseUrl}/donate/success`);
 
     // Validate amount
     if (!amount || amount < 1) {
