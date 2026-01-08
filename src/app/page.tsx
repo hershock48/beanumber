@@ -60,13 +60,13 @@ export default function Home() {
         <div className="absolute inset-0 z-0 bg-black/65"></div>
         <div className="relative z-10 max-w-6xl mx-auto">
           <div className="max-w-3xl">
-            <h1 className="text-5xl md:text-6xl font-bold text-white mb-4 leading-tight">
+            <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-4 leading-tight">
               Rebuilding post-war societies through locally-led systems change.
           </h1>
-            <p className="text-lg text-white/90 mb-6 leading-[1.8]">
+            <p className="text-base sm:text-lg text-white/90 mb-6 leading-[1.8]">
               Be A Number partners with local leadership in Northern Uganda to design and operate integrated community systems — healthcare, education, workforce development, and local economic infrastructure — that move communities from survival to long-term stability.
             </p>
-            <p className="text-lg text-white/90 mb-6 leading-[1.8]">
+            <p className="text-base sm:text-lg text-white/90 mb-6 leading-[1.8]">
               In 2025 alone, our work reached 700+ patients, 60 women, and 15 students, demonstrating how durable institutions, when owned and led by the community, generate measurable outcomes and lasting transformation.
             </p>
             <p className="text-lg text-white/90 mb-10 leading-[1.8]">

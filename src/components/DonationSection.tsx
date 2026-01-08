@@ -1,96 +1,148 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 
-interface DonationSectionProps {
-  donorboxUrl?: string;
-}
+interface DonationSectionProps {}
 
-export function DonationSection({ donorboxUrl = 'https://donorbox.org/beanumber' }: DonationSectionProps) {
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [donationAmount, setDonationAmount] = useState<number | undefined>(undefined);
+export function DonationSection({}: DonationSectionProps) {
+  const [isLoading, setIsLoading] = useState(false);
+  const [customAmount, setCustomAmount] = useState<string>('');
+  const [isMonthly, setIsMonthly] = useState(true);
 
-  // Handle body scroll lock when modal is open
-  useEffect(() => {
-    if (isModalOpen) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = 'unset';
+  const handleDonate = async (amount?: number) => {
+    const donationAmount = amount || (customAmount ? parseFloat(customAmount) : null);
+    
+    if (!donationAmount || donationAmount < 1) {
+      alert('Please enter a valid donation amount (minimum $1)');
+      return;
     }
-    // Cleanup on unmount
-    return () => {
-      document.body.style.overflow = 'unset';
-    };
-  }, [isModalOpen]);
 
-  const handleDonate = (amount?: number) => {
-    setDonationAmount(amount);
-    setIsModalOpen(true);
-  };
+    setIsLoading(true);
 
-  const closeModal = () => {
-    setIsModalOpen(false);
-    setDonationAmount(undefined);
-  };
+    try {
+      // Create Stripe Checkout Session
+      const response = await fetch('/api/create-checkout', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          amount: donationAmount,
+          isMonthly: isMonthly,
+        }),
+      });
 
-  // Build Donorbox URL with amount parameter
-  const getDonorboxUrl = () => {
-    const params = new URLSearchParams();
-    if (donationAmount) {
-      params.set('amount', donationAmount.toString());
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to create checkout session');
+      }
+
+      // Redirect to Stripe Checkout
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        throw new Error('No checkout URL returned');
+      }
+    } catch (error: any) {
+      console.error('Donation error:', error);
+      alert(error.message || 'Something went wrong. Please try again.');
+      setIsLoading(false);
     }
-    return `${donorboxUrl}${params.toString() ? '?' + params.toString() : ''}`;
   };
 
   return (
-    <section id="donate" className="py-24 px-6">
+    <section id="donate" className="py-16 md:py-24 px-4 sm:px-6">
       <div className="max-w-6xl mx-auto">
-        <div className="bg-gray-900 text-white p-12 rounded-lg">
-          <h2 className="text-3xl font-bold mb-4 text-center">Support Our Work</h2>
+        <div className="bg-gray-900 text-white p-6 sm:p-8 md:p-12 rounded-lg">
+          <h2 className="text-2xl sm:text-3xl font-bold mb-4 text-center">Support Our Work</h2>
           <p className="text-gray-200 mb-12 max-w-2xl mx-auto text-center leading-relaxed">
             Your investment supports sustainable systems that generate measurable, long-term outcomes. 96–97% of all funding directly supports programs and community impact. We operate with a lean administrative structure and report all outcomes and financials annually.
           </p>
           
+          {/* Donation Frequency Toggle */}
+          <div className="flex items-center justify-center gap-4 mb-8">
+            <button
+              onClick={() => setIsMonthly(false)}
+              className={`px-6 py-2 rounded-md font-medium transition-colors cursor-pointer ${
+                !isMonthly
+                  ? 'bg-white text-gray-900'
+                  : 'bg-white/10 text-white hover:bg-white/20'
+              }`}
+            >
+              One-time
+            </button>
+            <button
+              onClick={() => setIsMonthly(true)}
+              className={`px-6 py-2 rounded-md font-medium transition-colors cursor-pointer ${
+                isMonthly
+                  ? 'bg-white text-gray-900'
+                  : 'bg-white/10 text-white hover:bg-white/20'
+              }`}
+            >
+              Monthly
+            </button>
+          </div>
+
           {/* Donation Tiers */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mb-8">
             <button 
               onClick={() => handleDonate(25)}
-              className="bg-white/10 hover:bg-white/20 border border-white/20 rounded-md p-4 text-center transition-colors"
+              disabled={isLoading}
+              className="bg-white/10 hover:bg-white/20 border border-white/20 rounded-md p-3 sm:p-4 text-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
             >
-              <div className="text-2xl font-bold mb-2">$25</div>
-              <div className="text-sm text-gray-200 leading-snug">Covers school supplies for 5 students for one term</div>
+              <div className="text-xl sm:text-2xl font-bold mb-2">$25</div>
+              <div className="text-xs sm:text-sm text-gray-200 leading-snug">Covers school supplies for 5 students for one term</div>
             </button>
             <button 
               onClick={() => handleDonate(50)}
-              className="bg-white/10 hover:bg-white/20 border border-white/20 rounded-md p-4 text-center transition-colors"
+              disabled={isLoading}
+              className="bg-white/10 hover:bg-white/20 border border-white/20 rounded-md p-3 sm:p-4 text-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
             >
-              <div className="text-2xl font-bold mb-2">$50</div>
-              <div className="text-sm text-gray-200 leading-snug">Covers malaria treatment for 3 families</div>
+              <div className="text-xl sm:text-2xl font-bold mb-2">$50</div>
+              <div className="text-xs sm:text-sm text-gray-200 leading-snug">Covers malaria treatment for 3 families</div>
             </button>
             <button 
               onClick={() => handleDonate(100)}
-              className="bg-white/10 hover:bg-white/20 border border-white/20 rounded-md p-4 text-center transition-colors"
+              disabled={isLoading}
+              className="bg-white/10 hover:bg-white/20 border border-white/20 rounded-md p-3 sm:p-4 text-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
             >
-              <div className="text-2xl font-bold mb-2">$100</div>
-              <div className="text-sm text-gray-200 leading-snug">Funds complete vocational training for 1 person</div>
+              <div className="text-xl sm:text-2xl font-bold mb-2">$100</div>
+              <div className="text-xs sm:text-sm text-gray-200 leading-snug">Funds complete vocational training for 1 person</div>
             </button>
             <button 
               onClick={() => handleDonate(250)}
-              className="bg-white/10 hover:bg-white/20 border border-white/20 rounded-md p-4 text-center transition-colors"
+              disabled={isLoading}
+              className="bg-white/10 hover:bg-white/20 border border-white/20 rounded-md p-3 sm:p-4 text-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
             >
-              <div className="text-2xl font-bold mb-2">$250</div>
-              <div className="text-sm text-gray-200 leading-snug">Covers one month's salary for a local teacher</div>
+              <div className="text-xl sm:text-2xl font-bold mb-2">$250</div>
+              <div className="text-xs sm:text-sm text-gray-200 leading-snug">Covers one month's salary for a local teacher</div>
             </button>
           </div>
           
-          <p className="text-center text-gray-300 text-sm mb-8">You may also choose your own amount.</p>
+          <p className="text-center text-gray-300 text-sm mb-6">You may also choose your own amount.</p>
           
-          <div className="text-center mb-8">
+          {/* Custom Amount Input */}
+          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-8">
+            <div className="flex items-center gap-2">
+              <span className="text-white text-lg">$</span>
+              <input
+                type="number"
+                min="1"
+                step="0.01"
+                placeholder="Enter amount"
+                value={customAmount}
+                onChange={(e) => setCustomAmount(e.target.value)}
+                className="px-4 py-2 bg-white/10 border border-white/20 rounded-md text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-white/50 w-32"
+                disabled={isLoading}
+              />
+            </div>
             <button
               onClick={() => handleDonate()}
-              className="inline-block px-8 py-4 bg-white text-gray-900 rounded-md hover:bg-gray-100 transition-colors font-medium"
+              disabled={isLoading}
+              className="px-8 py-4 bg-white text-gray-900 rounded-md hover:bg-gray-100 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Donate
+              {isLoading ? 'Processing...' : 'Donate'}
             </button>
           </div>
           
@@ -114,40 +166,6 @@ export function DonationSection({ donorboxUrl = 'https://donorbox.org/beanumber'
           </div>
         </div>
       </div>
-
-      {/* Donorbox Modal */}
-      {isModalOpen && (
-        <div 
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
-          onClick={closeModal}
-        >
-          <div 
-            className="relative bg-white rounded-lg shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Close button */}
-            <button
-              onClick={closeModal}
-              className="absolute top-4 right-4 z-10 p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-full transition-colors"
-              aria-label="Close donation form"
-            >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-
-            {/* Donorbox iframe */}
-            <div className="w-full h-[90vh] overflow-auto">
-              <iframe
-                src={getDonorboxUrl()}
-                className="w-full h-full border-0"
-                title="Donation Form"
-                allow="payment"
-              />
-            </div>
-          </div>
-        </div>
-      )}
     </section>
   );
 }

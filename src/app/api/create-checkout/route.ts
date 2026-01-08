@@ -1,0 +1,91 @@
+import { NextRequest, NextResponse } from 'next/server';
+import Stripe from 'stripe';
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+  apiVersion: '2024-11-20.acacia',
+});
+
+export async function POST(request: NextRequest) {
+  try {
+    const { amount, email, name, isMonthly } = await request.json();
+
+    // Validate amount
+    if (!amount || amount < 1) {
+      return NextResponse.json(
+        { error: 'Invalid donation amount' },
+        { status: 400 }
+      );
+    }
+
+    const mode = isMonthly ? 'subscription' : 'payment';
+    const donationType = isMonthly ? 'monthly' : 'one-time';
+
+    // Create Stripe Checkout Session
+    const sessionConfig: Stripe.Checkout.SessionCreateParams = {
+      payment_method_types: ['card'],
+      line_items: [
+        {
+          price_data: {
+            currency: 'usd',
+            product_data: {
+              name: isMonthly 
+                ? 'Monthly Donation to Be A Number, International'
+                : 'Donation to Be A Number, International',
+              description: isMonthly 
+                ? `Thank you for changing lives. Your monthly gift of $${amount} supports sustainable community systems in Northern Uganda — healthcare, education, workforce development, and economic empowerment that transform communities.`
+                : `Thank you for changing lives. Your contribution of $${amount} supports sustainable community systems in Northern Uganda — healthcare, education, workforce development, and economic empowerment that transform communities.`,
+              // Add your logo image URL here (must be hosted publicly accessible)
+              // images: [`${process.env.NEXT_PUBLIC_BASE_URL}/logo-be-a-number-primary-white.svg`],
+            },
+            unit_amount: Math.round(amount * 100), // Convert to cents
+            recurring: isMonthly ? { interval: 'month' } : undefined,
+          },
+          quantity: 1,
+        },
+      ],
+      mode: mode as 'payment' | 'subscription',
+      success_url: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3001'}/donate/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3001'}/donate?canceled=true`,
+      customer_email: email || undefined,
+      metadata: {
+        donor_name: name || 'Anonymous',
+        donation_type: donationType,
+      },
+      // Branding customization
+      allow_promotion_codes: false,
+      billing_address_collection: 'auto',
+      // Add custom fields for tax receipt
+      custom_fields: [
+        {
+          key: 'organization',
+          label: {
+            type: 'custom',
+            custom: 'Organization Name (if applicable)',
+          },
+          type: 'text',
+          optional: true,
+        },
+      ],
+    };
+
+    // For subscriptions, add subscription_data
+    if (isMonthly) {
+      sessionConfig.subscription_data = {
+        metadata: {
+          donation_type: 'monthly',
+          amount: amount.toString(),
+        },
+      };
+    }
+
+    const session = await stripe.checkout.sessions.create(sessionConfig);
+
+    return NextResponse.json({ sessionId: session.id, url: session.url });
+  } catch (error: any) {
+    console.error('Stripe checkout error:', error);
+    return NextResponse.json(
+      { error: error.message || 'Failed to create checkout session' },
+      { status: 500 }
+    );
+  }
+}

@@ -20,7 +20,7 @@ export function StickyDonateButton() {
   return (
     <a
       href="#donate"
-      className="fixed bottom-6 right-6 z-50 px-6 py-3 bg-gray-900 text-white rounded-md hover:bg-gray-800 transition-all shadow-lg font-medium"
+      className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-50 px-4 py-2 sm:px-6 sm:py-3 bg-gray-900 text-white rounded-md hover:bg-gray-800 transition-all shadow-lg font-medium text-sm sm:text-base"
     >
       Donate
     </a>
