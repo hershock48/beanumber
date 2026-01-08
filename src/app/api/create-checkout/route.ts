@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
       },
       // Branding customization
       allow_promotion_codes: false,
-      billing_address_collection: 'auto',
+      billing_address_collection: 'required', // Require billing address for tax receipts
       // Add custom fields for tax receipt
       custom_fields: [
         {
