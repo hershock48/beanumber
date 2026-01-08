@@ -19,10 +19,11 @@ export async function POST(request: NextRequest) {
     const { amount, email, name, isMonthly } = await request.json();
 
     // Get base URL from request headers (more reliable than env var)
-    const origin = request.headers.get('origin') || request.headers.get('host');
-    const protocol = request.headers.get('x-forwarded-proto') || 'https';
+    const origin = request.headers.get('origin');
+    const host = request.headers.get('host');
+    const protocol = request.headers.get('x-forwarded-proto') || (origin ? new URL(origin).protocol.replace(':', '') : 'https');
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 
-      (origin ? `${protocol}://${origin}` : 'https://beanumber.org');
+      (origin || (host ? `${protocol}://${host}` : 'https://beanumber.org'));
 
     // Validate amount
     if (!amount || amount < 1) {
