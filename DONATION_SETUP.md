@@ -42,12 +42,12 @@ STRIPE_WEBHOOK_SECRET=whsec_your_webhook_secret_here
 ### 2.1 Create Airtable Base
 
 1. Go to [Airtable](https://airtable.com) and create a new base
-2. Name it "Be A Number Donations" or similar
-3. Create a table called "Donations"
+2. Name it "Be A Number Donor Management" or similar
+3. Create these tables: **Donors**, **Donations**, **Communications**, **Exports**, **Subscriptions**
 
 ### 2.2 Create Fields in Airtable
 
-Create these fields in your "Donations" table:
+**Donors Table** - Create these fields:
 
 | Field Name | Type | Notes |
 |------------|------|-------|
