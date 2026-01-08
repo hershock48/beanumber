@@ -28,6 +28,8 @@ AIRTABLE_BASE_ID=app73ZPGbM0BQTOZW
 AIRTABLE_DONORS_TABLE=Donors
 AIRTABLE_DONATIONS_TABLE=Donations
 AIRTABLE_COMMUNICATIONS_TABLE=Communications
+AIRTABLE_SPONSORSHIPS_TABLE=Sponsorships
+AIRTABLE_UPDATES_TABLE=Updates
 ```
 
 **Note:** The Exports and Subscriptions tables are optional for the webhook - they're used by other parts of the system.
