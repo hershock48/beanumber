@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "export-donors": "tsx scripts/export-donors.ts"
+    "export-donors": "tsx scripts/export-donors.ts",
+    "create-test-sponsorship": "tsx scripts/create-test-sponsorship.ts"
   },
   "dependencies": {
     "@stripe/stripe-js": "^8.6.1",
