@@ -18,6 +18,12 @@ export async function POST(request: NextRequest) {
     const stripe = await getStripe();
     const { amount, email, name, isMonthly } = await request.json();
 
+    // Get base URL from request headers (more reliable than env var)
+    const origin = request.headers.get('origin') || request.headers.get('host');
+    const protocol = request.headers.get('x-forwarded-proto') || 'https';
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 
+      (origin ? `${protocol}://${origin}` : 'https://beanumber.org');
+
     // Validate amount
     if (!amount || amount < 1) {
       return NextResponse.json(
@@ -53,8 +59,8 @@ export async function POST(request: NextRequest) {
         },
       ],
       mode: mode as 'payment' | 'subscription',
-      success_url: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3001'}/donate/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3001'}/#donate`,
+      success_url: `${baseUrl}/donate/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${baseUrl}/#donate`,
       customer_email: email || undefined,
       metadata: {
         donor_name: name || 'Anonymous',
