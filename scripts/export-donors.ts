@@ -99,13 +99,22 @@ async function exportDonors(startDate?: string, endDate?: string) {
       // Get payment intent for billing details if available
       let billingAddress = null;
       if (fullSession.payment_intent) {
-        const paymentIntent =
-          typeof fullSession.payment_intent === 'string'
-            ? await stripe.paymentIntents.retrieve(fullSession.payment_intent)
-            : fullSession.payment_intent;
+        const paymentIntentId = typeof fullSession.payment_intent === 'string'
+          ? fullSession.payment_intent
+          : fullSession.payment_intent.id;
 
-        if (paymentIntent.charges?.data[0]?.billing_details?.address) {
-          billingAddress = paymentIntent.charges.data[0].billing_details.address;
+        try {
+          const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId, {
+            expand: ['charges.data.billing_details'],
+          });
+
+          // Access charges through the expanded data
+          const charges = (paymentIntent as any).charges?.data;
+          if (charges && charges.length > 0 && charges[0]?.billing_details?.address) {
+            billingAddress = charges[0].billing_details.address;
+          }
+        } catch (error) {
+          console.error(`Error retrieving payment intent ${paymentIntentId}:`, error);
         }
       }
 
