@@ -18,20 +18,22 @@ export async function POST(request: NextRequest) {
     const stripe = await getStripe();
     const { amount, email, name, isMonthly } = await request.json();
 
-    // SIMPLE FIX: Get the exact domain from the request URL
-    // This is the most reliable method - use the actual request URL
-    let baseUrl: string;
+    // Get the actual domain from headers (most reliable on Vercel)
+    const host = request.headers.get('host') || request.headers.get('x-forwarded-host');
+    const protocol = request.headers.get('x-forwarded-proto') || 'https';
     
-    try {
-      const requestUrl = new URL(request.url);
-      const host = request.headers.get('host') || requestUrl.host;
-      const protocol = request.headers.get('x-forwarded-proto') || 'https';
+    // Build the base URL from headers (this is what Vercel provides)
+    let baseUrl = process.env.NEXT_PUBLIC_BASE_URL;
+    
+    if (!baseUrl && host) {
+      // Use the host header directly - this is the actual domain
       baseUrl = `${protocol}://${host}`;
-    } catch (e) {
-      // If that fails, use environment variable or fallback
-      baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 
-                process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 
-                'https://beanumber.org';
+    } else if (!baseUrl && process.env.VERCEL_URL) {
+      // Fallback to Vercel URL if host header is missing
+      baseUrl = `https://${process.env.VERCEL_URL}`;
+    } else if (!baseUrl) {
+      // Final fallback
+      baseUrl = 'https://beanumber.org';
     }
     
     // Clean up the URL
@@ -39,6 +41,9 @@ export async function POST(request: NextRequest) {
     if (!baseUrl.startsWith('http')) {
       baseUrl = `https://${baseUrl}`;
     }
+    
+    console.log('[Stripe] Host header:', host);
+    console.log('[Stripe] Base URL:', baseUrl);
 
     // Validate amount
     if (!amount || amount < 1) {
