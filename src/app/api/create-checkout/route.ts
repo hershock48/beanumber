@@ -18,23 +18,9 @@ export async function POST(request: NextRequest) {
     const stripe = await getStripe();
     const { amount, email, name, isMonthly } = await request.json();
 
-    // Get base URL - prioritize env var, then detect from request, fallback to production domain
-    let baseUrl = process.env.NEXT_PUBLIC_BASE_URL;
-    
-    if (!baseUrl) {
-      try {
-        const url = new URL(request.url);
-        // Use the request URL, but prefer https
-        const protocol = url.protocol === 'https:' ? 'https:' : 'https:';
-        baseUrl = `${protocol}//${url.host}`;
-      } catch (e) {
-        // Fallback to production domain
-        baseUrl = 'https://beanumber.org';
-      }
-    }
-    
-    // Ensure baseUrl doesn't have trailing slash
-    baseUrl = baseUrl.replace(/\/$/, '');
+    // Get base URL - use production domain to avoid Vercel preview deployment issues
+    // This ensures Stripe always redirects to the correct production URL
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://beanumber.org';
 
     // Validate amount
     if (!amount || amount < 1) {
