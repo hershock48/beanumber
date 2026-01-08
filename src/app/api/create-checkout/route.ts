@@ -18,9 +18,8 @@ export async function POST(request: NextRequest) {
     const stripe = await getStripe();
     const { amount, email, name, isMonthly } = await request.json();
 
-    // SIMPLE FIX: Use production domain directly
-    // Environment variable takes precedence, otherwise use www.beanumber.org
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://www.beanumber.org';
+    // Get origin from request header (as per Stripe docs)
+    const origin = request.headers.get('origin') || 'https://www.beanumber.org';
 
     // Validate amount
     if (!amount || amount < 1) {
@@ -57,8 +56,8 @@ export async function POST(request: NextRequest) {
         },
       ],
       mode: mode as 'payment' | 'subscription',
-      success_url: `${baseUrl}/donate/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${baseUrl}/#donate`,
+      success_url: `${origin}/donate/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${origin}/donate?canceled=1`,
       customer_email: email || undefined,
       metadata: {
         donor_name: name || 'Anonymous',
