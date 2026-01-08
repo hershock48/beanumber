@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
       ],
       mode: mode as 'payment' | 'subscription',
       success_url: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3001'}/donate/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3001'}/donate?canceled=true`,
+      cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3001'}/#donate`,
       customer_email: email || undefined,
       metadata: {
         donor_name: name || 'Anonymous',
