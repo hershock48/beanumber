@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 interface DonationSectionProps {}
 
@@ -8,6 +8,33 @@ export function DonationSection({}: DonationSectionProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [customAmount, setCustomAmount] = useState<string>('');
   const [isMonthly, setIsMonthly] = useState(true);
+
+  // Reset loading state when component mounts or page becomes visible
+  // This handles the case when user clicks back from Stripe Checkout
+  useEffect(() => {
+    // Reset loading state on mount
+    setIsLoading(false);
+
+    // Handle page visibility - reset if user comes back to the page
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        setIsLoading(false);
+      }
+    };
+
+    // Handle focus - reset if user comes back to the tab/window
+    const handleFocus = () => {
+      setIsLoading(false);
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, []);
 
   const handleDonate = async (amount?: number) => {
     const donationAmount = amount || (customAmount ? parseFloat(customAmount) : null);
