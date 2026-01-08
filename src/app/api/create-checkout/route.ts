@@ -18,30 +18,40 @@ export async function POST(request: NextRequest) {
     const stripe = await getStripe();
     const { amount, email, name, isMonthly } = await request.json();
 
-    // Get base URL - try multiple methods to ensure we get the correct domain
-    let baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 
-                  process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null;
+    // Get base URL - prioritize environment variable, then detect from request
+    let baseUrl = process.env.NEXT_PUBLIC_BASE_URL;
     
-    // If still no URL, try to get from request headers
     if (!baseUrl) {
-      const origin = request.headers.get('origin');
-      const host = request.headers.get('host');
-      const protocol = request.headers.get('x-forwarded-proto') || 'https';
-      
-      if (origin) {
-        baseUrl = origin;
-      } else if (host) {
-        baseUrl = `${protocol}://${host}`;
+      // Try Vercel URL first (automatically set by Vercel)
+      if (process.env.VERCEL_URL) {
+        baseUrl = `https://${process.env.VERCEL_URL}`;
       } else {
-        // Final fallback - use production domain
-        baseUrl = 'https://beanumber.org';
+        // Try to get from request
+        try {
+          const url = new URL(request.url);
+          const origin = request.headers.get('origin');
+          const host = request.headers.get('host') || url.host;
+          const protocol = request.headers.get('x-forwarded-proto') || url.protocol.replace(':', '') || 'https';
+          
+          if (origin) {
+            baseUrl = origin;
+          } else if (host) {
+            baseUrl = `${protocol}://${host}`;
+          } else {
+            baseUrl = 'https://beanumber.org';
+          }
+        } catch (e) {
+          baseUrl = 'https://beanumber.org';
+        }
       }
     }
     
-    // Remove trailing slash
+    // Remove trailing slash and ensure it's a valid URL
     baseUrl = baseUrl.replace(/\/$/, '');
     
-    console.log('Stripe success URL will be:', `${baseUrl}/donate/success`);
+    // Log for debugging (remove in production if needed)
+    console.log('[Stripe Checkout] Success URL:', `${baseUrl}/donate/success`);
+    console.log('[Stripe Checkout] Cancel URL:', `${baseUrl}/#donate`);
 
     // Validate amount
     if (!amount || amount < 1) {
