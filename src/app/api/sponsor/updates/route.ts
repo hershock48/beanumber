@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Get child info from Sponsorships table
-    const sponsorshipFormula = `{Sponsor Code} = "${sponsorCode}"`;
+    const sponsorshipFormula = `{SponsorCode} = "${sponsorCode}"`;
     const sponsorshipResponse = await fetch(
       `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_SPONSORSHIPS_TABLE}?filterByFormula=${encodeURIComponent(sponsorshipFormula)}`,
       {
@@ -58,65 +58,61 @@ export async function GET(request: NextRequest) {
     );
 
     let childInfo = null;
+    let childID = null;
     if (sponsorshipResponse.ok) {
       const sponsorshipData = await sponsorshipResponse.json();
       if (sponsorshipData.records && sponsorshipData.records.length > 0) {
         const fields = sponsorshipData.records[0].fields;
+        childID = fields['ChildID'] || null;
         childInfo = {
-          name: fields['Child Name'] || '',
-          photo: fields['Child Photo']?.[0]?.url || undefined,
-          age: fields['Child Age'] || undefined,
-          location: fields['Child Location'] || undefined,
-          sponsorshipStartDate: fields['Sponsorship Start Date'] || undefined,
+          name: fields['ChildDisplayName'] || '',
+          photo: fields['ChildPhoto']?.[0]?.url || undefined,
+          age: fields['ChildAge'] || undefined,
+          location: fields['ChildLocation'] || undefined,
+          sponsorshipStartDate: fields['SponsorshipStartDate'] || undefined,
         };
       }
     }
 
-    // Get published updates
-    const updatesFormula = `AND({Sponsor Code} = "${sponsorCode}", {Status} = "Published")`;
-    const updatesResponse = await fetch(
-      `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_UPDATES_TABLE}?filterByFormula=${encodeURIComponent(updatesFormula)}&sort[0][field]=Update Date&sort[0][direction]=desc`,
-      {
-        headers: {
-          Authorization: `Bearer ${AIRTABLE_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-      }
-    );
-
+    // Get published updates - link by ChildID
     let updates = [];
-    if (updatesResponse.ok) {
-      const updatesData = await updatesResponse.json();
-      updates = (updatesData.records || []).map((record: any) => {
-        const fields = record.fields;
-        return {
-          id: record.id,
-          date: fields['Update Date'] || '',
-          type: fields['Update Type'] || 'Progress Report',
-          title: fields['Title'] || '',
-          content: fields['Content'] || '',
-          photos: (fields['Photos'] || []).map((photo: any) => photo.url),
-        };
-      });
+    if (childID) {
+      const updatesFormula = `AND({ChildID} = "${childID}", {VisibleToSponsor} = TRUE(), {Status} = "Published")`;
+      const updatesResponse = await fetch(
+        `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_UPDATES_TABLE}?filterByFormula=${encodeURIComponent(updatesFormula)}&sort[0][field]=PublishedAt&sort[0][direction]=desc`,
+        {
+          headers: {
+            Authorization: `Bearer ${AIRTABLE_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (updatesResponse.ok) {
+        const updatesData = await updatesResponse.json();
+        updates = (updatesData.records || []).map((record: any) => {
+          const fields = record.fields;
+          return {
+            id: record.id,
+            date: fields['PublishedAt'] || fields['RequestedAt'] || '',
+            type: fields['UpdateType'] || 'Progress Report',
+            title: fields['Title'] || '',
+            content: fields['Content'] || '',
+            photos: (fields['Photos'] || []).map((photo: any) => photo.url),
+          };
+        });
+      }
     }
 
-    // Get last request date
-    const requestFormula = `AND({Sponsor Code} = "${sponsorCode}", {Requested By Sponsor} = TRUE())`;
-    const requestResponse = await fetch(
-      `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_UPDATES_TABLE}?filterByFormula=${encodeURIComponent(requestFormula)}&sort[0][field]=Submitted Date&sort[0][direction]=desc&maxRecords=1`,
-      {
-        headers: {
-          Authorization: `Bearer ${AIRTABLE_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-      }
-    );
-
+    // Get last request date from Sponsorships table
     let lastRequestDate = null;
-    if (requestResponse.ok) {
-      const requestData = await requestResponse.json();
-      if (requestData.records && requestData.records.length > 0) {
-        lastRequestDate = requestData.records[0].fields['Submitted Date'] || null;
+    let nextRequestEligibleAt = null;
+    if (sponsorshipResponse.ok) {
+      const sponsorshipData = await sponsorshipResponse.json();
+      if (sponsorshipData.records && sponsorshipData.records.length > 0) {
+        const fields = sponsorshipData.records[0].fields;
+        lastRequestDate = fields['LastRequestAt'] || null;
+        nextRequestEligibleAt = fields['NextRequestEligibleAt'] || null;
       }
     }
 
@@ -124,6 +120,7 @@ export async function GET(request: NextRequest) {
       updates,
       childInfo,
       lastRequestDate,
+      nextRequestEligibleAt,
     });
   } catch (error: any) {
     console.error('[Sponsor Updates] Error:', error);

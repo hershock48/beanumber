@@ -30,7 +30,7 @@ export function SponsorDashboard({ sponsorCode, email }: SponsorDashboardProps) 
   const [updates, setUpdates] = useState<Update[]>([]);
   const [childInfo, setChildInfo] = useState<ChildInfo | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [lastRequestDate, setLastRequestDate] = useState<string | null>(null);
+  const [nextRequestEligibleAt, setNextRequestEligibleAt] = useState<string | null>(null);
   const [canRequestUpdate, setCanRequestUpdate] = useState(false);
 
   useEffect(() => {
@@ -45,13 +45,12 @@ export function SponsorDashboard({ sponsorCode, email }: SponsorDashboardProps) 
       if (response.ok) {
         setUpdates(data.updates || []);
         setChildInfo(data.childInfo || null);
-        setLastRequestDate(data.lastRequestDate);
+        setNextRequestEligibleAt(data.nextRequestEligibleAt);
         
-        // Check if can request update (90 days since last request)
-        if (data.lastRequestDate) {
-          const lastRequest = new Date(data.lastRequestDate);
-          const daysSince = Math.floor((Date.now() - lastRequest.getTime()) / (1000 * 60 * 60 * 24));
-          setCanRequestUpdate(daysSince >= 90);
+        // Check if can request update using NextRequestEligibleAt
+        if (data.nextRequestEligibleAt) {
+          const eligibleDate = new Date(data.nextRequestEligibleAt);
+          setCanRequestUpdate(new Date() >= eligibleDate);
         } else {
           setCanRequestUpdate(true);
         }
@@ -75,10 +74,11 @@ export function SponsorDashboard({ sponsorCode, email }: SponsorDashboardProps) 
 
       if (response.ok) {
         alert('Update request submitted! Our field team will prepare an update for you.');
-        setLastRequestDate(new Date().toISOString());
-        setCanRequestUpdate(false);
+        // Reload data to get updated NextRequestEligibleAt
+        await loadSponsorData();
       } else {
-        alert('Failed to submit request. Please try again.');
+        const errorData = await response.json();
+        alert(errorData.error || 'Failed to submit request. Please try again.');
       }
     } catch (error) {
       alert('Failed to submit request. Please try again.');
@@ -96,8 +96,8 @@ export function SponsorDashboard({ sponsorCode, email }: SponsorDashboardProps) 
     );
   }
 
-  const daysUntilCanRequest = lastRequestDate
-    ? Math.max(0, 90 - Math.floor((Date.now() - new Date(lastRequestDate).getTime()) / (1000 * 60 * 60 * 24)))
+  const daysUntilCanRequest = nextRequestEligibleAt
+    ? Math.max(0, Math.ceil((new Date(nextRequestEligibleAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
     : 0;
 
   return (

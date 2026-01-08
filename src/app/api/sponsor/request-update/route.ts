@@ -3,6 +3,7 @@ import { cookies } from 'next/headers';
 
 const AIRTABLE_API_KEY = process.env.AIRTABLE_API_KEY;
 const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID;
+const AIRTABLE_SPONSORSHIPS_TABLE = process.env.AIRTABLE_SPONSORSHIPS_TABLE || 'Sponsorships';
 const AIRTABLE_UPDATES_TABLE = process.env.AIRTABLE_UPDATES_TABLE || 'Updates';
 
 async function verifySession(sponsorCode: string): Promise<boolean> {
@@ -25,11 +26,11 @@ async function checkLastRequest(sponsorCode: string): Promise<{ canRequest: bool
     return { canRequest: false, daysUntil: 0 };
   }
 
-  const formula = `AND({Sponsor Code} = "${sponsorCode}", {Requested By Sponsor} = TRUE())`;
+  const formula = `{SponsorCode} = "${sponsorCode}"`;
   
   try {
     const response = await fetch(
-      `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_UPDATES_TABLE}?filterByFormula=${encodeURIComponent(formula)}&sort[0][field]=Submitted Date&sort[0][direction]=desc&maxRecords=1`,
+      `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_SPONSORSHIPS_TABLE}?filterByFormula=${encodeURIComponent(formula)}&maxRecords=1`,
       {
         headers: {
           Authorization: `Bearer ${AIRTABLE_API_KEY}`,
@@ -41,11 +42,15 @@ async function checkLastRequest(sponsorCode: string): Promise<{ canRequest: bool
     if (response.ok) {
       const data = await response.json();
       if (data.records && data.records.length > 0) {
-        const lastRequestDate = data.records[0].fields['Submitted Date'];
-        if (lastRequestDate) {
-          const lastRequest = new Date(lastRequestDate);
-          const daysSince = Math.floor((Date.now() - lastRequest.getTime()) / (1000 * 60 * 60 * 24));
-          return { canRequest: daysSince >= 90, daysUntil: Math.max(0, 90 - daysSince) };
+        const fields = data.records[0].fields;
+        const nextRequestEligibleAt = fields['NextRequestEligibleAt'];
+        
+        if (nextRequestEligibleAt) {
+          const eligibleDate = new Date(nextRequestEligibleAt);
+          const now = new Date();
+          const canRequest = now >= eligibleDate;
+          const daysUntil = canRequest ? 0 : Math.ceil((eligibleDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+          return { canRequest, daysUntil };
         }
       }
     }
@@ -75,7 +80,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if can request (90 days since last request)
+    // Check if can request using NextRequestEligibleAt
     const { canRequest, daysUntil } = await checkLastRequest(sponsorCode);
 
     if (!canRequest) {
@@ -89,7 +94,35 @@ export async function POST(request: NextRequest) {
       throw new Error('Airtable credentials not configured');
     }
 
+    // Get ChildID from Sponsorships table
+    const sponsorshipFormula = `{SponsorCode} = "${sponsorCode}"`;
+    const sponsorshipResponse = await fetch(
+      `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_SPONSORSHIPS_TABLE}?filterByFormula=${encodeURIComponent(sponsorshipFormula)}&maxRecords=1`,
+      {
+        headers: {
+          Authorization: `Bearer ${AIRTABLE_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    let childID = null;
+    if (sponsorshipResponse.ok) {
+      const sponsorshipData = await sponsorshipResponse.json();
+      if (sponsorshipData.records && sponsorshipData.records.length > 0) {
+        childID = sponsorshipData.records[0].fields['ChildID'] || null;
+      }
+    }
+
+    if (!childID) {
+      return NextResponse.json(
+        { error: 'Child ID not found for this sponsorship' },
+        { status: 404 }
+      );
+    }
+
     // Create update request record
+    const now = new Date().toISOString();
     const response = await fetch(
       `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_UPDATES_TABLE}`,
       {
@@ -100,18 +133,46 @@ export async function POST(request: NextRequest) {
         },
         body: JSON.stringify({
           fields: {
-            'Sponsor Code': sponsorCode,
-            'Update Type': 'Requested Update',
+            'ChildID': childID,
+            'SponsorCode': sponsorCode,
+            'UpdateType': 'Requested Update',
             'Title': `Update Request from ${email}`,
             'Content': `Sponsor ${email} has requested an update about their sponsored child.`,
-            'Status': 'Draft',
-            'Requested By Sponsor': true,
-            'Submitted Date': new Date().toISOString(),
-            'Update Date': new Date().toISOString(),
+            'Status': 'Pending Review',
+            'VisibleToSponsor': false,
+            'RequestedBySponsor': true,
+            'RequestedAt': now,
           },
         }),
       }
     );
+
+    // Update Sponsorships table with LastRequestAt and NextRequestEligibleAt
+    if (response.ok && sponsorshipResponse.ok) {
+      const sponsorshipData = await sponsorshipResponse.json();
+      if (sponsorshipData.records && sponsorshipData.records.length > 0) {
+        const sponsorshipId = sponsorshipData.records[0].id;
+        const nextEligible = new Date();
+        nextEligible.setDate(nextEligible.getDate() + 90); // 90 days from now
+
+        await fetch(
+          `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_SPONSORSHIPS_TABLE}/${sponsorshipId}`,
+          {
+            method: 'PATCH',
+            headers: {
+              Authorization: `Bearer ${AIRTABLE_API_KEY}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              fields: {
+                'LastRequestAt': now,
+                'NextRequestEligibleAt': nextEligible.toISOString(),
+              },
+            }),
+          }
+        );
+      }
+    }
 
     if (!response.ok) {
       const error = await response.text();

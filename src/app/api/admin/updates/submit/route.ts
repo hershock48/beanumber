@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 const AIRTABLE_API_KEY = process.env.AIRTABLE_API_KEY;
 const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID;
+const AIRTABLE_SPONSORSHIPS_TABLE = process.env.AIRTABLE_SPONSORSHIPS_TABLE || 'Sponsorships';
 const AIRTABLE_UPDATES_TABLE = process.env.AIRTABLE_UPDATES_TABLE || 'Updates';
 
 export async function POST(request: NextRequest) {
@@ -33,16 +34,45 @@ export async function POST(request: NextRequest) {
     // For now, we'll store photo metadata and you can upload manually or use a file storage service
     // In production, you'd want to upload to S3/Cloudinary/etc. and store URLs
 
+    // Get ChildID from Sponsorships table
+    const sponsorshipFormula = `{SponsorCode} = "${sponsorCode}"`;
+    const sponsorshipResponse = await fetch(
+      `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_SPONSORSHIPS_TABLE}?filterByFormula=${encodeURIComponent(sponsorshipFormula)}&maxRecords=1`,
+      {
+        headers: {
+          Authorization: `Bearer ${AIRTABLE_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    let childID = null;
+    if (sponsorshipResponse.ok) {
+      const sponsorshipData = await sponsorshipResponse.json();
+      if (sponsorshipData.records && sponsorshipData.records.length > 0) {
+        childID = sponsorshipData.records[0].fields['ChildID'] || null;
+      }
+    }
+
+    if (!childID) {
+      return NextResponse.json(
+        { error: 'Child ID not found for this sponsor code' },
+        { status: 404 }
+      );
+    }
+
     // Create update record in Airtable
+    const now = new Date().toISOString();
     const fields: any = {
-      'Sponsor Code': sponsorCode,
-      'Update Type': updateType,
+      'ChildID': childID,
+      'SponsorCode': sponsorCode,
+      'UpdateType': updateType,
       'Title': title,
       'Content': content,
       'Status': 'Pending Review',
-      'Submitted By': submittedBy,
-      'Submitted Date': new Date().toISOString(),
-      'Update Date': new Date().toISOString(),
+      'VisibleToSponsor': false,
+      'RequestedBySponsor': false,
+      'RequestedAt': now,
     };
 
     // If you have photo URLs, add them here

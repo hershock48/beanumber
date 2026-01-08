@@ -9,6 +9,7 @@ interface SponsorData {
   sponsorCode: string;
   email: string;
   name: string;
+  childID: string;
   childName: string;
   childPhoto?: string;
   sponsorshipStartDate: string;
@@ -20,7 +21,7 @@ async function verifySponsor(email: string, sponsorCode: string): Promise<Sponso
   }
 
   // Search for sponsor by email and sponsor code
-  const formula = `AND({Email Address} = "${email}", {Sponsor Code} = "${sponsorCode}")`;
+  const formula = `AND({SponsorEmail} = "${email}", {SponsorCode} = "${sponsorCode}")`;
   
   const response = await fetch(
     `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_SPONSORSHIPS_TABLE}?filterByFormula=${encodeURIComponent(formula)}`,
@@ -44,18 +45,24 @@ async function verifySponsor(email: string, sponsorCode: string): Promise<Sponso
     const fields = record.fields;
 
     // Check if sponsorship is active
-    const status = fields['Status'] || 'Active';
-    if (status !== 'Active') {
+    const authStatus = fields['AuthStatus'] || 'Active';
+    if (authStatus !== 'Active') {
+      return null;
+    }
+
+    // Check if visible to sponsor
+    if (fields['VisibleToSponsor'] === false) {
       return null;
     }
 
     return {
-      sponsorCode: fields['Sponsor Code'] || sponsorCode,
-      email: fields['Email Address'] || email,
-      name: fields['Sponsor Name'] || fields['Name'] || '',
-      childName: fields['Child Name'] || '',
-      childPhoto: fields['Child Photo']?.[0]?.url || undefined,
-      sponsorshipStartDate: fields['Sponsorship Start Date'] || '',
+      sponsorCode: fields['SponsorCode'] || sponsorCode,
+      email: fields['SponsorEmail'] || email,
+      name: fields['SponsorName'] || '',
+      childID: fields['ChildID'] || '',
+      childName: fields['ChildDisplayName'] || '',
+      childPhoto: fields['ChildPhoto']?.[0]?.url || undefined,
+      sponsorshipStartDate: fields['SponsorshipStartDate'] || '',
     };
   }
 
