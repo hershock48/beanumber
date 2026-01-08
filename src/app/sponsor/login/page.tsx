@@ -24,27 +24,34 @@ export default function SponsorLogin() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ email, sponsorCode }),
+        credentials: 'include', // Ensure cookies are sent/received
       });
 
-      const data = await response.json();
+      // Always try to parse JSON, even on error
+      const data = await response.json().catch(() => ({}));
 
-      console.log('Verify response:', { status: response.status, data });
+      console.log('Verify response:', { 
+        status: response.status, 
+        statusText: response.statusText,
+        data,
+        headers: Object.fromEntries(response.headers.entries())
+      });
 
       if (!response.ok) {
-        throw new Error(data.error || 'Invalid email or sponsor code');
+        setError(data?.error || `Login failed (${response.status})`);
+        setIsLoading(false);
+        return;
       }
 
-      if (!data.sponsorCode) {
-        throw new Error('No sponsor code returned from server');
+      if (!data?.sponsorCode) {
+        setError('Login succeeded but no sponsor code returned from server.');
+        setIsLoading(false);
+        return;
       }
 
-      // Redirect to sponsor dashboard
+      // Use window.location for reliable redirect
       console.log('Redirecting to:', `/sponsor/${data.sponsorCode}`);
-      router.push(`/sponsor/${data.sponsorCode}`);
-      // Also try window.location as fallback
-      setTimeout(() => {
-        window.location.href = `/sponsor/${data.sponsorCode}`;
-      }, 500);
+      window.location.href = `/sponsor/${encodeURIComponent(data.sponsorCode)}`;
     } catch (err: any) {
       console.error('Login error:', err);
       setError(err.message || 'Failed to verify. Please check your email and sponsor code.');
