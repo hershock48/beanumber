@@ -18,62 +18,54 @@ export async function POST(request: NextRequest) {
     const stripe = await getStripe();
     const { amount, email, name, isMonthly } = await request.json();
 
-    // Get base URL - prioritize environment variable, then detect from request
-    // Mobile-friendly: check multiple headers that work on mobile
+    // Get base URL from the actual request - most reliable method
+    // This ensures we use the exact domain the user is currently on
     let baseUrl = process.env.NEXT_PUBLIC_BASE_URL;
     
     if (!baseUrl) {
-      // Try Vercel URL first (automatically set by Vercel)
-      if (process.env.VERCEL_URL) {
-        baseUrl = `https://${process.env.VERCEL_URL}`;
-      } else {
-        // Try to get from request headers (mobile-friendly approach)
+      // Parse the request URL directly - this is the most reliable
+      try {
+        const requestUrl = new URL(request.url);
+        // Use the host from the request URL
+        const host = request.headers.get('host') || requestUrl.host;
+        const protocol = request.headers.get('x-forwarded-proto') || requestUrl.protocol.replace(':', '') || 'https';
+        baseUrl = `${protocol}://${host}`;
+      } catch (e) {
+        // Fallback: try headers
         const origin = request.headers.get('origin');
         const referer = request.headers.get('referer');
         const host = request.headers.get('host') || request.headers.get('x-forwarded-host');
         const protocol = request.headers.get('x-forwarded-proto') || 'https';
         
-        // Try origin first (most reliable on mobile)
         if (origin) {
           baseUrl = origin;
-        } 
-        // Try referer (often available on mobile)
-        else if (referer) {
+        } else if (referer) {
           try {
             const refererUrl = new URL(referer);
             baseUrl = `${refererUrl.protocol}//${refererUrl.host}`;
-          } catch (e) {
-            // Fall through
+          } catch (e2) {
+            baseUrl = host ? `${protocol}://${host}` : 'https://beanumber.org';
           }
-        }
-        // Try host header
-        else if (host) {
+        } else if (host) {
           baseUrl = `${protocol}://${host}`;
-        }
-        // Try parsing request URL as last resort
-        else {
-          try {
-            const url = new URL(request.url);
-            baseUrl = `${url.protocol}//${url.host}`;
-          } catch (e) {
-            baseUrl = 'https://beanumber.org';
-          }
+        } else {
+          baseUrl = 'https://beanumber.org';
         }
       }
     }
     
-    // Remove trailing slash and ensure it's a valid URL
+    // Remove trailing slash
     baseUrl = baseUrl.replace(/\/$/, '');
     
-    // Ensure protocol is https (important for Stripe)
+    // Ensure protocol is https (required for Stripe)
     if (!baseUrl.startsWith('http')) {
       baseUrl = `https://${baseUrl}`;
     }
     
     // Log for debugging
+    console.log('[Stripe Checkout] Request URL:', request.url);
     console.log('[Stripe Checkout] Detected base URL:', baseUrl);
     console.log('[Stripe Checkout] Success URL:', `${baseUrl}/donate/success`);
-    console.log('[Stripe Checkout] Cancel URL:', `${baseUrl}/#donate`);
 
     // Validate amount
     if (!amount || amount < 1) {
