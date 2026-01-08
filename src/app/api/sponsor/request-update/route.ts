@@ -148,7 +148,7 @@ export async function POST(request: NextRequest) {
     );
 
     // Update Sponsorships table with LastRequestAt and NextRequestEligibleAt
-    if (response.ok && sponsorshipResponse.ok) {
+    if (response.ok) {
       const sponsorshipData = await sponsorshipResponse.json();
       if (sponsorshipData.records && sponsorshipData.records.length > 0) {
         const sponsorshipId = sponsorshipData.records[0].id;
