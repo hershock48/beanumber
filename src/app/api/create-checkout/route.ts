@@ -18,12 +18,10 @@ export async function POST(request: NextRequest) {
     const stripe = await getStripe();
     const { amount, email, name, isMonthly } = await request.json();
 
-    // Get base URL from request headers (more reliable than env var)
-    const origin = request.headers.get('origin');
-    const host = request.headers.get('host');
-    const protocol = request.headers.get('x-forwarded-proto') || (origin ? new URL(origin).protocol.replace(':', '') : 'https');
+    // Get base URL from request (most reliable method)
+    const url = new URL(request.url);
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 
-      (origin || (host ? `${protocol}://${host}` : 'https://beanumber.org'));
+      `${url.protocol}//${url.host}`;
 
     // Validate amount
     if (!amount || amount < 1) {
