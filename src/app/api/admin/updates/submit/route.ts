@@ -73,6 +73,7 @@ export async function POST(request: NextRequest) {
       'VisibleToSponsor': false,
       'RequestedBySponsor': false,
       'RequestedAt': now,
+      'SubmittedBy': submittedBy,
     };
 
     // If you have photo URLs, add them here
