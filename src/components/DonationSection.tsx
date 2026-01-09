@@ -56,7 +56,7 @@ export function DonationSection({}: DonationSectionProps) {
         },
         body: JSON.stringify({
           amount: donationAmount,
-          isMonthly: isMonthly,
+          recurring: isMonthly,
         }),
       });
 
