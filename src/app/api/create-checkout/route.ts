@@ -126,9 +126,11 @@ async function handler(request: NextRequest): Promise<NextResponse> {
       sessionId: session.id,
       url: session.url,
     });
-  } catch (error) {
+  } catch (error: any) {
     logger.error('Stripe checkout creation failed', error);
-    throw new PaymentError('Failed to create checkout session');
+    // Include the actual Stripe error message for debugging
+    const errorMessage = error?.message || 'Failed to create checkout session';
+    throw new PaymentError(`Stripe error: ${errorMessage}`);
   }
 }
 
