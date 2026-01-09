@@ -455,12 +455,6 @@ export function HomePageContent() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-16">
             <div className="p-8 border border-gray-200 rounded-lg bg-white">
               <div className="h-16 mb-4 flex items-center">
-                <div className="text-2xl font-bold text-gray-700">University of Worcester (UK)</div>
-              </div>
-              <p className="text-gray-700">Academic partner; four student cohorts scheduled for 2026</p>
-            </div>
-            <div className="p-8 border border-gray-200 rounded-lg bg-white">
-              <div className="h-16 mb-4 flex items-center">
                 <div className="text-xl font-semibold text-gray-700">Youth Development Organization (YDO), Uganda</div>
               </div>
               <p className="text-gray-700 mb-2">Core local implementing partner in Northern Uganda</p>
@@ -469,6 +463,12 @@ export function HomePageContent() {
                   Visit YDO's website →
                 </a>
               </p>
+            </div>
+            <div className="p-8 border border-gray-200 rounded-lg bg-white">
+              <div className="h-16 mb-4 flex items-center">
+                <div className="text-2xl font-bold text-gray-700">University of Worcester (UK)</div>
+              </div>
+              <p className="text-gray-700">Academic partner; four student cohorts scheduled for 2026</p>
             </div>
             <div className="p-8 border border-gray-200 rounded-lg bg-white">
               <div className="h-16 mb-4 flex items-center">
