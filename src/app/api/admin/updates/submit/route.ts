@@ -9,6 +9,30 @@ export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
     
+    // Authentication check
+    const adminPassword = formData.get('adminPassword') as string;
+    const adminToken = request.headers.get('Authorization')?.replace('Bearer ', '') || 
+                      request.headers.get('X-Admin-Token') || 
+                      adminPassword ||
+                      null;
+    const expectedToken = process.env.ADMIN_API_TOKEN;
+    
+    if (!expectedToken) {
+      console.error('[Admin Submit] ADMIN_API_TOKEN not configured');
+      return NextResponse.json(
+        { error: 'Server configuration error' },
+        { status: 500 }
+      );
+    }
+    
+    if (!adminToken || adminToken !== expectedToken) {
+      console.warn('[Admin Submit] Unauthorized access attempt');
+      return NextResponse.json(
+        { error: 'Unauthorized - Invalid admin password' },
+        { status: 401 }
+      );
+    }
+    
     const sponsorCode = formData.get('sponsorCode') as string;
     const updateType = formData.get('updateType') as string;
     const title = formData.get('title') as string;

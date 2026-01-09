@@ -12,6 +12,7 @@ export default function SubmitUpdatePage() {
     content: '',
     photos: [] as File[],
     submittedBy: '',
+    adminPassword: '',
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -44,6 +45,9 @@ export default function SubmitUpdatePage() {
         formDataToSend.append('photos', photo);
       });
 
+      // Add admin password to form data for authentication
+      formDataToSend.append('adminPassword', formData.adminPassword);
+
       const response = await fetch('/api/admin/updates/submit', {
         method: 'POST',
         body: formDataToSend,
@@ -63,6 +67,7 @@ export default function SubmitUpdatePage() {
         content: '',
         photos: [],
         submittedBy: '',
+        adminPassword: '',
       });
       
       // Reset file input
@@ -203,6 +208,24 @@ export default function SubmitUpdatePage() {
                 className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-gray-900 focus:border-transparent"
                 placeholder="Field team member name"
               />
+            </div>
+
+            <div>
+              <label htmlFor="adminPassword" className="block text-sm font-medium text-gray-700 mb-2">
+                Admin Password <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="password"
+                id="adminPassword"
+                value={formData.adminPassword}
+                onChange={(e) => setFormData({ ...formData, adminPassword: e.target.value })}
+                required
+                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                placeholder="Enter admin password"
+              />
+              <p className="mt-1 text-sm text-gray-500">
+                Required for authentication
+              </p>
             </div>
 
             <button

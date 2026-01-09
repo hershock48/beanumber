@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL('https://beanumber.org'),
+  metadataBase: new URL('https://www.beanumber.org'),
   title: {
     default: "Be A Number, International | Rebuilding Post-War Societies",
     template: "%s | Be A Number, International"
@@ -26,7 +26,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     locale: "en_US",
-    url: "https://beanumber.org",
+    url: "https://www.beanumber.org",
     siteName: "Be A Number, International",
     title: "Be A Number, International | Rebuilding Post-War Societies",
     description: "Be A Number partners with local leadership in Northern Uganda to build sustainable community systems — healthcare, education, workforce development, and economic infrastructure that transform communities from survival to long-term stability.",

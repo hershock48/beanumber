@@ -6,15 +6,36 @@ async function getStripe() {
   const StripeModule = (await import('stripe')).default;
   const secretKey = process.env.STRIPE_SECRET_KEY;
   if (!secretKey) {
-    throw new Error('STRIPE_SECRET_KEY is not set');
+    console.error('[Create Checkout] STRIPE_SECRET_KEY is not set');
+    throw new Error('Payment system configuration error. Please contact support.');
   }
   return new StripeModule(secretKey, {
     apiVersion: '2025-12-15.clover',
   });
 }
 
+// Validate required environment variables
+function validateEnvVars() {
+  const required = {
+    STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
+    NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY,
+  };
+  
+  const missing = Object.entries(required)
+    .filter(([_, value]) => !value)
+    .map(([key]) => key);
+  
+  if (missing.length > 0) {
+    console.error('[Create Checkout] Missing required environment variables:', missing);
+    throw new Error('Payment system configuration error. Please contact support.');
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
+    // Validate environment variables
+    validateEnvVars();
+    
     const stripe = await getStripe();
     const { amount, email, name, isMonthly } = await request.json();
 
@@ -22,9 +43,16 @@ export async function POST(request: NextRequest) {
     const origin = request.headers.get('origin') || 'https://www.beanumber.org';
 
     // Validate amount
+    const MAX_DONATION_AMOUNT = 10000; // $10,000 maximum per transaction
     if (!amount || amount < 1) {
       return NextResponse.json(
-        { error: 'Invalid donation amount' },
+        { error: 'Invalid donation amount. Minimum donation is $1.' },
+        { status: 400 }
+      );
+    }
+    if (amount > MAX_DONATION_AMOUNT) {
+      return NextResponse.json(
+        { error: `Donation amount exceeds maximum of $${MAX_DONATION_AMOUNT.toLocaleString()}. Please contact us for larger donations.` },
         { status: 400 }
       );
     }

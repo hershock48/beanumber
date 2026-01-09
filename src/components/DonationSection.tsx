@@ -38,9 +38,15 @@ export function DonationSection({}: DonationSectionProps) {
 
   const handleDonate = async (amount?: number) => {
     const donationAmount = amount || (customAmount ? parseFloat(customAmount) : null);
+    const MAX_DONATION_AMOUNT = 10000; // $10,000 maximum per transaction
     
     if (!donationAmount || donationAmount < 1) {
       alert('Please enter a valid donation amount (minimum $1)');
+      return;
+    }
+    
+    if (donationAmount > MAX_DONATION_AMOUNT) {
+      alert(`Donation amount exceeds maximum of $${MAX_DONATION_AMOUNT.toLocaleString()}. Please contact us for larger donations.`);
       return;
     }
 
@@ -156,6 +162,7 @@ export function DonationSection({}: DonationSectionProps) {
               <input
                 type="number"
                 min="1"
+                max="10000"
                 step="0.01"
                 placeholder="Enter amount"
                 value={customAmount}

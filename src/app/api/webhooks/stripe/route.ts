@@ -6,11 +6,31 @@ async function getStripe() {
   const StripeModule = (await import('stripe')).default;
   const secretKey = process.env.STRIPE_SECRET_KEY;
   if (!secretKey) {
-    throw new Error('STRIPE_SECRET_KEY is not set');
+    console.error('[Webhook] STRIPE_SECRET_KEY is not set');
+    throw new Error('Payment system configuration error');
   }
   return new StripeModule(secretKey, {
     apiVersion: '2025-12-15.clover',
   });
+}
+
+// Validate required environment variables for webhook
+function validateWebhookEnvVars() {
+  const required = {
+    STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
+    STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET,
+    AIRTABLE_API_KEY: process.env.AIRTABLE_API_KEY,
+    AIRTABLE_BASE_ID: process.env.AIRTABLE_BASE_ID,
+  };
+  
+  const missing = Object.entries(required)
+    .filter(([_, value]) => !value)
+    .map(([key]) => key);
+  
+  if (missing.length > 0) {
+    console.error('[Webhook] Missing required environment variables:', missing);
+    // Don't throw - log and continue (webhook should still respond to Stripe)
+  }
 }
 
 // Rate limiter for Airtable API (5 requests per second)
@@ -604,6 +624,9 @@ async function verifyWebhookSignature(
 
 export async function POST(request: NextRequest) {
   try {
+    // Validate environment variables (non-blocking for webhook)
+    validateWebhookEnvVars();
+    
     const stripe = await getStripe();
     const event = await verifyWebhookSignature(request, stripe);
 

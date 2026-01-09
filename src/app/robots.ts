@@ -7,6 +7,6 @@ export default function robots(): MetadataRoute.Robots {
       allow: '/',
       disallow: ['/api/', '/donate/success'],
     },
-    sitemap: 'https://beanumber.org/sitemap.xml',
+    sitemap: 'https://www.beanumber.org/sitemap.xml',
   };
 }
