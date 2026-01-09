@@ -79,7 +79,21 @@ export default function YDOContact() {
                 </div>
                 
                 <div className="p-6 border border-green-200 rounded-lg bg-green-50">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">Partner Organization</h3>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">Visit Our Website</h3>
+                  <p className="text-gray-700 mb-3">
+                    Learn more about YDO:
+                  </p>
+                  <p className="text-gray-700 mb-4">
+                    <a 
+                      href="https://www.theyouth.world" 
+                      target="_blank" 
+                      rel="noopener noreferrer" 
+                      className="text-green-700 hover:text-green-800 underline font-medium"
+                    >
+                      www.theyouth.world
+                    </a>
+                  </p>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2 mt-6">Partner Organization</h3>
                   <p className="text-gray-700 mb-3">
                     For inquiries, please contact our partner:
                   </p>
@@ -207,6 +221,9 @@ export default function YDOContact() {
             </div>
             <div>
               <h3 className="font-semibold text-white mb-4">Contact</h3>
+              <p className="text-gray-400 text-sm mb-2">
+                Visit our website: <a href="https://www.theyouth.world" target="_blank" rel="noopener noreferrer" className="text-green-400 hover:text-green-300 underline">theyouth.world</a>
+              </p>
               <p className="text-gray-400 text-sm">
                 Visit our partner: <a href="https://beanumber.org" target="_blank" rel="noopener noreferrer" className="text-green-400 hover:text-green-300 underline">beanumber.org</a>
               </p>

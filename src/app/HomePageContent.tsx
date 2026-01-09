@@ -463,7 +463,12 @@ export function HomePageContent() {
               <div className="h-16 mb-4 flex items-center">
                 <div className="text-xl font-semibold text-gray-700">Youth Development Organization (YDO), Uganda</div>
               </div>
-              <p className="text-gray-700">Core local implementing partner in Northern Uganda</p>
+              <p className="text-gray-700 mb-2">Core local implementing partner in Northern Uganda</p>
+              <p className="text-gray-700 text-sm">
+                <a href="https://www.theyouth.world" target="_blank" rel="noopener noreferrer" className="text-gray-900 hover:text-gray-700 underline">
+                  Visit YDO's website →
+                </a>
+              </p>
             </div>
             <div className="p-8 border border-gray-200 rounded-lg bg-white">
               <div className="h-16 mb-4 flex items-center">

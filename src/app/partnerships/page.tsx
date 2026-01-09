@@ -69,7 +69,12 @@ export default function Partnerships() {
               <p className="text-gray-700 leading-relaxed mb-4">
                 Youth Development Organization (YDO) serves as our local implementing partner, working directly with community leadership to deliver programs.
               </p>
-              <p className="text-gray-600 text-sm">Northern Uganda</p>
+              <p className="text-gray-600 text-sm mb-3">Northern Uganda</p>
+              <p className="text-gray-700 text-sm">
+                <a href="https://www.theyouth.world" target="_blank" rel="noopener noreferrer" className="text-gray-900 hover:text-gray-700 underline">
+                  Visit YDO's website →
+                </a>
+              </p>
             </div>
           </div>
 
