@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
       ],
       mode: mode as 'payment' | 'subscription',
       success_url: `${origin}/donate/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${origin}/donate?canceled=1`,
+      cancel_url: `${origin}/#donate`,
       customer_email: email || undefined,
       metadata: {
         donor_name: name || 'Anonymous',
