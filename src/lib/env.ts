@@ -9,14 +9,21 @@ interface EnvironmentVariables {
   AIRTABLE_BASE_ID: string;
   AIRTABLE_SPONSORSHIPS_TABLE: string;
   AIRTABLE_UPDATES_TABLE: string;
+  AIRTABLE_CHILDREN_TABLE?: string;
+  AIRTABLE_CHILD_UPDATES_TABLE?: string;
 
   // Stripe (optional until configured)
   STRIPE_SECRET_KEY?: string;
   STRIPE_WEBHOOK_SECRET?: string;
   NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY?: string;
 
-  // SendGrid
+  // Email Service (SendGrid or Gmail)
   SENDGRID_API_KEY?: string;
+  GMAIL_CLIENT_ID?: string;
+  GMAIL_CLIENT_SECRET?: string;
+  GMAIL_REFRESH_TOKEN?: string;
+  GMAIL_USER_EMAIL?: string;
+  GMAIL_FROM_EMAIL?: string;
 
   // Admin
   ADMIN_API_TOKEN?: string;
@@ -42,6 +49,12 @@ function validateEnvironment(): EnvironmentVariables {
     'AIRTABLE_BASE_ID',
     'AIRTABLE_SPONSORSHIPS_TABLE',
     'AIRTABLE_UPDATES_TABLE',
+  ] as const;
+  
+  // Optional new tables (for Child Update System)
+  const optionalAirtableVars = [
+    'AIRTABLE_CHILDREN_TABLE',
+    'AIRTABLE_CHILD_UPDATES_TABLE',
   ] as const;
 
   const missing: string[] = [];
@@ -80,6 +93,8 @@ function validateEnvironment(): EnvironmentVariables {
     AIRTABLE_BASE_ID: process.env.AIRTABLE_BASE_ID!,
     AIRTABLE_SPONSORSHIPS_TABLE: process.env.AIRTABLE_SPONSORSHIPS_TABLE!,
     AIRTABLE_UPDATES_TABLE: process.env.AIRTABLE_UPDATES_TABLE!,
+    AIRTABLE_CHILDREN_TABLE: process.env.AIRTABLE_CHILDREN_TABLE,
+    AIRTABLE_CHILD_UPDATES_TABLE: process.env.AIRTABLE_CHILD_UPDATES_TABLE,
     STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
     STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET,
     NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY,
@@ -145,6 +160,8 @@ export function getAirtableConfig() {
     tables: {
       sponsorships: envVars.AIRTABLE_SPONSORSHIPS_TABLE,
       updates: envVars.AIRTABLE_UPDATES_TABLE,
+      children: envVars.AIRTABLE_CHILDREN_TABLE,
+      childUpdates: envVars.AIRTABLE_CHILD_UPDATES_TABLE,
     },
   };
 }
@@ -192,15 +209,26 @@ export function getSendGridConfig() {
 
 /**
  * Get email service configuration
+ * Supports both SendGrid and Gmail
  */
 export function getEmailConfig() {
   const envVars = getEnv();
+  const useGmail = !!(envVars.GMAIL_CLIENT_ID && envVars.GMAIL_CLIENT_SECRET && envVars.GMAIL_REFRESH_TOKEN);
+  const useSendGrid = !!envVars.SENDGRID_API_KEY;
 
   return {
-    enabled: !!envVars.SENDGRID_API_KEY,
-    apiKey: envVars.SENDGRID_API_KEY || '',
-    fromEmail: process.env.SENDGRID_FROM_EMAIL || 'info@beanumber.org',
-    fromName: process.env.SENDGRID_FROM_NAME || 'Be A Number, International',
+    enabled: useGmail || useSendGrid,
+    provider: useGmail ? 'gmail' : 'sendgrid',
+    // SendGrid config
+    sendgridApiKey: envVars.SENDGRID_API_KEY || '',
+    // Gmail config
+    gmailClientId: envVars.GMAIL_CLIENT_ID,
+    gmailClientSecret: envVars.GMAIL_CLIENT_SECRET,
+    gmailRefreshToken: envVars.GMAIL_REFRESH_TOKEN,
+    gmailUserEmail: envVars.GMAIL_USER_EMAIL || envVars.GMAIL_FROM_EMAIL,
+    // Common config
+    fromEmail: process.env.GMAIL_FROM_EMAIL || process.env.SENDGRID_FROM_EMAIL || 'info@beanumber.org',
+    fromName: process.env.GMAIL_FROM_NAME || process.env.SENDGRID_FROM_NAME || 'Be A Number, International',
   };
 }
 
@@ -222,6 +250,18 @@ export function getAdminToken(): string {
  */
 export function isSendGridConfigured(): boolean {
   return hasEnv('SENDGRID_API_KEY');
+}
+
+/**
+ * Check if Gmail is configured
+ */
+export function isGmailConfigured(): boolean {
+  const envVars = getEnv();
+  return !!(
+    envVars.GMAIL_CLIENT_ID &&
+    envVars.GMAIL_CLIENT_SECRET &&
+    envVars.GMAIL_REFRESH_TOKEN
+  );
 }
 
 /**

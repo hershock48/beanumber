@@ -28,7 +28,7 @@ export interface AirtableSponsorshipRecord {
     ChildLocation?: string;
     SponsorshipStartDate?: string;
     AuthStatus: 'Active' | 'Inactive' | 'Suspended';
-    Status?: 'Active' | 'Paused' | 'Ended';
+    Status?: 'Active' | 'Paused' | 'Ended' | 'Awaiting Sponsor';
     VisibleToSponsor: boolean;
     LastRequestAt?: string;
     NextRequestEligibleAt?: string;
@@ -192,3 +192,85 @@ export interface RequestUpdateEligibility {
   nextEligibleAt?: string;
   daysUntilEligible?: number;
 }
+
+// ============================================================================
+// CHILDREN TABLE (NEW)
+// ============================================================================
+
+export interface AirtableChildRecord {
+  id: string;
+  fields: {
+    'Child ID': string;
+    FirstName: string;
+    LastInitial?: string;
+    Status: 'active' | 'inactive' | 'paused' | 'archived';
+    SchoolLocation?: string;
+    GradeClass?: string;
+    ExpectedFieldPeriod?: string;
+    ExpectedAcademicTerm?: string;
+    LastFieldUpdateDate?: string;
+    LastAcademicUpdateDate?: string;
+    Sponsors?: string[]; // Linked record IDs
+    Notes?: string;
+  };
+  createdTime: string;
+}
+
+export type ChildFields = AirtableChildRecord['fields'];
+
+// ============================================================================
+// CHILD UPDATES TABLE (NEW)
+// ============================================================================
+
+export interface AirtableChildUpdateRecord {
+  id: string;
+  fields: {
+    'Update ID'?: string; // Formula field
+    Child?: string[]; // Linked record IDs
+    ChildID?: string; // Lookup field
+    SourceType: 'field' | 'academic';
+    Period?: string; // For field updates (e.g., '2026-01')
+    AcademicTerm?: string; // For academic updates (e.g., 'Term 1 2026')
+    SubmittedAt: string;
+    SubmittedBy: string; // Email
+    Status: 'Draft' | 'Pending Review' | 'Published' | 'Rejected' | 'Needs Correction';
+    
+    // Field Update Payload
+    PhysicalWellbeing?: 'Excellent' | 'Good' | 'Okay' | 'Needs attention';
+    PhysicalNotes?: string;
+    EmotionalWellbeing?: 'Excellent' | 'Good' | 'Okay' | 'Needs attention';
+    EmotionalNotes?: string;
+    SchoolEngagement?: 'Very engaged' | 'Engaged' | 'Inconsistent' | 'Not engaged';
+    EngagementNotes?: string;
+    SponsorNarrative?: string;
+    PositiveHighlight?: string;
+    Challenge?: string;
+    
+    // Academic Update Payload
+    AttendancePercent?: number;
+    EnglishGrade?: number;
+    MathGrade?: number;
+    ScienceGrade?: number;
+    SocialStudiesGrade?: number;
+    TeacherComment?: string;
+    
+    // Drive File References
+    DriveFolderID?: string;
+    Photo1FileID?: string;
+    Photo2FileID?: string;
+    Photo3FileID?: string;
+    HandwrittenNoteFileID?: string;
+    ReportCardFileID?: string;
+    
+    // Governance
+    ReviewedBy?: string; // Email
+    ReviewedAt?: string;
+    RejectionReason?: string;
+    CorrectionNotes?: string;
+    SupersedesUpdate?: string[]; // Linked record IDs
+    SupersededBy?: string[]; // Linked record IDs
+  };
+  createdTime: string;
+}
+
+export type ChildUpdateFields = AirtableChildUpdateRecord['fields'];

@@ -8,11 +8,14 @@
     "start": "next start",
     "lint": "eslint",
     "export-donors": "tsx scripts/export-donors.ts",
-    "create-test-sponsorship": "tsx scripts/create-test-sponsorship.ts"
+    "create-test-sponsorship": "tsx scripts/create-test-sponsorship.ts",
+    "migrate-children": "tsx scripts/migrate-children-to-airtable.ts",
+    "check-airtable": "tsx scripts/check-airtable-setup.ts"
   },
   "dependencies": {
     "@sendgrid/mail": "^8.1.3",
     "@stripe/stripe-js": "^8.6.1",
+    "googleapis": "^170.1.0",
     "next": "16.1.1",
     "react": "19.2.3",
     "react-dom": "19.2.3",
@@ -24,6 +27,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "dotenv": "^17.2.3",
     "eslint": "^9",
     "eslint-config-next": "16.1.1",
     "sharp": "^0.34.5",

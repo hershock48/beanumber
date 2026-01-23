@@ -42,11 +42,29 @@ NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_live_...
 STRIPE_WEBHOOK_SECRET=whsec_...
 ```
 
-### SendGrid Configuration (REQUIRED for thank-you emails)
+### Email Configuration (REQUIRED for thank-you emails)
+
+Choose ONE provider: Gmail (recommended) or SendGrid. Gmail takes priority if both are configured.
+
+#### Option 1: Gmail (Recommended)
+
+Uses Gmail API via Google Workspace. See `docs/setup/GMAIL_SETUP.md` for full setup instructions.
+
+```
+GMAIL_CLIENT_ID=your_gmail_client_id
+GMAIL_CLIENT_SECRET=your_gmail_client_secret
+GMAIL_REFRESH_TOKEN=your_gmail_refresh_token
+GMAIL_USER_EMAIL=Kevin@beanumber.org
+GMAIL_FROM_EMAIL=Kevin@beanumber.org
+GMAIL_FROM_NAME=Be A Number, International
+```
+
+#### Option 2: SendGrid (Alternative)
 
 ```
 SENDGRID_API_KEY=SG.your_api_key_here
 SENDGRID_FROM_EMAIL=Kevin@beanumber.org
+SENDGRID_FROM_NAME=Be A Number, International
 ```
 
 ### Optional Configuration
@@ -72,7 +90,9 @@ NODE_ENV=production
 - [ ] Add `AIRTABLE_DONATIONS_TABLE=Donations` to Vercel
 - [ ] Add `AIRTABLE_COMMUNICATIONS_TABLE=Communications` to Vercel
 - [ ] Verify Stripe variables are set
-- [ ] Verify SendGrid variables are set
+- [ ] Add email provider variables (Gmail OR SendGrid)
+  - [ ] If Gmail: Add all `GMAIL_*` variables
+  - [ ] If SendGrid: Add `SENDGRID_API_KEY` and `SENDGRID_FROM_EMAIL`
 - [ ] Redeploy on Vercel after adding variables
 - [ ] Test with a small donation
 

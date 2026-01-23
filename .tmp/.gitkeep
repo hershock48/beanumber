@@ -1,0 +1,2 @@
+# This file keeps the .tmp directory in git while ignoring its contents
+# The .tmp directory is for temporary processing files that can be regenerated

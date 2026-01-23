@@ -656,9 +656,39 @@ export async function POST(request: NextRequest) {
       }
 
       case 'invoice.payment_succeeded': {
-        const invoice = event.data.object as Stripe.Invoice;
+        // Cast to any to access all invoice properties (Stripe types can be restrictive)
+        const invoice = event.data.object as Record<string, any>;
         console.log('[Webhook] Invoice payment succeeded:', invoice.id);
-        // Handle recurring donation payments here if needed
+
+        // Import the recurring payment tool dynamically to avoid circular deps
+        const { processRecurringPaymentTool } = await import('@/lib/tools');
+
+        // Process recurring subscription payments
+        const result = await processRecurringPaymentTool({
+          invoiceId: invoice.id || '',
+          subscriptionId: (typeof invoice.subscription === 'string' ? invoice.subscription : invoice.subscription?.id) || '',
+          customerId: (typeof invoice.customer === 'string' ? invoice.customer : invoice.customer?.id) || '',
+          email: invoice.customer_email || '',
+          name: invoice.customer_name || 'Supporter',
+          amountCents: invoice.amount_paid || 0,
+          currency: invoice.currency || 'usd',
+          paymentDate: new Date((invoice.created || Date.now() / 1000) * 1000).toISOString(),
+          billingReason: invoice.billing_reason || 'unknown',
+        });
+
+        if (result.success) {
+          if (result.data?.skipped) {
+            console.log('[Webhook] Invoice skipped:', result.data.skipReason);
+          } else {
+            console.log('[Webhook] Recurring payment processed:', {
+              invoiceId: invoice.id,
+              donationId: result.data?.donationId,
+              emailSent: result.data?.emailSent,
+            });
+          }
+        } else {
+          console.error('[Webhook] Failed to process recurring payment:', result.error);
+        }
         break;
       }
 
