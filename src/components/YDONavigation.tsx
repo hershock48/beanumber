@@ -45,6 +45,16 @@ export function YDONavigation({ currentPath }: YDONavigationProps) {
                 {link.label}
               </Link>
             ))}
+            {/* BAN relationship indicator */}
+            <div className="border-l border-gray-200 pl-6">
+              <Link
+                href="/"
+                className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 transition-colors"
+              >
+                <span className="text-xs bg-gray-100 px-2 py-0.5 rounded">Partner</span>
+                Be A Number
+              </Link>
+            </div>
           </div>
           
           {/* Mobile Menu Button */}
