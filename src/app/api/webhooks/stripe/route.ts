@@ -976,6 +976,168 @@ async function sendSponsorWelcomeEmail(data: {
   console.log('[Webhook] Sponsor welcome email sent to:', data.email);
 }
 
+// ────────────────────────────────────────────────────────────────────────────
+// Admin order notification — ping Kevin whenever money lands.
+//
+// Fires once per completed checkout alongside whatever customer-facing email
+// already goes out. Sends TWO messages in a single SendGrid API call using
+// multiple personalizations:
+//
+//   1. Rich HTML summary to ADMIN_NOTIFY_EMAIL (default: kevin@beanumber.org)
+//      — customer name/email, order details, amount, Stripe session link.
+//   2. Short plain-text ping to ADMIN_NOTIFY_SMS_EMAIL (default:
+//      2692743203@tmomail.net — T-Mobile's email-to-SMS gateway) so Kevin
+//      gets a phone text the moment an order clears.
+//
+// Both are best-effort. Any failure is logged but does NOT fail the webhook;
+// order records + customer emails must still go through.
+// ────────────────────────────────────────────────────────────────────────────
+async function sendAdminOrderNotification(data: {
+  // One of 'Shirt', 'Shirt + Monthly', 'Sponsorship', 'Donation'
+  kind: 'Shirt' | 'Shirt + Monthly' | 'Sponsorship' | 'Donation';
+  customerName: string;
+  customerEmail: string;
+  amount: number;
+  isRecurring: boolean;
+  // Shirt-specific
+  shirtName?: string;
+  shirtColor?: string;
+  shirtSize?: string;
+  // Sponsorship-specific
+  childDisplayName?: string;
+  shirtNumber?: number;
+  sponsorCode?: string;
+  // For building the inspector link
+  stripeSessionId?: string;
+}): Promise<void> {
+  const sendGridApiKey = process.env.SENDGRID_API_KEY;
+  const fromEmail = process.env.SENDGRID_FROM_EMAIL || 'Kevin@beanumber.org';
+  const adminEmail = process.env.ADMIN_NOTIFY_EMAIL || 'kevin@beanumber.org';
+  const smsEmail = process.env.ADMIN_NOTIFY_SMS_EMAIL || '2692743203@tmomail.net';
+
+  if (!sendGridApiKey) {
+    console.log('[Webhook] SendGrid API key not set, skipping admin notification');
+    return;
+  }
+
+  const amountStr = `$${data.amount.toFixed(2)}`;
+  const recurringTag = data.isRecurring ? '/mo' : '';
+
+  // Short subject lines do double duty: for email inbox previews AND for the
+  // carrier SMS gateway (which often uses subject as the text body for old
+  // phones, or concatenates subject + body into one MMS blob).
+  const shortLine = (() => {
+    switch (data.kind) {
+      case 'Shirt':
+        return `${data.customerName} ordered ${data.shirtName} (${data.shirtColor}, ${data.shirtSize}) · ${amountStr}`;
+      case 'Shirt + Monthly':
+        return `${data.customerName} ordered ${data.shirtName} + sponsoring${data.childDisplayName ? ` ${data.childDisplayName}` : ''} · ${amountStr}/mo`;
+      case 'Sponsorship':
+        return `${data.customerName} sponsoring${data.childDisplayName ? ` ${data.childDisplayName}` : ''} · ${amountStr}/mo`;
+      case 'Donation':
+        return `${data.customerName} donated ${amountStr}${recurringTag}`;
+    }
+  })();
+
+  // Plain-text SMS body — short, no HTML, <160 chars where possible.
+  const smsText = [
+    `BAN: ${shortLine}`,
+    `${data.customerEmail}`,
+  ]
+    .filter(Boolean)
+    .join('\n');
+
+  const stripeLink = data.stripeSessionId
+    ? `https://dashboard.stripe.com/payments/${data.stripeSessionId}`
+    : '';
+
+  // Rich HTML for the inbox copy. Kept compact and scannable — this email
+  // is a ping, not a report.
+  const detailsRows: string[] = [
+    `<tr><td style="padding: 6px 12px 6px 0; color: #999; font-size: 13px;">Customer</td><td style="padding: 6px 0; font-size: 14px;"><strong>${data.customerName}</strong><br><a href="mailto:${data.customerEmail}" style="color: #D4A843;">${data.customerEmail}</a></td></tr>`,
+    `<tr><td style="padding: 6px 12px 6px 0; color: #999; font-size: 13px;">Amount</td><td style="padding: 6px 0; font-size: 14px;"><strong>${amountStr}${recurringTag}</strong></td></tr>`,
+    `<tr><td style="padding: 6px 12px 6px 0; color: #999; font-size: 13px;">Type</td><td style="padding: 6px 0; font-size: 14px;">${data.kind}</td></tr>`,
+  ];
+  if (data.shirtName) {
+    detailsRows.push(
+      `<tr><td style="padding: 6px 12px 6px 0; color: #999; font-size: 13px;">Shirt</td><td style="padding: 6px 0; font-size: 14px;">${data.shirtName} &middot; ${data.shirtColor} &middot; ${data.shirtSize}</td></tr>`
+    );
+  }
+  if (data.childDisplayName) {
+    const numStr = data.shirtNumber ? `#${data.shirtNumber} ` : '';
+    detailsRows.push(
+      `<tr><td style="padding: 6px 12px 6px 0; color: #999; font-size: 13px;">Child</td><td style="padding: 6px 0; font-size: 14px;">${numStr}${data.childDisplayName}</td></tr>`
+    );
+  }
+  if (data.sponsorCode) {
+    detailsRows.push(
+      `<tr><td style="padding: 6px 12px 6px 0; color: #999; font-size: 13px;">Sponsor code</td><td style="padding: 6px 0; font-size: 14px; font-family: monospace;">${data.sponsorCode}</td></tr>`
+    );
+  }
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+      <head><meta charset="utf-8"></head>
+      <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 560px; margin: 0 auto; padding: 24px 20px; color: #111;">
+        <p style="margin-top: 0; color: #D4A843; font-weight: bold; font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase;">New ${data.kind} order</p>
+        <h2 style="margin: 4px 0 20px 0; font-size: 18px; color: #0d0d0d;">${shortLine}</h2>
+        <table cellpadding="0" cellspacing="0" style="border-collapse: collapse;">
+          ${detailsRows.join('\n          ')}
+        </table>
+        ${
+          stripeLink
+            ? `<p style="margin-top: 24px;"><a href="${stripeLink}" style="display: inline-block; background: #0d0d0d; color: #D4A843; padding: 10px 18px; text-decoration: none; font-size: 13px; font-weight: bold; letter-spacing: 0.05em;">View in Stripe</a></p>`
+            : ''
+        }
+      </body>
+    </html>
+  `;
+
+  const emailBody = {
+    personalizations: [
+      {
+        to: [{ email: adminEmail }],
+        subject: shortLine,
+      },
+      {
+        to: [{ email: smsEmail }],
+        // Empty subject on the SMS leg; body carries everything. Some carriers
+        // prepend the subject to the text and duplicate content looks weird.
+        subject: ' ',
+      },
+    ],
+    from: { email: fromEmail, name: 'BAN Orders' },
+    content: [
+      // SendGrid delivers the LAST matching MIME part, so we include both and
+      // let the gateway pick text/plain (SMS carriers strip HTML anyway).
+      { type: 'text/plain', value: smsText },
+      { type: 'text/html', value: html },
+    ],
+  };
+
+  try {
+    const response = await fetch('https://api.sendgrid.com/v3/mail/send', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${sendGridApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(emailBody),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      console.error('[Webhook] Admin notification SendGrid error:', error);
+      return;
+    }
+
+    console.log('[Webhook] Admin notification sent:', { kind: data.kind, to: adminEmail, sms: smsEmail });
+  } catch (error) {
+    console.error('[Webhook] Admin notification failed (non-fatal):', error);
+  }
+}
+
 // Handle successful checkout session
 async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) {
   console.log('[Webhook] Processing checkout session:', session.id);
@@ -1131,6 +1293,18 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
       } catch (err) {
         console.error('[Webhook] Failed to create communication record:', err);
       }
+
+      // Step 6c: Ping Kevin (email + SMS gateway) — non-fatal.
+      await sendAdminOrderNotification({
+        kind: 'Sponsorship',
+        customerName: name,
+        customerEmail: email,
+        amount,
+        isRecurring: true,
+        childDisplayName,
+        sponsorCode: sponsorCode || undefined,
+        stripeSessionId: session.id,
+      });
 
       console.log('[Webhook] Successfully processed sponsorship:', {
         sessionId: session.id,
@@ -1306,6 +1480,22 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
         console.error('[Webhook] Failed to create communication record (shirt+monthly):', err);
       }
 
+      // Step 8: Ping Kevin (email + SMS gateway) — non-fatal.
+      await sendAdminOrderNotification({
+        kind: 'Shirt + Monthly',
+        customerName: name,
+        customerEmail: email,
+        amount,
+        isRecurring: true,
+        shirtName,
+        shirtColor,
+        shirtSize,
+        childDisplayName: assignedChild?.displayName,
+        shirtNumber: assignedChild?.shirtNumber,
+        sponsorCode: sponsorCode || undefined,
+        stripeSessionId: session.id,
+      });
+
       console.log('[Webhook] Successfully processed shirt + monthly:', {
         sessionId: session.id,
         donorId,
@@ -1414,6 +1604,21 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
           : 'none',
       });
 
+      // Ping Kevin (email + SMS gateway) — non-fatal.
+      await sendAdminOrderNotification({
+        kind: 'Shirt',
+        customerName: name,
+        customerEmail: email,
+        amount,
+        isRecurring: false,
+        shirtName,
+        shirtColor,
+        shirtSize,
+        childDisplayName: assignedChild?.displayName,
+        shirtNumber: assignedChild?.shirtNumber,
+        stripeSessionId: session.id,
+      });
+
       return { donorId, donationId, assignedChild };
 
     } else {
@@ -1468,6 +1673,16 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
         sessionId: session.id,
         donorId,
         donationId,
+      });
+
+      // Ping Kevin (email + SMS gateway) — non-fatal.
+      await sendAdminOrderNotification({
+        kind: 'Donation',
+        customerName: name,
+        customerEmail: email,
+        amount,
+        isRecurring,
+        stripeSessionId: session.id,
       });
 
       return { donorId, donationId };
