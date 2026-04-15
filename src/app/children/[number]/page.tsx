@@ -28,6 +28,14 @@ interface AirtableChildRecord {
     Status?: string;
     DateOfBirth?: string;
     ReservedForAuction?: boolean;
+    // ── Structured profile fields populated via the YDO intake form.
+    // Rendered conditionally on the profile page — empty = hidden block.
+    HomeVillage?: string;
+    FamilyContext?: string;
+    Loves?: string;
+    ChildQuote?: string;
+    TeacherName?: string;
+    TeacherQuote?: string;
   };
 }
 
@@ -152,6 +160,14 @@ async function getChildByShirtNumber(shirtNumber: number) {
       photo_url: photo,
       location: sponsorship?.ChildLocation || 'Gulu, Northern Uganda',
       sponsorship_status: sponsorship?.Status,
+      // Structured intake fields — any may be empty; the page renders each
+      // block conditionally so a half-filled profile still looks intentional.
+      home_village: child.HomeVillage,
+      family_context: child.FamilyContext,
+      loves: child.Loves,
+      child_quote: child.ChildQuote,
+      teacher_name: child.TeacherName,
+      teacher_quote: child.TeacherQuote,
     };
   } catch (error) {
     console.error('[children/page] Error fetching child', {
@@ -269,7 +285,19 @@ export default async function ChildProfilePage({ params }: ChildPageProps) {
   }
 
   const displayName = child.display_name || child.first_name || 'Child';
+  const firstName = child.first_name || displayName.split(' ')[0] || 'them';
   const photoUrl = child.photo_url || '/images/child-placeholder.jpg';
+
+  // True if ANY of the structured intake fields are populated. When none
+  // are, we fall back to the legacy Notes prose so older records still
+  // render something human rather than an empty scaffold.
+  const hasStructured = Boolean(
+    child.home_village ||
+    child.family_context ||
+    child.loves ||
+    child.child_quote ||
+    child.teacher_quote
+  );
 
   return (
     <div className="min-h-screen bg-[#FFF8F0]">
@@ -329,25 +357,79 @@ export default async function ChildProfilePage({ params }: ChildPageProps) {
               {child.grade_class && <span className="text-lg">{child.grade_class}</span>}
             </div>
 
-            {child.fun_fact && (
+            {/* Pull quote from the child — in their own voice. This is the
+                single strongest element on the page when it's present. */}
+            {child.child_quote && (
+              <div className="mb-8">
+                <p
+                  className="text-2xl md:text-[1.65rem] text-[#0d0d0d] leading-snug"
+                  style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 500, fontStyle: 'italic' }}
+                >
+                  &ldquo;{child.child_quote}&rdquo;
+                </p>
+                <p className="mt-3 text-xs uppercase tracking-[0.2em] text-[#aaa]">
+                  — {firstName}
+                </p>
+              </div>
+            )}
+
+            {/* Structured fact lines. Each is its own tiny block so an
+                empty field just disappears instead of leaving dead scaffold. */}
+            {hasStructured && (
+              <div className="mb-8 space-y-4">
+                {child.home_village && (
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-1">
+                      Home
+                    </p>
+                    <p className="text-[#444] leading-relaxed">{child.home_village}</p>
+                  </div>
+                )}
+                {child.family_context && (
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-1">
+                      Family
+                    </p>
+                    <p className="text-[#444] leading-relaxed">{child.family_context}</p>
+                  </div>
+                )}
+                {child.loves && (
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-1">
+                      What {firstName} loves
+                    </p>
+                    <p className="text-[#444] leading-relaxed">{child.loves}</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Teacher quote — attributed, treated as a second human voice
+                on the page. Only appears when TeacherQuote is present. */}
+            {child.teacher_quote && (
+              <div className="bg-white border border-[#e8e0d4] p-5 mb-8">
+                <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-3">
+                  From {firstName}&rsquo;s teacher
+                </p>
+                <p className="text-[#444] leading-relaxed italic">
+                  &ldquo;{child.teacher_quote}&rdquo;
+                </p>
+                {child.teacher_name && (
+                  <p className="mt-3 text-sm text-[#888]">— {child.teacher_name}</p>
+                )}
+              </div>
+            )}
+
+            {/* Fallback: legacy Notes prose. Only shown if the intake form
+                hasn't been filled out yet — we'd rather show this than an
+                empty right column. */}
+            {!hasStructured && child.fun_fact && (
               <div className="bg-white border border-[#e8e0d4] p-5 mb-8">
                 <p className="text-[#666] italic leading-relaxed">
                   &ldquo;{child.fun_fact}&rdquo;
                 </p>
               </div>
             )}
-
-            {/* About the location */}
-            <div className="mb-8">
-              <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-2">
-                {child.location}
-              </h2>
-              <p className="text-[#777] text-sm leading-relaxed">
-                {displayName} lives in a community rebuilding after decades of conflict.
-                Your sponsorship provides daily access to education, nutritious meals,
-                and a personal mentor.
-              </p>
-            </div>
 
             {/* Sponsorship card */}
             <div className="bg-white border border-[#e8e0d4] p-7">
@@ -377,19 +459,19 @@ export default async function ChildProfilePage({ params }: ChildPageProps) {
               </Link>
             </div>
 
-            {/* What's included */}
-            <div className="mt-8 grid grid-cols-2 gap-4">
-              {[
-                { icon: '📚', text: 'Daily education' },
-                { icon: '🍽️', text: 'Nutritious meals' },
-                { icon: '🤝', text: 'Personal mentor' },
-                { icon: '📬', text: 'Progress updates' },
-              ].map(item => (
-                <div key={item.text} className="flex items-center gap-3 text-sm text-[#777]">
-                  <span className="text-lg">{item.icon}</span>
-                  {item.text}
-                </div>
-              ))}
+            {/* What your $25 does — concrete, named, specific. Replaces the
+                generic emoji grid. Uses the child's first name so the line
+                reads like it's about a person, not a program. */}
+            <div className="mt-8">
+              <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-3">
+                What your $25 does for {firstName}
+              </p>
+              <p className="text-[#555] leading-relaxed">
+                Keeps {firstName} in school at the YDO campus in Omoro District —
+                school fees, books, a uniform, morning porridge and a midday meal,
+                access to the on-site medical center, and a place where teachers
+                and 380 other kids know their name.
+              </p>
             </div>
           </div>
         </div>

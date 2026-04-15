@@ -219,11 +219,10 @@ export function HomePageContent() {
                         alt={displayName}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                       />
-                      {shirtNum && (
-                        <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm px-3 py-1.5 text-xs font-bold text-[#D4A843] tracking-wider">
-                          #{shirtNum}
-                        </div>
-                      )}
+                      {/* No number badge on the carousel cards. The whole
+                          brand turns on the moment a number becomes a
+                          name — that reveal belongs at checkout and on
+                          the child's own page, not on a browse tile. */}
                     </div>
                     <div className="p-5">
                       <h3
