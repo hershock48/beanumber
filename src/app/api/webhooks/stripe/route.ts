@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import type Stripe from 'stripe';
+import { sendEmail } from '@/lib/email';
 
 // Initialize Stripe lazily
 async function getStripe() {
@@ -449,37 +450,21 @@ async function sendThankYouEmail(donationData: {
   isRecurring: boolean;
   donationDate: string;
 }): Promise<void> {
-  const sendGridApiKey = process.env.SENDGRID_API_KEY;
-  const fromEmail = process.env.SENDGRID_FROM_EMAIL || 'Kevin@beanumber.org';
-
-  if (!sendGridApiKey) {
-    console.log('[Webhook] SendGrid API key not set, skipping email');
-    return;
-  }
-
   if (!donationData.email) {
     console.log('[Webhook] No customer email, skipping thank-you email');
     return;
   }
 
+  const fromEmail = process.env.SENDGRID_FROM_EMAIL || 'Kevin@beanumber.org';
   const firstName = donationData.name.split(' ')[0];
   const amountStr = `$${donationData.amount.toFixed(2)}`;
   const dateStr = new Date(donationData.donationDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
 
-  const emailBody = {
-    personalizations: [
-      {
-        to: [{ email: donationData.email, name: donationData.name }],
-        subject: donationData.isRecurring
-          ? 'You just became a monthly sponsor.'
-          : 'Thank you. This matters.',
-      },
-    ],
-    from: { email: fromEmail, name: 'Kevin at Be A Number' },
-    content: [
-      {
-        type: 'text/html',
-        value: `
+  const subject = donationData.isRecurring
+    ? 'You just became a monthly sponsor.'
+    : 'Thank you. This matters.';
+
+  const html = `
           <!DOCTYPE html>
           <html>
             <head>
@@ -514,26 +499,21 @@ async function sendThankYouEmail(donationData: {
               </p>
             </body>
           </html>
-        `,
-      },
-    ],
-  };
+        `;
 
-  const response = await fetch('https://api.sendgrid.com/v3/mail/send', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${sendGridApiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(emailBody),
+  const result = await sendEmail({
+    to: { email: donationData.email, name: donationData.name },
+    from: { email: fromEmail, name: 'Kevin at Be A Number' },
+    subject,
+    html,
   });
 
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`SendGrid API error: ${error}`);
+  if (!result.success) {
+    console.error('[Webhook] Thank-you email failed:', result.error);
+    return;
   }
 
-  console.log('[Webhook] Thank-you email sent to:', donationData.email);
+  console.log('[Webhook] Thank-you email sent to:', donationData.email, 'via', result.data?.provider);
 }
 
 // Assign the next available child (lowest ShirtNumber, ShirtAssignedAt blank,
@@ -666,19 +646,12 @@ async function sendShirtConfirmationEmail(orderData: {
   // Sponsor code to include when alreadySponsoring is true.
   sponsorCode?: string;
 }): Promise<void> {
-  const sendGridApiKey = process.env.SENDGRID_API_KEY;
-  const fromEmail = process.env.SENDGRID_FROM_EMAIL || 'Kevin@beanumber.org';
-
-  if (!sendGridApiKey) {
-    console.log('[Webhook] SendGrid API key not set, skipping shirt confirmation email');
-    return;
-  }
-
   if (!orderData.email) {
     console.log('[Webhook] No customer email, skipping shirt confirmation email');
     return;
   }
 
+  const fromEmail = process.env.SENDGRID_FROM_EMAIL || 'Kevin@beanumber.org';
   const firstName = orderData.name.split(' ')[0];
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.beanumber.org';
 
@@ -722,18 +695,7 @@ async function sendShirtConfirmationEmail(orderData: {
     ? 'Your shirt is on its way (and your sponsorship is active).'
     : 'Your shirt is being made right now.';
 
-  const emailBody = {
-    personalizations: [
-      {
-        to: [{ email: orderData.email, name: orderData.name }],
-        subject,
-      },
-    ],
-    from: { email: fromEmail, name: 'Kevin at Be A Number' },
-    content: [
-      {
-        type: 'text/html',
-        value: `
+  const html = `
           <!DOCTYPE html>
           <html>
             <head>
@@ -771,26 +733,21 @@ async function sendShirtConfirmationEmail(orderData: {
               </p>
             </body>
           </html>
-        `,
-      },
-    ],
-  };
+        `;
 
-  const response = await fetch('https://api.sendgrid.com/v3/mail/send', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${sendGridApiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(emailBody),
+  const result = await sendEmail({
+    to: { email: orderData.email, name: orderData.name },
+    from: { email: fromEmail, name: 'Kevin at Be A Number' },
+    subject,
+    html,
   });
 
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`SendGrid API error: ${error}`);
+  if (!result.success) {
+    console.error('[Webhook] Shirt confirmation email failed:', result.error);
+    return;
   }
 
-  console.log('[Webhook] Shirt confirmation email sent to:', orderData.email);
+  console.log('[Webhook] Shirt confirmation email sent to:', orderData.email, 'via', result.data?.provider);
 }
 
 // Generate a unique sponsor code (e.g. BAN-2026-427)
@@ -904,28 +861,15 @@ async function sendSponsorWelcomeEmail(data: {
   sponsorCode: string;
   amount: number;
 }): Promise<void> {
-  const sendGridApiKey = process.env.SENDGRID_API_KEY;
-  const fromEmail = process.env.SENDGRID_FROM_EMAIL || 'Kevin@beanumber.org';
-
-  if (!sendGridApiKey || !data.email) {
-    console.log('[Webhook] Skipping sponsor welcome email');
+  if (!data.email) {
+    console.log('[Webhook] No customer email, skipping sponsor welcome email');
     return;
   }
 
+  const fromEmail = process.env.SENDGRID_FROM_EMAIL || 'Kevin@beanumber.org';
   const firstName = data.name.split(' ')[0] || 'Friend';
 
-  const emailBody = {
-    personalizations: [
-      {
-        to: [{ email: data.email, name: data.name }],
-        subject: `You're sponsoring ${data.childDisplayName}.`,
-      },
-    ],
-    from: { email: fromEmail, name: 'Kevin at Be A Number' },
-    content: [
-      {
-        type: 'text/html',
-        value: `
+  const html = `
           <!DOCTYPE html>
           <html>
             <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
@@ -954,26 +898,21 @@ async function sendSponsorWelcomeEmail(data: {
               </p>
             </body>
           </html>
-        `,
-      },
-    ],
-  };
+        `;
 
-  const response = await fetch('https://api.sendgrid.com/v3/mail/send', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${sendGridApiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(emailBody),
+  const result = await sendEmail({
+    to: { email: data.email, name: data.name },
+    from: { email: fromEmail, name: 'Kevin at Be A Number' },
+    subject: `You're sponsoring ${data.childDisplayName}.`,
+    html,
   });
 
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`SendGrid API error: ${error}`);
+  if (!result.success) {
+    console.error('[Webhook] Sponsor welcome email failed:', result.error);
+    return;
   }
 
-  console.log('[Webhook] Sponsor welcome email sent to:', data.email);
+  console.log('[Webhook] Sponsor welcome email sent to:', data.email, 'via', result.data?.provider);
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -1010,15 +949,9 @@ async function sendAdminOrderNotification(data: {
   // For building the inspector link
   stripeSessionId?: string;
 }): Promise<void> {
-  const sendGridApiKey = process.env.SENDGRID_API_KEY;
   const fromEmail = process.env.SENDGRID_FROM_EMAIL || 'Kevin@beanumber.org';
   const adminEmail = process.env.ADMIN_NOTIFY_EMAIL || 'kevin@beanumber.org';
   const smsEmail = process.env.ADMIN_NOTIFY_SMS_EMAIL || '2692743203@tmomail.net';
-
-  if (!sendGridApiKey) {
-    console.log('[Webhook] SendGrid API key not set, skipping admin notification');
-    return;
-  }
 
   const amountStr = `$${data.amount.toFixed(2)}`;
   const recurringTag = data.isRecurring ? '/mo' : '';
@@ -1094,45 +1027,49 @@ async function sendAdminOrderNotification(data: {
     </html>
   `;
 
-  const emailBody = {
-    personalizations: [
-      {
-        to: [{ email: adminEmail }],
-        subject: shortLine,
-      },
-      {
-        to: [{ email: smsEmail }],
-        // Empty subject on the SMS leg; body carries everything. Some carriers
-        // prepend the subject to the text and duplicate content looks weird.
-        subject: ' ',
-      },
-    ],
-    from: { email: fromEmail, name: 'BAN Orders' },
-    content: [
-      // SendGrid delivers the LAST matching MIME part, so we include both and
-      // let the gateway pick text/plain (SMS carriers strip HTML anyway).
-      { type: 'text/plain', value: smsText },
-      { type: 'text/html', value: html },
-    ],
-  };
-
+  // Two separate sends: one rich HTML to the admin inbox, one plaintext to
+  // the carrier SMS gateway. The sendEmail() abstraction routes through
+  // Gmail (preferred) or SendGrid depending on what's configured in env.
+  // Both calls are best-effort — any failure is logged, never thrown.
   try {
-    const response = await fetch('https://api.sendgrid.com/v3/mail/send', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${sendGridApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(emailBody),
-    });
+    const from = { email: fromEmail, name: 'BAN Orders' };
 
-    if (!response.ok) {
-      const error = await response.text();
-      console.error('[Webhook] Admin notification SendGrid error:', error);
-      return;
+    const [adminResult, smsResult] = await Promise.all([
+      sendEmail({
+        to: { email: adminEmail },
+        from,
+        subject: shortLine,
+        html,
+        text: smsText,
+      }),
+      sendEmail({
+        to: { email: smsEmail },
+        from,
+        // SMS gateways often concatenate subject + body. Keep the subject
+        // blank-ish so the text isn't duplicated on the phone screen.
+        subject: ' ',
+        // The SMS gateway strips HTML, but sendEmail() requires html.
+        // Give it the same plaintext wrapped minimally so stripHtml() returns
+        // the clean text in the text/plain MIME part.
+        html: `<pre style="font-family:inherit;white-space:pre-wrap;margin:0;">${smsText.replace(/[<>&]/g, s => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' } as Record<string, string>)[s])}</pre>`,
+        text: smsText,
+      }),
+    ]);
+
+    if (!adminResult.success) {
+      console.error('[Webhook] Admin notification email failed:', adminResult.error);
+    }
+    if (!smsResult.success) {
+      console.error('[Webhook] Admin notification SMS failed:', smsResult.error);
     }
 
-    console.log('[Webhook] Admin notification sent:', { kind: data.kind, to: adminEmail, sms: smsEmail });
+    console.log('[Webhook] Admin notification sent:', {
+      kind: data.kind,
+      admin: adminEmail,
+      adminProvider: adminResult.data?.provider,
+      sms: smsEmail,
+      smsProvider: smsResult.data?.provider,
+    });
   } catch (error) {
     console.error('[Webhook] Admin notification failed (non-fatal):', error);
   }
