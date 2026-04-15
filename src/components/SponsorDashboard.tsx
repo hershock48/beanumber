@@ -358,12 +358,23 @@ export function SponsorDashboard({ sponsorCode, email }: SponsorDashboardProps) 
                 </div>
               )}
 
-              {/* Fallback: legacy Notes prose. Only shown if the intake
-                  form hasn't been filled out yet. */}
-              {!hasStructured && childInfo.notes && (
+              {/* Placeholder when no structured intake fields are populated.
+                  IMPORTANT: we do NOT fall back to childInfo.notes. The legacy
+                  Notes field on most records is AI-template boilerplate
+                  ("bright and hopeful", "peasant farmers", "humble background",
+                  "life full of potential and hope") that violates voice.md.
+                  Better to show an honest, dignified "story coming" line than
+                  to ship savior-narrative copy under our brand. */}
+              {!hasStructured && (
                 <div className="bg-white border border-[#e8e0d4] p-5 mb-6">
-                  <p className="text-[#666] italic leading-relaxed">
-                    &ldquo;{childInfo.notes}&rdquo;
+                  <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-2">
+                    {firstName}&rsquo;s story
+                  </p>
+                  <p className="text-[#666] leading-relaxed">
+                    We&rsquo;re gathering {firstName}&rsquo;s full profile from
+                    the campus in Omoro District right now — home, family,
+                    what they love, and a note from their teacher. It&rsquo;ll
+                    land here as soon as it&rsquo;s in our hands.
                   </p>
                 </div>
               )}

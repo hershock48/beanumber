@@ -420,13 +420,24 @@ export default async function ChildProfilePage({ params }: ChildPageProps) {
               </div>
             )}
 
-            {/* Fallback: legacy Notes prose. Only shown if the intake form
-                hasn't been filled out yet — we'd rather show this than an
-                empty right column. */}
-            {!hasStructured && child.fun_fact && (
+            {/* Placeholder when no structured intake fields are populated.
+                IMPORTANT: we do NOT fall back to child.fun_fact (the legacy
+                Notes field). That field contains AI-template boilerplate
+                ("bright and hopeful", "peasant farmers", "humble background",
+                "life full of potential and hope") that violates voice.md top
+                to bottom. Better to show an honest, dignified "story coming"
+                line than to ship savior-narrative copy under our brand. */}
+            {!hasStructured && (
               <div className="bg-white border border-[#e8e0d4] p-5 mb-8">
-                <p className="text-[#666] italic leading-relaxed">
-                  &ldquo;{child.fun_fact}&rdquo;
+                <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-2">
+                  {firstName}&rsquo;s story
+                </p>
+                <p className="text-[#666] leading-relaxed">
+                  We&rsquo;re gathering {firstName}&rsquo;s full profile from
+                  the campus in Omoro District right now — home, family, what
+                  they love, and a note from their teacher. Sponsor them today
+                  and we&rsquo;ll send it to you as soon as it&rsquo;s in our
+                  hands.
                 </p>
               </div>
             )}
