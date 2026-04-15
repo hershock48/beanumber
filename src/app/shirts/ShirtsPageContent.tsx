@@ -122,10 +122,10 @@ function DesignContainer({
 /* ── Shirt design components ────────────────────────────────── */
 
 /**
- * Universal front used on every shirt except the Cross Tee. Small # mark +
- * "beanumber.org" in small caps centered ~3 inches below the neckline.
- * In tee mode the mark sits lower on the mockup (below the SVG neckline);
- * in flat mode it sits higher (closer to the top of the box).
+ * Universal front used on every shirt. Small # mark + "beanumber.org" in
+ * small caps centered ~3 inches below the neckline. In tee mode the mark
+ * sits lower on the mockup (below the SVG neckline); in flat mode it sits
+ * higher (closer to the top of the box).
  */
 function SharedFront({ theme, mode = 'tee', className = '' }: DesignProps) {
   // Real-shirt proportions: chest mark is ~3–4" on a ~20" body. The body
@@ -156,7 +156,38 @@ function SharedFront({ theme, mode = 'tee', className = '' }: DesignProps) {
   );
 }
 
-/** Large mission-gold # logo with BEANUMBER lettering — Flagship back. */
+/**
+ * Flagship front — small cross mark on the chest at the same size and
+ * placement as the # mark on every other shirt, with beanumber.org below.
+ */
+function FlagshipFront({ theme, mode = 'tee', className = '' }: DesignProps) {
+  const top = mode === 'tee' ? '28%' : '17%';
+  const width = mode === 'tee' ? '8%' : '18%';
+
+  return (
+    <DesignContainer theme={theme} mode={mode} side="front" className={className}>
+      <div
+        className="absolute left-1/2 flex flex-col items-center"
+        style={{ top, width, transform: 'translateX(-50%)' }}
+      >
+        <Logo variant="cross" className="w-full" style={{ color: theme.vinyl }} />
+        <span
+          className="font-semibold uppercase"
+          style={{
+            color: theme.vinyl,
+            fontSize: mode === 'tee' ? 'clamp(4px, 1.7cqw, 8px)' : 'clamp(5px, 2.2cqw, 10px)',
+            letterSpacing: '0.18em',
+            marginTop: '8%',
+          }}
+        >
+          beanumber.org
+        </span>
+      </div>
+    </DesignContainer>
+  );
+}
+
+/** Large white # logo with BEANUMBER lettering — Flagship back. */
 function FlagshipBack({ theme, mode = 'tee', className = '' }: DesignProps) {
   // Back print is typically ~10–12" wide on a ~20" body, so ~55% of body
   // ≈ 28% of the container.
@@ -169,53 +200,7 @@ function FlagshipBack({ theme, mode = 'tee', className = '' }: DesignProps) {
         className="absolute left-1/2"
         style={{ top, width, transform: 'translateX(-50%)' }}
       >
-        <Logo variant="primary" className="w-full" style={{ color: GOLD }} />
-      </div>
-    </DesignContainer>
-  );
-}
-
-/** Cross Tee front — gold cross. */
-function CrossTeeFront({ theme, mode = 'tee', className = '' }: DesignProps) {
-  // Cross front print ~8–9" on a ~20" body, so ~42% of body ≈ 22% of container.
-  const top = mode === 'tee' ? '32%' : '28%';
-  const width = mode === 'tee' ? '22%' : '40%';
-
-  return (
-    <DesignContainer theme={theme} mode={mode} side="front" className={className}>
-      <div
-        className="absolute left-1/2"
-        style={{ top, width, transform: 'translateX(-50%)' }}
-      >
-        <Logo variant="cross" className="w-full" style={{ color: GOLD }} />
-      </div>
-    </DesignContainer>
-  );
-}
-
-/** Cross Tee back — micro # mark with URL. */
-function CrossTeeBack({ theme, mode = 'tee', className = '' }: DesignProps) {
-  const top = mode === 'tee' ? '40%' : '40%';
-  const width = mode === 'tee' ? '8%' : '18%';
-
-  return (
-    <DesignContainer theme={theme} mode={mode} side="back" className={className}>
-      <div
-        className="absolute left-1/2 flex flex-col items-center"
-        style={{ top, width, transform: 'translateX(-50%)' }}
-      >
-        <Logo variant="micro" className="w-full" style={{ color: theme.vinyl }} />
-        <span
-          className="font-semibold uppercase"
-          style={{
-            color: theme.muted,
-            fontSize: mode === 'tee' ? 'clamp(4px, 1.7cqw, 8px)' : 'clamp(5px, 2.2cqw, 10px)',
-            letterSpacing: '0.2em',
-            marginTop: '8%',
-          }}
-        >
-          beanumber.org
-        </span>
+        <Logo variant="primary" className="w-full" style={{ color: '#ffffff' }} />
       </div>
     </DesignContainer>
   );
@@ -298,21 +283,10 @@ const shirts: Shirt[] = [
     name: 'The Flagship',
     tagline: 'The one that started it all',
     price: 25,
-    description: 'The original Be A Number shirt. Small # mark on the front with the full gold # logo across the back. Your $25 gets you the shirt and sponsors a child for your first month. The number you receive is assigned by order and belongs to a real child in Northern Uganda.',
-    Front: SharedFront,
+    description: 'The original Be A Number shirt. Small cross mark on the front with the full # logo across the back. Your $25 gets you the shirt and sponsors a child for your first month. The number you receive is assigned by order and belongs to a real child in Northern Uganda.',
+    Front: FlagshipFront,
     Back: FlagshipBack,
     badge: 'Core',
-    specs: 'S – 2XL · Unisex · Heavyweight cotton',
-  },
-  {
-    id: 'cross-tee',
-    name: 'The Cross Tee',
-    tagline: 'The faith behind the mission',
-    price: 25,
-    description: 'The cross hidden inside the # logo, pulled out and standing on its own. Gold cross on the front, small # mark on the back. Where the Flagship represents the mission, this one represents what\'s underneath it.',
-    Front: CrossTeeFront,
-    Back: CrossTeeBack,
-    badge: null,
     specs: 'S – 2XL · Unisex · Heavyweight cotton',
   },
   {

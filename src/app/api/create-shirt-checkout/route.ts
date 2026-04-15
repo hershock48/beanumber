@@ -18,7 +18,6 @@ async function getStripe() {
 // design record.
 const SHIRTS: Record<string, { name: string }> = {
   flagship: { name: 'The Flagship' },
-  'cross-tee': { name: 'The Cross Tee' },
   'thank-you': { name: 'Thank you.' },
   'do-not-fear': { name: 'Do Not Fear.' },
   peacemaker: { name: 'Peacemaker.' },
