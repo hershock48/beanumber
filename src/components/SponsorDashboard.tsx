@@ -29,9 +29,11 @@ interface SponsorDashboardProps {
 export function SponsorDashboard({ sponsorCode, email }: SponsorDashboardProps) {
   const [updates, setUpdates] = useState<Update[]>([]);
   const [childInfo, setChildInfo] = useState<ChildInfo | null>(null);
+  const [childRevealed, setChildRevealed] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState(true);
   const [nextRequestEligibleAt, setNextRequestEligibleAt] = useState<string | null>(null);
   const [canRequestUpdate, setCanRequestUpdate] = useState(false);
+  const [revealing, setRevealing] = useState(false);
 
   useEffect(() => {
     loadSponsorData();
@@ -45,8 +47,9 @@ export function SponsorDashboard({ sponsorCode, email }: SponsorDashboardProps) 
       if (response.ok) {
         setUpdates(data.updates || []);
         setChildInfo(data.childInfo || null);
+        setChildRevealed(!!data.childRevealed);
         setNextRequestEligibleAt(data.nextRequestEligibleAt);
-        
+
         // Check if can request update using NextRequestEligibleAt
         if (data.nextRequestEligibleAt) {
           const eligibleDate = new Date(data.nextRequestEligibleAt);
@@ -85,6 +88,43 @@ export function SponsorDashboard({ sponsorCode, email }: SponsorDashboardProps) 
     }
   }
 
+  // Manual reveal — used when the sponsor has lost the shirt or just
+  // doesn't want to wait. Confirmed click, since it intentionally breaks
+  // the surprise.
+  async function handleRevealAnyway() {
+    const ok = confirm(
+      "Reveal now? The magic of Be A Number is meeting your child when your shirt arrives, but if you'd rather not wait, we won't stop you."
+    );
+    if (!ok) return;
+
+    setRevealing(true);
+    try {
+      const res = await fetch('/api/sponsor/reveal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}), // no number => "reveal anyway" path
+        credentials: 'include',
+      });
+      const data = await res.json().catch(() => ({}));
+
+      if (res.ok && data?.revealed) {
+        await loadSponsorData();
+      } else if (data?.reason === 'airtable_patch_failed') {
+        // Field doesn't exist yet on the Airtable side. Tell the sponsor
+        // the portal hasn't finished setup and to try again later.
+        alert(
+          "Your portal is still being set up on our end. Please try again in a bit, or email kevin@beanumber.org and we'll unlock it for you."
+        );
+      } else {
+        alert('We could not unlock your portal. Please email kevin@beanumber.org.');
+      }
+    } catch {
+      alert('Something went wrong. Please try again.');
+    } finally {
+      setRevealing(false);
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="max-w-4xl mx-auto px-6 py-16">
@@ -96,6 +136,90 @@ export function SponsorDashboard({ sponsorCode, email }: SponsorDashboardProps) 
     );
   }
 
+  // ---------------------------------------------------------------
+  // LOCKBOX VIEW — no child details until the reveal has happened.
+  // The sponsor sees a confirmation that the sponsorship is active,
+  // a clear explanation of why the portal is waiting, and a small
+  // "reveal anyway" escape hatch for when the shirt is lost.
+  // ---------------------------------------------------------------
+  if (!childRevealed) {
+    return (
+      <div className="max-w-2xl mx-auto px-6 py-16">
+        <div className="bg-white rounded-lg shadow-lg p-10 text-center">
+          <div className="w-14 h-14 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
+            <svg
+              className="w-7 h-7 text-gray-500"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1.8}
+                d="M12 11c.828 0 1.5-.672 1.5-1.5S12.828 8 12 8s-1.5.672-1.5 1.5S11.172 11 12 11zM20 12a8 8 0 11-16 0 8 8 0 0116 0z"
+              />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1.8}
+                d="M12 11v4"
+              />
+            </svg>
+          </div>
+
+          <p className="text-xs font-bold uppercase tracking-[0.2em] text-gray-500 mb-3">
+            Your sponsorship is active
+          </p>
+
+          <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-4">
+            Your child is waiting for you to open the package.
+          </h1>
+
+          <p className="text-gray-600 leading-relaxed mb-6 max-w-md mx-auto">
+            Be A Number works like this: when your shirt arrives, look at the
+            tag. There&rsquo;s a number on it. That number belongs to a real
+            child in Northern Uganda. Go to <Link href="/" className="text-gray-900 font-medium underline underline-offset-2">beanumber.org</Link>, enter your number, and meet them.
+          </p>
+
+          <p className="text-gray-600 leading-relaxed mb-8 max-w-md mx-auto">
+            Once you&rsquo;ve met them, this portal will unlock with their
+            full profile, updates from our team on the campus, and a place
+            to write back.
+          </p>
+
+          <div className="bg-gray-50 border border-gray-200 rounded-md p-4 mb-8 text-sm text-gray-600">
+            <p className="mb-1">
+              <strong className="text-gray-800">Your sponsor code:</strong>{' '}
+              <span className="font-mono">{sponsorCode}</span>
+            </p>
+            <p className="text-xs text-gray-500">
+              Keep this somewhere safe. You&rsquo;ll use it to log back in.
+            </p>
+          </div>
+
+          <button
+            onClick={handleRevealAnyway}
+            disabled={revealing}
+            className="text-sm text-gray-500 hover:text-gray-900 underline underline-offset-4 disabled:opacity-50"
+          >
+            {revealing ? 'Unlocking…' : "Can't wait? Reveal anyway."}
+          </button>
+
+          <p className="text-xs text-gray-400 mt-8">
+            Questions? Email{' '}
+            <a href="mailto:kevin@beanumber.org" className="underline">
+              kevin@beanumber.org
+            </a>
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // ---------------------------------------------------------------
+  // FULL DASHBOARD — reveal has happened, show everything.
+  // ---------------------------------------------------------------
   const daysUntilCanRequest = nextRequestEligibleAt
     ? Math.max(0, Math.ceil((new Date(nextRequestEligibleAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
     : 0;

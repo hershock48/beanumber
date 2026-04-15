@@ -74,7 +74,7 @@ export default function YDOHome() {
               Youth Development Organisation Uganda (YDO) envisions a world where war-affected communities are rehabilitated and where children are protected from armed conflict and supported to thrive.
             </p>
             <p className="text-base sm:text-lg text-white/90 mb-6 leading-[1.8]">
-              We focus on education, psycho-social support, life skills, vocational training, scholarship programs, and the welfare of children, women, and vulnerable populations — rebuilding community resilience and creating protective environments.
+              We focus on education, psycho-social support, life skills, vocational training, scholarship programs, and the welfare of children, women, and vulnerable populations, rebuilding community resilience and creating protective environments.
             </p>
             <p className="text-base sm:text-lg text-white/90 mb-10 leading-[1.8]">
               Our mission centers on locally grounded solutions that empower families, strengthen access to education, and promote economic opportunity through community-led development.
@@ -132,7 +132,7 @@ export default function YDOHome() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
             <div>
               <p className="text-gray-700 text-lg leading-relaxed mb-4">
-                YDO's mission focuses on rehabilitating post-war communities by empowering families, children, and vulnerable populations — strengthening access to education, advocacy, psycho-social support, and vocational pathways.
+                YDO's mission focuses on rehabilitating post-war communities by empowering families, children, and vulnerable populations, strengthening access to education, advocacy, psycho-social support, and vocational pathways.
               </p>
               <p className="text-gray-700 leading-relaxed mb-4">
                 We envision a world where war-affected communities are rehabilitated and where children are protected from armed conflict and supported to thrive. Our work emphasizes locally grounded solutions that build community resilience and create protective environments.
@@ -333,7 +333,7 @@ export default function YDOHome() {
             </div>
           </div>
           <div className="pt-8 border-t border-gray-700 text-center text-sm text-gray-400">
-            <p>© 2025 Youth Development Organisation Uganda. All rights reserved.</p>
+            <p>© {new Date().getFullYear()} Youth Development Organisation Uganda. All rights reserved.</p>
           </div>
         </div>
       </footer>

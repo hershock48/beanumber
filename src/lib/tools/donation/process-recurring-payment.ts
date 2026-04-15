@@ -167,6 +167,40 @@ async function recordRecurringDonation(data: ProcessRecurringPaymentInput): Prom
     }
   }
 
+  // Check if this subscription belongs to a sponsorship; if so, enrich the donation
+  const AIRTABLE_SPONSORSHIPS_TABLE = process.env.AIRTABLE_SPONSORSHIPS_TABLE || 'Sponsorships';
+  let linkedChildRecordId: string | null = null;
+  let linkedChildDisplayName: string | null = null;
+
+  try {
+    const sponsorshipFormula = `{StripeSubscriptionID} = "${data.subscriptionId}"`;
+    const sponsorshipResponse = await fetch(
+      `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_SPONSORSHIPS_TABLE}?filterByFormula=${encodeURIComponent(sponsorshipFormula)}`,
+      {
+        headers: {
+          Authorization: `Bearer ${AIRTABLE_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    if (sponsorshipResponse.ok) {
+      const sponsorshipData = await sponsorshipResponse.json();
+      if (sponsorshipData.records && sponsorshipData.records.length > 0) {
+        const sponsorship = sponsorshipData.records[0];
+        const childLinks = sponsorship.fields?.Children as string[] | undefined;
+        if (childLinks && childLinks.length > 0) {
+          linkedChildRecordId = childLinks[0];
+        }
+        linkedChildDisplayName = sponsorship.fields?.ChildDisplayName || null;
+      }
+    }
+  } catch (error) {
+    logger.warn('Could not resolve sponsorship for subscription (continuing)', {
+      subscriptionId: data.subscriptionId,
+    });
+  }
+
   // Create donation record
   const donationFields: Record<string, unknown> = {
     'Stripe Payment Intent ID': data.invoiceId, // Use invoice ID for recurring
@@ -178,11 +212,18 @@ async function recordRecurringDonation(data: ProcessRecurringPaymentInput): Prom
     'Recurring Donation': true,
     'Subscription ID': data.subscriptionId,
     'Donor Email at Donation': data.email,
-    'Donation Source': 'Website - Recurring',
+    'Donation Source': linkedChildRecordId ? 'Sponsorship' : 'Website - Recurring',
   };
 
   if (donorId) {
     donationFields['Donor'] = [donorId];
+  }
+
+  if (linkedChildRecordId) {
+    donationFields['Child'] = [linkedChildRecordId];
+    if (linkedChildDisplayName) {
+      donationFields['Donation Note'] = `Sponsorship renewal for ${linkedChildDisplayName}`;
+    }
   }
 
   const createResponse = await fetch(

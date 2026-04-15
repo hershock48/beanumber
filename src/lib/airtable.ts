@@ -838,5 +838,234 @@ export async function getSponsorshipById(
   }
 }
 
+// ============================================================================
+// NEWSLETTERS QUERIES
+// ============================================================================
+
+export interface AirtableNewsletterRecord {
+  id: string;
+  fields: {
+    Title?: string;
+    Subject?: string;
+    BodyHTML?: string;
+    HeroPhoto?: Array<{ id: string; url: string; filename: string }>;
+    Status?: 'Draft' | 'Scheduled' | 'Sending' | 'Sent' | 'Failed';
+    SendDate?: string;
+    PublishedAt?: string;
+    RecipientCount?: number;
+    SentCount?: number;
+    FailedCount?: number;
+    SendNotes?: string;
+    Author?: string;
+  };
+  createdTime: string;
+}
+
+function getNewslettersTableName(): string {
+  const name = process.env.AIRTABLE_NEWSLETTERS_TABLE || 'Newsletters';
+  return name;
+}
+
+/**
+ * Get a single newsletter by record ID.
+ */
+export async function getNewsletterById(
+  recordId: string
+): Promise<AirtableNewsletterRecord | null> {
+  logger.dbQuery('newsletters', 'getById', { recordId });
+  try {
+    const record = await airtableClient.getRecord<AirtableNewsletterRecord>(
+      getNewslettersTableName(),
+      recordId
+    );
+    return record;
+  } catch (error) {
+    logger.dbError('newsletters', 'getById', error);
+    return null;
+  }
+}
+
+/**
+ * Find newsletters queued to send (Status=Scheduled and SendDate <= now).
+ * The cron uses this.
+ */
+export async function findNewslettersDueToSend(): Promise<AirtableNewsletterRecord[]> {
+  logger.dbQuery('newsletters', 'findDue', {});
+  const formula = `AND(
+    {Status}="Scheduled",
+    IS_BEFORE({SendDate}, NOW())
+  )`;
+  try {
+    const response = await airtableClient.listRecords<AirtableNewsletterRecord>(
+      getNewslettersTableName(),
+      {
+        filterByFormula: formula,
+        sort: [{ field: 'SendDate', direction: 'asc' }],
+        maxRecords: 20,
+      }
+    );
+    return response.records;
+  } catch (error) {
+    logger.dbError('newsletters', 'findDue', error);
+    return [];
+  }
+}
+
+/**
+ * List every newsletter, newest first. Used by the admin editor.
+ */
+export async function listAllNewsletters(): Promise<AirtableNewsletterRecord[]> {
+  logger.dbQuery('newsletters', 'listAll', {});
+  try {
+    const response = await airtableClient.listRecords<AirtableNewsletterRecord>(
+      getNewslettersTableName(),
+      {
+        // Newest first — most operationally useful default for the editor.
+        sort: [{ field: 'SendDate', direction: 'desc' }],
+        maxRecords: 100,
+      }
+    );
+    return response.records;
+  } catch (error) {
+    logger.dbError('newsletters', 'listAll', error);
+    return [];
+  }
+}
+
+/**
+ * Create a new newsletter draft.
+ */
+export async function createNewsletter(
+  fields: Partial<AirtableNewsletterRecord['fields']>
+): Promise<AirtableNewsletterRecord> {
+  logger.dbQuery('newsletters', 'create', { title: fields.Title });
+  return airtableClient.createRecord<AirtableNewsletterRecord>(
+    getNewslettersTableName(),
+    fields as Record<string, unknown>
+  );
+}
+
+/**
+ * Patch a newsletter record (used to write status, counts, timestamps).
+ */
+export async function updateNewsletter(
+  recordId: string,
+  fields: Partial<AirtableNewsletterRecord['fields']>
+): Promise<AirtableNewsletterRecord> {
+  logger.dbQuery('newsletters', 'update', { recordId });
+  return airtableClient.updateRecord<AirtableNewsletterRecord>(
+    getNewslettersTableName(),
+    recordId,
+    fields as Record<string, unknown>
+  );
+}
+
+/**
+ * Find all active sponsors for the purpose of a campus-wide blast.
+ *
+ * This is intentionally more permissive than findAllActiveSponsorships:
+ * we don't gate on VisibleToSponsor (the campus newsletter is generic
+ * campus news, not child-specific, so it's fine to send to everyone
+ * whose sponsorship is currently active — including shirt+monthly
+ * buyers whose reveal hasn't happened yet). We do still require
+ * AuthStatus=Active so we skip paused / ended records.
+ */
+export async function findAllSponsorsForNewsletter(): Promise<AirtableSponsorshipRecord[]> {
+  logger.dbQuery('sponsorships', 'findAllForNewsletter', {});
+  const formula = `OR(
+    {${AIRTABLE_FIELDS.SPONSORSHIPS.AUTH_STATUS}}="${AUTH_STATUS.ACTIVE}",
+    {${AIRTABLE_FIELDS.SPONSORSHIPS.STATUS}}="Active"
+  )`;
+  try {
+    const response = await airtableClient.listRecords<AirtableSponsorshipRecord>(
+      airtableClient['tables'].sponsorships,
+      {
+        filterByFormula: formula,
+      }
+    );
+    return response.records;
+  } catch (error) {
+    logger.dbError('sponsorships', 'findAllForNewsletter', error);
+    throw error;
+  }
+}
+
+// ============================================================================
+// DONORS QUERIES
+// ============================================================================
+
+/**
+ * The Donors table holds the marketing opt-in flag. It's keyed on the
+ * free-text "Email Address" column rather than on record ID, since we
+ * only know the email when someone clicks an unsubscribe link.
+ */
+function getDonorsTableName(): string {
+  return process.env.AIRTABLE_DONORS_TABLE || 'Donors';
+}
+
+export interface AirtableDonorRecord {
+  id: string;
+  fields: {
+    'Donor Name'?: string;
+    'Email Address'?: string;
+    'Communication Opt-In'?: boolean;
+    'Stripe Customer ID'?: string;
+    Notes?: string;
+    [key: string]: unknown;
+  };
+  createdTime: string;
+}
+
+/**
+ * Find a donor record by exact email (case-insensitive).
+ *
+ * Airtable's `=` comparison is case-sensitive for text fields, so we
+ * normalize both sides with LOWER() in the formula. Returns the first
+ * match — we dedupe donors on creation, so there should be at most one.
+ */
+export async function findDonorByEmail(
+  email: string
+): Promise<AirtableDonorRecord | null> {
+  const normalized = email.trim().toLowerCase();
+  if (!normalized) return null;
+
+  logger.dbQuery('donors', 'findByEmail', { email: logger.maskEmail(normalized) });
+
+  // Escape double quotes to stop formula injection.
+  const safe = normalized.replace(/"/g, '\\"');
+  const formula = `LOWER({Email Address})="${safe}"`;
+
+  try {
+    const response = await airtableClient.listRecords<AirtableDonorRecord>(
+      getDonorsTableName(),
+      {
+        filterByFormula: formula,
+        maxRecords: 1,
+      }
+    );
+    return response.records[0] || null;
+  } catch (error) {
+    logger.dbError('donors', 'findByEmail', error);
+    throw error;
+  }
+}
+
+/**
+ * Flip the "Communication Opt-In" checkbox on a donor record.
+ * Used by the unsubscribe endpoint — CAN-SPAM requires marketing email
+ * recipients to be able to opt out without logging in.
+ */
+export async function updateDonorOptIn(
+  recordId: string,
+  optIn: boolean
+): Promise<AirtableDonorRecord> {
+  logger.dbQuery('donors', 'updateOptIn', { recordId, optIn });
+  return airtableClient.updateRecord<AirtableDonorRecord>(
+    getDonorsTableName(),
+    recordId,
+    { 'Communication Opt-In': optIn }
+  );
+}
+
 // Export client for advanced usage
 export { airtableClient };

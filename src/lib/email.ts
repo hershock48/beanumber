@@ -11,6 +11,7 @@
 import { logger } from './logger';
 import { getEmailConfig } from './env';
 import { sendEmailViaGmail, isGmailConfigured, GmailSendResult } from './gmail';
+import { buildUnsubscribeUrl } from './unsubscribe-token';
 
 // ============================================================================
 // TYPES
@@ -28,6 +29,12 @@ export interface EmailOptions {
   text?: string;
   from?: EmailRecipient;
   replyTo?: EmailRecipient;
+  /**
+   * Extra MIME headers. Currently used for `List-Unsubscribe` and
+   * `List-Unsubscribe-Post: List-Unsubscribe=One-Click` on newsletter
+   * sends (RFC 8058).
+   */
+  headers?: Record<string, string>;
 }
 
 export interface EmailSendResult {
@@ -86,6 +93,7 @@ export async function sendEmail(options: EmailOptions): Promise<EmailSendResult>
       html: options.html,
       text: options.text || stripHtml(options.html),
       replyTo: replyToAddress,
+      headers: options.headers,
     });
 
     return result;
@@ -110,6 +118,9 @@ export async function sendEmail(options: EmailOptions): Promise<EmailSendResult>
       subject: options.subject,
       text: options.text || stripHtml(options.html),
       html: options.html,
+      // SendGrid passes `headers` through to the recipient as custom
+      // MIME headers. Used for List-Unsubscribe on newsletters.
+      ...(options.headers ? { headers: options.headers } : {}),
     };
 
     const response = await sgMail.send(message);
@@ -179,7 +190,7 @@ export async function sendSponsorWelcomeEmail(
           <div class="content">
             <p>Dear ${sponsorName},</p>
 
-            <p>Thank you for partnering with us to support ${childName}! Your sponsorship directly enables sustainable community systems in Northern Uganda — healthcare, education, workforce development, and economic infrastructure that transform lives.</p>
+            <p>Thank you for partnering with us to support ${childName}! Your sponsorship directly enables sustainable community systems in Northern Uganda: healthcare, education, workforce development, and economic infrastructure that transform lives.</p>
 
             <div class="credentials">
               <h3>Your Sponsor Dashboard</h3>
@@ -194,10 +205,10 @@ export async function sendSponsorWelcomeEmail(
 
             <h3>What Happens Next</h3>
             <ul>
-              <li><strong>Regular Updates:</strong> We'll send you quarterly updates about ${childName} and community impact</li>
-              <li><strong>Photos & Stories:</strong> Our field team shares photos and stories directly from the community</li>
-              <li><strong>Impact Reports:</strong> See how your sponsorship contributes to measurable outcomes</li>
-              <li><strong>Request Updates:</strong> You can request a personalized update once every 90 days</li>
+              <li><strong>Monthly campus newsletter</strong> from our team in Gulu</li>
+              <li><strong>Photos every few months</strong> from the campus and community</li>
+              <li><strong>A handwritten letter from ${childName}</strong> once a year</li>
+              <li><strong>A year-end report card</strong> summarizing the impact of your sponsorship</li>
             </ul>
 
             <p>Your support makes a lasting difference. Thank you for being a number that counts.</p>
@@ -218,6 +229,107 @@ export async function sendSponsorWelcomeEmail(
     subject: `Welcome! You're now supporting ${childName}`,
     html,
   });
+}
+
+/**
+ * Send campus newsletter to one sponsor.
+ *
+ * The newsletter is the monthly "here's what's happening on campus"
+ * email — NOT child-specific. It goes to every active sponsor, including
+ * those whose reveal is still pending, so the content must never name
+ * a specific child. The only merge tag we substitute per-recipient is
+ * {{sponsorFirstName}}, which the admin can drop into their HTML.
+ *
+ * The raw body comes from the Newsletters table in Airtable and is
+ * treated as trusted HTML. Kevin writes it himself — we are not
+ * letting user-supplied content flow through here.
+ */
+export async function sendCampusNewsletterEmail(params: {
+  sponsorEmail: string;
+  sponsorName: string;
+  subject: string;
+  bodyHtml: string;
+  heroPhotoUrl?: string;
+}): Promise<EmailSendResult> {
+  const { sponsorEmail, sponsorName, subject, bodyHtml, heroPhotoUrl } = params;
+
+  const firstName = (sponsorName || 'Friend').trim().split(/\s+/)[0] || 'Friend';
+
+  // Substitute merge tags in the admin-authored body.
+  const merged = bodyHtml
+    .replace(/\{\{\s*sponsorFirstName\s*\}\}/g, escapeHtml(firstName))
+    .replace(/\{\{\s*sponsorName\s*\}\}/g, escapeHtml(sponsorName || 'Friend'));
+
+  const portalUrl = `${process.env.NEXT_PUBLIC_SITE_URL || 'https://www.beanumber.org'}/sponsor/login`;
+  // Signed, one-click unsubscribe target. RFC 8058 + Gmail bulk sender
+  // requirements both expect this to be a real, verifiable link and not
+  // a page that asks the recipient to log in first.
+  const unsubscribeUrl = buildUnsubscribeUrl(sponsorEmail);
+
+  const heroBlock = heroPhotoUrl
+    ? `<img src="${escapeAttr(heroPhotoUrl)}" alt="From the campus" style="display:block;width:100%;max-width:560px;height:auto;border-radius:8px;margin:0 0 24px 0;">`
+    : '';
+
+  const html = `<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${escapeHtml(subject)}</title>
+  </head>
+  <body style="margin:0;padding:0;background-color:#faf8f3;font-family:Georgia,'Times New Roman',serif;color:#2a2a2a;">
+    <div style="max-width:600px;margin:0 auto;padding:32px 24px;background-color:#ffffff;">
+      <div style="text-align:center;margin-bottom:24px;">
+        <div style="font-size:12px;letter-spacing:0.2em;color:#999;text-transform:uppercase;">From the campus</div>
+        <div style="font-size:14px;color:#666;margin-top:6px;">Be A Number &middot; Monthly Newsletter</div>
+      </div>
+      ${heroBlock}
+      <div style="font-size:17px;line-height:1.7;color:#2a2a2a;">
+        ${merged}
+      </div>
+      <hr style="border:none;border-top:1px solid #e8e0d4;margin:32px 0;">
+      <p style="font-size:14px;color:#666;line-height:1.6;">
+        You're receiving this because you're a Be A Number sponsor.
+        <a href="${portalUrl}" style="color:#D4A843;">Visit your portal</a> to see updates about your child, or
+        <a href="${unsubscribeUrl}" style="color:#999;">manage your emails</a>.
+      </p>
+      <p style="font-size:12px;color:#999;text-align:center;margin-top:24px;">
+        Be A Number, International &middot; 501(c)(3) Nonprofit<br>
+        <a href="${process.env.NEXT_PUBLIC_SITE_URL || 'https://www.beanumber.org'}" style="color:#D4A843;">beanumber.org</a>
+      </p>
+    </div>
+  </body>
+</html>`;
+
+  return sendEmail({
+    to: { email: sponsorEmail, name: sponsorName },
+    subject,
+    html,
+    // RFC 8058 one-click unsubscribe headers.
+    // - `List-Unsubscribe` wraps the URL in angle brackets (can also include
+    //    a mailto: fallback; we don't ship one yet — the HTTP URL is enough
+    //    for every major inbox provider in 2026).
+    // - `List-Unsubscribe-Post` tells the client "this is a one-click URL,
+    //    you can POST to it without my involvement." Required for Gmail to
+    //    show the inbox-level "Unsubscribe" button on bulk mail.
+    headers: {
+      'List-Unsubscribe': `<${unsubscribeUrl}>`,
+      'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+    },
+  });
+}
+
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function escapeAttr(s: string): string {
+  return escapeHtml(s);
 }
 
 /**
@@ -327,7 +439,7 @@ export async function sendDonationReceiptEmail(
           <div class="content">
             <p>Dear ${donorName},</p>
 
-            <p>Thank you for changing lives. Your generosity supports sustainable community systems in Northern Uganda — healthcare, education, workforce development, and economic empowerment that transform communities.</p>
+            <p>Thank you for changing lives. Your generosity supports sustainable community systems in Northern Uganda: healthcare, education, workforce development, and economic empowerment that transform communities.</p>
 
             <div class="receipt-box">
               <h3>Tax-Deductible Receipt</h3>
@@ -335,7 +447,7 @@ export async function sendDonationReceiptEmail(
               <p><strong>Donation Type:</strong> ${donationTypeText}</p>
               <p><strong>Transaction ID:</strong> ${transactionId}</p>
               <p><strong>Date:</strong> ${date}</p>
-              <p><strong>Tax ID:</strong> 46-2612870</p>
+              <p><strong>Tax ID:</strong> 93-1948872</p>
               <p style="margin-top: 20px; font-size: 12px; color: #666;">
                 Be A Number, International is a 501(c)(3) nonprofit organization. Your donation is tax-deductible to the fullest extent allowed by law. No goods or services were provided in exchange for this donation.
               </p>
@@ -350,12 +462,12 @@ export async function sendDonationReceiptEmail(
               <li><strong>Economic Systems:</strong> Income-generating infrastructure</li>
             </ul>
 
-            <p>We'll share quarterly updates on how your contribution is creating lasting change.</p>
+            <p>You'll hear from us monthly through our campus newsletter, with photos every few months and a year-end report card showing how your contribution created lasting change.</p>
 
             <p>With gratitude,<br>The Be A Number Team</p>
           </div>
           <div class="footer">
-            <p>Be A Number, International | 501(c)(3) Nonprofit | Tax ID: 46-2612870</p>
+            <p>Be A Number, International | 501(c)(3) Nonprofit | Tax ID: 93-1948872</p>
             <p><a href="${process.env.NEXT_PUBLIC_SITE_URL || 'https://www.beanumber.org'}">www.beanumber.org</a></p>
             <p>Questions? Email us at info@beanumber.org</p>
           </div>
@@ -503,7 +615,7 @@ export async function sendRecurringDonationThankYouEmail(
             Be A Number, International</p>
           </div>
           <div class="footer">
-            <p>Be A Number, International | 501(c)(3) Nonprofit | Tax ID: 46-2612870</p>
+            <p>Be A Number, International | 501(c)(3) Nonprofit | Tax ID: 93-1948872</p>
             <p><a href="${process.env.NEXT_PUBLIC_SITE_URL || 'https://www.beanumber.org'}">www.beanumber.org</a></p>
             <p>To update or cancel your subscription, reply to this email.</p>
           </div>

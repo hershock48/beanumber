@@ -46,8 +46,8 @@ export default function Impact() {
       {/* Main Content */}
       <main className="py-24 px-6">
         <div className="max-w-4xl mx-auto">
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">2025 Impact</h1>
-          <p className="text-xl text-gray-600 mb-12">Measured outcomes from our integrated community development model in Northern Uganda.</p>
+          <h1 className="text-4xl font-bold text-gray-900 mb-4">What We Accomplished in 2025</h1>
+          <p className="text-xl text-gray-600 mb-12">Real outcomes from our community in Northern Uganda. Because every number matters.</p>
 
           <div className="prose prose-lg max-w-none mb-16">
             <p className="text-gray-700 leading-relaxed mb-6">
@@ -77,8 +77,8 @@ export default function Impact() {
             <div className="bg-gray-50 p-8 rounded-lg border border-gray-200">
               <h2 className="text-2xl font-bold text-gray-900 mb-4">Education</h2>
               <p className="text-4xl font-bold text-gray-900 mb-2">15</p>
-              <p className="text-gray-700">Students supported</p>
-              <p className="text-gray-600 text-sm mt-2">380-student capacity school opening 2026</p>
+              <p className="text-gray-700">Children sponsored through BAN</p>
+              <p className="text-gray-600 text-sm mt-2">380-student capacity school, now open and serving the community</p>
             </div>
             <div className="bg-gray-50 p-8 rounded-lg border border-gray-200">
               <h2 className="text-2xl font-bold text-gray-900 mb-4">Workforce</h2>
@@ -95,7 +95,7 @@ export default function Impact() {
 
           <div className="border-t border-gray-200 pt-8">
             <p className="text-gray-700 leading-relaxed">
-              These outcomes are the foundation of a regional model designed to reach 20,000+ lives within five years and replicate across post-conflict regions.
+              These numbers represent real change: children in school, families with healthcare, women with skills to earn income. Our goal is to reach 20,000+ children and families within five years.
             </p>
           </div>
         </div>
@@ -104,7 +104,7 @@ export default function Impact() {
       {/* Footer */}
       <footer className="py-16 px-6 bg-gray-50 border-t border-gray-200 mt-24">
         <div className="max-w-6xl mx-auto text-center text-sm text-gray-500">
-          <p>© 2025 Be A Number, International. All rights reserved.</p>
+          <p>© {new Date().getFullYear()} Be A Number, International. All rights reserved.</p>
         </div>
       </footer>
     </div>

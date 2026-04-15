@@ -74,7 +74,7 @@ export default function DonateSuccess() {
 
         {/* What's Next in 2026 */}
         <section className="bg-gray-900 text-white rounded-lg shadow-lg p-8 md:p-12 mb-8">
-          <h2 className="text-2xl md:text-3xl font-bold mb-6">What's Next in 2026 — With Your Help</h2>
+          <h2 className="text-2xl md:text-3xl font-bold mb-6">What's Next in 2026</h2>
           <p className="text-white/90 leading-relaxed mb-6">
             Your donation directly supports our 2026 goals:
           </p>
@@ -166,8 +166,8 @@ export default function DonateSuccess() {
           <h2 className="text-2xl font-bold text-gray-900 mb-4">Questions or Want to Learn More?</h2>
           <p className="text-gray-700 mb-6">
             Contact us at{' '}
-            <a href="mailto:Kevin@beanumber.org" className="text-gray-900 font-semibold hover:text-gray-700 underline">
-              Kevin@beanumber.org
+            <a href="mailto:kevin@beanumber.org" className="text-gray-900 font-semibold hover:text-gray-700 underline">
+              kevin@beanumber.org
             </a>
             {' '}or explore our website to see the full impact of your contribution.
           </p>

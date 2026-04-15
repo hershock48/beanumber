@@ -1,589 +1,365 @@
 'use client';
 
-import { useEffect } from 'react';
-import { Logo } from '@/components/Logo';
-import { CountUpNumber } from '@/components/CountUpNumber';
-import { StickyDonateButton } from '@/components/StickyDonateButton';
-import { DonationSection } from '@/components/DonationSection';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import Image from 'next/image';
+import Link from 'next/link';
+import { BANNavigation } from '@/components/BANNavigation';
+import { BANFooter } from '@/components/BANFooter';
+import { Logo } from '@/components/Logo';
+
+interface Child {
+  id: string;
+  child_id: string;
+  first_name: string;
+  last_initial?: string;
+  display_name?: string;
+  age?: number;
+  grade_class?: string;
+  photo_url?: string;
+  fun_fact?: string;
+  months_waiting?: number;
+  sponsor_count?: number;
+  shirt_number_start?: number;
+  shirt_number_end?: number;
+}
 
 export function HomePageContent() {
-  // Fix title and favicon when page is restored from cache (e.g., after navigating back from Stripe)
+  const [searchNumber, setSearchNumber] = useState('');
+  const [children, setChildren] = useState<Child[]>([]);
+  const [loading, setLoading] = useState(true);
+  const router = useRouter();
+
   useEffect(() => {
-    const fixMetadata = () => {
-      // Ensure title is correct
-      const correctTitle = 'Be A Number, International | Rebuilding Post-War Societies';
-      if (document.title !== correctTitle) {
-        document.title = correctTitle;
-      }
-      
-      // Ensure favicon is correct
-      const updateFavicon = () => {
-        let link = document.querySelector("link[rel~='icon']") as HTMLLinkElement;
-        if (!link) {
-          link = document.createElement('link');
-          link.rel = 'icon';
-          document.getElementsByTagName('head')[0].appendChild(link);
-        }
-        // Force reload by adding timestamp
-        link.href = '/favicon.ico?' + Date.now();
-        // Then set to normal after a moment
-        setTimeout(() => {
-          link.href = '/favicon.ico';
-        }, 100);
-      };
-      
-      updateFavicon();
-    };
-
-    // Fix immediately
-    fixMetadata();
-
-    // Fix when page becomes visible (user navigates back)
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        fixMetadata();
-      }
-    };
-
-    // Fix when page is restored from cache (browser back button)
-    const handlePageShow = (e: PageTransitionEvent) => {
-      if (e.persisted) {
-        // Page was loaded from cache
-        fixMetadata();
-      }
-    };
-
-    // Also fix on focus (user switches back to tab)
-    const handleFocus = () => {
-      fixMetadata();
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('pageshow', handlePageShow);
-    window.addEventListener('focus', handleFocus);
-
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('pageshow', handlePageShow);
-      window.removeEventListener('focus', handleFocus);
-    };
+    fetch('/api/children')
+      .then(res => res.json())
+      .then(data => {
+        setChildren(data.children || []);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
   }, []);
 
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchNumber.trim()) {
+      router.push('/children/' + searchNumber.trim());
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-white">
-      <StickyDonateButton />
-      {/* Sticky Navigation */}
-      <nav className="sticky top-0 z-50 bg-white border-b border-gray-200">
-        <div className="max-w-6xl mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <a href="/" className="flex items-center gap-3">
-              <Logo className="h-8 w-8 text-gray-900" />
-              <span className="text-xl font-semibold text-gray-900">Be A Number</span>
-            </a>
-            <div className="hidden md:flex items-center gap-8">
-              <a href="#model" className="text-gray-700 hover:text-gray-900 transition-colors">
-                Model
-              </a>
-              <a href="#impact-2025" className="text-gray-700 hover:text-gray-900 transition-colors">
-                Impact
-              </a>
-              <a href="#partnerships" className="text-gray-700 hover:text-gray-900 transition-colors">
-                Partnerships
-              </a>
-              <a
-                href="#donate"
-                className="px-4 py-2 bg-gray-900 text-white rounded-md hover:bg-gray-800 transition-colors"
-              >
-                Donate
-              </a>
-            </div>
-            <div className="md:hidden">
-              <a
-                href="#donate"
-                className="px-4 py-2 bg-gray-900 text-white rounded-md text-sm"
-              >
-                Donate
-              </a>
-            </div>
-          </div>
-        </div>
-      </nav>
+    <div className="min-h-screen bg-[#FFF8F0]">
+      <BANNavigation currentPath="/" transparent />
 
-      {/* Hero Section */}
-      <section id="top" className="relative pt-16 pb-20 md:pt-20 md:pb-32 px-6 overflow-hidden">
-        {/* Background image with overlay */}
+      {/* ========== HERO ========== */}
+      <section className="relative -mt-[72px] pt-[72px] min-h-[90vh] flex items-center">
         <div className="absolute inset-0 z-0">
-        <Image
+          <Image
             src="/images/homepage/hero-community-group.jpg"
-            alt="Wide community group photo in front of painted building"
+            alt="Children in Africa"
             fill
-            className="object-cover md:object-cover"
-            style={{ objectPosition: 'center 30%' }}
-            sizes="100vw"
-          priority
-        />
+            className="object-cover"
+            priority
+          />
+          <div className="absolute inset-0 bg-gradient-to-b from-[#0d0d0d]/70 via-[#0d0d0d]/40 to-[#0d0d0d]/80" />
         </div>
-        <div className="absolute inset-0 z-0 bg-black/70 md:bg-black/65"></div>
-        <div className="relative z-10 max-w-6xl mx-auto">
-          <div className="max-w-3xl">
-            <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-4 leading-tight">
-              Rebuilding post-war societies through locally-led systems change.
+
+        <div className="relative z-10 max-w-4xl mx-auto px-5 py-24 text-center">
+          <Logo className="h-36 w-36 sm:h-44 sm:w-44 md:h-52 md:w-52 text-[#FFF8F0] mx-auto mb-10 drop-shadow-xl" />
+          <h1
+            className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl text-[#FFF8F0] mb-6 leading-tight tracking-tight"
+            style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
+          >
+            This number has a name.
           </h1>
-            <p className="text-base sm:text-lg text-white/90 mb-6 leading-[1.8]">
-              Be A Number partners with local leadership in Northern Uganda to design and operate integrated community systems — healthcare, education, workforce development, and local economic infrastructure — that move communities from survival to long-term stability.
+          <div className="mb-10" />
+          <p className="text-lg md:text-xl text-[#FFF8F0]/70 mb-12 max-w-lg mx-auto leading-relaxed">
+            There&rsquo;s a child in Africa waiting to tell you their name.
+            Your shirt number is theirs. Enter it and meet them.
+          </p>
+
+          <form onSubmit={handleSearch} className="flex max-w-md mx-auto shadow-2xl rounded-sm overflow-hidden">
+            <input
+              type="text"
+              value={searchNumber}
+              onChange={e => setSearchNumber(e.target.value)}
+              placeholder="Your shirt number"
+              className="flex-1 px-6 py-4 text-base text-[#0d0d0d] bg-white placeholder-[#999] focus:outline-none"
+            />
+            <button
+              type="submit"
+              className="px-8 py-4 bg-[#D4A843] text-[#0d0d0d] font-bold uppercase tracking-wider text-sm hover:bg-[#c49a3a] transition-colors"
+            >
+              Find
+            </button>
+          </form>
+
+          <p className="text-sm text-[#FFF8F0]/40 mt-8">
+            {"Don't have a number yet? "}
+            <Link href="/shirts" className="text-[#D4A843]/80 underline underline-offset-2 hover:text-[#D4A843]">
+              Get a shirt
+            </Link>
+          </p>
+        </div>
+
+        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-10">
+          <div className="w-5 h-9 rounded-full border border-[#FFF8F0]/20 flex items-start justify-center p-2">
+            <div className="w-0.5 h-2 bg-[#FFF8F0]/30 rounded-full animate-bounce" />
+          </div>
+        </div>
+      </section>
+
+      {/* ========== TRUST BAR ========== */}
+      <section className="bg-white border-b border-[#e8e0d4] py-5">
+        <div className="max-w-5xl mx-auto px-5 flex flex-wrap items-center justify-center gap-x-10 gap-y-2 text-sm text-[#999]">
+          <span className="flex items-center gap-2">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#D4A843]" />
+            501(c)(3) Registered
+          </span>
+          <span className="flex items-center gap-2">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#D4A843]" />
+            $25/month Sponsorship
+          </span>
+        </div>
+      </section>
+
+      {/* ========== THE CHILDREN ========== */}
+      <section className="py-24 px-5 bg-[#FFF8F0]">
+        <div className="max-w-3xl mx-auto text-center mb-16">
+          <p className="text-xs font-bold text-[#D4A843] uppercase tracking-[0.3em] mb-6">The Children</p>
+          <h2
+            className="text-3xl md:text-4xl text-[#0d0d0d] mb-8 leading-snug"
+            style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
+          >
+            They have names and stories.
+          </h2>
+          <p className="text-[#777] max-w-lg mx-auto leading-relaxed text-lg">
+            Every number on every shirt belongs to a child like the ones below. Your shirt covers their first month
+            of school. Stay with them for $25/month and you&rsquo;ll get a monthly newsletter from the campus, photos
+            of your child through the year, and a handwritten letter from them once a year.
+          </p>
+        </div>
+
+        {loading ? (
+          <div className="text-center py-16">
+            <div className="inline-block w-8 h-8 border-2 border-[#D4A843]/20 border-t-[#D4A843] rounded-full animate-spin" />
+          </div>
+        ) : children.length === 0 ? (
+          <div className="text-center py-16 bg-white border border-[#e8e0d4] max-w-md mx-auto">
+            <p className="text-[#0d0d0d] text-lg mb-2 font-medium">New children arriving soon.</p>
+            <p className="text-[#999] text-sm mb-8 px-6">
+              Get a shirt now and we&rsquo;ll introduce you to your child as soon as they&rsquo;re enrolled.
             </p>
-            <p className="text-base sm:text-lg text-white/90 mb-6 leading-[1.8]">
-              In 2025 alone, our work reached 700+ patients, 60 women, and 15 students, demonstrating how durable institutions, when owned and led by the community, generate measurable outcomes and lasting transformation.
-            </p>
-            <p className="text-base sm:text-lg text-white/90 mb-10 leading-[1.8]">
-              Each system is built to sustain itself through earned income and local ownership, ensuring long-term operations beyond initial investment and enabling replication across post-conflict regions.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 mb-6">
-              <a
-                href="#impact-2025"
-                className="px-8 py-4 bg-gray-900 text-white rounded-md hover:bg-gray-800 transition-colors text-center font-medium"
-              >
-                View 2025 Impact
-              </a>
-              <a
-                href="#community"
-                className="px-8 py-4 bg-white text-gray-900 rounded-md hover:bg-gray-100 transition-colors text-center font-medium"
-              >
-                Meet the Community
-              </a>
+            <Link
+              href="/shirts"
+              className="inline-block px-6 py-3 bg-[#D4A843] text-[#0d0d0d] font-bold text-sm uppercase tracking-wider hover:bg-[#c49a3a] transition-colors"
+            >
+              Get a Shirt
+            </Link>
+          </div>
+        ) : (
+          <div className="max-w-6xl mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {children.map(child => {
+              const displayName = child.display_name || child.first_name;
+              const photoUrl = child.photo_url || '/images/child-placeholder.jpg';
+              const shirtNum = child.shirt_number_start;
+              return (
+                <Link
+                  key={child.id || child.child_id}
+                  href={'/children/' + (shirtNum || child.child_id)}
+                  className="group bg-white overflow-hidden border border-[#e8e0d4] hover:border-[#D4A843]/40 hover:shadow-lg transition-all duration-300"
+                >
+                  <div className="aspect-[4/5] bg-[#f5f0e8] overflow-hidden relative">
+                    <img
+                      src={photoUrl}
+                      alt={displayName}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    />
+                    {shirtNum && (
+                      <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm px-3 py-1.5 text-xs font-bold text-[#D4A843] tracking-wider">
+                        #{shirtNum}
+                      </div>
+                    )}
+                  </div>
+                  <div className="p-5">
+                    <h3
+                      className="text-xl text-[#0d0d0d] mb-1"
+                      style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
+                    >
+                      {displayName}
+                    </h3>
+                    <div className="flex items-center gap-3 text-sm text-[#999] mb-4">
+                      {child.age && <span>Age {child.age}</span>}
+                      {child.age && child.grade_class && <span className="text-[#ccc]">&middot;</span>}
+                      {child.grade_class && <span>{child.grade_class}</span>}
+                    </div>
+                    {child.fun_fact && (
+                      <p className="text-sm text-[#777] italic mb-4 line-clamp-2">
+                        &ldquo;{child.fun_fact}&rdquo;
+                      </p>
+                    )}
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-[#aaa]">$25/month</span>
+                      <span className="text-sm font-bold text-[#D4A843] group-hover:translate-x-1 transition-transform uppercase tracking-wider">
+                        Meet them &rarr;
+                      </span>
+                    </div>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      {/* ========== HOW IT WORKS ========== */}
+      <section className="py-24 px-5 bg-white border-t border-[#e8e0d4]">
+        <div className="max-w-5xl mx-auto">
+          <p className="text-xs font-bold text-[#D4A843] uppercase tracking-[0.3em] mb-6 text-center">How It Works</p>
+          <h2
+            className="text-3xl md:text-4xl text-[#0d0d0d] mb-20 text-center"
+            style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
+          >
+            It starts with a shirt.
+          </h2>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-16">
+            <div className="text-center">
+              <div className="w-14 h-14 bg-[#D4A843]/10 border border-[#D4A843]/20 flex items-center justify-center mx-auto mb-6">
+                <span className="text-[#D4A843] font-bold text-lg" style={{ fontFamily: 'var(--font-lora), serif' }}>I</span>
+              </div>
+              <h3 className="text-lg font-semibold text-[#0d0d0d] mb-3">Get a Shirt</h3>
+              <p className="text-[#777] text-sm leading-relaxed">
+                Every shirt has a number, and every number belongs to a child. $25 gets you the shirt and covers their first month of school. Your number is assigned when you order.
+              </p>
             </div>
-            
-            {/* Trust Bar */}
-            <div className="flex flex-wrap items-center justify-center gap-6 py-4 px-6 bg-white/10 backdrop-blur-sm rounded-md border border-white/20">
-              <div className="flex items-center gap-2 text-white text-sm font-medium">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                </svg>
-                <span>501(c)(3) Registered</span>
+
+            <div className="text-center">
+              <div className="w-14 h-14 bg-[#D4A843]/10 border border-[#D4A843]/20 flex items-center justify-center mx-auto mb-6">
+                <span className="text-[#D4A843] font-bold text-lg" style={{ fontFamily: 'var(--font-lora), serif' }}>II</span>
               </div>
-              <div className="flex items-center gap-2 text-white text-sm font-medium">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-                <span>96.7% Program Allocation</span>
+              <h3 className="text-lg font-semibold text-[#0d0d0d] mb-3">Meet Them</h3>
+              <p className="text-[#777] text-sm leading-relaxed">
+                Come back here and enter your number. You&rsquo;ll see their face, learn their name, and read about who they are and what they dream about.
+              </p>
+            </div>
+
+            <div className="text-center">
+              <div className="w-14 h-14 bg-[#D4A843]/10 border border-[#D4A843]/20 flex items-center justify-center mx-auto mb-6">
+                <span className="text-[#D4A843] font-bold text-lg" style={{ fontFamily: 'var(--font-lora), serif' }}>III</span>
               </div>
-              <div className="flex items-center gap-2 text-white text-sm font-medium">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                </svg>
-                <span>Local Leadership</span>
-              </div>
-              <div className="flex items-center gap-2 text-white text-sm font-medium">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                </svg>
-                <span>Audited Reports</span>
-              </div>
+              <h3 className="text-lg font-semibold text-[#0d0d0d] mb-3">Stay With Them</h3>
+              <p className="text-[#777] text-sm leading-relaxed">
+                For $25/month you stay connected. A monthly campus newsletter, photos of your child through the year, a handwritten letter from them, and a year-end report card.
+              </p>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Impact Snapshot */}
-      <section id="impact-2025" className="py-24 px-6 bg-gray-50">
-        <div className="max-w-6xl mx-auto">
-          <h2 className="text-3xl font-bold text-gray-900 mb-4">2025 Measured Outcomes (Current)</h2>
-          <p className="text-gray-700 mb-12 leading-relaxed">These results demonstrate the model's effectiveness. We are on track to reach 20,000+ lives within five years and replicate the model in additional post-conflict regions.</p>
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              <div className="bg-white p-8 rounded-lg border border-gray-200">
-                <div className="text-4xl font-bold text-gray-900 mb-2">
-                  <CountUpNumber target={700} suffix="+" className="inline" />
-                </div>
-                <div className="text-gray-700">Medical outreach served</div>
-              </div>
-              <div className="bg-white p-8 rounded-lg border border-gray-200">
-                <div className="text-4xl font-bold text-gray-900 mb-2">
-                  <CountUpNumber target={60} className="inline" />
-                </div>
-                <div className="text-gray-700">Women trained (sewing/vocational)</div>
-              </div>
-              <div className="bg-white p-8 rounded-lg border border-gray-200">
-                <div className="text-4xl font-bold text-gray-900 mb-2">
-                  <CountUpNumber target={8} className="inline" />
-                </div>
-                <div className="text-gray-700">Men trained (construction skills)</div>
-              </div>
-              <div className="bg-white p-8 rounded-lg border border-gray-200">
-                <div className="text-4xl font-bold text-gray-900 mb-2">
-                  <CountUpNumber target={15} className="inline" />
-                </div>
-                <div className="text-gray-700">Students supported</div>
-              </div>
-              <div className="bg-white p-8 rounded-lg border border-gray-200">
-                <div className="text-4xl font-bold text-gray-900 mb-2">
-                  <CountUpNumber target={30} className="inline" />
-                </div>
-                <div className="text-gray-700">Local jobs supported</div>
-              </div>
-              <div className="bg-white p-8 rounded-lg border border-gray-200">
-                <div className="text-4xl font-bold text-gray-900 mb-2">
-                  <CountUpNumber target={380} className="inline" />
-                </div>
-                <div className="text-gray-700">School capacity: students</div>
-              </div>
-            </div>
-            <div className="lg:col-span-1">
-              <div className="bg-white rounded-lg border border-gray-200 overflow-hidden h-full px-4 py-4">
-                <div className="relative aspect-[3/4] bg-gray-200 rounded-lg overflow-hidden">
-                  <Image
-                    src="/images/impact/mother-child-portrait.jpg"
-                    alt="Portrait of mother and child inside home with jerrycans"
-                    fill
-                    className="object-cover"
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
+      {/* ========== QUOTE BREAK ========== */}
+      <section className="py-20 px-5 bg-[#FFF8F0] border-t border-[#e8e0d4]">
+        <div className="max-w-3xl mx-auto text-center">
+          <Logo variant="cross" className="h-10 w-10 text-[#D4A843] mx-auto mb-8" />
+          <blockquote
+            className="text-xl md:text-2xl text-[#0d0d0d]/70 leading-relaxed"
+            style={{ fontFamily: 'var(--font-lora), serif', fontStyle: 'italic' }}
+          >
+            &ldquo;You have not lived today until you have done something for someone who can never repay you.&rdquo;
+          </blockquote>
+          <p className="text-xs text-[#999] uppercase tracking-[0.3em] mt-4">John Bosco</p>
         </div>
       </section>
 
-      {/* How the model works */}
-      <section className="py-20 px-6 bg-white border-y border-gray-200">
-        <div className="max-w-6xl mx-auto">
-          <h2 className="text-lg font-semibold text-gray-900 mb-12 text-center">How it works</h2>
-          <div className="flex flex-col md:flex-row items-center md:items-start justify-between gap-8 md:gap-4 relative">
-            {/* Timeline connector line - desktop */}
-            <div className="hidden md:block absolute top-6 left-1/4 right-1/4 h-0.5 bg-gray-300 -z-10"></div>
-            
-            {/* Step 1 */}
-            <div className="flex-1 w-full md:w-auto text-center md:text-left">
-              <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-gray-900 text-white mb-4 text-xl font-bold">
-                1
-              </div>
-              <p className="text-gray-900 font-semibold text-lg">Community-led planning</p>
-            </div>
-            
-            {/* Arrow - desktop */}
-            <div className="hidden md:block text-gray-400 text-2xl flex-shrink-0">→</div>
-            
-            {/* Arrow - mobile */}
-            <div className="md:hidden text-gray-400 text-2xl py-2">↓</div>
-            
-            {/* Step 2 */}
-            <div className="flex-1 w-full md:w-auto text-center md:text-left">
-              <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-gray-900 text-white mb-4 text-xl font-bold">
-                2
-              </div>
-              <p className="text-gray-900 font-semibold text-lg">Build foundational community systems</p>
-            </div>
-            
-            {/* Arrow - desktop */}
-            <div className="hidden md:block text-gray-400 text-2xl flex-shrink-0">→</div>
-            
-            {/* Arrow - mobile */}
-            <div className="md:hidden text-gray-400 text-2xl py-2">↓</div>
-            
-            {/* Step 3 */}
-            <div className="flex-1 w-full md:w-auto text-center md:text-left">
-              <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-gray-900 text-white mb-4 text-xl font-bold">
-                3
-              </div>
-              <p className="text-gray-900 font-semibold text-lg">Sustain through local jobs + earned income</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Why Be A Number */}
-      <section className="py-20 px-6 bg-gray-50">
-        <div className="max-w-6xl mx-auto">
-          <h2 className="text-2xl font-bold text-gray-900 mb-6">Why Be A Number</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
-            <div>
-              <p className="text-gray-700 text-lg leading-relaxed mb-4">
-                Unlike traditional aid programs, we build systems that sustain themselves. Communities own and operate all programs long-term.
-              </p>
-              <p className="text-gray-700 leading-relaxed mb-4">
-                Traditional aid often creates dependency: communities wait for outside funding, programs end when donations stop, and local leadership is sidelined. Our model works differently. We invest in infrastructure, training, and income-generating activities that create earned revenue. Programs become self-sustaining, ensuring operations continue without ongoing external funding. Communities set priorities, local staff run operations, and the systems we build become permanent assets.
-              </p>
-              <p className="text-gray-700 leading-relaxed">
-                This model can be replicated in any post-conflict region where community leadership and local partnerships are in place.
-              </p>
-            </div>
-            <div className="w-full">
-              <div className="relative w-full aspect-[4/3] bg-gray-200 rounded-lg overflow-hidden">
-                <Image
-                  src="/images/governance/planning-notebook.jpg"
-                  alt="Woman with clothesline in Northern Uganda"
-                  fill
-                  className="object-cover"
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* The Model */}
-      <section id="model" className="py-24 px-6">
-        <div className="max-w-6xl mx-auto">
-          <h2 className="text-3xl font-bold text-gray-900 mb-4">The Model</h2>
-          <p className="text-gray-700 mb-12 max-w-3xl leading-relaxed">Four integrated systems work together to create sustainable, long-term change. Each system generates measurable outcomes and can operate independently.</p>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div className="p-8 border border-gray-200 rounded-lg">
-              <h3 className="text-xl font-semibold text-gray-900 mb-4">Health</h3>
-              <p className="text-gray-700 leading-relaxed">
-                Medical center and outreach programs provide essential healthcare services. Measured outcomes include patient visits, treatment completions, and health education sessions. Operations are sustained through local partnerships and community support.
-              </p>
-              <p className="text-gray-700 leading-relaxed mt-2">700+ patient visits in 2025</p>
-            </div>
-            <div className="p-8 border border-gray-200 rounded-lg">
-              <h3 className="text-xl font-semibold text-gray-900 mb-4">Education</h3>
-              <p className="text-gray-700 leading-relaxed">
-                School infrastructure serves 380 students. Scholarships support children from early childhood through secondary education. Measured outcomes include enrollment rates, completion rates, and academic performance. School fees sustain operations long-term.
-              </p>
-              <p className="text-gray-700 leading-relaxed mt-2">380-student capacity school opening 2026</p>
-            </div>
-            <div className="p-8 border border-gray-200 rounded-lg">
-              <h3 className="text-xl font-semibold text-gray-900 mb-4">Workforce</h3>
-              <p className="text-gray-700 leading-relaxed">
-                Vocational training programs teach practical skills in sewing, construction, and other in-demand trades. Measured outcomes include training completions, job placements, and business starts. Programs are designed to respond to local market needs.
-              </p>
-              <p className="text-gray-700 leading-relaxed mt-2">68 adults trained</p>
-            </div>
-            <div className="p-8 border border-gray-200 rounded-lg">
-              <h3 className="text-xl font-semibold text-gray-900 mb-4">Economic Empowerment</h3>
-              <p className="text-gray-700 leading-relaxed">
-                Economic activities include local business support, job creation, and income-generating partnerships. Measured outcomes include jobs created, businesses supported, and revenue generated. These activities ensure long-term program sustainability.
-              </p>
-              <p className="text-gray-700 leading-relaxed mt-2">30 local jobs supported</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Community */}
-      <section id="community" className="py-24 px-6">
-        <div className="max-w-6xl mx-auto">
-          <h2 className="text-3xl font-bold text-gray-900 mb-6">Meet the Community</h2>
-          <p className="text-gray-700 mb-12 max-w-3xl leading-relaxed">
-            The people of Northern Uganda are building their own future. Community leaders set priorities, local staff run operations, and families participate in programs that will sustain generations to come.
+      {/* ========== IMPACT / CAMPUS ========== */}
+      <section className="py-24 px-5 bg-white border-t border-[#e8e0d4]">
+        <div className="max-w-5xl mx-auto">
+          <p className="text-xs font-bold text-[#D4A843] uppercase tracking-[0.3em] mb-6 text-center">Where Your Money Goes</p>
+          <h2
+            className="text-3xl md:text-4xl text-[#0d0d0d] mb-4 text-center"
+            style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
+          >
+            A place they can call home.
+          </h2>
+          <p className="text-[#999] text-center mb-16 max-w-lg mx-auto">
+            Six acres in Africa. A school, a medical center, vocational training,
+            and 30 people from the community employed to run it. Your $25 keeps it going.
           </p>
 
-          {/* Community Image */}
-          <div className="mb-12 w-full max-w-2xl mx-auto">
-            <div className="relative w-full aspect-[16/10] bg-gray-200 rounded-lg overflow-hidden">
-              <Image
-                src="/images/partnerships/sewing-classroom-training.jpg"
-                alt="Wide sewing classroom training scene"
-                fill
-                className="object-cover"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="bg-white p-8 rounded-lg border border-gray-200">
-              <h3 className="text-xl font-semibold text-gray-900 mb-3">Community Leaders</h3>
-              <p className="text-gray-700 leading-relaxed">
-                Local elders and elected leaders work with our team to identify community needs and set program priorities. Their leadership ensures programs reflect local values and long-term goals.
-              </p>
-            </div>
-            <div className="bg-white p-8 rounded-lg border border-gray-200">
-              <h3 className="text-xl font-semibold text-gray-900 mb-3">Program Staff</h3>
-              <p className="text-gray-700 leading-relaxed">
-                All programs are staffed by trained local professionals—teachers, healthcare workers, and vocational instructors. They run daily operations and build relationships with participants.
-              </p>
-            </div>
-            <div className="bg-white p-8 rounded-lg border border-gray-200">
-              <h3 className="text-xl font-semibold text-gray-900 mb-3">Participants</h3>
-              <p className="text-gray-700 leading-relaxed">
-                Families participate in health programs, students attend school, and adults learn new skills. Their success creates lasting change that extends to future generations.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Infrastructure Built */}
-      <section id="infrastructure" className="py-24 px-6 bg-gray-50">
-        <div className="max-w-6xl mx-auto">
-          <h2 className="text-3xl font-bold text-gray-900 mb-4">Infrastructure Built</h2>
-          <p className="text-gray-700 mb-12 leading-relaxed">All infrastructure built and operated by local partners in Northern Uganda.</p>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="bg-white p-8 rounded-lg border border-gray-200">
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">Medical Center</h3>
-              <p className="text-gray-700">Operational</p>
-            </div>
-            <div className="bg-white p-8 rounded-lg border border-gray-200">
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">Nursery & Primary School</h3>
-              <p className="text-gray-700">95% complete; 380-student capacity</p>
-            </div>
-            <div className="bg-white p-8 rounded-lg border border-gray-200">
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">Training Center</h3>
-              <p className="text-gray-700">Active</p>
-            </div>
-            <div className="bg-white p-8 rounded-lg border border-gray-200">
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">Lodge + 3 Dorms</h3>
-              <p className="text-gray-700">For university cohorts</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Partnerships */}
-      <section id="partnerships" className="py-24 px-6">
-        <div className="max-w-6xl mx-auto">
-          <h2 className="text-3xl font-bold text-gray-900 mb-6">Partnerships</h2>
-          <p className="text-gray-700 mb-12 max-w-3xl leading-relaxed">
-            We partner with established institutions to ensure program quality, accountability, and replicability. Academic partnerships provide technical expertise and program validation. Local organizations implement programs with community leadership. These partnerships demonstrate the model's ability to scale across regions.
-          </p>
-          
-          {/* Primary Image */}
-          <div className="mb-12 w-full max-w-2xl mx-auto">
-            <div className="relative w-full aspect-[16/10] bg-gray-200 rounded-lg overflow-hidden">
-            <Image
-                src="/images/impact-page/secondary-image.jpg"
-                alt="Kevin Hershock with community members carrying jerrycans"
-                fill
-                className="object-cover"
-              />
-            </div>
-          </div>
-          
-          {/* Key Partners & Collaborators */}
-          <h3 className="text-2xl font-bold text-gray-900 mb-6">Key Partners & Collaborators</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-16">
-            <div className="p-8 border border-gray-200 rounded-lg bg-white">
-              <div className="h-16 mb-4 flex items-center">
-                <div className="text-xl font-semibold text-gray-700">Youth Development Organization (YDO), Uganda</div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {[
+              { number: '380', label: 'Students' },
+              { number: '700+', label: 'Patients Served' },
+              { number: '68', label: 'Adults Trained' },
+              { number: '30', label: 'Local Jobs' },
+            ].map((stat) => (
+              <div key={stat.label} className="bg-[#FFF8F0] border border-[#e8e0d4] p-6 text-center">
+                <div
+                  className="text-3xl md:text-4xl text-[#D4A843] mb-1"
+                  style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 700 }}
+                >
+                  {stat.number}
+                </div>
+                <div className="text-xs text-[#999] uppercase tracking-wider">{stat.label}</div>
               </div>
-              <p className="text-gray-700 mb-2">Core local implementing partner in Northern Uganda</p>
-              <p className="text-gray-700 text-sm">
-                <a href="https://www.theyouth.world" target="_blank" rel="noopener noreferrer" className="text-gray-900 hover:text-gray-700 underline">
-                  Visit YDO's website →
-                </a>
-              </p>
-            </div>
-            <div className="p-8 border border-gray-200 rounded-lg bg-white">
-              <div className="h-16 mb-4 flex items-center">
-                <div className="text-2xl font-bold text-gray-700">University of Worcester (UK)</div>
-              </div>
-              <p className="text-gray-700">Academic partner; four student cohorts scheduled for 2026</p>
-            </div>
-            <div className="p-8 border border-gray-200 rounded-lg bg-white">
-              <div className="h-16 mb-4 flex items-center">
-                <div className="text-xl font-semibold text-gray-700">Rotary Club of Marshall (USA)</div>
-              </div>
-              <p className="text-gray-700">Longstanding civic partner supporting health, education, and community development initiatives</p>
-            </div>
-            <div className="p-8 border border-gray-200 rounded-lg bg-white">
-              <div className="h-16 mb-4 flex items-center">
-                <div className="text-xl font-semibold text-gray-700">Rotary Club of Gulu (Uganda)</div>
-              </div>
-              <p className="text-gray-700">Local institutional partner advancing health, education, and post-conflict community development</p>
-            </div>
+            ))}
           </div>
 
-          {/* Testimonial */}
-          <div className="bg-gray-50 border-l-4 border-gray-900 p-8 rounded-lg">
-            <p className="text-lg text-gray-700 italic mb-4 leading-relaxed">
-              "This partnership has transformed our community. Our children now have access to education, our families have healthcare, and our people have skills to build their futures. We are building something that will last for generations."
-            </p>
-            <p className="text-gray-600 font-medium">— Community Leader, Northern Uganda</p>
+          <div className="text-center mt-10">
+            <Link
+              href="/impact"
+              className="inline-flex items-center gap-2 text-[#D4A843] font-medium text-sm hover:underline underline-offset-4 uppercase tracking-wider"
+            >
+              Full impact report
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+              </svg>
+            </Link>
           </div>
         </div>
       </section>
 
-      {/* Trust & Credibility */}
-      <section className="py-16 px-6 bg-white border-y border-gray-200">
-        <div className="max-w-6xl mx-auto">
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-6 text-center">
-            <div>
-              <div className="text-2xl font-bold text-gray-900 mb-1">3+</div>
-              <div className="text-sm text-gray-600">Years active</div>
-            </div>
-            <div>
-              <div className="text-2xl font-bold text-gray-900 mb-1">501(c)(3)</div>
-              <div className="text-sm text-gray-600">Nonprofit status</div>
-            </div>
-            <div>
-              <div className="text-2xl font-bold text-gray-900 mb-1">100%</div>
-              <div className="text-sm text-gray-600">Local leadership</div>
-            </div>
-            <div>
-              <div className="text-2xl font-bold text-gray-900 mb-1">3</div>
-              <div className="text-sm text-gray-600">Institutional partners</div>
-            </div>
-            <div>
-              <div className="text-2xl font-bold text-gray-900 mb-1">Public</div>
-              <div className="text-sm text-gray-600">Financial reports</div>
-            </div>
-          </div>
+      {/* ========== FINAL CTA ========== */}
+      <section className="relative py-28 px-5 overflow-hidden">
+        <div className="absolute inset-0 bg-[#0d0d0d]" />
+        <div className="absolute inset-0 opacity-10">
+          <Image
+            src="/images/homepage/hero-community-group.jpg"
+            alt=""
+            fill
+            className="object-cover"
+          />
         </div>
-      </section>
-
-      {/* Donate CTA */}
-      <DonationSection />
-
-      {/* Founder Attribution */}
-      <section className="py-12 px-6 bg-white border-t border-gray-200">
-        <div className="max-w-6xl mx-auto text-center">
-          <p className="text-gray-600 text-sm">
-            Founded by <a href="/founder" className="text-gray-900 hover:text-gray-700 underline font-medium">Kevin Hershock</a> after 15+ years of community work in Northern Uganda
+        <div className="relative z-10 max-w-3xl mx-auto text-center">
+          <div className="w-8 h-px bg-[#D4A843] mx-auto mb-10" />
+          <h2
+            className="text-2xl md:text-3xl text-[#FFF8F0] mb-6 leading-snug"
+            style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
+          >
+            Someone is waiting for you.
+          </h2>
+          <p className="text-[#999] mb-12 max-w-md mx-auto leading-relaxed">
+            A child in Africa with a name, a classroom, and a story that&rsquo;s just getting started. Your shirt is how you meet them.
           </p>
-        </div>
-      </section>
 
-      {/* Vision Statement */}
-      <section className="py-12 px-6 bg-white border-t border-gray-200">
-        <div className="max-w-6xl mx-auto text-center">
-          <p className="text-gray-700 leading-relaxed">
-            Our 5-year goal: Reach 20,000+ lives and replicate this model across post-conflict regions.
-          </p>
-        </div>
-      </section>
-
-      {/* Reports */}
-      <section className="py-12 px-6 bg-white border-t border-gray-200">
-        <div className="max-w-6xl mx-auto text-center">
-          <p className="text-gray-600 text-sm mb-2">
-            Reports: <a href="/reports/2025-impact-financial-summary" className="text-gray-900 hover:text-gray-700 underline font-medium">2025 Impact & Financial Summary</a> • <a href="/reports/2025-annual-report" className="text-gray-900 hover:text-gray-700 underline font-medium">2025 Annual Report</a>
-          </p>
-          <p className="text-gray-500 text-xs mt-2">All reports independently reviewed and publicly available.</p>
-        </div>
-      </section>
-
-      {/* Footer */}
-      <footer className="py-16 px-6 bg-gray-50 border-t border-gray-200">
-        <div className="max-w-6xl mx-auto">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
-            <div>
-              <h3 className="font-semibold text-gray-900 mb-4">Be A Number, International</h3>
-              <p className="text-gray-600 text-sm">
-                8475 18 1/2 Mile Road, Marshall, MI 49068
-              </p>
-            </div>
-            <div>
-              <h3 className="font-semibold text-gray-900 mb-4">Contact</h3>
-              <p className="text-gray-600 text-sm">
-                Email: Kevin@beanumber.org
-              </p>
-            </div>
-            <div>
-              <h3 className="font-semibold text-gray-900 mb-4">Legal</h3>
-              <p className="text-gray-600 text-sm mb-2">
-                EIN: 93-1948872
-              </p>
-              <a href="/governance" className="text-gray-600 text-sm hover:text-gray-900 underline">
-                Governance & Financials
-              </a>
-            </div>
-          </div>
-          <div className="pt-8 border-t border-gray-200 text-center text-sm text-gray-500">
-            <p>© 2025 Be A Number, International. All rights reserved.</p>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <Link
+              href="/shirts"
+              className="px-8 py-4 bg-[#D4A843] text-[#0d0d0d] font-bold uppercase tracking-wider text-sm hover:bg-[#c49a3a] transition-colors"
+            >
+              Get a Shirt
+            </Link>
+            <Link
+              href="/sponsorship"
+              className="px-8 py-4 bg-transparent text-[#FFF8F0] font-bold uppercase tracking-wider text-sm border border-[#444] hover:border-[#D4A843]/50 transition-colors"
+            >
+              Browse Children
+            </Link>
           </div>
         </div>
-      </footer>
+      </section>
+
+      <BANFooter />
     </div>
   );
 }

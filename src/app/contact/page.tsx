@@ -45,10 +45,10 @@ export default function Contact() {
                 For general inquiries, sponsorship questions, or to request your sponsor code:
               </p>
               <a
-                href="mailto:Kevin@beanumber.org"
+                href="mailto:kevin@beanumber.org"
                 className="text-lg font-medium text-gray-900 hover:underline"
               >
-                Kevin@beanumber.org
+                kevin@beanumber.org
               </a>
             </div>
 
@@ -72,8 +72,8 @@ export default function Contact() {
                 </h3>
                 <p className="text-gray-700">
                   Email us at{' '}
-                  <a href="mailto:Kevin@beanumber.org" className="text-gray-900 font-medium hover:underline">
-                    Kevin@beanumber.org
+                  <a href="mailto:kevin@beanumber.org" className="text-gray-900 font-medium hover:underline">
+                    kevin@beanumber.org
                   </a>
                   {' '}with the email address you used when you started your sponsorship, and we'll send your sponsor code right away.
                 </p>
@@ -120,7 +120,7 @@ export default function Contact() {
       {/* Footer */}
       <footer className="py-16 px-6 bg-gray-50 border-t border-gray-200 mt-24">
         <div className="max-w-6xl mx-auto text-center text-sm text-gray-500">
-          <p>© 2025 Be A Number, International. All rights reserved.</p>
+          <p>© {new Date().getFullYear()} Be A Number, International. All rights reserved.</p>
         </div>
       </footer>
     </div>

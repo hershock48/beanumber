@@ -66,7 +66,7 @@ export default function Governance() {
           <section className="mb-12">
             <h2 className="text-2xl font-bold text-gray-900 mb-6">Governance</h2>
             <p className="text-gray-700 leading-relaxed">
-              Be A Number is overseen by a Board of Directors and operates under disciplined financial and organizational governance to ensure accountability, compliance, and long-term sustainability. The organization is founder-led with active local and international oversight.
+              Your trust matters. Be A Number is guided by a Board of Directors and keeps tight financial controls so your donations go where they're meant to go. We're founder-led with active local and international oversight.
             </p>
           </section>
 
@@ -114,7 +114,7 @@ export default function Governance() {
           <section className="mb-12">
             <h2 className="text-2xl font-bold text-gray-900 mb-6">Financial Stewardship</h2>
             <p className="text-gray-700 leading-relaxed">
-              Be A Number operates with a lean administrative structure, ensuring maximum program impact while maintaining the governance, compliance, reporting, and operational capacity required for long-term scale and institutional credibility.
+              We run lean so that most of your money goes directly to programs. With just 3.3% in administrative costs, we stretch every dollar while staying accountable and ready to grow responsibly.
             </p>
           </section>
         </div>
@@ -123,7 +123,7 @@ export default function Governance() {
       {/* Footer */}
       <footer className="py-16 px-6 bg-gray-50 border-t border-gray-200 mt-24">
         <div className="max-w-6xl mx-auto text-center text-sm text-gray-500">
-          <p>© 2025 Be A Number, International. All rights reserved.</p>
+          <p>© {new Date().getFullYear()} Be A Number, International. All rights reserved.</p>
         </div>
       </footer>
     </div>

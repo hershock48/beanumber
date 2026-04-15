@@ -9,8 +9,12 @@ interface EnvironmentVariables {
   AIRTABLE_BASE_ID: string;
   AIRTABLE_SPONSORSHIPS_TABLE: string;
   AIRTABLE_UPDATES_TABLE: string;
+  AIRTABLE_NEWSLETTERS_TABLE: string;
   AIRTABLE_CHILDREN_TABLE?: string;
   AIRTABLE_CHILD_UPDATES_TABLE?: string;
+
+  // Cron auth
+  CRON_SECRET?: string;
 
   // Stripe (optional until configured)
   STRIPE_SECRET_KEY?: string;
@@ -49,6 +53,7 @@ function validateEnvironment(): EnvironmentVariables {
     'AIRTABLE_BASE_ID',
     'AIRTABLE_SPONSORSHIPS_TABLE',
     'AIRTABLE_UPDATES_TABLE',
+    'AIRTABLE_NEWSLETTERS_TABLE',
   ] as const;
   
   // Optional new tables (for Child Update System)
@@ -93,8 +98,10 @@ function validateEnvironment(): EnvironmentVariables {
     AIRTABLE_BASE_ID: process.env.AIRTABLE_BASE_ID!,
     AIRTABLE_SPONSORSHIPS_TABLE: process.env.AIRTABLE_SPONSORSHIPS_TABLE!,
     AIRTABLE_UPDATES_TABLE: process.env.AIRTABLE_UPDATES_TABLE!,
+    AIRTABLE_NEWSLETTERS_TABLE: process.env.AIRTABLE_NEWSLETTERS_TABLE!,
     AIRTABLE_CHILDREN_TABLE: process.env.AIRTABLE_CHILDREN_TABLE,
     AIRTABLE_CHILD_UPDATES_TABLE: process.env.AIRTABLE_CHILD_UPDATES_TABLE,
+    CRON_SECRET: process.env.CRON_SECRET,
     STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
     STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET,
     NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY,
@@ -162,6 +169,7 @@ export function getAirtableConfig() {
       updates: envVars.AIRTABLE_UPDATES_TABLE,
       children: envVars.AIRTABLE_CHILDREN_TABLE,
       childUpdates: envVars.AIRTABLE_CHILD_UPDATES_TABLE,
+      newsletters: envVars.AIRTABLE_NEWSLETTERS_TABLE,
     },
   };
 }

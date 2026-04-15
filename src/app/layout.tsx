@@ -1,30 +1,33 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Lora, Inter } from "next/font/google";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const lora = Lora({
+  variable: "--font-lora",
   subsets: ["latin"],
+  display: "swap",
+  weight: ["400", "500", "600", "700"],
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const inter = Inter({
+  variable: "--font-inter",
   subsets: ["latin"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://www.beanumber.org'),
   title: {
-    default: "Be A Number, International | Rebuilding Post-War Societies",
-    template: "%s | Be A Number, International"
+    default: "Be A Number | Every Number Is a Child",
+    template: "%s | Be A Number"
   },
   icons: {
     icon: '/favicon.ico',
     shortcut: '/favicon.ico',
     apple: '/icon.svg',
   },
-  description: "Be A Number partners with local leadership in Northern Uganda to build sustainable community systems — healthcare, education, workforce development, and economic infrastructure that transform communities from survival to long-term stability.",
-  keywords: ["nonprofit", "Northern Uganda", "community development", "post-conflict recovery", "sustainable development", "501c3", "international development", "healthcare", "education", "workforce development"],
+  description: "Every Be A Number shirt carries a unique number connected to a real child in Africa. Find your number, meet your child, become their sponsor.",
+  keywords: ["child sponsorship", "Africa", "Northern Uganda", "nonprofit", "Be A Number", "sponsor a child", "education", "community development"],
   authors: [{ name: "Be A Number, International" }],
   creator: "Be A Number, International",
   publisher: "Be A Number, International",
@@ -32,22 +35,22 @@ export const metadata: Metadata = {
     type: "website",
     locale: "en_US",
     url: "https://www.beanumber.org",
-    siteName: "Be A Number, International",
-    title: "Be A Number, International | Rebuilding Post-War Societies",
-    description: "Be A Number partners with local leadership in Northern Uganda to build sustainable community systems — healthcare, education, workforce development, and economic infrastructure that transform communities from survival to long-term stability.",
+    siteName: "Be A Number",
+    title: "Be A Number | Every Number Is a Child",
+    description: "Every Be A Number shirt carries a unique number connected to a real child in Africa. Find your number, meet your child, become their sponsor.",
     images: [
       {
         url: "/images/homepage/hero-community-group.jpg",
         width: 1200,
         height: 630,
-        alt: "Community group in Northern Uganda",
+        alt: "Children in Northern Uganda",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Be A Number, International | Rebuilding Post-War Societies",
-    description: "Be A Number partners with local leadership in Northern Uganda to build sustainable community systems.",
+    title: "Be A Number | Every Number Is a Child",
+    description: "Every shirt carries a number. Every number is a child.",
     images: ["/images/homepage/hero-community-group.jpg"],
   },
   robots: {
@@ -61,10 +64,6 @@ export const metadata: Metadata = {
       'max-snippet': -1,
     },
   },
-  verification: {
-    // Add Google Search Console verification if you have it
-    // google: "your-verification-code",
-  },
 };
 
 export default function RootLayout({
@@ -74,9 +73,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="scroll-smooth">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
+      <body className={`${lora.variable} ${inter.variable} antialiased`}>
         {children}
       </body>
     </html>

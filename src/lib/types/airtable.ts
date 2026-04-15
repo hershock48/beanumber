@@ -32,6 +32,12 @@ export interface AirtableSponsorshipRecord {
     VisibleToSponsor: boolean;
     LastRequestAt?: string;
     NextRequestEligibleAt?: string;
+    // ISO timestamp when sponsor first met their child (via /children/{n} or
+    // auto-set at creation for non-shirt sponsors). When unset, the sponsor
+    // portal stays in lockbox mode.
+    ChildRevealedAt?: string;
+    StripeSubscriptionID?: string;
+    MonthlyAmount?: number;
   };
   createdTime: string;
 }
@@ -274,3 +280,54 @@ export interface AirtableChildUpdateRecord {
 }
 
 export type ChildUpdateFields = AirtableChildUpdateRecord['fields'];
+
+// ============================================================================
+// SCHEDULED POSTS TABLE (NEW - Social Media Automation)
+// ============================================================================
+
+export type SocialPlatform = 'Instagram' | 'Facebook' | 'Both';
+export type SocialContentType = 'Reel' | 'Image' | 'Carousel' | 'Story' | 'Video' | 'Link';
+export type ScheduledPostStatus = 'Pending' | 'Processing' | 'Published' | 'Failed' | 'Cancelled';
+
+export interface AirtableScheduledPostRecord {
+  id: string;
+  fields: {
+    Platform: SocialPlatform;
+    ContentType: SocialContentType;
+    MediaDriveId?: string; // Google Drive file ID
+    MediaUrl?: string; // Public URL for posting
+    Caption: string;
+    Hashtags?: string; // Comma-separated
+    ScheduledAt: string; // ISO datetime
+    Status: ScheduledPostStatus;
+    PublishedAt?: string;
+    InstagramPostId?: string;
+    FacebookPostId?: string;
+    Error?: string;
+    CreatedBy: string; // Email
+    CreatedAt?: string;
+    // Posting rules
+    ApprovedBy?: string;
+    ApprovedAt?: string;
+  };
+  createdTime: string;
+}
+
+export type ScheduledPostFields = AirtableScheduledPostRecord['fields'];
+
+/**
+ * Simplified scheduled post for API responses
+ */
+export interface ScheduledPost {
+  id: string;
+  platform: SocialPlatform;
+  contentType: SocialContentType;
+  caption: string;
+  hashtags?: string[];
+  scheduledAt: Date;
+  status: ScheduledPostStatus;
+  publishedAt?: Date;
+  error?: string;
+  instagramPostId?: string;
+  facebookPostId?: string;
+}

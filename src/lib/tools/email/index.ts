@@ -34,3 +34,10 @@ export {
   type SendEscalationNoticeInput,
   type SendEscalationNoticeOutput,
 } from './send-escalation-notice';
+
+// Campus newsletter (monthly blast to all active sponsors)
+export {
+  sendCampusNewsletterTool,
+  type SendCampusNewsletterInput,
+  type SendCampusNewsletterOutput,
+} from './send-campus-newsletter';

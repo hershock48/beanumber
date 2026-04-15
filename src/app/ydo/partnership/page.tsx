@@ -327,7 +327,7 @@ export default function YDOPartnership() {
             </div>
           </div>
           <div className="pt-8 border-t border-gray-700 text-center text-sm text-gray-400">
-            <p>© 2025 Youth Development Organisation Uganda. All rights reserved.</p>
+            <p>© {new Date().getFullYear()} Youth Development Organisation Uganda. All rights reserved.</p>
           </div>
         </div>
       </footer>

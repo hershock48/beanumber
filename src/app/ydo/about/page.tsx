@@ -98,7 +98,7 @@ export default function YDOAbout() {
           <h2 className="text-3xl font-bold text-gray-900 mb-6">Our Mission</h2>
           <div className="prose prose-lg max-w-none">
             <p className="text-gray-700 text-lg leading-relaxed mb-6">
-              YDO's mission focuses on rehabilitating post-war communities by empowering families, children, and vulnerable populations — strengthening access to education, advocacy, psycho-social support, and vocational pathways.
+              YDO's mission focuses on rehabilitating post-war communities by empowering families, children, and vulnerable populations, strengthening access to education, advocacy, psycho-social support, and vocational pathways.
             </p>
             <p className="text-gray-700 leading-relaxed mb-6">
               We envision a world where war-affected communities are rehabilitated and where children are protected from armed conflict and supported to thrive. Our work emphasizes locally grounded solutions that build community resilience and create protective environments.
@@ -218,7 +218,7 @@ export default function YDOAbout() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
             <div>
               <p className="text-gray-700 text-lg leading-relaxed mb-4">
-                YDO is based in Gulu District, Northern Uganda — a region that has experienced significant challenges following decades of conflict.
+                YDO is based in Gulu District, Northern Uganda, a region that has experienced significant challenges following decades of conflict.
               </p>
               <p className="text-gray-700 leading-relaxed mb-4">
                 Gulu District is at the heart of post-conflict recovery efforts in Northern Uganda. The region's communities are rebuilding infrastructure, restoring social systems, and creating new opportunities for children and families.
@@ -279,7 +279,7 @@ export default function YDOAbout() {
             </div>
           </div>
           <div className="pt-8 border-t border-gray-700 text-center text-sm text-gray-400">
-            <p>© 2025 Youth Development Organisation Uganda. All rights reserved.</p>
+            <p>© {new Date().getFullYear()} Youth Development Organisation Uganda. All rights reserved.</p>
           </div>
         </div>
       </footer>

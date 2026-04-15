@@ -83,7 +83,7 @@ export default function Partnerships() {
             <p className="text-lg text-gray-700 italic mb-4 leading-relaxed">
               "This partnership has transformed our community. Our children now have access to education, our families have healthcare, and our people have skills to build their futures. We are building something that will last for generations."
             </p>
-            <p className="text-gray-600 font-medium">— Community Leader, Northern Uganda</p>
+            <p className="text-gray-600 font-medium">Community Leader, Northern Uganda</p>
           </div>
 
           <div className="border-t border-gray-200 pt-8">
@@ -97,7 +97,7 @@ export default function Partnerships() {
       {/* Footer */}
       <footer className="py-16 px-6 bg-gray-50 border-t border-gray-200 mt-24">
         <div className="max-w-6xl mx-auto text-center text-sm text-gray-500">
-          <p>© 2025 Be A Number, International. All rights reserved.</p>
+          <p>© {new Date().getFullYear()} Be A Number, International. All rights reserved.</p>
         </div>
       </footer>
     </div>

@@ -23,6 +23,13 @@ export interface GmailSendOptions {
   html: string;
   text?: string;
   replyTo?: string;
+  /**
+   * Extra MIME headers to append. Used for RFC 8058 one-click unsubscribe
+   * (`List-Unsubscribe`, `List-Unsubscribe-Post`) and any other per-message
+   * routing signals. Keys are copied verbatim — the caller is responsible
+   * for correct casing.
+   */
+  headers?: Record<string, string>;
 }
 
 export interface GmailSendResult {
@@ -84,10 +91,20 @@ function createMessage(
   subject: string,
   html: string,
   text?: string,
-  replyTo?: string
+  replyTo?: string,
+  extraHeaders?: Record<string, string>
 ): string {
   const recipients = Array.isArray(to) ? to.join(', ') : to;
   const textContent = text || stripHtml(html);
+
+  // Extra headers go BEFORE Content-Type so the MIME boundary stays intact.
+  // We sanitize values — any embedded CR/LF is a classic header-injection
+  // vector in raw-MIME email senders.
+  const extraHeaderLines = extraHeaders
+    ? Object.entries(extraHeaders)
+        .filter(([k, v]) => k && v)
+        .map(([k, v]) => `${k}: ${String(v).replace(/[\r\n]+/g, ' ')}`)
+    : [];
 
   // Create MIME message
   const messageParts = [
@@ -95,6 +112,7 @@ function createMessage(
     `From: ${from}`,
     `Subject: ${subject}`,
     replyTo ? `Reply-To: ${replyTo}` : '',
+    ...extraHeaderLines,
     'Content-Type: multipart/alternative; boundary="boundary123"',
     '',
     '--boundary123',
@@ -191,7 +209,8 @@ export async function sendEmailViaGmail(options: GmailSendOptions): Promise<Gmai
       options.subject,
       options.html,
       options.text,
-      options.replyTo
+      options.replyTo,
+      options.headers
     );
 
     // Send the message

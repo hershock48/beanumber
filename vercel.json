@@ -3,6 +3,14 @@
     {
       "path": "/api/cron/compliance",
       "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/api/cron/publish-scheduled",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/cron/newsletter",
+      "schedule": "0 13 * * *"
     }
   ]
 }

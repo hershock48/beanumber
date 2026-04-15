@@ -59,24 +59,40 @@ export async function GET(request: NextRequest) {
 
     let childInfo = null;
     let childID = null;
+
+    // The reveal gate. Portal shows a locked "waiting for your shirt"
+    // view until this is set, either by the beacon on /children/[n]
+    // (when the sponsor types their number) or by the manual "reveal
+    // anyway" button in the dashboard. See /api/sponsor/reveal.
+    let childRevealed = false;
+    let revealedAt: string | null = null;
+
     if (sponsorshipResponse.ok) {
       const sponsorshipData = await sponsorshipResponse.json();
       if (sponsorshipData.records && sponsorshipData.records.length > 0) {
         const fields = sponsorshipData.records[0].fields;
         childID = fields['ChildID'] || null;
-        childInfo = {
-          name: fields['ChildDisplayName'] || '',
-          photo: fields['ChildPhoto']?.[0]?.url || undefined,
-          age: fields['ChildAge'] || undefined,
-          location: fields['ChildLocation'] || undefined,
-          sponsorshipStartDate: fields['SponsorshipStartDate'] || undefined,
-        };
+        revealedAt = fields['ChildRevealedAt'] || null;
+        childRevealed = !!revealedAt;
+
+        // Only attach child info when revealed. The portal UI uses the
+        // presence of childInfo as the unlock signal.
+        if (childRevealed) {
+          childInfo = {
+            name: fields['ChildDisplayName'] || '',
+            photo: fields['ChildPhoto']?.[0]?.url || undefined,
+            age: fields['ChildAge'] || undefined,
+            location: fields['ChildLocation'] || undefined,
+            sponsorshipStartDate: fields['SponsorshipStartDate'] || undefined,
+          };
+        }
       }
     }
 
-    // Get published updates - link by ChildID
+    // Get published updates - link by ChildID. Gated on reveal: the
+    // updates feed stays empty until the sponsor has met their child.
     let updates = [];
-    if (childID) {
+    if (childID && childRevealed) {
       const updatesFormula = `AND({ChildID} = "${childID}", {VisibleToSponsor} = TRUE(), {Status} = "Published")`;
       const updatesResponse = await fetch(
         `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_UPDATES_TABLE}?filterByFormula=${encodeURIComponent(updatesFormula)}&sort[0][field]=PublishedAt&sort[0][direction]=desc`,
@@ -119,6 +135,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       updates,
       childInfo,
+      childRevealed,
+      revealedAt,
       lastRequestDate,
       nextRequestEligibleAt,
     });

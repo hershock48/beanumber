@@ -194,7 +194,7 @@ export function DonationSection({}: DonationSectionProps) {
               </div>
               <div className="text-center">
                 <div className="font-semibold mb-2 text-white">3. Impact Updates</div>
-                <div>We share quarterly updates on how your contribution is creating lasting change.</div>
+                <div>You'll get our monthly campus newsletter, photos every few months, and a year-end report card showing the impact of your support.</div>
               </div>
             </div>
           </div>

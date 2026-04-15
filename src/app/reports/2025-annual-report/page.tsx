@@ -39,7 +39,7 @@ export default function AnnualReport() {
           <section className="mb-12">
             <h2 className="text-2xl font-bold text-gray-900 mb-4">Overview</h2>
             <p className="text-gray-700 leading-relaxed">
-              In 2025, Be A Number continued to build sustainable community systems in Northern Uganda. Our model—focused on locally-led infrastructure, training, and income-generating activities—demonstrated measurable impact across health, education, workforce, and economic empowerment. Communities own and operate all programs, ensuring lasting change beyond initial investment.
+              In 2025, Be A Number continued to build sustainable community systems in Northern Uganda. Our model, focused on locally-led infrastructure, training, and income-generating activities, demonstrated measurable impact across health, education, workforce, and economic empowerment. Communities own and operate all programs, ensuring lasting change beyond initial investment.
             </p>
           </section>
 
@@ -84,7 +84,7 @@ export default function AnnualReport() {
               </div>
               <div className="bg-gray-50 p-6 rounded-lg border border-gray-200">
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">Nursery & Primary School</h3>
-                <p className="text-gray-700">95% complete; 380-student capacity</p>
+                <p className="text-gray-700">Open and operational; 380-student capacity</p>
               </div>
               <div className="bg-gray-50 p-6 rounded-lg border border-gray-200">
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">Training Center</h3>
@@ -128,7 +128,7 @@ export default function AnnualReport() {
       {/* Footer */}
       <footer className="py-16 px-6 bg-gray-50 border-t border-gray-200 mt-24">
         <div className="max-w-6xl mx-auto text-center text-sm text-gray-500">
-          <p>© 2025 Be A Number, International. All rights reserved.</p>
+          <p>© {new Date().getFullYear()} Be A Number, International. All rights reserved.</p>
         </div>
       </footer>
     </div>

@@ -71,9 +71,9 @@ export async function POST(request: NextRequest) {
               name: isMonthly 
                 ? 'Monthly Donation to Be A Number, International'
                 : 'Donation to Be A Number, International',
-              description: isMonthly 
-                ? `Thank you for changing lives. Your monthly gift of $${amount} supports sustainable community systems in Northern Uganda — healthcare, education, workforce development, and economic empowerment that transform communities.`
-                : `Thank you for changing lives. Your contribution of $${amount} supports sustainable community systems in Northern Uganda — healthcare, education, workforce development, and economic empowerment that transform communities.`,
+              description: isMonthly
+                ? `Thank you for changing lives. Your monthly gift of $${amount} supports sustainable community systems in Northern Uganda: healthcare, education, workforce development, and economic empowerment that transform communities.`
+                : `Thank you for changing lives. Your contribution of $${amount} supports sustainable community systems in Northern Uganda: healthcare, education, workforce development, and economic empowerment that transform communities.`,
               // Add your logo image URL here (must be hosted publicly accessible)
               // images: [`${process.env.NEXT_PUBLIC_BASE_URL}/logo-be-a-number-primary-white.svg`],
             },
@@ -94,13 +94,22 @@ export async function POST(request: NextRequest) {
       // Branding customization
       allow_promotion_codes: false,
       billing_address_collection: 'required', // Require billing address for tax receipts
-      // Add custom fields for tax receipt
+      // Add custom fields for tax receipt and attribution
       custom_fields: [
         {
           key: 'organization',
           label: {
             type: 'custom',
             custom: 'Organization Name (if applicable)',
+          },
+          type: 'text',
+          optional: true,
+        },
+        {
+          key: 'referral',
+          label: {
+            type: 'custom',
+            custom: 'How did you hear about us?',
           },
           type: 'text',
           optional: true,

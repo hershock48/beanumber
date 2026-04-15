@@ -116,5 +116,26 @@ export {
   type GenerateComplianceSummaryOutput,
 } from './compliance';
 
+// Social media tools
+export {
+  postToInstagramTool,
+  type PostToInstagramInput,
+  type PostToInstagramOutput,
+  postToFacebookTool,
+  type PostToFacebookInput,
+  type PostToFacebookOutput,
+  schedulePostTool,
+  type SchedulePostInput,
+  type SchedulePostOutput,
+  listScheduledPostsTool,
+  type ListScheduledPostsInput,
+  type ListScheduledPostsOutput,
+  cancelScheduledPostTool,
+  type CancelScheduledPostInput,
+  type CancelScheduledPostOutput,
+  publishDuePostsTool,
+  type PublishDuePostsOutput,
+} from './social';
+
 // Future tools:
 // export { queryAirtable } from './query-airtable';
