@@ -579,24 +579,60 @@ function ShirtCard({ shirt, reversed }: { shirt: Shirt; reversed: boolean }) {
               <p className="text-sm text-red-600 mb-3">{error}</p>
             )}
 
-            {/* Monthly opt-in. Unchecked by default — the shirt always
-                stands on its own. Checking it converts the purchase into a
-                monthly sponsorship from day one ($25 today = month one,
-                then $25/month). */}
-            <label className="flex items-start gap-3 mb-4 cursor-pointer group select-none">
-              <input
-                type="checkbox"
-                checked={continueMonthly}
-                onChange={e => setContinueMonthly(e.target.checked)}
-                className="mt-0.5 h-4 w-4 accent-[#D4A843] cursor-pointer flex-shrink-0"
-              />
-              <span className="text-sm text-[#555] leading-snug group-hover:text-[#333]">
-                <span className="font-semibold text-[#0d0d0d]">Keep sponsoring after this shirt</span>
-                <span className="block text-xs text-[#888] mt-0.5">
-                  $25/month starting next month. Cancel anytime from your sponsor portal.
+            {/* Monthly sponsorship opt-in. Unchecked by default — the
+                shirt always stands on its own. Checking it converts the
+                purchase into a monthly sponsorship from day one ($25 today
+                = month one, then $25/month). Built as a full-width card
+                instead of a text checkbox so it actually gets read. */}
+            <button
+              type="button"
+              onClick={() => setContinueMonthly(v => !v)}
+              aria-pressed={continueMonthly}
+              className={`w-full text-left mb-4 border transition-all cursor-pointer relative p-4 sm:p-5 ${
+                continueMonthly
+                  ? 'border-[#D4A843] bg-[#D4A843]/5 shadow-sm'
+                  : 'border-[#e8e0d4] bg-white hover:border-[#D4A843]/50'
+              }`}
+            >
+              <div className="flex items-start gap-3">
+                {/* Gold checkbox indicator — visual state only; the whole
+                    card is the click target. */}
+                <span
+                  aria-hidden
+                  className={`mt-0.5 flex-shrink-0 w-5 h-5 border flex items-center justify-center transition-colors ${
+                    continueMonthly
+                      ? 'bg-[#D4A843] border-[#D4A843]'
+                      : 'bg-white border-[#c9bfae]'
+                  }`}
+                >
+                  {continueMonthly && (
+                    <svg viewBox="0 0 20 20" fill="none" className="w-3.5 h-3.5 text-[#0d0d0d]">
+                      <path d="M5 10l3.5 3.5L15 7" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  )}
                 </span>
-              </span>
-            </label>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-baseline justify-between gap-3 mb-1">
+                    <p
+                      className="text-base text-[#0d0d0d]"
+                      style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
+                    >
+                      Stay in their life.
+                    </p>
+                    <p className="text-xs font-bold uppercase tracking-wider text-[#D4A843] whitespace-nowrap">
+                      +$25/mo
+                    </p>
+                  </div>
+                  <p className="text-sm text-[#555] leading-snug mb-2">
+                    The shirt is how you meet them. $25 a month is how you stay &mdash;
+                    letters, photos, report cards, report from the ground.
+                  </p>
+                  <p className="text-xs text-[#999] leading-snug">
+                    Your $25 today covers the shirt and month one. Billed $25/month after that. Cancel anytime from your sponsor portal.
+                  </p>
+                </div>
+              </div>
+            </button>
 
             <button
               onClick={handleBuy}
@@ -627,8 +663,8 @@ function ShirtCard({ shirt, reversed }: { shirt: Shirt; reversed: boolean }) {
 
             <p className="text-xs text-[#bbb] mt-3">
               {continueMonthly
-                ? '$25 today covers your shirt and first month. $25/month after that.'
-                : 'Includes first month of child sponsorship.'}
+                ? '$25 today. $25/month after. Cancel anytime.'
+                : 'Your $25 covers the shirt and their first month.'}
             </p>
           </div>
         </div>
