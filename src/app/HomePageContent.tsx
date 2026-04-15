@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -29,6 +29,21 @@ export function HomePageContent() {
   const [children, setChildren] = useState<Child[]>([]);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
+
+  // Ref + helper for the children carousel. Kids without profile photos are
+  // filtered out — a face is the whole point of the section — and the
+  // remaining cards live in a horizontally-snapping scroll container with
+  // arrow controls on md+ screens (mobile users swipe natively).
+  const carouselRef = useRef<HTMLDivElement | null>(null);
+  const scrollCarousel = (direction: 'left' | 'right') => {
+    const el = carouselRef.current;
+    if (!el) return;
+    // Scroll by ~80% of the visible container so the next card snaps cleanly
+    // to the leading edge instead of leaving a sliver of the previous card.
+    const delta = el.clientWidth * 0.8;
+    el.scrollBy({ left: direction === 'right' ? delta : -delta, behavior: 'smooth' });
+  };
+  const childrenWithPhotos = children.filter(c => !!c.photo_url);
 
   useEffect(() => {
     fetch('/api/children')
@@ -144,11 +159,11 @@ export function HomePageContent() {
           <div className="text-center py-16">
             <div className="inline-block w-8 h-8 border-2 border-[#D4A843]/20 border-t-[#D4A843] rounded-full animate-spin" />
           </div>
-        ) : children.length === 0 ? (
+        ) : childrenWithPhotos.length === 0 ? (
           <div className="text-center py-16 bg-white border border-[#e8e0d4] max-w-md mx-auto">
-            <p className="text-[#0d0d0d] text-lg mb-2 font-medium">New children arriving soon.</p>
+            <p className="text-[#0d0d0d] text-lg mb-2 font-medium">New profiles coming soon.</p>
             <p className="text-[#999] text-sm mb-8 px-6">
-              Get a shirt now and we&rsquo;ll introduce you to your child as soon as they&rsquo;re enrolled.
+              Get a shirt now and we&rsquo;ll introduce you to your child as soon as their profile is ready.
             </p>
             <Link
               href="/shirts"
@@ -158,56 +173,86 @@ export function HomePageContent() {
             </Link>
           </div>
         ) : (
-          <div className="max-w-6xl mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {children.map(child => {
-              const displayName = child.display_name || child.first_name;
-              const photoUrl = child.photo_url || '/images/child-placeholder.jpg';
-              const shirtNum = child.shirt_number_start;
-              return (
-                <Link
-                  key={child.id || child.child_id}
-                  href={'/children/' + (shirtNum || child.child_id)}
-                  className="group bg-white overflow-hidden border border-[#e8e0d4] hover:border-[#D4A843]/40 hover:shadow-lg transition-all duration-300"
-                >
-                  <div className="aspect-[4/5] bg-[#f5f0e8] overflow-hidden relative">
-                    <img
-                      src={photoUrl}
-                      alt={displayName}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                    />
-                    {shirtNum && (
-                      <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm px-3 py-1.5 text-xs font-bold text-[#D4A843] tracking-wider">
-                        #{shirtNum}
+          <div className="relative max-w-6xl mx-auto">
+            {/* Arrow controls — desktop only. Mobile users swipe the native scroll. */}
+            <button
+              type="button"
+              onClick={() => scrollCarousel('left')}
+              aria-label="Previous children"
+              className="hidden md:flex absolute -left-2 lg:-left-6 top-1/2 -translate-y-1/2 z-10 w-12 h-12 items-center justify-center bg-white border border-[#e8e0d4] text-[#0d0d0d] hover:border-[#D4A843] hover:text-[#D4A843] transition-colors shadow-sm"
+            >
+              <span className="text-2xl leading-none" aria-hidden="true">&lsaquo;</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => scrollCarousel('right')}
+              aria-label="Next children"
+              className="hidden md:flex absolute -right-2 lg:-right-6 top-1/2 -translate-y-1/2 z-10 w-12 h-12 items-center justify-center bg-white border border-[#e8e0d4] text-[#0d0d0d] hover:border-[#D4A843] hover:text-[#D4A843] transition-colors shadow-sm"
+            >
+              <span className="text-2xl leading-none" aria-hidden="true">&rsaquo;</span>
+            </button>
+
+            {/*
+              Horizontal snap-scroll track. The negative horizontal margin on
+              mobile lets cards bleed to the screen edge so the first and last
+              don't feel boxed-in by the section's padding; on md+ we reset it.
+              The scrollbar-hiding utility pair (Firefox + WebKit) keeps the
+              visual clean without disabling keyboard scroll.
+            */}
+            <div
+              ref={carouselRef}
+              className="flex gap-6 overflow-x-auto snap-x snap-mandatory scroll-smooth pb-6 -mx-5 px-5 md:mx-0 md:px-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            >
+              {childrenWithPhotos.map(child => {
+                const displayName = child.display_name || child.first_name;
+                const photoUrl = child.photo_url as string;
+                const shirtNum = child.shirt_number_start;
+                return (
+                  <Link
+                    key={child.id || child.child_id}
+                    href={'/children/' + (shirtNum || child.child_id)}
+                    className="group snap-start shrink-0 w-[280px] sm:w-[320px] bg-white overflow-hidden border border-[#e8e0d4] hover:border-[#D4A843]/40 hover:shadow-lg transition-all duration-300"
+                  >
+                    <div className="aspect-[4/5] bg-[#f5f0e8] overflow-hidden relative">
+                      <img
+                        src={photoUrl}
+                        alt={displayName}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      />
+                      {shirtNum && (
+                        <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm px-3 py-1.5 text-xs font-bold text-[#D4A843] tracking-wider">
+                          #{shirtNum}
+                        </div>
+                      )}
+                    </div>
+                    <div className="p-5">
+                      <h3
+                        className="text-xl text-[#0d0d0d] mb-1"
+                        style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
+                      >
+                        {displayName}
+                      </h3>
+                      <div className="flex items-center gap-3 text-sm text-[#999] mb-4">
+                        {child.age && <span>Age {child.age}</span>}
+                        {child.age && child.grade_class && <span className="text-[#ccc]">&middot;</span>}
+                        {child.grade_class && <span>{child.grade_class}</span>}
                       </div>
-                    )}
-                  </div>
-                  <div className="p-5">
-                    <h3
-                      className="text-xl text-[#0d0d0d] mb-1"
-                      style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
-                    >
-                      {displayName}
-                    </h3>
-                    <div className="flex items-center gap-3 text-sm text-[#999] mb-4">
-                      {child.age && <span>Age {child.age}</span>}
-                      {child.age && child.grade_class && <span className="text-[#ccc]">&middot;</span>}
-                      {child.grade_class && <span>{child.grade_class}</span>}
+                      {child.fun_fact && (
+                        <p className="text-sm text-[#777] italic mb-4 line-clamp-2">
+                          &ldquo;{child.fun_fact}&rdquo;
+                        </p>
+                      )}
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-[#aaa]">$25/month</span>
+                        <span className="text-sm font-bold text-[#D4A843] group-hover:translate-x-1 transition-transform uppercase tracking-wider">
+                          Meet them &rarr;
+                        </span>
+                      </div>
                     </div>
-                    {child.fun_fact && (
-                      <p className="text-sm text-[#777] italic mb-4 line-clamp-2">
-                        &ldquo;{child.fun_fact}&rdquo;
-                      </p>
-                    )}
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-[#aaa]">$25/month</span>
-                      <span className="text-sm font-bold text-[#D4A843] group-hover:translate-x-1 transition-transform uppercase tracking-wider">
-                        Meet them &rarr;
-                      </span>
-                    </div>
-                  </div>
-                </Link>
-              );
-            })}
+                  </Link>
+                );
+              })}
+            </div>
           </div>
         )}
       </section>
