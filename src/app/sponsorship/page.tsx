@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { Suspense, useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useSearchParams } from 'next/navigation';
@@ -28,7 +28,7 @@ interface ApiResponse {
   error?: string;
 }
 
-export default function SponsorshipPage() {
+function SponsorshipPageContent() {
   const searchParams = useSearchParams();
 
   // URL params set by the shirt success page and the /children/[number] page.
@@ -488,5 +488,13 @@ export default function SponsorshipPage() {
 
       <BANFooter />
     </div>
+  );
+}
+
+export default function SponsorshipPage() {
+  return (
+    <Suspense fallback={null}>
+      <SponsorshipPageContent />
+    </Suspense>
   );
 }
