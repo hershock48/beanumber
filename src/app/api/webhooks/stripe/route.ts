@@ -322,6 +322,20 @@ async function upsertDonation(
     }
   }
 
+  // Donation Source is a singleSelect in Airtable with a fixed option list
+  // (Website / Manual Entry / Event / Other). The webhook needs to route
+  // business-semantic labels like "Sponsorship" / "Shirt" / "Shirt + Monthly"
+  // somewhere, but Airtable rejects any value outside the option list with
+  // 422 UNKNOWN_VALUE. Until we expand the option list in Airtable, all
+  // web-originated revenue reports as 'Website' and the real label lives
+  // in Donation Note (which is free text). Reporting can split by Note
+  // contents; this stops the webhook from 422ing first time someone
+  // sponsors a child.
+  const VALID_SOURCES = new Set(['Website', 'Manual Entry', 'Event', 'Other']);
+  const rawSource = donationData.donationSource || 'Website';
+  const sourceForAirtable = VALID_SOURCES.has(rawSource) ? rawSource : 'Website';
+  const sourceLabelForNote = VALID_SOURCES.has(rawSource) ? null : rawSource;
+
   // Create new donation record
   const donationFields: any = {
     'Stripe Payment Intent ID': paymentIntentId,
@@ -334,40 +348,41 @@ async function upsertDonation(
     'Recurring Donation': donationData.isRecurring,
     'Donor': [donationData.donorId], // Link to donor record
     'Donor Email at Donation': donationData.email,
-    'Donation Source': donationData.donationSource || 'Website',
+    'Donation Source': sourceForAirtable,
   };
 
-  if (donationData.notes) {
-    donationFields['Donation Note'] = donationData.notes;
+  // Prepend the real source label to the note so reporting can still split
+  // Shirt vs Sponsorship vs plain Website revenue without needing an
+  // Airtable schema change.
+  const notePieces: string[] = [];
+  if (sourceLabelForNote) notePieces.push(`[${sourceLabelForNote}]`);
+  if (donationData.notes) notePieces.push(donationData.notes);
+  if (notePieces.length > 0) {
+    donationFields['Donation Note'] = notePieces.join(' ');
   }
 
   if (donationData.childRecordId) {
     donationFields['Child'] = [donationData.childRecordId];
   }
 
-  if (donationData.subscriptionId) {
-    donationFields['Subscription ID'] = donationData.subscriptionId;
-  }
-  if (donationData.organization) {
-    donationFields['Organization Name'] = donationData.organization;
-  }
-  if (donationData.address) {
-    if (donationData.address.line1) {
-      donationFields['Address Line 1'] = donationData.address.line1;
-    }
-    if (donationData.address.city) {
-      donationFields['City'] = donationData.address.city;
-    }
-    if (donationData.address.state) {
-      donationFields['State'] = donationData.address.state;
-    }
-    if (donationData.address.postal_code) {
-      donationFields['Postal Code'] = donationData.address.postal_code;
-    }
-    if (donationData.address.country) {
-      donationFields['Country'] = donationData.address.country;
-    }
-  }
+  // NOTE on what we intentionally don't write to the Donations table:
+  //
+  //   - Subscription ID → belongs on the Subscriptions table, not denormalized
+  //     onto every first-month donation. The Donations record is linked to a
+  //     Donor, who is linked to their Subscription, which has the ID.
+  //   - Organization Name → lives on the Donor record. One donor, one org;
+  //     duplicating it per donation invites drift.
+  //   - Address (line1 / city / state / postal / country) → lives on the
+  //     Donor record as a single 'Mailing Address' string. Stripe always
+  //     collects it at checkout and we flow it to the donor in
+  //     findOrCreateDonor. Writing it to each Donation used to 422 the
+  //     whole webhook because those columns don't exist on the Donations
+  //     table — which is why every $5 test donation silently failed.
+  //
+  // If we ever want per-donation address (say, a shirt shipped to a
+  // different address than the donor's home), we add fields here
+  // explicitly and stop pretending the billing address is always the
+  // shipping address.
 
   const response = await airtableAPICall(() =>
     fetch(
