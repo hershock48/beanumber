@@ -627,17 +627,28 @@ function ShirtCard({ shirt, reversed }: { shirt: Shirt; reversed: boolean }) {
             <button
               onClick={handleBuy}
               disabled={loading}
-              className={`w-full sm:w-auto px-10 py-4 font-bold uppercase tracking-wider text-sm transition-colors ${
+              aria-busy={loading}
+              className={`w-full sm:w-auto px-10 py-4 font-bold uppercase tracking-wider text-sm transition-colors inline-flex items-center justify-center gap-3 ${
                 loading
-                  ? 'bg-[#ccc] text-[#888] cursor-not-allowed'
+                  ? 'bg-[#D4A843]/70 text-[#0d0d0d] cursor-wait'
                   : 'bg-[#D4A843] text-[#0d0d0d] hover:bg-[#c49a3a] cursor-pointer'
               }`}
             >
-              {loading
-                ? 'Redirecting...'
-                : continueMonthly
-                ? 'Get Shirt + Sponsor Monthly'
-                : 'Get This Shirt · $25'}
+              <span>
+                {continueMonthly ? 'Get Shirt + Sponsor Monthly' : 'Get This Shirt · $25'}
+              </span>
+              {loading && (
+                <svg
+                  aria-hidden="true"
+                  className="animate-spin h-4 w-4 text-[#0d0d0d]"
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                </svg>
+              )}
             </button>
 
             <p className="text-xs text-[#bbb] mt-3">
