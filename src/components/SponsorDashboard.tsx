@@ -15,10 +15,21 @@ interface Update {
 
 interface ChildInfo {
   name: string;
+  firstName?: string;
   photo?: string;
   age?: string;
   location?: string;
   sponsorshipStartDate?: string;
+  // Structured intake fields — mirror /children/[number]. Any may be empty;
+  // each block is rendered conditionally so a half-filled profile still
+  // looks intentional.
+  homeVillage?: string;
+  familyContext?: string;
+  loves?: string;
+  childQuote?: string;
+  teacherName?: string;
+  teacherQuote?: string;
+  notes?: string;
 }
 
 interface SponsorDashboardProps {
@@ -224,35 +235,142 @@ export function SponsorDashboard({ sponsorCode, email }: SponsorDashboardProps) 
     ? Math.max(0, Math.ceil((new Date(nextRequestEligibleAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
     : 0;
 
+  // Derive a single first-name token for labels like "What {firstName} loves".
+  // Falls back through FirstName → first word of display name → "them" so a
+  // partial record never renders "What undefined loves".
+  const firstName =
+    childInfo?.firstName ||
+    childInfo?.name?.split(' ')[0] ||
+    'them';
+
+  // True if ANY of the structured intake fields are populated. When none
+  // are, we fall back to the Notes prose so older records still render
+  // something human rather than an empty scaffold.
+  const hasStructured = Boolean(
+    childInfo?.homeVillage ||
+    childInfo?.familyContext ||
+    childInfo?.loves ||
+    childInfo?.childQuote ||
+    childInfo?.teacherQuote
+  );
+
   return (
     <div className="max-w-4xl mx-auto px-6 py-12">
-      {/* Child Profile Header */}
+      {/* Child Profile Header — mirrors the structured treatment on
+          /children/[number]. Cream/gold/Lora instead of the portal's
+          gray chrome, because this card is the emotional anchor of the
+          page and should feel like the brand, not like a SaaS dashboard. */}
       {childInfo && (
-        <div className="bg-white rounded-lg shadow-lg p-8 mb-8">
-          <div className="flex flex-col md:flex-row gap-6">
-            {childInfo.photo && (
-              <div className="relative w-32 h-32 md:w-40 md:h-40 rounded-full overflow-hidden bg-gray-200 flex-shrink-0">
+        <div className="bg-[#FFF8F0] border border-[#e8e0d4] p-8 md:p-10 mb-8">
+          <div className="grid md:grid-cols-[minmax(0,1fr)_1.6fr] gap-8 md:gap-10 items-start">
+            {/* Photo */}
+            <div className="aspect-[4/5] bg-[#f5f0e8] border border-[#e8e0d4] overflow-hidden relative">
+              {childInfo.photo ? (
                 <Image
                   src={childInfo.photo}
                   alt={childInfo.name}
                   fill
                   className="object-cover"
                 />
-              </div>
-            )}
-            <div className="flex-1">
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">
+              ) : (
+                <div className="w-full h-full flex items-center justify-center">
+                  <p className="text-[#aaa] text-sm">Photo coming soon</p>
+                </div>
+              )}
+            </div>
+
+            {/* Details */}
+            <div className="flex flex-col justify-center">
+              <h1
+                className="text-3xl md:text-4xl text-[#0d0d0d] mb-3"
+                style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
+              >
                 {childInfo.name}
               </h1>
-              {childInfo.age && (
-                <p className="text-gray-600 mb-1">Age: {childInfo.age}</p>
+
+              <div className="flex flex-wrap items-center gap-3 text-[#777] mb-6">
+                {childInfo.age && <span className="text-base">Age {childInfo.age}</span>}
+                {childInfo.age && childInfo.location && <span className="text-[#ccc]">&middot;</span>}
+                {childInfo.location && <span className="text-base">{childInfo.location}</span>}
+              </div>
+
+              {/* Pull quote from the child — in their own voice. The single
+                  strongest element on the card when it's present. */}
+              {childInfo.childQuote && (
+                <div className="mb-6">
+                  <p
+                    className="text-xl md:text-2xl text-[#0d0d0d] leading-snug"
+                    style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 500, fontStyle: 'italic' }}
+                  >
+                    &ldquo;{childInfo.childQuote}&rdquo;
+                  </p>
+                  <p className="mt-3 text-xs uppercase tracking-[0.2em] text-[#aaa]">
+                    — {firstName}
+                  </p>
+                </div>
               )}
-              {childInfo.location && (
-                <p className="text-gray-600 mb-1">Location: {childInfo.location}</p>
+
+              {/* Structured fact lines. Each block hides itself when its
+                  field is empty, so a half-filled profile still looks
+                  intentional instead of leaving dead scaffold. */}
+              {hasStructured && (
+                <div className="mb-6 space-y-4">
+                  {childInfo.homeVillage && (
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-1">
+                        Home
+                      </p>
+                      <p className="text-[#444] leading-relaxed">{childInfo.homeVillage}</p>
+                    </div>
+                  )}
+                  {childInfo.familyContext && (
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-1">
+                        Family
+                      </p>
+                      <p className="text-[#444] leading-relaxed">{childInfo.familyContext}</p>
+                    </div>
+                  )}
+                  {childInfo.loves && (
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-1">
+                        What {firstName} loves
+                      </p>
+                      <p className="text-[#444] leading-relaxed">{childInfo.loves}</p>
+                    </div>
+                  )}
+                </div>
               )}
+
+              {/* Teacher quote — attributed, second human voice on the card.
+                  Only appears when TeacherQuote is present. */}
+              {childInfo.teacherQuote && (
+                <div className="bg-white border border-[#e8e0d4] p-5 mb-6">
+                  <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-3">
+                    From {firstName}&rsquo;s teacher
+                  </p>
+                  <p className="text-[#444] leading-relaxed italic">
+                    &ldquo;{childInfo.teacherQuote}&rdquo;
+                  </p>
+                  {childInfo.teacherName && (
+                    <p className="mt-3 text-sm text-[#888]">— {childInfo.teacherName}</p>
+                  )}
+                </div>
+              )}
+
+              {/* Fallback: legacy Notes prose. Only shown if the intake
+                  form hasn't been filled out yet. */}
+              {!hasStructured && childInfo.notes && (
+                <div className="bg-white border border-[#e8e0d4] p-5 mb-6">
+                  <p className="text-[#666] italic leading-relaxed">
+                    &ldquo;{childInfo.notes}&rdquo;
+                  </p>
+                </div>
+              )}
+
               {childInfo.sponsorshipStartDate && (
-                <p className="text-sm text-gray-500 mt-2">
-                  Sponsorship started: {new Date(childInfo.sponsorshipStartDate).toLocaleDateString()}
+                <p className="text-sm text-[#888] mt-2">
+                  Sponsoring since {new Date(childInfo.sponsorshipStartDate).toLocaleDateString()}
                 </p>
               )}
             </div>

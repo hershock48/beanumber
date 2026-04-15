@@ -5,6 +5,7 @@ const AIRTABLE_API_KEY = process.env.AIRTABLE_API_KEY;
 const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID;
 const AIRTABLE_SPONSORSHIPS_TABLE = process.env.AIRTABLE_SPONSORSHIPS_TABLE || 'Sponsorships';
 const AIRTABLE_UPDATES_TABLE = process.env.AIRTABLE_UPDATES_TABLE || 'Updates';
+const AIRTABLE_CHILDREN_TABLE = process.env.AIRTABLE_CHILDREN_TABLE || 'Children';
 
 async function verifySession(sponsorCode: string): Promise<boolean> {
   const cookieStore = await cookies();
@@ -80,11 +81,61 @@ export async function GET(request: NextRequest) {
         if (childRevealed) {
           childInfo = {
             name: fields['ChildDisplayName'] || '',
+            firstName: undefined as string | undefined,
             photo: fields['ChildPhoto']?.[0]?.url || undefined,
             age: fields['ChildAge'] || undefined,
             location: fields['ChildLocation'] || undefined,
             sponsorshipStartDate: fields['SponsorshipStartDate'] || undefined,
+            // Structured intake fields from the Children table. Any may be
+            // empty; the dashboard renders each block conditionally so a
+            // half-filled profile still looks intentional (matches the
+            // /children/[number] page treatment).
+            homeVillage: undefined as string | undefined,
+            familyContext: undefined as string | undefined,
+            loves: undefined as string | undefined,
+            childQuote: undefined as string | undefined,
+            teacherName: undefined as string | undefined,
+            teacherQuote: undefined as string | undefined,
+            notes: undefined as string | undefined,
           };
+
+          // Look up the Children record to pull the structured intake
+          // fields. The Sponsorship holds the denormalized basics (name,
+          // photo, age) but the structured profile lives on Children.
+          // One extra Airtable request per portal load; fine for a
+          // logged-in dashboard.
+          if (childID) {
+            try {
+              const childFormula = `{ChildID} = "${childID}"`;
+              const childResponse = await fetch(
+                `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_CHILDREN_TABLE}?filterByFormula=${encodeURIComponent(childFormula)}&maxRecords=1`,
+                {
+                  headers: {
+                    Authorization: `Bearer ${AIRTABLE_API_KEY}`,
+                    'Content-Type': 'application/json',
+                  },
+                }
+              );
+              if (childResponse.ok) {
+                const childData = await childResponse.json();
+                const childFields = childData.records?.[0]?.fields;
+                if (childFields) {
+                  childInfo.firstName = childFields['FirstName'] || undefined;
+                  childInfo.homeVillage = childFields['HomeVillage'] || undefined;
+                  childInfo.familyContext = childFields['FamilyContext'] || undefined;
+                  childInfo.loves = childFields['Loves'] || undefined;
+                  childInfo.childQuote = childFields['ChildQuote'] || undefined;
+                  childInfo.teacherName = childFields['TeacherName'] || undefined;
+                  childInfo.teacherQuote = childFields['TeacherQuote'] || undefined;
+                  childInfo.notes = childFields['Notes'] || undefined;
+                }
+              }
+            } catch (err) {
+              // Non-fatal. The portal still renders with the denormalized
+              // basics if the Children lookup fails.
+              console.warn('[Sponsor Updates] Children lookup failed', err);
+            }
+          }
         }
       }
     }
