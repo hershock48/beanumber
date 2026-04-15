@@ -6,7 +6,7 @@
     },
     {
       "path": "/api/cron/publish-scheduled",
-      "schedule": "*/15 * * * *"
+      "schedule": "0 9 * * *"
     },
     {
       "path": "/api/cron/newsletter",
