@@ -216,16 +216,26 @@ function TextBack({
   mode = 'tee',
   lines,
   weight = 700,
+  scale = 1,
   className = '',
-}: DesignProps & { lines: string[]; weight?: number }) {
+}: DesignProps & { lines: string[]; weight?: number; scale?: number }) {
   // In tee mode the text is positioned within the back body region (body
   // runs ~23% → 77% horizontally, ~18% → 92% vertically). In flat mode the
   // whole box is usable; we still left-align but with a generous margin.
   // The *block* is centered horizontally on the shirt back (transform
   // -50%), but the text inside the block is left-aligned so each line
   // starts at the same x — matching the Peacemaker production photo.
+  //
+  // `scale` shrinks text for longer words (e.g. "Everything / Hallelujah.")
+  // so they don't overflow the shirt body.
   const topPos = mode === 'tee' ? '23%' : '14%';
-  const fontSize = mode === 'tee' ? 'clamp(20px, 10.5cqw, 64px)' : 'clamp(26px, 12.5cqw, 80px)';
+  const teeSize = 10.5 * scale;
+  const teeMax = Math.round(64 * scale);
+  const flatSize = 12.5 * scale;
+  const flatMax = Math.round(80 * scale);
+  const fontSize = mode === 'tee'
+    ? `clamp(20px, ${teeSize}cqw, ${teeMax}px)`
+    : `clamp(26px, ${flatSize}cqw, ${flatMax}px)`;
 
   return (
     <DesignContainer theme={theme} mode={mode} side="back" className={className}>
@@ -264,7 +274,7 @@ function PeacemakerBack(props: DesignProps) {
 }
 
 function EverythingHallelujahBack(props: DesignProps) {
-  return <TextBack {...props} lines={['Everything', 'Hallelujah.']} />;
+  return <TextBack {...props} lines={['Everything', 'Hallelujah.']} scale={0.7} />;
 }
 
 /**
