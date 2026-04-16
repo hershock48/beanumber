@@ -962,11 +962,11 @@ async function sendAdminOrderNotification(data: {
   const shortLine = (() => {
     switch (data.kind) {
       case 'Shirt':
-        return `${data.customerName} ordered ${data.shirtName} (${data.shirtColor}, ${data.shirtSize}) · ${amountStr}`;
+        return `${data.customerName} ordered ${data.shirtName} (${data.shirtColor}, ${data.shirtSize}) - ${amountStr}`;
       case 'Shirt + Monthly':
-        return `${data.customerName} ordered ${data.shirtName} + sponsoring${data.childDisplayName ? ` ${data.childDisplayName}` : ''} · ${amountStr}/mo`;
+        return `${data.customerName} ordered ${data.shirtName} + sponsoring${data.childDisplayName ? ` ${data.childDisplayName}` : ''} - ${amountStr}/mo`;
       case 'Sponsorship':
-        return `${data.customerName} sponsoring${data.childDisplayName ? ` ${data.childDisplayName}` : ''} · ${amountStr}/mo`;
+        return `${data.customerName} sponsoring${data.childDisplayName ? ` ${data.childDisplayName}` : ''} - ${amountStr}/mo`;
       case 'Donation':
         return `${data.customerName} donated ${amountStr}${recurringTag}`;
     }
@@ -1040,7 +1040,7 @@ async function sendAdminOrderNotification(data: {
       sendEmail({
         to: { email: smsEmail },
         from,
-        subject: ' ',
+        subject: 'BAN Order',
         html: smsText,  // required by sendEmail interface but ignored in plainTextOnly mode
         text: smsText,
         plainTextOnly: true,  // carrier gateways choke on multipart MIME

@@ -112,11 +112,17 @@ function createMessage(
         .map(([k, v]) => `${k}: ${String(v).replace(/[\r\n]+/g, ' ')}`)
     : [];
 
+  // RFC 2047: encode Subject as base64 UTF-8 so non-ASCII characters
+  // (middot, em-dash, curly quotes, etc.) survive MIME transport.
+  const encodedSubject = /[^\x20-\x7E]/.test(subject)
+    ? `=?UTF-8?B?${Buffer.from(subject, 'utf-8').toString('base64')}?=`
+    : subject;
+
   // Build common headers
   const headerLines = [
     `To: ${recipients}`,
     `From: ${from}`,
-    `Subject: ${subject}`,
+    `Subject: ${encodedSubject}`,
   ];
   if (replyTo) headerLines.push(`Reply-To: ${replyTo}`);
   for (const line of extraHeaderLines) headerLines.push(line);
