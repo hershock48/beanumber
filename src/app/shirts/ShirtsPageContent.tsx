@@ -278,15 +278,15 @@ function PeacemakerBack(props: DesignProps) {
  * spine of the shirt, each block the same size as the front chest logo.
  */
 function EverythingHallelujahBack({ theme, mode = 'tee', className = '' }: DesignProps) {
-  // Match the front logo width (~8% of container in tee, ~18% in flat) for
-  // the text block width, and scale font to fit inside that width.
-  const blockWidth = mode === 'tee' ? '16%' : '28%';
+  // Tee mode: small like the front chest logo. Flat/hover mode: scaled up
+  // so the text is actually readable when someone hovers to inspect.
+  const blockWidth = mode === 'tee' ? '16%' : '40%';
   const fontSize = mode === 'tee'
     ? 'clamp(3.5px, 1.8cqw, 9px)'
-    : 'clamp(5px, 2.4cqw, 12px)';
+    : 'clamp(7px, 3.8cqw, 18px)';
   // Spread the 5 repetitions evenly down the back body area
-  const startTop = mode === 'tee' ? 20 : 12;
-  const gap = mode === 'tee' ? 13 : 14;
+  const startTop = mode === 'tee' ? 20 : 10;
+  const gap = mode === 'tee' ? 13 : 16;
 
   return (
     <DesignContainer theme={theme} mode={mode} side="back" className={className}>
