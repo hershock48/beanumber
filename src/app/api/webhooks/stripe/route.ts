@@ -658,11 +658,7 @@ async function sendShirtConfirmationEmail(orderData: {
   // The reveal block is now always generic. The buyer enters their number
   // at beanumber.org when the shirt physically arrives.
   const revealBlock = `
-              <p><strong style="color: #0d0d0d;">When your shirt arrives, here&rsquo;s the part that matters:</strong></p>
-
-              <p>Look at the tag. Your shirt has a number on it. That number belongs to a real child in Northern Uganda. Go to <a href="${siteUrl}" style="color: #D4A843; font-weight: bold;">beanumber.org</a>, enter your number, and meet them &mdash; their name, their face, their story.</p>
-
-              <p>Your $25 today covered the shirt and their first month of school, meals, and medical care.</p>
+              <p>When it arrives, look at the inside of the collar. There&rsquo;s a number on it, and that number belongs to a real child in Northern Uganda. Go to <a href="${siteUrl}" style="color: #D4A843; font-weight: bold;">beanumber.org</a>, enter your number, and meet them &mdash; their name, their face, their story. Your $25 today covered the shirt and their first month of school, meals, and medical care.</p>
     `;
 
   // Monthly sponsorship confirmation + sponsor code block. Only rendered
@@ -706,7 +702,7 @@ async function sendShirtConfirmationEmail(orderData: {
 
               <p style="margin-top: 0;">Hey ${firstName},</p>
 
-              <p>Your shirt is in the works. I\u2019m cutting the vinyl and pressing it by hand. It\u2019ll ship within 5\u20137 business days.</p>
+              <p>Your shirt is in the works &mdash; I&rsquo;m cutting the vinyl and pressing it now, and it&rsquo;ll ship within 5&ndash;7 business days.</p>
 
               <p style="color: #999; font-size: 14px; margin-bottom: 4px;">Your order:</p>
               <p style="font-size: 15px; color: #555; margin-top: 0;">
@@ -719,7 +715,7 @@ async function sendShirtConfirmationEmail(orderData: {
 
               <hr style="border: none; border-top: 1px solid #e8e0d4; margin: 30px 0;">
 
-              <p style="color: #666; font-size: 14px; line-height: 1.6;">One more thing &mdash; because you&rsquo;re part of the BAN community now, once a month you&rsquo;ll get a short update straight from the campus in Gulu. Photos, progress, the small stuff. Unsubscribe anytime.</p>
+              <p style="color: #666; font-size: 14px; line-height: 1.6;">You&rsquo;re part of the BAN community now, so once a month you&rsquo;ll get a short update straight from the campus in Gulu &mdash; photos, progress, the small stuff. Unsubscribe anytime.</p>
 
               <p>Thanks for being part of this,<br>
               <strong>Kevin</strong></p>
