@@ -336,13 +336,13 @@ type Shirt = {
   specs: string;
 };
 
-const shirts: Shirt[] = [
+const SHIRTS_SOURCE: Shirt[] = [
   {
     id: 'flagship',
     name: 'The Flagship',
     tagline: 'The one that started it all',
     price: 25,
-    description: 'The original Be A Number shirt. Small cross mark on the front with the full # logo across the back. Your $25 gets you the shirt and sponsors a child for your first month. The number you receive is assigned by order and belongs to a real child in Northern Uganda.',
+    description: 'This is the shirt that started Be A Number. Before there were six designs there was one idea: put a number on a shirt, connect that number to a real child, and see what happens. What happened was people showed up. Your $25 gets you the shirt and sponsors a child for your first month. The number you receive is assigned by order and belongs to a real kid in Northern Uganda. This is the original.',
     Front: FlagshipFront,
     Back: FlagshipBack,
     badge: 'Core',
@@ -353,7 +353,7 @@ const shirts: Shirt[] = [
     name: 'Thank you.',
     tagline: 'Says enough on its own',
     price: 25,
-    description: 'Thank you for the good times. Thank you for the bad ones too. Suffering without gratitude is just suffering. Suffering with it becomes something else. It shifts your perspective, brings purpose to the pain, and roots you in trust. God\'s love doesn\'t skip the hard parts. This shirt is a decision to say it out loud.',
+    description: 'Thank you for the good times. Thank you for the bad ones too. Suffering without gratitude is just suffering. Suffering with it becomes something else. It shifts your perspective, brings purpose to the pain, and roots you in trust. God\'s love doesn\'t skip the hard parts. This shirt is a decision to say it out loud. It\'s probably the quietest shirt in the collection. It starts the most conversations.',
     Front: SharedFront,
     Back: ThankYouBack,
     badge: 'Faith',
@@ -375,7 +375,7 @@ const shirts: Shirt[] = [
     name: 'Peacemaker.',
     tagline: 'Blessed are those who show up',
     price: 25,
-    description: '"Blessed are the peacemakers." Not the peacekeepers. Not the ones who stay quiet to keep things comfortable. The ones who build it. Pope Leo XIV called the world to reject unjust wars and stand for something. This shirt is for the person who took that seriously.',
+    description: '"Blessed are the peacemakers." Not the peacekeepers. Not the ones who stay quiet to keep things comfortable. The ones who build it. When Pope Leo XIV stood in front of the world and called for an end to unjust wars, he wasn\'t being diplomatic. He was being clear. This shirt is for the person who heard that and took it seriously.',
     Front: SharedFront,
     Back: PeacemakerBack,
     badge: 'Faith',
@@ -386,7 +386,7 @@ const shirts: Shirt[] = [
     name: 'Everything Hallelujah.',
     tagline: 'The whole thing, all of it',
     price: 25,
-    description: 'Through the good and the bad. Everything hallelujah. Not just praise when things are easy. Praise when they\'re not. Praise when it doesn\'t make sense yet. That\'s the whole point.',
+    description: 'Through the good and the bad. Everything hallelujah. Not just praise when things are easy. Praise when they\'re not. Praise when it doesn\'t make sense yet. When the news is bad, when the money is short, when someone you love is suffering and you can\'t fix it. Hallelujah anyway. That\'s the whole point.',
     Front: SharedFront,
     Back: EverythingHallelujahBack,
     badge: 'Faith',
@@ -397,13 +397,23 @@ const shirts: Shirt[] = [
     name: 'Nigeria.',
     tagline: 'For the ones who can\'t wear it there',
     price: 25,
-    description: 'The killing of Christians in Nigeria is one of the most underreported stories in the world right now. Tens of thousands dead, mostly in the Middle Belt, and it barely makes Western news. This shirt puts the name where people have to see it. That\'s the start.',
+    description: 'The killing of Christians in Nigeria is one of the most underreported stories in the world right now. Tens of thousands dead, mostly in the Middle Belt, and it barely makes Western news. We operate in Uganda, not Nigeria. But they\'re our brothers. This shirt puts the name where people have to see it. That\'s the start.',
     Front: SharedFront,
     Back: NigeriaBack,
     badge: 'Solidarity',
     specs: 'S – 2XL · Unisex · Heavyweight cotton',
   },
 ];
+
+/** Shuffled once per page load so no design is permanently buried at the bottom. */
+function shuffleShirts(src: Shirt[]): Shirt[] {
+  const arr = [...src];
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
 
 /* ── Per-shirt card (owns color + size state) ───────────────── */
 
@@ -757,6 +767,11 @@ function ShirtCard({ shirt, reversed }: { shirt: Shirt; reversed: boolean }) {
 /* ── Page content ────────────────────────────────────────────── */
 
 export default function ShirtsPageContent() {
+  // Shuffle once on mount so every visitor sees a different order.
+  // This prevents any single design from always being buried at the bottom
+  // and lets us see organically which ones convert.
+  const [shirts] = useState(() => shuffleShirts(SHIRTS_SOURCE));
+
   return (
     <div className="min-h-screen bg-[#FFF8F0]">
       <BANNavigation currentPath="/shirts" />
