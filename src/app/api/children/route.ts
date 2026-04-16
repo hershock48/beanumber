@@ -18,6 +18,9 @@ interface AirtableChildRecord {
     ProfilePhoto?: Array<{ url: string; filename: string }>;
     Notes?: string;
     Loves?: string;
+    ChildQuote?: string;
+    FamilyContext?: string;
+    HomeVillage?: string;
     Status?: string;
     ShirtNumber?: number;
     EnrollmentDate?: string;
@@ -35,6 +38,9 @@ interface OutgoingChild {
   grade_class?: string;
   photo_url?: string;
   fun_fact?: string;
+  child_quote?: string;
+  family_context?: string;
+  home_village?: string;
   shirt_number_start?: number;
   shirt_number_end?: number;
 }
@@ -100,6 +106,9 @@ function toOutgoing(record: AirtableChildRecord): OutgoingChild {
     grade_class: f.GradeClass,
     photo_url: photo,
     fun_fact: f.Loves || undefined,
+    child_quote: f.ChildQuote || undefined,
+    family_context: f.FamilyContext || undefined,
+    home_village: f.HomeVillage || undefined,
     shirt_number_start: typeof f.ShirtNumber === 'number' ? f.ShirtNumber : undefined,
     shirt_number_end: typeof f.ShirtNumber === 'number' ? f.ShirtNumber : undefined,
   };

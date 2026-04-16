@@ -23,13 +23,20 @@ interface AvailableChild {
   };
 }
 
-interface ApiResponse {
-  success: boolean;
-  data?: {
-    children: AvailableChild[];
-    total: number;
-  };
-  error?: string;
+interface ChildrenApiChild {
+  id: string;
+  child_id: string;
+  first_name: string;
+  last_initial?: string;
+  display_name?: string;
+  age?: number;
+  grade_class?: string;
+  photo_url?: string;
+  fun_fact?: string;
+  child_quote?: string;
+  family_context?: string;
+  home_village?: string;
+  shirt_number_start?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -139,21 +146,33 @@ function SponsorshipPageContent() {
   };
 
   useEffect(() => {
-    async function fetchAvailableChildren() {
+    async function fetchChildren() {
       try {
-        const response = await fetch('/api/sponsorship/available');
-        const data: ApiResponse = await response.json();
-        if (!response.ok || !data.success) {
-          throw new Error(data.error || 'Failed to load available children');
+        const response = await fetch('/api/children');
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to load children');
         }
-        setChildren(data.data?.children || []);
+        const mapped: AvailableChild[] = (data.children || []).map((c: ChildrenApiChild) => ({
+          recordId: c.id,
+          id: c.child_id,
+          displayName: c.display_name || c.first_name || 'Child',
+          age: c.age ? String(c.age) : undefined,
+          location: c.home_village || undefined,
+          loves: c.fun_fact || undefined,
+          childQuote: c.child_quote || undefined,
+          familyContext: c.family_context || undefined,
+          shirtNumber: c.shirt_number_start || undefined,
+          photo: c.photo_url ? { url: c.photo_url, filename: '' } : undefined,
+        }));
+        setChildren(mapped);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'An error occurred');
       } finally {
         setLoading(false);
       }
     }
-    fetchAvailableChildren();
+    fetchChildren();
   }, []);
 
   // Only show children with photos, shuffled. If a specific child was
