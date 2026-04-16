@@ -292,7 +292,7 @@ function SponsorshipPageContent() {
                   {
                     icon: <IconUser className="w-5 h-5 text-[#D4A843]" />,
                     title: 'Matched to a specific child',
-                    desc: 'Their name, photo, age, and story are yours. One child, one number, one connection.',
+                    desc: 'You\u2019ll know their name, see their photo, and follow their story. Multiple sponsors can back the same child \u2014 that\u2019s how we fully fund them.',
                   },
                   {
                     icon: <IconNewspaper className="w-5 h-5 text-[#D4A843]" />,
