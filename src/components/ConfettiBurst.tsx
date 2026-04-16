@@ -11,7 +11,7 @@ export function ConfettiBurst() {
   useEffect(() => {
     const colors = ['#D4A843', '#FFF8F0', '#0d0d0d', '#e8e0d4'];
     const burst = (opts: confetti.Options) =>
-      confetti({ ...opts, colors, disableForReducedMotion: true });
+      confetti({ ...opts, colors });
 
     burst({ particleCount: 80, spread: 70, origin: { x: 0.3, y: 0.6 } });
     burst({ particleCount: 80, spread: 70, origin: { x: 0.7, y: 0.6 } });
