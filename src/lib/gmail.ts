@@ -107,28 +107,34 @@ function createMessage(
     : [];
 
   // Create MIME message
-  const messageParts = [
+  // IMPORTANT: MIME requires blank lines (empty strings) to separate headers
+  // from body content. We must NOT filter those out. We handle optional
+  // headers (Reply-To, extra headers) separately to avoid blank-line removal.
+  const headerLines = [
     `To: ${recipients}`,
     `From: ${from}`,
     `Subject: ${subject}`,
-    replyTo ? `Reply-To: ${replyTo}` : '',
-    ...extraHeaderLines,
-    'Content-Type: multipart/alternative; boundary="boundary123"',
-    '',
+  ];
+  if (replyTo) headerLines.push(`Reply-To: ${replyTo}`);
+  for (const line of extraHeaderLines) headerLines.push(line);
+  headerLines.push('MIME-Version: 1.0');
+  headerLines.push('Content-Type: multipart/alternative; boundary="boundary123"');
+
+  const message = [
+    ...headerLines,
+    '',  // blank line separating headers from body (REQUIRED by MIME)
     '--boundary123',
     'Content-Type: text/plain; charset=utf-8',
-    '',
+    '',  // blank line before plain text content (REQUIRED by MIME)
     textContent,
     '',
     '--boundary123',
     'Content-Type: text/html; charset=utf-8',
-    '',
+    '',  // blank line before HTML content (REQUIRED by MIME)
     html,
     '',
     '--boundary123--',
-  ].filter(Boolean);
-
-  const message = messageParts.join('\n');
+  ].join('\r\n');
 
   // Encode to base64url format (Gmail API requirement)
   return Buffer.from(message)
