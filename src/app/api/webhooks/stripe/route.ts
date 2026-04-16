@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import type Stripe from 'stripe';
 import { sendEmail } from '@/lib/email';
 
+// Allow up to 60 seconds for the webhook handler. The default 10s on
+// Hobby plans is too tight — a shirt order does 8+ Airtable API calls,
+// email sends, and Stripe subscription backfills.
+export const maxDuration = 60;
+
 // Initialize Stripe lazily
 async function getStripe() {
   const StripeModule = (await import('stripe')).default;
@@ -322,21 +327,25 @@ async function upsertDonation(
     }
   }
 
-  // Donation Source is a singleSelect in Airtable with a fixed option list
-  // (Website / Manual Entry / Event / Other). The webhook needs to route
-  // business-semantic labels like "Sponsorship" / "Shirt" / "Shirt + Monthly"
-  // somewhere, but Airtable rejects any value outside the option list with
-  // 422 UNKNOWN_VALUE. Until we expand the option list in Airtable, all
-  // web-originated revenue reports as 'Website' and the real label lives
-  // in Donation Note (which is free text). Reporting can split by Note
-  // contents; this stops the webhook from 422ing first time someone
-  // sponsors a child.
+  // Normalize Donation Source to a valid singleSelect option.
+  // Airtable only accepts: Website, Manual Entry, Event, Other.
+  // Real labels like "Shirt Order" or "Sponsorship" go into Donation Note.
   const VALID_SOURCES = new Set(['Website', 'Manual Entry', 'Event', 'Other']);
   const rawSource = donationData.donationSource || 'Website';
   const sourceForAirtable = VALID_SOURCES.has(rawSource) ? rawSource : 'Website';
   const sourceLabelForNote = VALID_SOURCES.has(rawSource) ? null : rawSource;
 
-  // Create new donation record
+  // Build the note: prepend the real source label if it was normalized away,
+  // then append whatever note the caller already provided.
+  const noteParts: string[] = [];
+  if (sourceLabelForNote) noteParts.push(`[${sourceLabelForNote}]`);
+  if (donationData.notes) noteParts.push(donationData.notes);
+  const finalNote = noteParts.join(' ') || undefined;
+
+  // Create new donation record.
+  // IMPORTANT: Only write fields that actually exist on the Donations table.
+  // Address, Organization, and Subscription ID do NOT exist here — they live
+  // on Donors or Sponsorships. See docs/claude/airtable_schema.md Trap 2.
   const donationFields: any = {
     'Stripe Payment Intent ID': paymentIntentId,
     'Stripe Checkout Session ID': donationData.sessionId,
@@ -351,38 +360,13 @@ async function upsertDonation(
     'Donation Source': sourceForAirtable,
   };
 
-  // Prepend the real source label to the note so reporting can still split
-  // Shirt vs Sponsorship vs plain Website revenue without needing an
-  // Airtable schema change.
-  const notePieces: string[] = [];
-  if (sourceLabelForNote) notePieces.push(`[${sourceLabelForNote}]`);
-  if (donationData.notes) notePieces.push(donationData.notes);
-  if (notePieces.length > 0) {
-    donationFields['Donation Note'] = notePieces.join(' ');
+  if (finalNote) {
+    donationFields['Donation Note'] = finalNote;
   }
 
   if (donationData.childRecordId) {
     donationFields['Child'] = [donationData.childRecordId];
   }
-
-  // NOTE on what we intentionally don't write to the Donations table:
-  //
-  //   - Subscription ID → belongs on the Subscriptions table, not denormalized
-  //     onto every first-month donation. The Donations record is linked to a
-  //     Donor, who is linked to their Subscription, which has the ID.
-  //   - Organization Name → lives on the Donor record. One donor, one org;
-  //     duplicating it per donation invites drift.
-  //   - Address (line1 / city / state / postal / country) → lives on the
-  //     Donor record as a single 'Mailing Address' string. Stripe always
-  //     collects it at checkout and we flow it to the donor in
-  //     findOrCreateDonor. Writing it to each Donation used to 422 the
-  //     whole webhook because those columns don't exist on the Donations
-  //     table — which is why every $5 test donation silently failed.
-  //
-  // If we ever want per-donation address (say, a shirt shipped to a
-  // different address than the donor's home), we add fields here
-  // explicitly and stop pretending the billing address is always the
-  // shipping address.
 
   const response = await airtableAPICall(() =>
     fetch(
@@ -1095,55 +1079,55 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
   console.log('[Webhook] Processing checkout session:', session.id);
 
   try {
-    // Get payment intent for full details
-    const paymentIntentId = session.payment_intent as string;
-    let paymentIntent: Stripe.PaymentIntent | null = null;
-    let customer: Stripe.Customer | null = null;
-
-    if (paymentIntentId) {
-      const stripe = await getStripe();
-      paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
-      
-      if (paymentIntent.customer) {
-        customer = await stripe.customers.retrieve(paymentIntent.customer as string) as Stripe.Customer;
-      }
-    }
-
-    // Extract donor information
-    const email = session.customer_email || session.customer_details?.email || customer?.email || '';
-    const name = session.customer_details?.name || session.metadata?.donor_name || customer?.name || 'Anonymous';
+    // Extract donor information directly from the session object.
+    // The session already contains customer_details (name, email, phone,
+    // address) and payment_status — we don't need to make additional Stripe
+    // API calls to retrieve the PaymentIntent or Customer objects. Skipping
+    // those two calls saves ~1s and keeps us inside the serverless timeout.
+    const paymentIntentId = (session.payment_intent as string) || session.id;
+    const email = session.customer_email || session.customer_details?.email || '';
+    const name = session.customer_details?.name || session.metadata?.donor_name || 'Anonymous';
     const organization = session.custom_fields?.find(f => f.key === 'organization')?.text?.value || '';
     const referralRaw = session.custom_fields?.find(f => f.key === 'referral')?.text?.value || '';
-    const phone = session.customer_details?.phone || customer?.phone || '';
-    const address = session.customer_details?.address || customer?.address || null;
-    
+    const phone = session.customer_details?.phone || '';
+    const address = session.customer_details?.address || null;
+
     // Format address as single string
     const addressString = address
       ? `${address.line1 || ''}${address.line2 ? ', ' + address.line2 : ''}, ${address.city || ''}, ${address.state || ''} ${address.postal_code || ''}, ${address.country || ''}`
       : undefined;
 
-    const stripeCustomerId = session.customer as string || customer?.id || null;
+    const stripeCustomerId = session.customer as string || null;
     const amount = session.amount_total ? session.amount_total / 100 : 0;
     const currency = session.currency || 'usd';
     const isRecurring = session.mode === 'subscription';
     const subscriptionId = session.subscription as string | null;
     const donationDate = new Date().toISOString();
-    const status = paymentIntent?.status === 'succeeded' ? 'Succeeded' : 'Pending';
+    // session.payment_status is 'paid' | 'unpaid' | 'no_payment_required'.
+    // For checkout.session.completed, it's always 'paid'.
+    const status = session.payment_status === 'paid' ? 'Succeeded' : 'Pending';
 
     // Step 1: Find or create donor (shared for donations, shirt orders, sponsorships)
-    const donorId = await findOrCreateDonor(stripeCustomerId, email, {
+    // Branch: Shirt order, Shirt + Monthly, Sponsorship, or standard donation.
+    // We determine the branch BEFORE calling findOrCreateDonor so we can
+    // parallelize the donor lookup with path-specific Airtable work (child
+    // assignment or child record fetch). This shaves ~1-2s off total time,
+    // critical for staying inside the serverless timeout.
+    const isShirtOrder = session.metadata?.order_type === 'shirt';
+    const isShirtPlusMonthly = session.metadata?.order_type === 'shirt_plus_monthly';
+    const isSponsorship = session.metadata?.order_type === 'sponsorship';
+
+    const donorArgs = {
       name,
       organization: organization || undefined,
       email,
       phone: phone || undefined,
       address: addressString,
       referral: referralRaw || undefined,
-    });
+    };
 
-    // Branch: Shirt order, Shirt + Monthly, Sponsorship, or standard donation
-    const isShirtOrder = session.metadata?.order_type === 'shirt';
-    const isShirtPlusMonthly = session.metadata?.order_type === 'shirt_plus_monthly';
-    const isSponsorship = session.metadata?.order_type === 'sponsorship';
+    // Start the donor lookup — every path needs it.
+    const donorPromise = findOrCreateDonor(stripeCustomerId, email, donorArgs);
 
     if (isSponsorship) {
       // --- SPONSORSHIP FLOW ---
@@ -1158,8 +1142,11 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
         console.error('[Webhook] Sponsorship missing child_record_id in metadata');
       }
 
-      // Fetch child record to enrich sponsorship with display info
-      const childRecord = childRecordId ? await fetchChildRecord(childRecordId) : null;
+      // Parallelize: donor lookup + child record fetch
+      const [donorId, childRecord] = await Promise.all([
+        donorPromise,
+        childRecordId ? fetchChildRecord(childRecordId) : Promise.resolve(null),
+      ]);
       const childFields = childRecord?.fields || {};
       const childDisplayName = childFields.DisplayName || childDisplayNameMeta || 'a child';
       const childId = childFields.ChildID || childFields['Child ID'] || childIdMeta;
@@ -1167,7 +1154,7 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
       const childLocation = childFields.SchoolLocation;
 
       // Step 2c: Record the first month as a donation tagged as Sponsorship
-      const donationId = await upsertDonation(paymentIntentId || session.id, {
+      const donationId = await upsertDonation(paymentIntentId, {
         sessionId: session.id,
         customerId: stripeCustomerId,
         donorId,
@@ -1294,14 +1281,22 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
         subscriptionId,
       });
 
-      // Step 2: Assign the next available child (same pool / same rules as
-      // a shirt-only order). This must happen before we try to backfill
-      // subscription metadata so we have child_id in hand.
+      // Parallelize: donor lookup + child assignment (independent of each other)
       let assignedChild: Awaited<ReturnType<typeof assignNextShirtChild>> = null;
+      let donorId: string;
       try {
-        assignedChild = await assignNextShirtChild(email, name);
+        const [donorResult, childResult] = await Promise.all([
+          donorPromise,
+          assignNextShirtChild(email, name).catch(err => {
+            console.error('[Webhook] Unexpected error during shirt+monthly assignment:', err);
+            return null;
+          }),
+        ]);
+        donorId = donorResult;
+        assignedChild = childResult;
       } catch (error) {
-        console.error('[Webhook] Unexpected error during shirt+monthly assignment:', error);
+        // If donorPromise fails, we can't continue
+        throw error;
       }
 
       // Step 3: Backfill subscription metadata so the sponsor portal and
@@ -1341,7 +1336,7 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
       const assignmentNote = assignedChild
         ? ` / Assigned to #${assignedChild.shirtNumber} (${assignedChild.displayName})`
         : ' / No child assigned (out of stock or assignment failed)';
-      const donationId = await upsertDonation(paymentIntentId || session.id, {
+      const donationId = await upsertDonation(paymentIntentId, {
         sessionId: session.id,
         customerId: stripeCustomerId,
         donorId,
@@ -1471,15 +1466,21 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
 
       console.log('[Webhook] Processing shirt order:', { shirtName, shirtColor, shirtSize });
 
-      // Step 2a: Assign the next available child BEFORE creating the donation,
-      // so the donation record can include the Child link at creation time.
-      // Assignment can return null (no children available or Airtable error);
-      // we continue with the order in that case and flag for manual follow-up.
+      // Parallelize: donor lookup + child assignment (independent of each other)
       let assignedChild: Awaited<ReturnType<typeof assignNextShirtChild>> = null;
+      let donorId: string;
       try {
-        assignedChild = await assignNextShirtChild(email, name);
+        const [donorResult, childResult] = await Promise.all([
+          donorPromise,
+          assignNextShirtChild(email, name).catch(err => {
+            console.error('[Webhook] Unexpected error during shirt assignment:', err);
+            return null;
+          }),
+        ]);
+        donorId = donorResult;
+        assignedChild = childResult;
       } catch (error) {
-        console.error('[Webhook] Unexpected error during shirt assignment:', error);
+        throw error;
       }
 
       // Step 3a: Create donation record tagged as shirt order, linked to the
@@ -1489,7 +1490,7 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
       const assignmentNote = assignedChild
         ? ` / Assigned to #${assignedChild.shirtNumber} (${assignedChild.displayName})`
         : ' / No child assigned (out of stock or assignment failed)';
-      const donationId = await upsertDonation(paymentIntentId || session.id, {
+      const donationId = await upsertDonation(paymentIntentId, {
         sessionId: session.id,
         customerId: stripeCustomerId,
         donorId,
@@ -1575,9 +1576,10 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
 
     } else {
       // --- STANDARD DONATION FLOW ---
+      const donorId = await donorPromise;
 
       // Step 2b: Create donation record (idempotent)
-      const donationId = await upsertDonation(paymentIntentId || session.id, {
+      const donationId = await upsertDonation(paymentIntentId, {
         sessionId: session.id,
         customerId: stripeCustomerId,
         donorId,
