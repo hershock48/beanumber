@@ -342,7 +342,7 @@ const SHIRTS_SOURCE: Shirt[] = [
     name: 'The Flagship',
     tagline: 'The one that started it all',
     price: 25,
-    description: 'This is the shirt that started Be A Number. Before there were six designs there was one idea: put a number on a shirt, connect that number to a real child, and see what happens. What happened was people showed up. Your $25 gets you the shirt and sponsors a child for your first month. The number you receive is assigned by order and belongs to a real kid in Northern Uganda. This is the original.',
+    description: 'This is the shirt that started Be A Number. Before there were any designs there was one idea: put a number on a shirt, connect that number to a real child, and see what happens. What happened was people showed up. Your $25 gets you the shirt and sponsors a child for your first month. The number you receive is assigned by order and belongs to a real kid in Northern Uganda. This is the original.',
     Front: FlagshipFront,
     Back: FlagshipBack,
     badge: 'Original',
