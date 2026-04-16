@@ -375,7 +375,7 @@ const SHIRTS_SOURCE: Shirt[] = [
     name: 'Peacemaker.',
     tagline: 'Blessed are those who show up',
     price: 25,
-    description: '"Blessed are the peacemakers. But woe to those who manipulate religion and the very name of God for their own military, economic and political gain." That\'s Pope Leo XIV, this week, standing in Cameroon while the President of the United States called him weak and terrible for opposing war. He didn\'t flinch. He said "I have no fear." This shirt is for the person who heard that and meant it.',
+    description: '"Blessed are the peacemakers. But woe to those who manipulate religion and the very name of God for their own military, economic and political gain." That\'s Pope Leo XIV, standing in Cameroon while the President of the United States called him weak and terrible for opposing war. He didn\'t flinch. He said "I have no fear." This shirt is for the person who heard that and meant it.',
     Front: SharedFront,
     Back: PeacemakerBack,
     badge: 'Conviction',
