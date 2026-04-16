@@ -30,6 +30,11 @@ export interface GmailSendOptions {
    * for correct casing.
    */
   headers?: Record<string, string>;
+  /**
+   * When true, send as text/plain only (no multipart, no HTML).
+   * Required for carrier email-to-SMS gateways which choke on MIME.
+   */
+  plainTextOnly?: boolean;
 }
 
 export interface GmailSendResult {
@@ -92,7 +97,8 @@ function createMessage(
   html: string,
   text?: string,
   replyTo?: string,
-  extraHeaders?: Record<string, string>
+  extraHeaders?: Record<string, string>,
+  plainTextOnly?: boolean
 ): string {
   const recipients = Array.isArray(to) ? to.join(', ') : to;
   const textContent = text || stripHtml(html);
@@ -106,10 +112,7 @@ function createMessage(
         .map(([k, v]) => `${k}: ${String(v).replace(/[\r\n]+/g, ' ')}`)
     : [];
 
-  // Create MIME message
-  // IMPORTANT: MIME requires blank lines (empty strings) to separate headers
-  // from body content. We must NOT filter those out. We handle optional
-  // headers (Reply-To, extra headers) separately to avoid blank-line removal.
+  // Build common headers
   const headerLines = [
     `To: ${recipients}`,
     `From: ${from}`,
@@ -118,6 +121,26 @@ function createMessage(
   if (replyTo) headerLines.push(`Reply-To: ${replyTo}`);
   for (const line of extraHeaderLines) headerLines.push(line);
   headerLines.push('MIME-Version: 1.0');
+
+  // Plain text mode for SMS gateways — no multipart, no HTML.
+  // Carrier gateways (T-Mobile, AT&T, etc.) choke on multipart MIME.
+  if (plainTextOnly) {
+    headerLines.push('Content-Type: text/plain; charset=utf-8');
+    const message = [
+      ...headerLines,
+      '',  // blank line separating headers from body (REQUIRED by MIME)
+      textContent,
+    ].join('\r\n');
+    return Buffer.from(message)
+      .toString('base64')
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/, '');
+  }
+
+  // Full multipart/alternative for real email clients
+  // IMPORTANT: MIME requires blank lines to separate headers from body
+  // content and each part's headers from its content.
   headerLines.push('Content-Type: multipart/alternative; boundary="boundary123"');
 
   const message = [
@@ -216,7 +239,8 @@ export async function sendEmailViaGmail(options: GmailSendOptions): Promise<Gmai
       options.html,
       options.text,
       options.replyTo,
-      options.headers
+      options.headers,
+      options.plainTextOnly
     );
 
     // Send the message

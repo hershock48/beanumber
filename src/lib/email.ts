@@ -35,6 +35,11 @@ export interface EmailOptions {
    * sends (RFC 8058).
    */
   headers?: Record<string, string>;
+  /**
+   * Send as plain text only (no HTML, no multipart MIME).
+   * Use for carrier email-to-SMS gateways.
+   */
+  plainTextOnly?: boolean;
 }
 
 export interface EmailSendResult {
@@ -94,6 +99,7 @@ export async function sendEmail(options: EmailOptions): Promise<EmailSendResult>
       text: options.text || stripHtml(options.html),
       replyTo: replyToAddress,
       headers: options.headers,
+      plainTextOnly: options.plainTextOnly,
     });
 
     return result;

@@ -972,13 +972,8 @@ async function sendAdminOrderNotification(data: {
     }
   })();
 
-  // Plain-text SMS body — short, no HTML, <160 chars where possible.
-  const smsText = [
-    `BAN: ${shortLine}`,
-    `${data.customerEmail}`,
-  ]
-    .filter(Boolean)
-    .join('\n');
+  // Plain-text SMS body — keep it dead simple for carrier gateways.
+  const smsText = `New ${data.kind.toLowerCase()}: ${shortLine}`;
 
   const stripeLink = data.stripeSessionId
     ? `https://dashboard.stripe.com/payments/${data.stripeSessionId}`
@@ -1045,14 +1040,10 @@ async function sendAdminOrderNotification(data: {
       sendEmail({
         to: { email: smsEmail },
         from,
-        // SMS gateways often concatenate subject + body. Keep the subject
-        // blank-ish so the text isn't duplicated on the phone screen.
         subject: ' ',
-        // The SMS gateway strips HTML, but sendEmail() requires html.
-        // Give it the same plaintext wrapped minimally so stripHtml() returns
-        // the clean text in the text/plain MIME part.
-        html: `<pre style="font-family:inherit;white-space:pre-wrap;margin:0;">${smsText.replace(/[<>&]/g, s => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' } as Record<string, string>)[s])}</pre>`,
+        html: smsText,  // required by sendEmail interface but ignored in plainTextOnly mode
         text: smsText,
+        plainTextOnly: true,  // carrier gateways choke on multipart MIME
       }),
     ]);
 
