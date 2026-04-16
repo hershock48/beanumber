@@ -345,7 +345,7 @@ const SHIRTS_SOURCE: Shirt[] = [
     description: 'This is the shirt that started Be A Number. Before there were six designs there was one idea: put a number on a shirt, connect that number to a real child, and see what happens. What happened was people showed up. Your $25 gets you the shirt and sponsors a child for your first month. The number you receive is assigned by order and belongs to a real kid in Northern Uganda. This is the original.',
     Front: FlagshipFront,
     Back: FlagshipBack,
-    badge: 'Core',
+    badge: 'Original',
     specs: 'S – 2XL · Unisex · Heavyweight cotton',
   },
   {
@@ -356,7 +356,7 @@ const SHIRTS_SOURCE: Shirt[] = [
     description: 'Thank you for the good times. Thank you for the bad ones too. Suffering without gratitude is just suffering. Suffering with it becomes something else. It shifts your perspective, brings purpose to the pain, and roots you in trust. God\'s love doesn\'t skip the hard parts. This shirt is a decision to say it out loud. It\'s probably the quietest shirt in the collection. It starts the most conversations.',
     Front: SharedFront,
     Back: ThankYouBack,
-    badge: 'Faith',
+    badge: 'Gratitude',
     specs: 'S – 2XL · Unisex · Heavyweight cotton',
   },
   {
@@ -367,7 +367,7 @@ const SHIRTS_SOURCE: Shirt[] = [
     description: '"Do not fear" appears over 100 times in the Bible. More than any other repeated command. Not because it\'s easy, but because God knows we need to hear it constantly. Move forward. Trust in love. The thing you\'re afraid of is smaller than the one who told you not to be.',
     Front: SharedFront,
     Back: DoNotFearBack,
-    badge: 'Faith',
+    badge: 'Courage',
     specs: 'S – 2XL · Unisex · Heavyweight cotton',
   },
   {
@@ -378,7 +378,7 @@ const SHIRTS_SOURCE: Shirt[] = [
     description: '"Blessed are the peacemakers." Not the peacekeepers. Not the ones who stay quiet to keep things comfortable. The ones who build it. When Pope Leo XIV stood in front of the world and called for an end to unjust wars, he wasn\'t being diplomatic. He was being clear. This shirt is for the person who heard that and took it seriously.',
     Front: SharedFront,
     Back: PeacemakerBack,
-    badge: 'Faith',
+    badge: 'Conviction',
     specs: 'S – 2XL · Unisex · Heavyweight cotton',
   },
   {
@@ -389,7 +389,7 @@ const SHIRTS_SOURCE: Shirt[] = [
     description: 'Through the good and the bad. Everything hallelujah. Not just praise when things are easy. Praise when they\'re not. Praise when it doesn\'t make sense yet. When the news is bad, when the money is short, when someone you love is suffering and you can\'t fix it. Hallelujah anyway. That\'s the whole point.',
     Front: SharedFront,
     Back: EverythingHallelujahBack,
-    badge: 'Faith',
+    badge: 'Praise',
     specs: 'S – 2XL · Unisex · Heavyweight cotton',
   },
   {
