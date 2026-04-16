@@ -273,8 +273,46 @@ function PeacemakerBack(props: DesignProps) {
   return <TextBack {...props} lines={['Peace', 'maker.']} />;
 }
 
-function EverythingHallelujahBack(props: DesignProps) {
-  return <TextBack {...props} lines={['Everything', 'Hallelujah.']} scale={0.7} />;
+/**
+ * Everything Hallelujah back — small centered text repeated 5 times down the
+ * spine of the shirt, each block the same size as the front chest logo.
+ */
+function EverythingHallelujahBack({ theme, mode = 'tee', className = '' }: DesignProps) {
+  // Match the front logo width (~8% of container in tee, ~18% in flat) for
+  // the text block width, and scale font to fit inside that width.
+  const blockWidth = mode === 'tee' ? '16%' : '28%';
+  const fontSize = mode === 'tee'
+    ? 'clamp(3.5px, 1.8cqw, 9px)'
+    : 'clamp(5px, 2.4cqw, 12px)';
+  // Spread the 5 repetitions evenly down the back body area
+  const startTop = mode === 'tee' ? 20 : 12;
+  const gap = mode === 'tee' ? 13 : 14;
+
+  return (
+    <DesignContainer theme={theme} mode={mode} side="back" className={className}>
+      {Array.from({ length: 5 }).map((_, i) => (
+        <div
+          key={i}
+          className="absolute text-center uppercase"
+          style={{
+            left: '50%',
+            top: `${startTop + i * gap}%`,
+            transform: 'translateX(-50%)',
+            width: blockWidth,
+            fontFamily: 'var(--font-lora), Georgia, serif',
+            fontWeight: 700,
+            color: theme.vinyl,
+            fontSize,
+            lineHeight: 1.3,
+            letterSpacing: '0.08em',
+          }}
+        >
+          <div>Everything</div>
+          <div>Hallelujah</div>
+        </div>
+      ))}
+    </DesignContainer>
+  );
 }
 
 /**
