@@ -595,6 +595,27 @@ function ShirtCard({ shirt, reversed, initialColor }: { shirt: Shirt; reversed: 
   return (
     <div className="scroll-mt-24" id={shirt.id}>
       <div className={`flex flex-col ${reversed ? 'md:flex-row-reverse' : 'md:flex-row'} gap-6 md:gap-14 items-center`}>
+        {/* Title block — visible on mobile ABOVE the mockups so the buyer
+            knows what they're looking at before scrolling past the image.
+            Hidden on desktop where the side-by-side layout makes it redundant. */}
+        <div className="md:hidden w-full">
+          <div className="flex items-center gap-3 mb-2">
+            {shirt.badge && (
+              <span className="text-xs font-bold uppercase tracking-wider px-2.5 py-1 bg-[#D4A843]/10 text-[#D4A843] border border-[#D4A843]/20">
+                {shirt.badge}
+              </span>
+            )}
+            <span className="text-xs text-[#aaa] uppercase tracking-wider">Available in 5 colors</span>
+          </div>
+          <h2
+            className="text-3xl text-[#0d0d0d] mb-1"
+            style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
+          >
+            {shirt.name}
+          </h2>
+          <p className="text-sm text-[#777] italic mb-0">{shirt.tagline}</p>
+        </div>
+
         {/* Mockup previews */}
         <div className="flex-1 w-full">
           <div className="grid grid-cols-2 gap-2 sm:gap-4">
@@ -641,21 +662,24 @@ function ShirtCard({ shirt, reversed, initialColor }: { shirt: Shirt; reversed: 
 
         {/* Details */}
         <div className="flex-1 w-full">
-          <div className="flex items-center gap-3 mb-2">
-            {shirt.badge && (
-              <span className="text-xs font-bold uppercase tracking-wider px-2.5 py-1 bg-[#D4A843]/10 text-[#D4A843] border border-[#D4A843]/20">
-                {shirt.badge}
-              </span>
-            )}
-            <span className="text-xs text-[#aaa] uppercase tracking-wider">Available in 5 colors</span>
+          {/* Desktop title — hidden on mobile where it appears above the mockups */}
+          <div className="hidden md:block">
+            <div className="flex items-center gap-3 mb-2">
+              {shirt.badge && (
+                <span className="text-xs font-bold uppercase tracking-wider px-2.5 py-1 bg-[#D4A843]/10 text-[#D4A843] border border-[#D4A843]/20">
+                  {shirt.badge}
+                </span>
+              )}
+              <span className="text-xs text-[#aaa] uppercase tracking-wider">Available in 5 colors</span>
+            </div>
+            <h2
+              className="text-3xl md:text-4xl text-[#0d0d0d] mb-1"
+              style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
+            >
+              {shirt.name}
+            </h2>
+            <p className="text-sm text-[#777] italic mb-4">{shirt.tagline}</p>
           </div>
-          <h2
-            className="text-3xl md:text-4xl text-[#0d0d0d] mb-1"
-            style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
-          >
-            {shirt.name}
-          </h2>
-          <p className="text-sm text-[#777] italic mb-4">{shirt.tagline}</p>
           <p
             className="text-2xl text-[#D4A843] mb-4"
             style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 700 }}
@@ -669,6 +693,11 @@ function ShirtCard({ shirt, reversed, initialColor }: { shirt: Shirt; reversed: 
 
           {/* Buy controls */}
           <div className="mt-6">
+            {/* Unisex fit callout — small, clean, hard to miss */}
+            <div className="inline-block border border-[#e8e0d4] bg-white px-3 py-1.5 mb-5">
+              <span className="text-[11px] text-[#888] uppercase tracking-[0.15em] font-semibold">Unisex fit</span>
+            </div>
+
             {/* Color selector */}
             <div className="flex items-baseline justify-between mb-2">
               <p className="text-xs text-[#999] uppercase tracking-wider font-bold">Color</p>
