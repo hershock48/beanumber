@@ -215,7 +215,7 @@ function SponsorshipPageContent() {
           </h1>
           <p className="text-lg text-[#777] max-w-2xl mx-auto leading-relaxed">
             {focusedChild && referringShirtSessionId
-              ? `Your shirt covered ${focusedChild.displayName.split(' ')[0]}\u2019s first month of school, meals, and medical care. Keep going for $25/month \u2014 cancel anytime.`
+              ? `Your shirt covered ${focusedChild.displayName.split(' ')[0]}\u2019s first month of school, meals, and medical care. Keep going for $25/month. Cancel anytime.`
               : '$25 a month covers school, daily meals, medical care, and a personal mentor for a child at the YDO campus in Northern Uganda. You\u2019ll know their name, see their face, and follow their year.'}
           </p>
         </div>
@@ -248,7 +248,7 @@ function SponsorshipPageContent() {
                   >
                     96.7%
                   </div>
-                  <p className="text-[#777] text-sm mt-1">goes directly to programs</p>
+                  <p className="text-[#777] text-sm mt-1">went directly to programs in 2025</p>
                 </div>
               </div>
             </div>
@@ -292,12 +292,12 @@ function SponsorshipPageContent() {
                   {
                     icon: <IconUser className="w-5 h-5 text-[#D4A843]" />,
                     title: 'Matched to a specific child',
-                    desc: 'You\u2019ll know their name, see their photo, and follow their story. Multiple sponsors can back the same child \u2014 that\u2019s how we fully fund them.',
+                    desc: 'You\u2019ll know their name, see their photo, and follow their story. Multiple sponsors can back the same child. That\u2019s how we fully fund them.',
                   },
                   {
                     icon: <IconNewspaper className="w-5 h-5 text-[#D4A843]" />,
                     title: 'A monthly newsletter from the campus',
-                    desc: 'Our team in Gulu sends a note from the ground each month \u2014 what the kids have been up to, stories from the school, photos from the week.',
+                    desc: 'Our team in Gulu sends a note from the ground each month: what the kids have been up to, stories from the school, photos from the week.',
                   },
                   {
                     icon: <IconCamera className="w-5 h-5 text-[#D4A843]" />,
@@ -312,7 +312,7 @@ function SponsorshipPageContent() {
                   {
                     icon: <IconClipboard className="w-5 h-5 text-[#D4A843]" />,
                     title: 'A year-end report card',
-                    desc: 'Grades, attendance, and teacher comments \u2014 real proof of progress.',
+                    desc: 'Grades, attendance, and teacher comments. Real proof of progress.',
                   },
                   {
                     icon: <IconLaptop className="w-5 h-5 text-[#D4A843]" />,
@@ -347,7 +347,7 @@ function SponsorshipPageContent() {
               </h2>
               <p className="text-[#777] text-center mb-10 max-w-lg mx-auto">
                 {referringShirtSessionId
-                  ? "Your shirt covered their first month. Keep going \u2014 $25/month, cancel anytime."
+                  ? "Your shirt covered their first month. Keep going. $25/month, cancel anytime."
                   : `Confirm below to sponsor ${focusedChild.displayName} for $25/month. Cancel anytime.`}
               </p>
             </>
@@ -357,10 +357,11 @@ function SponsorshipPageContent() {
                 className="text-3xl text-[#0d0d0d] mb-2 text-center"
                 style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
               >
-                Children Waiting for a Sponsor
+
+                Meet the Kids
               </h2>
               <p className="text-[#777] text-center mb-10 max-w-lg mx-auto">
-                Each child is enrolled in our program at the YDO campus and ready to be matched with a sponsor.
+                Every child here is already enrolled at the YDO campus. Your $25/month joins the team that keeps them there.
               </p>
             </>
           )}
@@ -393,11 +394,11 @@ function SponsorshipPageContent() {
                   className="text-2xl text-[#0d0d0d] mb-3"
                   style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
                 >
-                  All children are sponsored!
+
+                  No children loaded right now
                 </h3>
                 <p className="text-[#777] mb-6 leading-relaxed">
-                  Every child in our current program has a sponsor. New children are being enrolled regularly.
-                  Leave your email and we&rsquo;ll let you know as soon as a child is available.
+                  We&rsquo;re updating our roster. Drop us a note and we&rsquo;ll connect you with a child to sponsor.
                 </p>
                 <div className="flex flex-col sm:flex-row gap-3 justify-center">
                   <Link
@@ -572,11 +573,11 @@ function SponsorshipPageContent() {
             {[
               {
                 q: 'How much of my $25 goes directly to my child?',
-                a: 'Be A Number operates at 96.7% program efficiency. The vast majority of your sponsorship covers education, meals, healthcare, and community programs that serve your child directly.',
+                a: 'In 2025, 96.7% of every dollar went directly to programs. Your sponsorship covers education, meals, healthcare, and community programs that serve your child directly.',
               },
               {
                 q: 'Do I need to buy a shirt first?',
-                a: 'No. The shirt is one way in \u2014 you can also sponsor directly from this page. If you do buy a shirt, it covers your first month and the number on the tag connects you to a specific child.',
+                a: 'No. The shirt is one way in, but you can also sponsor directly from this page. If you do buy a shirt, it covers your first month and the number on the tag connects you to a specific child.',
               },
               {
                 q: 'How often will I hear about my child?',

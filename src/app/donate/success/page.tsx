@@ -107,7 +107,7 @@ export default function DonateSuccess() {
             </li>
           </ul>
           <p className="text-white/90 leading-relaxed">
-            Every dollar you give directly supports these outcomes. 96.7% of all funding goes to programs and community impact.
+            Every dollar you give directly supports these outcomes. In 2025, 96.7% of all funding went to programs and community work.
           </p>
         </section>
 

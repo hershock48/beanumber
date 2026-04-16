@@ -748,7 +748,7 @@ export default function ShirtsPageContent() {
               },
               {
                 q: 'Where does the $25 actually go?',
-                a: 'Be A Number operates at 96.7% program efficiency, meaning nearly every dollar reaches the ground. Your child\'s sponsorship funds education, daily meals, medical care through the on-site clinic, and mentorship. But it also supports the community infrastructure around them: the 60 women in vocational training, the 700+ patients served through medical outreach, the construction apprenticeships. It\'s not just one child; it\'s the ecosystem that keeps them safe.',
+                a: 'In 2025, 96.7% of every dollar went directly to programs. Your child\'s sponsorship funds education, daily meals, medical care through the on-site clinic, and mentorship. But it also supports the community infrastructure around them: the 60 women in vocational training, the 700+ patients served through medical outreach, the construction apprenticeships. It\'s not just one child; it\'s the ecosystem that keeps them safe.',
               },
               {
                 q: 'Can I pick my number?',
