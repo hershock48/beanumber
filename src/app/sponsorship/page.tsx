@@ -504,8 +504,15 @@ function SponsorshipPageContent() {
                 </div>
               </div>
 
-              {/* --- Section header --- */}
-              <p className="text-xs font-bold text-[#D4A843] uppercase tracking-[0.3em] mb-8 text-center">Change their lives</p>
+              {/* --- Section header + photo --- */}
+              <p className="text-xs font-bold text-[#D4A843] uppercase tracking-[0.3em] mb-6 text-center">Change their lives</p>
+              <div className="mb-12 overflow-hidden max-w-2xl mx-auto">
+                <img
+                  src="/images/story/kids-hugging.png"
+                  alt="Children standing together outside their home in Northern Uganda"
+                  className="w-full object-cover"
+                />
+              </div>
 
               {/* --- Expanded profile cards (paginated) --- */}
               <div className="space-y-10">

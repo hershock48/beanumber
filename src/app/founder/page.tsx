@@ -52,6 +52,13 @@ export default function Founder() {
 
           {/* Kevin */}
           <div className="space-y-6 mb-16">
+            <div className="mb-8 overflow-hidden">
+              <img
+                src="/images/story/kevin-elder.png"
+                alt="Kevin Hershock with a community elder in Northern Uganda"
+                className="w-full max-w-md mx-auto object-cover"
+              />
+            </div>
             <h2
               className="text-2xl md:text-3xl text-[#0d0d0d] mb-2"
               style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
@@ -103,6 +110,13 @@ export default function Founder() {
 
           {/* Simon */}
           <div className="space-y-6 mb-16">
+            <div className="mb-8 overflow-hidden">
+              <img
+                src="/images/story/simon-leader.png"
+                alt="Simon Peter Wilobo in Omoro District, Northern Uganda"
+                className="w-full max-w-md mx-auto object-cover"
+              />
+            </div>
             <h2
               className="text-2xl md:text-3xl text-[#0d0d0d] mb-2"
               style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
