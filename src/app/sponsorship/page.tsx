@@ -531,11 +531,6 @@ function SponsorshipPageContent() {
                               </div>
                             </div>
                           )}
-                          {child.shirtNumber && (
-                            <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm px-3 py-1">
-                              <span className="text-sm font-bold text-[#D4A843]">#{child.shirtNumber}</span>
-                            </div>
-                          )}
                         </div>
 
                         {/* Info side */}
