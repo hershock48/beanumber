@@ -195,8 +195,8 @@ export default function Impact() {
         <div className="max-w-4xl mx-auto">
           <div className="relative w-full aspect-[16/9] bg-[#f5f0e8] border border-[#e8e0d4] overflow-hidden">
             <Image
-              src="/images/impact-page/secondary-image.jpg"
-              alt="Programs in action at the YDO campus"
+              src="/images/impact-page/lead-image.jpg"
+              alt="The YDO campus in Northern Uganda"
               fill
               className="object-cover"
             />

@@ -461,7 +461,7 @@ export default function TermsPage() {
                 <a href="mailto:kevin@beanumber.org" className="text-[#D4A843] underline">
                   kevin@beanumber.org
                 </a>
-                . Mail: Be A Number, International, 8475 18 1/2 Mile Road,
+                . Mail: Be A Number, International, 108 N. Sycamore Street,
                 Marshall, MI 49068.
               </p>
             </section>

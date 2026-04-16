@@ -241,7 +241,7 @@ export default async function ChildProfilePage({ params }: ChildPageProps) {
             Back to home
           </Link>
 
-          <div className="text-center">
+          <div className="text-center mb-16">
             <h1
               className="text-4xl md:text-5xl text-[#0d0d0d] mb-4"
               style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
@@ -250,7 +250,7 @@ export default async function ChildProfilePage({ params }: ChildPageProps) {
             </h1>
 
             <p className="text-lg text-[#666] leading-relaxed max-w-xl mx-auto mb-4">
-              Double-check your shirt tag — the number is printed on the inside label.
+              Double-check your shirt tag &mdash; the number is printed on the inside label.
               If you&rsquo;re sure it&rsquo;s #{number}, reach out and we&rsquo;ll sort it out.
             </p>
 
@@ -272,6 +272,51 @@ export default async function ChildProfilePage({ params }: ChildPageProps) {
                 Back to home
               </Link>
             </div>
+          </div>
+
+          {/* How the number works — gives the page substance and context
+              for people who landed here without a shirt. */}
+          <div className="bg-white border border-[#e8e0d4] p-8 md:p-10 mb-12">
+            <h2
+              className="text-2xl text-[#0d0d0d] mb-4"
+              style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
+            >
+              How the number works
+            </h2>
+            <p className="text-[#666] leading-relaxed mb-4">
+              Every Be A Number shirt has a unique number stamped on the inside collar.
+              That number belongs to a real child at our campus in Omoro District, Northern Uganda.
+              When you enter it here, you meet them &mdash; their name, their face, their story.
+            </p>
+            <p className="text-[#666] leading-relaxed">
+              Your $25 covers the shirt and sponsors that child for your first month of school,
+              meals, and medical care. Continue at $25/month and you stay connected to their
+              story all year &mdash; a monthly campus newsletter, photos, a handwritten letter
+              from your child, and a year-end report card.
+            </p>
+          </div>
+
+          {/* Don't have a shirt yet? — conversion path for curious visitors. */}
+          <div className="text-center">
+            <p className="text-xs font-bold text-[#D4A843] uppercase tracking-[0.2em] mb-3">
+              Don&rsquo;t have a shirt yet?
+            </p>
+            <h2
+              className="text-2xl md:text-3xl text-[#0d0d0d] mb-4"
+              style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
+            >
+              Get one. Meet your child.
+            </h2>
+            <p className="text-[#666] leading-relaxed max-w-lg mx-auto mb-8">
+              Six designs. Five colors. Heavyweight cotton, HTV vinyl, handmade to order.
+              Every shirt funds a real child&rsquo;s education, meals, and medical care for a month.
+            </p>
+            <Link
+              href="/shirts"
+              className="inline-block bg-[#D4A843] text-[#0d0d0d] font-bold uppercase tracking-wider py-4 px-10 hover:bg-[#c49a3a] transition-colors"
+            >
+              Shop the collection
+            </Link>
           </div>
         </main>
 

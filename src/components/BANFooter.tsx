@@ -47,7 +47,7 @@ export function BANFooter() {
           <div>
             <h3 className="text-[#FFF8F0] text-xs font-bold uppercase tracking-[0.2em] mb-4">Contact</h3>
             <div className="text-sm space-y-2.5">
-              <p>8475 18 1/2 Mile Road</p>
+              <p>108 N. Sycamore Street</p>
               <p>Marshall, MI 49068</p>
               <a href="mailto:kevin@beanumber.org" className="block hover:text-[#D4A843] transition-colors">
                 kevin@beanumber.org
