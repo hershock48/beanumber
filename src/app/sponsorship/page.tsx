@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useState, useEffect } from 'react';
+import { Suspense, useState, useEffect, useRef, useMemo } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useSearchParams } from 'next/navigation';
@@ -13,6 +13,7 @@ interface AvailableChild {
   displayName: string;
   age?: string;
   location?: string;
+  loves?: string;
   photo?: {
     url: string;
     filename: string;
@@ -28,14 +29,96 @@ interface ApiResponse {
   error?: string;
 }
 
+// ---------------------------------------------------------------------------
+// Fisher-Yates shuffle — returns a new array, does not mutate the original.
+// ---------------------------------------------------------------------------
+function shuffle<T>(arr: T[]): T[] {
+  const out = [...arr];
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// Small SVG icon components (gold accent, no emoji)
+// ---------------------------------------------------------------------------
+function IconBook({ className = 'w-6 h-6' }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
+    </svg>
+  );
+}
+function IconBowl({ className = 'w-6 h-6' }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 8.25v-1.5m0 1.5c-1.355 0-2.697.056-4.024.166C6.845 8.51 6 9.473 6 10.608v2.513m6-4.871c1.355 0 2.697.056 4.024.166C17.155 8.51 18 9.473 18 10.608v2.513M15 8.25v-1.5m-6 1.5v-1.5m12 9.75l-1.5.75a3.354 3.354 0 01-3 0 3.354 3.354 0 00-3 0 3.354 3.354 0 01-3 0 3.354 3.354 0 00-3 0 3.354 3.354 0 01-3 0L3 16.5m18-12L19.5 5.25a3.354 3.354 0 01-3 0 3.354 3.354 0 00-3 0 3.354 3.354 0 01-3 0 3.354 3.354 0 00-3 0L3 4.5" />
+    </svg>
+  );
+}
+function IconHeart({ className = 'w-6 h-6' }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" />
+    </svg>
+  );
+}
+function IconShield({ className = 'w-6 h-6' }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
+    </svg>
+  );
+}
+function IconUser({ className = 'w-6 h-6' }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+    </svg>
+  );
+}
+function IconNewspaper({ className = 'w-6 h-6' }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 7.5h1.5m-1.5 3h1.5m-7.5 3h7.5m-7.5 3h7.5m3-9h3.375c.621 0 1.125.504 1.125 1.125V18a2.25 2.25 0 01-2.25 2.25M16.5 7.5V18a2.25 2.25 0 002.25 2.25M16.5 7.5V4.875c0-.621-.504-1.125-1.125-1.125H4.125C3.504 3.75 3 4.254 3 4.875V18a2.25 2.25 0 002.25 2.25h13.5" />
+    </svg>
+  );
+}
+function IconCamera({ className = 'w-6 h-6' }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z" />
+    </svg>
+  );
+}
+function IconEnvelope({ className = 'w-6 h-6' }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
+    </svg>
+  );
+}
+function IconClipboard({ className = 'w-6 h-6' }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15a2.25 2.25 0 012.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25z" />
+    </svg>
+  );
+}
+function IconLaptop({ className = 'w-6 h-6' }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 17.25v1.007a3 3 0 01-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0115 18.257V17.25m6-12V15a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 15V5.25A2.25 2.25 0 015.25 3h13.5A2.25 2.25 0 0121 5.25z" />
+    </svg>
+  );
+}
+
 function SponsorshipPageContent() {
   const searchParams = useSearchParams();
 
-  // URL params set by the shirt success page and the /children/[number] page.
-  //   ?child=X         — preselected child id (ChildID field in Airtable)
-  //   ?name=Y          — cosmetic display name
-  //   ?from_shirt=cs_… — the Stripe shirt checkout session id, threaded
-  //                      through so we can attribute shirt→sponsor conversion.
   const preselectedChildId = searchParams.get('child');
   const referringShirtSessionId = searchParams.get('from_shirt');
 
@@ -43,6 +126,14 @@ function SponsorshipPageContent() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [sponsoringId, setSponsoringId] = useState<string | null>(null);
+
+  const carouselRef = useRef<HTMLDivElement | null>(null);
+  const scrollCarousel = (direction: 'left' | 'right') => {
+    const el = carouselRef.current;
+    if (!el) return;
+    const delta = el.clientWidth * 0.8;
+    el.scrollBy({ left: direction === 'right' ? delta : -delta, behavior: 'smooth' });
+  };
 
   useEffect(() => {
     async function fetchAvailableChildren() {
@@ -61,6 +152,17 @@ function SponsorshipPageContent() {
     }
     fetchAvailableChildren();
   }, []);
+
+  // Shuffle once per page load. If a specific child was preselected,
+  // that child gets pulled to the front; the rest are randomized.
+  const displayChildren = useMemo(() => {
+    if (preselectedChildId) {
+      const target = children.find(c => c.id === preselectedChildId);
+      const rest = shuffle(children.filter(c => c.id !== preselectedChildId));
+      return target ? [target, ...rest] : rest;
+    }
+    return shuffle(children);
+  }, [children, preselectedChildId]);
 
   async function handleSponsor(child: AvailableChild) {
     setSponsoringId(child.recordId);
@@ -91,11 +193,15 @@ function SponsorshipPageContent() {
     }
   }
 
+  // Focus state: if a preselected child was found
+  const focusedChild =
+    preselectedChildId ? displayChildren.find(c => c.id === preselectedChildId) : null;
+
   return (
     <div className="min-h-screen bg-[#FFF8F0]">
       <BANNavigation currentPath="/sponsorship" />
 
-      {/* Hero */}
+      {/* ========== HERO ========== */}
       <section className="pt-24 pb-16 px-6">
         <div className="max-w-3xl mx-auto text-center">
           <p className="text-xs font-bold text-[#D4A843] uppercase tracking-[0.3em] mb-6">Sponsorship</p>
@@ -103,33 +209,48 @@ function SponsorshipPageContent() {
             className="text-4xl md:text-5xl text-[#0d0d0d] mb-4"
             style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 700 }}
           >
-            Continue Their Story
+            {focusedChild
+              ? `Stay in ${focusedChild.displayName.split(' ')[0]}\u2019s life.`
+              : 'Pick a number. Stay in their life.'}
           </h1>
           <p className="text-lg text-[#777] max-w-2xl mx-auto leading-relaxed">
-            Your shirt connected you to a child in Northern Uganda. For $25 a month,
-            you stay connected to their name, their face, their journey through
-            school and life.
+            {focusedChild && referringShirtSessionId
+              ? `Your shirt covered ${focusedChild.displayName.split(' ')[0]}\u2019s first month of school, meals, and medical care. Keep going for $25/month \u2014 cancel anytime.`
+              : '$25 a month covers school, daily meals, medical care, and a personal mentor for a child at the YDO campus in Northern Uganda. You\u2019ll know their name, see their face, and follow their year.'}
           </p>
         </div>
       </section>
 
-      {/* What You Receive */}
+      {/* ========== PRICING BLOCK ========== */}
       <section className="pb-16 px-6">
         <div className="max-w-4xl mx-auto">
           <div className="bg-white border border-[#e8e0d4] overflow-hidden">
-            {/* Price header */}
-            <div className="bg-[#0d0d0d] border-b border-[#222] px-8 py-8 text-center">
-              <p className="text-xs font-bold text-[#D4A843] uppercase tracking-[0.3em] mb-2">Child Sponsorship</p>
-              <div className="flex items-baseline justify-center gap-1">
-                <span
-                  className="text-5xl text-[#FFF8F0]"
-                  style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 700 }}
-                >
-                  $25
-                </span>
-                <span className="text-[#777] text-lg">/month</span>
+            {/* Price header + efficiency stat */}
+            <div className="bg-[#0d0d0d] border-b border-[#222] px-8 py-8">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+                <div className="text-center md:text-left">
+                  <p className="text-xs font-bold text-[#D4A843] uppercase tracking-[0.3em] mb-2">Child Sponsorship</p>
+                  <div className="flex items-baseline justify-center md:justify-start gap-1">
+                    <span
+                      className="text-5xl text-[#FFF8F0]"
+                      style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 700 }}
+                    >
+                      $25
+                    </span>
+                    <span className="text-[#777] text-lg">/month</span>
+                  </div>
+                  <p className="text-[#777] text-sm mt-2">Cancel anytime. No questions asked.</p>
+                </div>
+                <div className="text-center md:text-right">
+                  <div
+                    className="text-4xl text-[#D4A843]"
+                    style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 700 }}
+                  >
+                    96.7%
+                  </div>
+                  <p className="text-[#777] text-sm mt-1">goes directly to programs</p>
+                </div>
               </div>
-              <p className="text-[#777] text-sm mt-2">Your shirt covered month one. Keep going. Cancel anytime.</p>
             </div>
 
             {/* What your child receives */}
@@ -140,15 +261,15 @@ function SponsorshipPageContent() {
               >
                 What your sponsorship provides
               </h2>
-              <div className="grid sm:grid-cols-2 gap-4">
+              <div className="grid sm:grid-cols-2 gap-5">
                 {[
-                  { icon: '📚', title: 'Education', desc: 'School tuition, uniforms, books, and supplies' },
-                  { icon: '🍽️', title: 'Daily meals', desc: 'Nutritious food to support healthy growth' },
-                  { icon: '🏥', title: 'Medical care', desc: 'Regular check-ups and access to the on-site clinic' },
-                  { icon: '🤝', title: 'Mentorship', desc: 'A personal mentor and a safe community to grow in' },
+                  { icon: <IconBook className="w-5 h-5 text-[#D4A843]" />, title: 'Education', desc: 'School tuition, uniforms, books, and supplies' },
+                  { icon: <IconBowl className="w-5 h-5 text-[#D4A843]" />, title: 'Daily meals', desc: 'Nutritious food prepared on campus every school day' },
+                  { icon: <IconShield className="w-5 h-5 text-[#D4A843]" />, title: 'Medical care', desc: 'Regular check-ups at the on-site clinic' },
+                  { icon: <IconHeart className="w-5 h-5 text-[#D4A843]" />, title: 'Mentorship', desc: 'A personal mentor and a safe community to grow in' },
                 ].map(item => (
                   <div key={item.title} className="flex gap-4 items-start">
-                    <span className="text-2xl mt-0.5">{item.icon}</span>
+                    <span className="mt-0.5 flex-shrink-0">{item.icon}</span>
                     <div>
                       <p className="font-semibold text-[#0d0d0d] text-sm">{item.title}</p>
                       <p className="text-[#777] text-sm">{item.desc}</p>
@@ -169,38 +290,38 @@ function SponsorshipPageContent() {
               <div className="space-y-4">
                 {[
                   {
-                    icon: '👤',
+                    icon: <IconUser className="w-5 h-5 text-[#D4A843]" />,
                     title: 'Matched to a specific child',
-                    desc: 'You\u2019re tied to one child by their shirt number. Their name, photo, age, and story are yours once your shirt arrives and you enter your number.',
+                    desc: 'Their name, photo, age, and story are yours. One child, one number, one connection.',
                   },
                   {
-                    icon: '📰',
+                    icon: <IconNewspaper className="w-5 h-5 text-[#D4A843]" />,
                     title: 'A monthly newsletter from the campus',
-                    desc: 'Each month our team in Gulu sends a note from the ground \u2014 what the kids have been up to, stories from the school, photos from the week.',
+                    desc: 'Our team in Gulu sends a note from the ground each month \u2014 what the kids have been up to, stories from the school, photos from the week.',
                   },
                   {
-                    icon: '📸',
+                    icon: <IconCamera className="w-5 h-5 text-[#D4A843]" />,
                     title: 'Photos of your child every few months',
-                    desc: 'Current photos taken at school and around the campus, so you can watch them grow over the year.',
+                    desc: 'Current photos taken at school and around the campus, so you can watch them grow.',
                   },
                   {
-                    icon: '✉️',
+                    icon: <IconEnvelope className="w-5 h-5 text-[#D4A843]" />,
                     title: 'A handwritten letter once a year',
-                    desc: 'Your child writes to you, usually timed with the Ugandan school calendar. You\u2019ll get the scanned original and can write back anytime.',
+                    desc: 'Your child writes to you, timed with the Ugandan school calendar. You get the scanned original and can write back anytime.',
                   },
                   {
-                    icon: '📋',
+                    icon: <IconClipboard className="w-5 h-5 text-[#D4A843]" />,
                     title: 'A year-end report card',
-                    desc: 'Grades, attendance, and teacher comments \u2014 real proof of their progress, once a year.',
+                    desc: 'Grades, attendance, and teacher comments \u2014 real proof of progress.',
                   },
                   {
-                    icon: '💻',
+                    icon: <IconLaptop className="w-5 h-5 text-[#D4A843]" />,
                     title: 'Online sponsor portal',
-                    desc: 'Log in anytime with your sponsor code to see every update, photo, and letter in one place.',
+                    desc: 'Log in with your sponsor code to see every update, photo, and letter in one place.',
                   },
                 ].map(item => (
                   <div key={item.title} className="flex gap-4 items-start">
-                    <span className="text-xl mt-0.5 w-8 text-center flex-shrink-0">{item.icon}</span>
+                    <span className="mt-0.5 w-6 flex-shrink-0">{item.icon}</span>
                     <div>
                       <p className="font-semibold text-[#0d0d0d] text-sm">{item.title}</p>
                       <p className="text-[#777] text-sm leading-relaxed">{item.desc}</p>
@@ -213,52 +334,42 @@ function SponsorshipPageContent() {
         </div>
       </section>
 
-      {/* Children Awaiting Sponsors */}
+      {/* ========== CHILDREN CAROUSEL ========== */}
       <section className="pb-16 px-6">
         <div className="max-w-6xl mx-auto">
-          {(() => {
-            // When a specific child was preselected (from /shirts/success or
-            // /children/[number]), focus the page on that single child if we
-            // can find them. Fall back to the full list if not.
-            const focused =
-              preselectedChildId && children.find(c => c.id === preselectedChildId);
-            if (focused) {
-              return (
-                <>
-                  <h2
-                    className="text-3xl text-[#0d0d0d] mb-2 text-center"
-                    style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
-                  >
-                    You&rsquo;re sponsoring {focused.displayName}
-                  </h2>
-                  <p className="text-[#777] text-center mb-10 max-w-lg mx-auto">
-                    {referringShirtSessionId
-                      ? "Your shirt covered their first month. Keep going \u2014 $25/month, cancel anytime."
-                      : `Confirm below to sponsor ${focused.displayName} monthly for $25. Cancel anytime.`}
-                  </p>
-                </>
-              );
-            }
-            return (
-              <>
-                <h2
-                  className="text-3xl text-[#0d0d0d] mb-2 text-center"
-                  style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
-                >
-                  Children Waiting for a Sponsor
-                </h2>
-                <p className="text-[#777] text-center mb-10 max-w-lg mx-auto">
-                  Each of these children is enrolled in our program and ready to be matched with a sponsor like you.
-                </p>
-              </>
-            );
-          })()}
+          {focusedChild ? (
+            <>
+              <h2
+                className="text-3xl text-[#0d0d0d] mb-2 text-center"
+                style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
+              >
+                You&rsquo;re sponsoring {focusedChild.displayName}
+              </h2>
+              <p className="text-[#777] text-center mb-10 max-w-lg mx-auto">
+                {referringShirtSessionId
+                  ? "Your shirt covered their first month. Keep going \u2014 $25/month, cancel anytime."
+                  : `Confirm below to sponsor ${focusedChild.displayName} for $25/month. Cancel anytime.`}
+              </p>
+            </>
+          ) : (
+            <>
+              <h2
+                className="text-3xl text-[#0d0d0d] mb-2 text-center"
+                style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
+              >
+                Children Waiting for a Sponsor
+              </h2>
+              <p className="text-[#777] text-center mb-10 max-w-lg mx-auto">
+                Each child is enrolled in our program at the YDO campus and ready to be matched with a sponsor.
+              </p>
+            </>
+          )}
 
           {loading ? (
             <div className="text-center py-12">
               <div className="animate-pulse space-y-3">
-                <div className="h-6 w-48 bg-[#e8e0d4] mx-auto"></div>
-                <div className="h-4 w-64 bg-[#e8e0d4] mx-auto"></div>
+                <div className="h-6 w-48 bg-[#e8e0d4] mx-auto" />
+                <div className="h-4 w-64 bg-[#e8e0d4] mx-auto" />
               </div>
               <p className="text-[#aaa] mt-4 text-sm">Loading...</p>
             </div>
@@ -275,7 +386,7 @@ function SponsorshipPageContent() {
                 </button>
               </div>
             </div>
-          ) : children.length === 0 ? (
+          ) : displayChildren.length === 0 ? (
             <div className="text-center py-12">
               <div className="bg-white border border-[#e8e0d4] p-8 max-w-lg mx-auto">
                 <h3
@@ -305,70 +416,100 @@ function SponsorshipPageContent() {
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {(preselectedChildId && children.some(c => c.id === preselectedChildId)
-                ? children.filter(c => c.id === preselectedChildId)
-                : children
-              ).map((child) => (
-                <div
-                  key={child.recordId}
-                  className="bg-white border border-[#e8e0d4] overflow-hidden hover:shadow-lg transition-all"
-                >
-                  {/* Photo */}
-                  <div className="aspect-[4/5] relative bg-[#f5f0e8]">
-                    {child.photo?.url ? (
-                      <Image
-                        src={child.photo.url}
-                        alt={`Photo of ${child.displayName}`}
-                        fill
-                        className="object-cover"
-                        sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                      />
-                    ) : (
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <div className="text-center">
-                          <div className="text-5xl mb-2 opacity-40">👤</div>
-                          <p className="text-[#aaa] text-sm">Photo coming soon</p>
-                        </div>
+            <div className="relative">
+              {/* Arrow controls — desktop only */}
+              <button
+                type="button"
+                onClick={() => scrollCarousel('left')}
+                aria-label="Previous children"
+                className="hidden md:flex absolute -left-2 lg:-left-6 top-1/2 -translate-y-1/2 z-10 w-12 h-12 items-center justify-center bg-white border border-[#e8e0d4] text-[#0d0d0d] hover:border-[#D4A843] hover:text-[#D4A843] transition-colors shadow-sm"
+              >
+                <span className="text-2xl leading-none" aria-hidden="true">&lsaquo;</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => scrollCarousel('right')}
+                aria-label="Next children"
+                className="hidden md:flex absolute -right-2 lg:-right-6 top-1/2 -translate-y-1/2 z-10 w-12 h-12 items-center justify-center bg-white border border-[#e8e0d4] text-[#0d0d0d] hover:border-[#D4A843] hover:text-[#D4A843] transition-colors shadow-sm"
+              >
+                <span className="text-2xl leading-none" aria-hidden="true">&rsaquo;</span>
+              </button>
+
+              {/* Snap-scroll carousel track */}
+              <div
+                ref={carouselRef}
+                className="flex gap-6 overflow-x-auto snap-x snap-mandatory scroll-smooth pb-6 -mx-5 px-5 md:mx-0 md:px-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+              >
+                {displayChildren.map((child) => {
+                  const firstName = child.displayName?.split(' ')[0] || 'them';
+                  return (
+                    <div
+                      key={child.recordId}
+                      className="snap-start shrink-0 w-[280px] sm:w-[320px] bg-white border border-[#e8e0d4] overflow-hidden hover:shadow-lg transition-all"
+                    >
+                      {/* Photo */}
+                      <div className="aspect-[4/5] relative bg-[#f5f0e8]">
+                        {child.photo?.url ? (
+                          <Image
+                            src={child.photo.url}
+                            alt={`Photo of ${child.displayName}`}
+                            fill
+                            className="object-cover"
+                            sizes="(max-width: 640px) 280px, 320px"
+                          />
+                        ) : (
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <div className="text-center">
+                              <IconUser className="w-12 h-12 text-[#ccc] mx-auto mb-2" />
+                              <p className="text-[#aaa] text-sm">Photo coming soon</p>
+                            </div>
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
 
-                  {/* Info */}
-                  <div className="p-6">
-                    <h3
-                      className="text-xl text-[#0d0d0d] mb-1"
-                      style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
-                    >
-                      {child.displayName}
-                    </h3>
-                    <div className="flex items-center gap-2 text-[#777] text-sm mb-5">
-                      {child.age && <span>Age {child.age}</span>}
-                      {child.age && child.location && <span className="text-[#ccc]">&middot;</span>}
-                      {child.location && <span>{child.location}</span>}
+                      {/* Info */}
+                      <div className="p-5">
+                        <h3
+                          className="text-xl text-[#0d0d0d] mb-1"
+                          style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
+                        >
+                          {child.displayName}
+                        </h3>
+                        <div className="flex items-center gap-2 text-[#999] text-sm mb-3">
+                          {child.age && <span>Age {child.age}</span>}
+                          {child.age && child.location && <span className="text-[#ccc]">&middot;</span>}
+                          {child.location && <span>{child.location}</span>}
+                        </div>
+
+                        {child.loves && (
+                          <p className="text-sm text-[#777] mb-4 leading-relaxed">
+                            {child.loves}
+                          </p>
+                        )}
+
+                        <button
+                          onClick={() => handleSponsor(child)}
+                          disabled={sponsoringId === child.recordId}
+                          className="block w-full py-3 bg-[#D4A843] text-[#0d0d0d] text-center font-bold uppercase tracking-wider text-sm hover:bg-[#c49a3a] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                        >
+                          {sponsoringId === child.recordId
+                            ? 'Starting...'
+                            : `Sponsor ${firstName} \u00b7 $25/mo`}
+                        </button>
+                        <p className="text-center text-xs text-[#999] mt-3">
+                          Cancel anytime. Secure checkout via Stripe.
+                        </p>
+                      </div>
                     </div>
-
-                    <button
-                      onClick={() => handleSponsor(child)}
-                      disabled={sponsoringId === child.recordId}
-                      className="block w-full py-3 bg-[#D4A843] text-[#0d0d0d] text-center font-bold uppercase tracking-wider text-sm hover:bg-[#c49a3a] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-                    >
-                      {sponsoringId === child.recordId
-                        ? 'Starting...'
-                        : `Sponsor ${child.displayName.split(' ')[0]} \u00b7 $25/mo`}
-                    </button>
-                    <p className="text-center text-xs text-[#999] mt-3">
-                      Cancel anytime. Secure checkout via Stripe.
-                    </p>
-                  </div>
-                </div>
-              ))}
+                  );
+                })}
+              </div>
             </div>
           )}
         </div>
       </section>
 
-      {/* How It Works */}
+      {/* ========== HOW IT WORKS ========== */}
       <section className="pb-16 px-6 bg-white border-t border-[#e8e0d4] pt-16">
         <div className="max-w-3xl mx-auto">
           <h2
@@ -382,23 +523,23 @@ function SponsorshipPageContent() {
             {[
               {
                 step: 'I',
-                title: 'Get a shirt',
-                desc: '$25 gets you a heavyweight shirt and sponsors a child for your first month.',
+                title: 'Choose a child',
+                desc: 'Browse the children above. Pick the one you want to walk with. Hit sponsor.',
               },
               {
                 step: 'II',
-                title: 'Meet your child',
-                desc: 'Enter your shirt number on the site. See their name, their photo, their story.',
+                title: '$25/month covers everything',
+                desc: 'School fees, daily meals, medical care, and mentorship at the YDO campus in Omoro District. Secure checkout via Stripe.',
               },
               {
                 step: 'III',
-                title: 'Continue for $25/month',
-                desc: 'Keep going with secure, automatic monthly giving. Adjust or cancel at any time (no questions asked).',
+                title: 'Get your sponsor portal',
+                desc: 'A sponsor code arrives by email. Log in anytime to see updates, photos, and letters from your child.',
               },
               {
                 step: 'IV',
                 title: 'Stay connected all year',
-                desc: 'Monthly campus newsletters, photos of your child every few months, a handwritten letter once a year, and a year-end report card \u2014 all in your sponsor portal.',
+                desc: 'Monthly newsletters from the campus, photos every few months, a handwritten letter once a year, and a year-end report card.',
               },
             ].map(item => (
               <div key={item.step} className="flex gap-5 items-start">
@@ -418,7 +559,7 @@ function SponsorshipPageContent() {
         </div>
       </section>
 
-      {/* FAQ */}
+      {/* ========== FAQ ========== */}
       <section className="pb-20 px-6 border-t border-[#e8e0d4] pt-16">
         <div className="max-w-3xl mx-auto">
           <h2
@@ -431,27 +572,31 @@ function SponsorshipPageContent() {
             {[
               {
                 q: 'How much of my $25 goes directly to my child?',
-                a: 'Be A Number operates at 96.7% program efficiency. The vast majority of your sponsorship goes directly to education, meals, healthcare, and community programs that serve your child.',
+                a: 'Be A Number operates at 96.7% program efficiency. The vast majority of your sponsorship covers education, meals, healthcare, and community programs that serve your child directly.',
+              },
+              {
+                q: 'Do I need to buy a shirt first?',
+                a: 'No. The shirt is one way in \u2014 you can also sponsor directly from this page. If you do buy a shirt, it covers your first month and the number on the tag connects you to a specific child.',
               },
               {
                 q: 'How often will I hear about my child?',
-                a: 'About one touchpoint a month. Every month, a newsletter from our team on the campus in Gulu \u2014 stories, photos from the week, what your $25s are collectively doing. Every few months, a photo of your specific child. Once a year, a handwritten letter from them and a year-end report card aligned with the Ugandan school calendar. Everything lands in your sponsor portal; you\u2019ll also get an email when something new is posted.',
+                a: 'About one touchpoint a month. Every month, a newsletter from the campus in Gulu. Every few months, a photo of your specific child. Once a year, a handwritten letter from them and a year-end report card. Everything lands in your sponsor portal.',
               },
               {
                 q: 'Can I write to my child?',
-                a: 'Yes! You can send letters and messages through the sponsor portal. Our field team in Uganda delivers them to your child, and your child writes back.',
+                a: 'Yes. Send letters and messages through the sponsor portal. Our field team in Uganda delivers them, and your child writes back.',
               },
               {
                 q: 'What if I need to cancel?',
-                a: 'We understand that circumstances change. You can adjust your giving amount or cancel at any time with no penalty. If you cancel, we\u2019ll work to find your child a new sponsor so their education isn\u2019t interrupted.',
+                a: 'Cancel anytime from your sponsor portal with no penalty. If you cancel, we work to find your child a new sponsor so their education continues.',
               },
               {
                 q: 'Is my donation tax-deductible?',
-                a: 'Yes. Be A Number is a registered 501(c)(3) nonprofit organization. You\u2019ll receive a year-end giving statement for your tax records.',
+                a: 'Yes. Be A Number is a registered 501(c)(3). You\u2019ll receive a year-end giving statement for your records.',
               },
               {
                 q: 'Can I visit my sponsored child?',
-                a: 'We welcome sponsor visits! We have an international lodge on our campus in Northern Uganda. Contact us to plan a trip. Meeting your child in person is an incredible experience.',
+                a: 'We welcome it. We have an international lodge on the campus in Northern Uganda. Email us to plan a trip.',
               },
             ].map(item => (
               <div key={item.q} className="border-b border-[#e8e0d4] pb-5">
@@ -463,25 +608,25 @@ function SponsorshipPageContent() {
         </div>
       </section>
 
-      {/* Bottom CTA */}
+      {/* ========== BOTTOM CTA ========== */}
       <section className="pb-20 px-6">
         <div className="max-w-2xl mx-auto bg-[#0d0d0d] p-10 text-center">
           <h2
             className="text-3xl text-[#FFF8F0] mb-3"
             style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
           >
-            Ready to change a life?
+            Six acres. Thirty staff. Your $25.
           </h2>
           <p className="text-[#777] mb-6 leading-relaxed">
-            Every child deserves someone in their corner. For less than a dollar a day,
-            you can be that person.
+            School, meals, medical care, and mentorship at the YDO campus in Omoro District.
+            One child, one number, one connection.
           </p>
           <a
             href="#top"
             onClick={(e) => { e.preventDefault(); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
             className="inline-block px-8 py-4 bg-[#D4A843] text-[#0d0d0d] font-bold uppercase tracking-wider text-sm hover:bg-[#c49a3a] transition-colors"
           >
-            Choose a Child to Sponsor
+            Choose a Child
           </a>
         </div>
       </section>

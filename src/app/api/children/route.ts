@@ -17,6 +17,7 @@ interface AirtableChildRecord {
     GradeClass?: string;
     ProfilePhoto?: Array<{ url: string; filename: string }>;
     Notes?: string;
+    Loves?: string;
     Status?: string;
     ShirtNumber?: number;
     EnrollmentDate?: string;
@@ -98,7 +99,7 @@ function toOutgoing(record: AirtableChildRecord): OutgoingChild {
     age,
     grade_class: f.GradeClass,
     photo_url: photo,
-    fun_fact: f.Notes,
+    fun_fact: f.Loves || undefined,
     shirt_number_start: typeof f.ShirtNumber === 'number' ? f.ShirtNumber : undefined,
     shirt_number_end: typeof f.ShirtNumber === 'number' ? f.ShirtNumber : undefined,
   };

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -81,7 +81,15 @@ export function HomePageContent() {
     const delta = el.clientWidth * 0.8;
     el.scrollBy({ left: direction === 'right' ? delta : -delta, behavior: 'smooth' });
   };
-  const childrenWithPhotos = children.filter(c => !!c.photo_url);
+  // Shuffle once per page load so every visit surfaces different kids first.
+  const childrenWithPhotos = useMemo(() => {
+    const arr = children.filter(c => !!c.photo_url);
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  }, [children]);
 
   useEffect(() => {
     fetch('/api/children')
