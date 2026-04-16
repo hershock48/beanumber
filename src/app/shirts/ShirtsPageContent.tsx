@@ -405,14 +405,24 @@ const SHIRTS_SOURCE: Shirt[] = [
   },
 ];
 
-/** Shuffled once per page load so no design is permanently buried at the bottom. */
-function shuffleShirts(src: Shirt[]): Shirt[] {
+/** Fisher-Yates shuffle — used for both shirts and colors. */
+function shuffle<T>(src: T[]): T[] {
   const arr = [...src];
   for (let i = arr.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [arr[i], arr[j]] = [arr[j], arr[i]];
   }
   return arr;
+}
+
+/**
+ * Assign a different preview color to each shirt so the page reads as a
+ * collection, not six identical black tees. Shuffles the five colors and
+ * cycles through them so no two adjacent shirts share a color.
+ */
+function assignPreviewColors(count: number): ColorName[] {
+  const shuffled = shuffle([...COLORS]);
+  return Array.from({ length: count }, (_, i) => shuffled[i % shuffled.length]);
 }
 
 /* ── Per-shirt card (owns color + size state) ───────────────── */
@@ -489,7 +499,7 @@ function PreviewMockup({
   );
 }
 
-function ShirtCard({ shirt, reversed }: { shirt: Shirt; reversed: boolean }) {
+function ShirtCard({ shirt, reversed, initialColor }: { shirt: Shirt; reversed: boolean; initialColor: ColorName }) {
   const [selectedColor, setSelectedColor] = useState<ColorName | null>(null);
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -498,7 +508,7 @@ function ShirtCard({ shirt, reversed }: { shirt: Shirt; reversed: boolean }) {
   // sponsorship from day one — the $25 today IS month one, then $25/month.
   const [continueMonthly, setContinueMonthly] = useState(false);
 
-  const previewTheme = THEMES[selectedColor ?? DEFAULT_PREVIEW_COLOR];
+  const previewTheme = THEMES[selectedColor ?? initialColor];
   const Front = shirt.Front;
   const Back = shirt.Back;
 
@@ -554,7 +564,7 @@ function ShirtCard({ shirt, reversed }: { shirt: Shirt; reversed: boolean }) {
           </div>
           {!selectedColor && (
             <p className="text-xs text-[#aaa] text-center mt-3 italic">
-              Showing in {DEFAULT_PREVIEW_COLOR} — pick a color below to preview.
+              Showing in {initialColor} — pick a color below to preview.
             </p>
           )}
           {/* Inside-collar detail: mini mockup of the actual stamp the buyer
@@ -767,10 +777,11 @@ function ShirtCard({ shirt, reversed }: { shirt: Shirt; reversed: boolean }) {
 /* ── Page content ────────────────────────────────────────────── */
 
 export default function ShirtsPageContent() {
-  // Shuffle once on mount so every visitor sees a different order.
-  // This prevents any single design from always being buried at the bottom
-  // and lets us see organically which ones convert.
-  const [shirts] = useState(() => shuffleShirts(SHIRTS_SOURCE));
+  // Shuffle order and preview colors once on mount so every visitor sees
+  // a different arrangement. Prevents any design from being permanently
+  // buried and makes the page feel like a real collection.
+  const [shirts] = useState(() => shuffle(SHIRTS_SOURCE));
+  const [previewColors] = useState(() => assignPreviewColors(SHIRTS_SOURCE.length));
 
   return (
     <div className="min-h-screen bg-[#FFF8F0]">
@@ -797,7 +808,7 @@ export default function ShirtsPageContent() {
       <section className="px-5 pb-24">
         <div className="max-w-6xl mx-auto space-y-28">
           {shirts.map((shirt, i) => (
-            <ShirtCard key={shirt.id} shirt={shirt} reversed={i % 2 !== 0} />
+            <ShirtCard key={shirt.id} shirt={shirt} reversed={i % 2 !== 0} initialColor={previewColors[i]} />
           ))}
         </div>
       </section>
