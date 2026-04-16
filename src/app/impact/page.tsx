@@ -12,7 +12,7 @@ export const metadata: Metadata = {
     title: '2025 Impact | Be A Number',
     description:
       '700+ patients, 68 adults trained, 30 community jobs, 96.7% program efficiency. Measured outcomes from a six-acre campus in Omoro District.',
-    images: ['/images/impact-page/lead-image.jpg'],
+    images: ['/images/impact-page/lead-image-kevin.png'],
   },
 };
 
@@ -24,8 +24,8 @@ export default function Impact() {
       {/* ========== HERO ========== */}
       <section className="relative w-full h-[55vh] min-h-[440px] bg-[#0d0d0d]">
         <Image
-          src="/images/impact-page/lead-image.jpg"
-          alt="Children and staff at the YDO campus in Northern Uganda"
+          src="/images/impact-page/lead-image-kevin.png"
+          alt="Kevin seated with a mother and child in Northern Uganda"
           fill
           className="object-cover opacity-60"
           priority
