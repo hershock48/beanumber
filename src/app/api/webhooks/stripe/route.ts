@@ -383,11 +383,12 @@ async function upsertDonation(
 
   if (!response.ok) {
     const error = await response.text();
-    throw new Error(`Airtable API error: ${error}`);
+    console.error('[WH] Airtable donation REJECT:', response.status, error.slice(0, 300));
+    throw new Error(`Airtable API error (${response.status}): ${error.slice(0, 200)}`);
   }
 
   const data = await response.json();
-  console.log('[Airtable] Created donation record:', data.id);
+  console.log('[WH] donation created:', data.id);
   return data.id;
 }
 
@@ -1076,7 +1077,7 @@ async function sendAdminOrderNotification(data: {
 
 // Handle successful checkout session
 async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) {
-  console.log('[Webhook] Processing checkout session:', session.id);
+  console.log('[WH] S0: checkout', session.id, 'mode=' + session.mode, 'type=' + (session.metadata?.order_type || 'donation'));
 
   try {
     // Extract donor information directly from the session object.
@@ -1127,6 +1128,7 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
     };
 
     // Start the donor lookup — every path needs it.
+    console.log('[WH] S1: donor lookup starting, email=' + email);
     const donorPromise = findOrCreateDonor(stripeCustomerId, email, donorArgs);
 
     if (isSponsorship) {
@@ -1136,7 +1138,7 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
       const childDisplayNameMeta = session.metadata?.child_display_name || '';
       const referral = session.custom_fields?.find(f => f.key === 'referral')?.text?.value || '';
 
-      console.log('[Webhook] Processing sponsorship:', { childRecordId, childIdMeta });
+      console.log('[WH] S2: sponsorship flow, child=' + childRecordId);
 
       if (!childRecordId) {
         console.error('[Webhook] Sponsorship missing child_record_id in metadata');
@@ -1154,6 +1156,7 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
       const childLocation = childFields.SchoolLocation;
 
       // Step 2c: Record the first month as a donation tagged as Sponsorship
+      console.log('[WH] S3: upsert donation, pi=' + paymentIntentId);
       const donationId = await upsertDonation(paymentIntentId, {
         sessionId: session.id,
         customerId: stripeCustomerId,
@@ -1234,16 +1237,21 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
       }
 
       // Step 6c: Ping Kevin (email + SMS gateway) — non-fatal.
-      await sendAdminOrderNotification({
-        kind: 'Sponsorship',
-        customerName: name,
-        customerEmail: email,
-        amount,
-        isRecurring: true,
-        childDisplayName,
-        sponsorCode: sponsorCode || undefined,
-        stripeSessionId: session.id,
-      });
+      console.log('[WH] S6: admin notify (sponsorship)');
+      try {
+        await sendAdminOrderNotification({
+          kind: 'Sponsorship',
+          customerName: name,
+          customerEmail: email,
+          amount,
+          isRecurring: true,
+          childDisplayName,
+          sponsorCode: sponsorCode || undefined,
+          stripeSessionId: session.id,
+        });
+      } catch (err: any) {
+        console.error('[WH] admin notify failed:', String(err?.message || err).slice(0, 200));
+      }
 
       console.log('[Webhook] Successfully processed sponsorship:', {
         sessionId: session.id,
@@ -1274,12 +1282,7 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
       const shirtId = session.metadata?.shirt_id || 'unknown';
       const referral = session.custom_fields?.find(f => f.key === 'referral')?.text?.value || '';
 
-      console.log('[Webhook] Processing shirt + monthly order:', {
-        shirtName,
-        shirtColor,
-        shirtSize,
-        subscriptionId,
-      });
+      console.log('[WH] S2: shirt+monthly flow, sub=' + subscriptionId);
 
       // Parallelize: donor lookup + child assignment (independent of each other)
       let assignedChild: Awaited<ReturnType<typeof assignNextShirtChild>> = null;
@@ -1336,6 +1339,7 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
       const assignmentNote = assignedChild
         ? ` / Assigned to #${assignedChild.shirtNumber} (${assignedChild.displayName})`
         : ' / No child assigned (out of stock or assignment failed)';
+      console.log('[WH] S4: upsert donation (shirt+monthly)');
       const donationId = await upsertDonation(paymentIntentId, {
         sessionId: session.id,
         customerId: stripeCustomerId,
@@ -1428,20 +1432,25 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
       }
 
       // Step 8: Ping Kevin (email + SMS gateway) — non-fatal.
-      await sendAdminOrderNotification({
-        kind: 'Shirt + Monthly',
-        customerName: name,
-        customerEmail: email,
-        amount,
-        isRecurring: true,
-        shirtName,
-        shirtColor,
-        shirtSize,
-        childDisplayName: assignedChild?.displayName,
-        shirtNumber: assignedChild?.shirtNumber,
-        sponsorCode: sponsorCode || undefined,
-        stripeSessionId: session.id,
-      });
+      console.log('[WH] S8: admin notify (shirt+monthly)');
+      try {
+        await sendAdminOrderNotification({
+          kind: 'Shirt + Monthly',
+          customerName: name,
+          customerEmail: email,
+          amount,
+          isRecurring: true,
+          shirtName,
+          shirtColor,
+          shirtSize,
+          childDisplayName: assignedChild?.displayName,
+          shirtNumber: assignedChild?.shirtNumber,
+          sponsorCode: sponsorCode || undefined,
+          stripeSessionId: session.id,
+        });
+      } catch (err: any) {
+        console.error('[WH] admin notify failed:', String(err?.message || err).slice(0, 200));
+      }
 
       console.log('[Webhook] Successfully processed shirt + monthly:', {
         sessionId: session.id,
@@ -1464,7 +1473,7 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
       const shirtSize = session.metadata?.shirt_size || 'Unknown';
       const shirtId = session.metadata?.shirt_id || 'unknown';
 
-      console.log('[Webhook] Processing shirt order:', { shirtName, shirtColor, shirtSize });
+      console.log('[WH] S2: shirt-only flow, shirt=' + shirtName);
 
       // Parallelize: donor lookup + child assignment (independent of each other)
       let assignedChild: Awaited<ReturnType<typeof assignNextShirtChild>> = null;
@@ -1490,6 +1499,7 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
       const assignmentNote = assignedChild
         ? ` / Assigned to #${assignedChild.shirtNumber} (${assignedChild.displayName})`
         : ' / No child assigned (out of stock or assignment failed)';
+      console.log('[WH] S3: upsert donation (shirt-only)');
       const donationId = await upsertDonation(paymentIntentId, {
         sessionId: session.id,
         customerId: stripeCustomerId,
@@ -1558,27 +1568,35 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
       });
 
       // Ping Kevin (email + SMS gateway) — non-fatal.
-      await sendAdminOrderNotification({
-        kind: 'Shirt',
-        customerName: name,
-        customerEmail: email,
-        amount,
-        isRecurring: false,
-        shirtName,
-        shirtColor,
-        shirtSize,
-        childDisplayName: assignedChild?.displayName,
-        shirtNumber: assignedChild?.shirtNumber,
-        stripeSessionId: session.id,
-      });
+      console.log('[WH] S7: admin notify (shirt)');
+      try {
+        await sendAdminOrderNotification({
+          kind: 'Shirt',
+          customerName: name,
+          customerEmail: email,
+          amount,
+          isRecurring: false,
+          shirtName,
+          shirtColor,
+          shirtSize,
+          childDisplayName: assignedChild?.displayName,
+          shirtNumber: assignedChild?.shirtNumber,
+          stripeSessionId: session.id,
+        });
+      } catch (err: any) {
+        console.error('[WH] admin notify failed:', String(err?.message || err).slice(0, 200));
+      }
 
       return { donorId, donationId, assignedChild };
 
     } else {
       // --- STANDARD DONATION FLOW ---
+      console.log('[WH] S2: donation flow');
       const donorId = await donorPromise;
+      console.log('[WH] S3: donor resolved, id=' + donorId);
 
       // Step 2b: Create donation record (idempotent)
+      console.log('[WH] S4: upsert donation (standard)');
       const donationId = await upsertDonation(paymentIntentId, {
         sessionId: session.id,
         customerId: stripeCustomerId,
@@ -1630,19 +1648,25 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
       });
 
       // Ping Kevin (email + SMS gateway) — non-fatal.
-      await sendAdminOrderNotification({
-        kind: 'Donation',
-        customerName: name,
-        customerEmail: email,
-        amount,
-        isRecurring,
-        stripeSessionId: session.id,
-      });
+      console.log('[WH] S5: admin notify (donation)');
+      try {
+        await sendAdminOrderNotification({
+          kind: 'Donation',
+          customerName: name,
+          customerEmail: email,
+          amount,
+          isRecurring,
+          stripeSessionId: session.id,
+        });
+      } catch (err: any) {
+        console.error('[WH] admin notify failed:', String(err?.message || err).slice(0, 200));
+      }
 
       return { donorId, donationId };
     }
   } catch (error: any) {
-    console.error('[Webhook] Error processing checkout session:', error);
+    console.error('[WH] CRASH msg:', String(error?.message || error).slice(0, 300));
+    console.error('[WH] CRASH stack:', String(error?.stack || '').slice(0, 500));
     throw error;
   }
 }
@@ -1927,7 +1951,8 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ received: true });
   } catch (error: any) {
-    console.error('[Webhook] Error:', error);
+    console.error('[WH] POST-FAIL msg:', String(error?.message || error).slice(0, 300));
+    console.error('[WH] POST-FAIL stack:', String(error?.stack || '').slice(0, 500));
     return NextResponse.json(
       { error: error.message || 'Webhook processing failed' },
       { status: 500 }
