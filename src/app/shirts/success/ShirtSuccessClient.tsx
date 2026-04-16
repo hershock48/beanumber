@@ -135,11 +135,17 @@ function ShippingConfirmation({
           Your shirt is being made.
         </h1>
 
-        <p className="text-lg text-[#777] leading-relaxed max-w-md mx-auto">
+        <p className="text-lg text-[#555] leading-relaxed max-w-md mx-auto mb-4">
           We&rsquo;ll ship it by hand within 5&ndash;7 business days. When it
           arrives, there&rsquo;s a number on the tag — that number belongs to
           a real child in Northern Uganda, and they&rsquo;re waiting to meet
           you.
+        </p>
+
+        <p className="text-[#777] leading-relaxed max-w-md mx-auto">
+          {alreadySponsoring
+            ? 'Your purchase and your sponsorship go directly to school, meals, and medical care at the YDO campus. You just changed a life.'
+            : 'Every shirt funds school, meals, and medical care for a child at the YDO campus in Northern Uganda. You just changed a life.'}
         </p>
 
         {shirt && (
@@ -208,15 +214,27 @@ function ShippingConfirmation({
         <p className="text-[#bbb] text-xs mb-10 max-w-sm mx-auto text-center">{note}</p>
       )}
 
-      {/* Soft exit */}
-      <div className="text-center">
-        <Link
-          href="/"
-          className="text-[#aaa] text-sm hover:text-[#D4A843] transition-colors underline underline-offset-4"
-        >
-          Back to home
-        </Link>
-        <p className="text-xs text-[#bbb] mt-6">
+      {/* Tell someone + Follow the story */}
+      <TellSomeone flow={alreadySponsoring ? 'shirt_sponsor' : 'shirt'} />
+
+      {/* Bottom nav */}
+      <div className="text-center mt-10">
+        <div className="flex flex-col sm:flex-row gap-4 justify-center mb-8">
+          <Link
+            href="/impact"
+            className="px-8 py-4 bg-[#D4A843] text-[#0d0d0d] font-bold uppercase tracking-wider text-sm hover:bg-[#c49a3a] transition-colors"
+          >
+            See the Impact
+          </Link>
+          <Link
+            href="/founder"
+            className="px-8 py-4 bg-transparent text-[#0d0d0d] font-bold uppercase tracking-wider text-sm border border-[#e8e0d4] hover:border-[#D4A843]/50 transition-colors"
+          >
+            Read the Story
+          </Link>
+        </div>
+
+        <p className="text-xs text-[#bbb]">
           Questions? Email{' '}
           <a
             href="mailto:kevin@beanumber.org"
@@ -225,6 +243,99 @@ function ShippingConfirmation({
             kevin@beanumber.org
           </a>
         </p>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Tell someone + Follow the story
+// ---------------------------------------------------------------------------
+
+const SHARE_MESSAGES: Record<string, string> = {
+  shirt:
+    'I just bought a shirt from beanumber.org — every shirt is tied to a real kid in Northern Uganda. When it arrives, the number on the tag is my kid. Check it out.',
+  shirt_sponsor:
+    'I just bought a shirt and started sponsoring a child through beanumber.org — $25/month covers school, meals, and medical care for a kid in Northern Uganda. Worth a look.',
+  sponsor:
+    'I just started sponsoring a child through beanumber.org — $25/month covers school, meals, and medical care at a campus in Northern Uganda. Worth a look.',
+};
+
+function TellSomeone({ flow }: { flow: 'shirt' | 'shirt_sponsor' | 'sponsor' }) {
+  const [copied, setCopied] = useState(false);
+  const message = SHARE_MESSAGES[flow];
+
+  async function handleShare() {
+    // Try native share (mobile), fall back to clipboard
+    if (typeof navigator !== 'undefined' && navigator.share) {
+      try {
+        await navigator.share({ text: message, url: 'https://www.beanumber.org' });
+        return;
+      } catch {
+        // User cancelled or share failed — fall through to clipboard
+      }
+    }
+
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      try {
+        await navigator.clipboard.writeText(message);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2500);
+      } catch {
+        // Clipboard failed silently
+      }
+    }
+  }
+
+  return (
+    <div className="bg-white border border-[#e8e0d4] p-7 md:p-8">
+      <div className="flex flex-col sm:flex-row gap-6 sm:gap-8">
+        {/* Tell someone */}
+        <div className="flex-1">
+          <h3
+            className="text-lg text-[#0d0d0d] mb-2"
+            style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
+          >
+            Tell someone
+          </h3>
+          <p className="text-[#666] text-sm leading-relaxed mb-4">
+            Know someone who&rsquo;d care about this? Share it however you want — text, DM, post.
+          </p>
+          <button
+            onClick={handleShare}
+            className="px-5 py-2.5 bg-[#0d0d0d] text-white text-sm font-semibold hover:bg-[#333] transition-colors"
+          >
+            {copied ? 'Copied to clipboard' : 'Share'}
+          </button>
+        </div>
+
+        {/* Divider */}
+        <div className="hidden sm:block w-px bg-[#e8e0d4]" />
+        <div className="sm:hidden h-px bg-[#e8e0d4]" />
+
+        {/* Follow the story */}
+        <div className="flex-1">
+          <h3
+            className="text-lg text-[#0d0d0d] mb-2"
+            style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
+          >
+            Follow the story
+          </h3>
+          <p className="text-[#666] text-sm leading-relaxed mb-4">
+            See the kids, the campus, the shirts in the wild.
+          </p>
+          <a
+            href="https://instagram.com/beanumber_"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 px-5 py-2.5 border border-[#e8e0d4] text-[#0d0d0d] text-sm font-semibold hover:border-[#D4A843]/50 transition-colors"
+          >
+            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
+            </svg>
+            @beanumber_
+          </a>
+        </div>
       </div>
     </div>
   );
