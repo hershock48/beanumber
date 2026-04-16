@@ -263,6 +263,7 @@ function PeacemakerBack(props: DesignProps) {
   return <TextBack {...props} lines={['Peace', 'maker.']} />;
 }
 
+
 /* ── Shirt data ─────────────────────────────────────────────── */
 
 type Shirt = {

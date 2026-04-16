@@ -615,7 +615,7 @@ function SponsorshipPageContent() {
                     onClick={() => setVisibleCount(prev => Math.min(prev + 3, displayChildren.length))}
                     className="px-8 py-4 border border-[#e8e0d4] text-[#0d0d0d] font-bold uppercase tracking-wider text-sm hover:border-[#D4A843] hover:text-[#D4A843] transition-colors"
                   >
-                    Meet more kids ({displayChildren.length - visibleCount} more)
+                    Meet more kids
                   </button>
                 </div>
               )}
