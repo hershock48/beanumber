@@ -19,23 +19,30 @@ const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID!;
 const AIRTABLE_API_KEY = process.env.AIRTABLE_API_KEY!;
 const AIRTABLE_CHILDREN_TABLE = process.env.AIRTABLE_CHILDREN_TABLE || 'Children';
 
+interface ChildEnrichment {
+  loves?: string;
+  childQuote?: string;
+  familyContext?: string;
+  shirtNumber?: number;
+}
+
 /**
- * Batch-fetch the Loves field from the Children table for every ChildID
- * in the sponsorship result set. Returns a Map<ChildID, loves string>.
+ * Batch-fetch profile fields from the Children table for every ChildID
+ * in the sponsorship result set. Returns a Map<ChildID, enrichment>.
  */
-async function fetchLovesForChildren(childIds: string[]): Promise<Map<string, string>> {
-  const lovesMap = new Map<string, string>();
-  if (!childIds.length || !AIRTABLE_BASE_ID || !AIRTABLE_API_KEY) return lovesMap;
+async function fetchChildEnrichment(childIds: string[]): Promise<Map<string, ChildEnrichment>> {
+  const enrichmentMap = new Map<string, ChildEnrichment>();
+  if (!childIds.length || !AIRTABLE_BASE_ID || !AIRTABLE_API_KEY) return enrichmentMap;
 
   try {
-    // Build an OR formula: OR({ChildID}="A", {ChildID}="B", …)
     const clauses = childIds.map(id => `{ChildID}="${id}"`).join(',');
     const formula = encodeURIComponent(`OR(${clauses})`);
-    const fields = encodeURIComponent('ChildID') + '&fields[]=' + encodeURIComponent('Loves');
+    const fieldNames = ['ChildID', 'Loves', 'ChildQuote', 'FamilyContext', 'ShirtNumber'];
+    const fieldsParam = fieldNames.map(f => 'fields[]=' + encodeURIComponent(f)).join('&');
 
     const url =
       `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(AIRTABLE_CHILDREN_TABLE)}` +
-      `?filterByFormula=${formula}&fields[]=${fields}&pageSize=100`;
+      `?filterByFormula=${formula}&${fieldsParam}&pageSize=100`;
 
     const res = await fetch(url, {
       headers: {
@@ -48,15 +55,21 @@ async function fetchLovesForChildren(childIds: string[]): Promise<Map<string, st
       const data = await res.json();
       for (const record of data.records || []) {
         const cid = record.fields?.ChildID;
-        const loves = record.fields?.Loves;
-        if (cid && loves) lovesMap.set(cid, loves);
+        if (cid) {
+          enrichmentMap.set(cid, {
+            loves: record.fields?.Loves || undefined,
+            childQuote: record.fields?.ChildQuote || undefined,
+            familyContext: record.fields?.FamilyContext || undefined,
+            shirtNumber: record.fields?.ShirtNumber || undefined,
+          });
+        }
       }
     }
   } catch (err) {
-    logger.warn('[sponsorship/available] Loves enrichment failed', { error: String(err) });
+    logger.warn('[sponsorship/available] Child enrichment failed', { error: String(err) });
   }
 
-  return lovesMap;
+  return enrichmentMap;
 }
 
 async function handler(request: NextRequest): Promise<NextResponse> {
@@ -77,20 +90,26 @@ async function handler(request: NextRequest): Promise<NextResponse> {
     throw new Error(result.error || 'Failed to fetch available children');
   }
 
-  // Enrich with Loves one-liners from the Children table
+  // Enrich with profile fields from the Children table
   const children = result.data?.children || [];
   const childIds = children.map(c => c.id).filter(Boolean);
-  const lovesMap = await fetchLovesForChildren(childIds);
+  const enrichmentMap = await fetchChildEnrichment(childIds);
 
-  const enriched = children.map(child => ({
-    ...child,
-    loves: lovesMap.get(child.id) || undefined,
-  }));
+  const enriched = children.map(child => {
+    const extra = enrichmentMap.get(child.id);
+    return {
+      ...child,
+      loves: extra?.loves || undefined,
+      childQuote: extra?.childQuote || undefined,
+      familyContext: extra?.familyContext || undefined,
+      shirtNumber: extra?.shirtNumber || undefined,
+    };
+  });
 
   logger.info('Listed available children', {
     total: result.data?.total,
     returned: enriched.length,
-    withLoves: lovesMap.size,
+    enriched: enrichmentMap.size,
   });
 
   logger.apiResponse(method, path, 200);

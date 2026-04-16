@@ -14,6 +14,9 @@ interface AvailableChild {
   age?: string;
   location?: string;
   loves?: string;
+  childQuote?: string;
+  familyContext?: string;
+  shirtNumber?: number;
   photo?: {
     url: string;
     filename: string;
@@ -334,7 +337,7 @@ function SponsorshipPageContent() {
         </div>
       </section>
 
-      {/* ========== CHILDREN CAROUSEL ========== */}
+      {/* ========== MEET THE KIDS ========== */}
       <section className="pb-16 px-6">
         <div className="max-w-6xl mx-auto">
           {focusedChild ? (
@@ -357,11 +360,10 @@ function SponsorshipPageContent() {
                 className="text-3xl text-[#0d0d0d] mb-2 text-center"
                 style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
               >
-
                 Meet the Kids
               </h2>
               <p className="text-[#777] text-center mb-10 max-w-lg mx-auto">
-                Every child here is already enrolled at the YDO campus. Your $25/month joins the team that keeps them there.
+                Every child here is already enrolled at the YDO campus. Your $25/month joins the team that keeps them there. Skip the shirt, pick a child, and start.
               </p>
             </>
           )}
@@ -394,7 +396,6 @@ function SponsorshipPageContent() {
                   className="text-2xl text-[#0d0d0d] mb-3"
                   style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
                 >
-
                   No children loaded right now
                 </h3>
                 <p className="text-[#777] mb-6 leading-relaxed">
@@ -417,95 +418,173 @@ function SponsorshipPageContent() {
               </div>
             </div>
           ) : (
-            <div className="relative">
-              {/* Arrow controls — desktop only */}
-              <button
-                type="button"
-                onClick={() => scrollCarousel('left')}
-                aria-label="Previous children"
-                className="hidden md:flex absolute -left-2 lg:-left-6 top-1/2 -translate-y-1/2 z-10 w-12 h-12 items-center justify-center bg-white border border-[#e8e0d4] text-[#0d0d0d] hover:border-[#D4A843] hover:text-[#D4A843] transition-colors shadow-sm"
-              >
-                <span className="text-2xl leading-none" aria-hidden="true">&lsaquo;</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => scrollCarousel('right')}
-                aria-label="Next children"
-                className="hidden md:flex absolute -right-2 lg:-right-6 top-1/2 -translate-y-1/2 z-10 w-12 h-12 items-center justify-center bg-white border border-[#e8e0d4] text-[#0d0d0d] hover:border-[#D4A843] hover:text-[#D4A843] transition-colors shadow-sm"
-              >
-                <span className="text-2xl leading-none" aria-hidden="true">&rsaquo;</span>
-              </button>
+            <>
+              {/* --- Quick-browse carousel --- */}
+              <div className="relative mb-16">
+                <button
+                  type="button"
+                  onClick={() => scrollCarousel('left')}
+                  aria-label="Previous children"
+                  className="hidden md:flex absolute -left-2 lg:-left-6 top-1/2 -translate-y-1/2 z-10 w-10 h-10 items-center justify-center bg-white border border-[#e8e0d4] text-[#0d0d0d] hover:border-[#D4A843] hover:text-[#D4A843] transition-colors shadow-sm"
+                >
+                  <span className="text-xl leading-none" aria-hidden="true">&lsaquo;</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => scrollCarousel('right')}
+                  aria-label="Next children"
+                  className="hidden md:flex absolute -right-2 lg:-right-6 top-1/2 -translate-y-1/2 z-10 w-10 h-10 items-center justify-center bg-white border border-[#e8e0d4] text-[#0d0d0d] hover:border-[#D4A843] hover:text-[#D4A843] transition-colors shadow-sm"
+                >
+                  <span className="text-xl leading-none" aria-hidden="true">&rsaquo;</span>
+                </button>
 
-              {/* Snap-scroll carousel track */}
-              <div
-                ref={carouselRef}
-                className="flex gap-6 overflow-x-auto snap-x snap-mandatory scroll-smooth pb-6 -mx-5 px-5 md:mx-0 md:px-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-              >
+                <div
+                  ref={carouselRef}
+                  className="flex gap-4 overflow-x-auto snap-x snap-mandatory scroll-smooth pb-4 -mx-5 px-5 md:mx-0 md:px-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                >
+                  {displayChildren.map((child) => {
+                    const firstName = child.displayName?.split(' ')[0] || 'them';
+                    return (
+                      <button
+                        key={child.recordId + '-thumb'}
+                        type="button"
+                        onClick={() => {
+                          const el = document.getElementById('child-' + child.recordId);
+                          if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        }}
+                        className="snap-start shrink-0 w-[140px] sm:w-[160px] bg-white border border-[#e8e0d4] overflow-hidden hover:border-[#D4A843] transition-colors text-left"
+                      >
+                        <div className="aspect-square relative bg-[#f5f0e8]">
+                          {child.photo?.url ? (
+                            <Image
+                              src={child.photo.url}
+                              alt={child.displayName}
+                              fill
+                              className="object-cover"
+                              sizes="160px"
+                            />
+                          ) : (
+                            <div className="absolute inset-0 flex items-center justify-center">
+                              <IconUser className="w-8 h-8 text-[#ccc]" />
+                            </div>
+                          )}
+                        </div>
+                        <div className="px-3 py-2">
+                          <p className="text-sm font-semibold text-[#0d0d0d] truncate">{firstName}</p>
+                          {child.age && <p className="text-xs text-[#999]">Age {child.age}</p>}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* --- Expanded profile cards --- */}
+              <div className="space-y-10">
                 {displayChildren.map((child) => {
                   const firstName = child.displayName?.split(' ')[0] || 'them';
                   return (
                     <div
                       key={child.recordId}
-                      className="snap-start shrink-0 w-[280px] sm:w-[320px] bg-white border border-[#e8e0d4] overflow-hidden hover:shadow-lg transition-all"
+                      id={'child-' + child.recordId}
+                      className="bg-white border border-[#e8e0d4] overflow-hidden"
                     >
-                      {/* Photo */}
-                      <div className="aspect-[4/5] relative bg-[#f5f0e8]">
-                        {child.photo?.url ? (
-                          <Image
-                            src={child.photo.url}
-                            alt={`Photo of ${child.displayName}`}
-                            fill
-                            className="object-cover"
-                            sizes="(max-width: 640px) 280px, 320px"
-                          />
-                        ) : (
-                          <div className="absolute inset-0 flex items-center justify-center">
-                            <div className="text-center">
-                              <IconUser className="w-12 h-12 text-[#ccc] mx-auto mb-2" />
-                              <p className="text-[#aaa] text-sm">Photo coming soon</p>
+                      <div className="grid md:grid-cols-2">
+                        {/* Photo side */}
+                        <div className="aspect-[4/5] md:aspect-auto relative bg-[#f5f0e8]">
+                          {child.photo?.url ? (
+                            <Image
+                              src={child.photo.url}
+                              alt={`Photo of ${child.displayName}`}
+                              fill
+                              className="object-cover"
+                              sizes="(max-width: 768px) 100vw, 50vw"
+                            />
+                          ) : (
+                            <div className="absolute inset-0 flex items-center justify-center">
+                              <div className="text-center">
+                                <IconUser className="w-16 h-16 text-[#ccc] mx-auto mb-2" />
+                                <p className="text-[#aaa] text-sm">Photo coming soon</p>
+                              </div>
                             </div>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Info */}
-                      <div className="p-5">
-                        <h3
-                          className="text-xl text-[#0d0d0d] mb-1"
-                          style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
-                        >
-                          {child.displayName}
-                        </h3>
-                        <div className="flex items-center gap-2 text-[#999] text-sm mb-3">
-                          {child.age && <span>Age {child.age}</span>}
-                          {child.age && child.location && <span className="text-[#ccc]">&middot;</span>}
-                          {child.location && <span>{child.location}</span>}
+                          )}
+                          {child.shirtNumber && (
+                            <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm px-3 py-1">
+                              <span className="text-sm font-bold text-[#D4A843]">#{child.shirtNumber}</span>
+                            </div>
+                          )}
                         </div>
 
-                        {child.loves && (
-                          <p className="text-sm text-[#777] mb-4 leading-relaxed">
-                            {child.loves}
-                          </p>
-                        )}
+                        {/* Info side */}
+                        <div className="p-6 md:p-8 flex flex-col justify-center">
+                          <h3
+                            className="text-2xl md:text-3xl text-[#0d0d0d] mb-1"
+                            style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
+                          >
+                            {child.displayName}
+                          </h3>
+                          <div className="flex items-center gap-2 text-[#999] text-sm mb-5">
+                            {child.age && <span>Age {child.age}</span>}
+                            {child.age && child.location && <span className="text-[#ccc]">&middot;</span>}
+                            {child.location && <span>{child.location}</span>}
+                          </div>
 
-                        <button
-                          onClick={() => handleSponsor(child)}
-                          disabled={sponsoringId === child.recordId}
-                          className="block w-full py-3 bg-[#D4A843] text-[#0d0d0d] text-center font-bold uppercase tracking-wider text-sm hover:bg-[#c49a3a] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-                        >
-                          {sponsoringId === child.recordId
-                            ? 'Starting...'
-                            : `Sponsor ${firstName} \u00b7 $25/mo`}
-                        </button>
-                        <p className="text-center text-xs text-[#999] mt-3">
-                          Cancel anytime. Secure checkout via Stripe.
-                        </p>
+                          {child.childQuote && (
+                            <p
+                              className="text-lg text-[#0d0d0d] leading-snug mb-5"
+                              style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 500, fontStyle: 'italic' }}
+                            >
+                              &ldquo;{child.childQuote}&rdquo;
+                            </p>
+                          )}
+
+                          {child.loves && (
+                            <div className="mb-5">
+                              <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-1">
+                                What {firstName} loves
+                              </p>
+                              <p className="text-[#555] leading-relaxed">{child.loves}</p>
+                            </div>
+                          )}
+
+                          {child.familyContext && (
+                            <div className="mb-5">
+                              <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-1">
+                                Family
+                              </p>
+                              <p className="text-[#555] leading-relaxed text-sm">{child.familyContext}</p>
+                            </div>
+                          )}
+
+                          <div className="mt-auto pt-4 space-y-3">
+                            <button
+                              onClick={() => handleSponsor(child)}
+                              disabled={sponsoringId === child.recordId}
+                              className="block w-full py-3 bg-[#D4A843] text-[#0d0d0d] text-center font-bold uppercase tracking-wider text-sm hover:bg-[#c49a3a] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                            >
+                              {sponsoringId === child.recordId
+                                ? 'Starting...'
+                                : `Sponsor ${firstName} \u00b7 $25/mo`}
+                            </button>
+                            <div className="flex items-center justify-between text-xs text-[#999]">
+                              <span>Cancel anytime. Secure checkout via Stripe.</span>
+                              {child.shirtNumber && (
+                                <Link
+                                  href={`/children/${child.shirtNumber}`}
+                                  className="text-[#D4A843] hover:underline"
+                                >
+                                  Full profile &rarr;
+                                </Link>
+                              )}
+                            </div>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   );
                 })}
               </div>
-            </div>
+            </>
           )}
         </div>
       </section>
@@ -572,35 +651,47 @@ function SponsorshipPageContent() {
           <div className="space-y-6">
             {[
               {
-                q: 'How much of my $25 goes directly to my child?',
-                a: 'In 2025, 96.7% of every dollar went directly to programs. Your sponsorship covers education, meals, healthcare, and community programs that serve your child directly.',
+                q: 'Where does my $25 actually go?',
+                a: 'In 2025, 96.7% of every dollar went directly to programs. Your $25 pools with other sponsors to fund education, daily meals, medical care through the on-site clinic, and mentorship for the children at the YDO campus. But it also supports the infrastructure around them: the 60 women in vocational training, the 700+ patients served through medical outreach, the construction apprenticeships. You\u2019re not funding one line item. You\u2019re funding the ecosystem that keeps a child safe.',
+              },
+              {
+                q: 'What happens if multiple people sponsor the same child?',
+                a: 'That\u2019s the model. It costs more than $25/month to fully fund a child\u2019s education, meals, and medical care. We set the price at $25 because it\u2019s accessible, and we stack multiple sponsors per child until they\u2019re fully funded. Every child at the campus is enrolled and cared for regardless of how many individual sponsors they have. Your $25 isn\u2019t the difference between a child going to school or not. It\u2019s part of the team that makes it possible.',
               },
               {
                 q: 'Do I need to buy a shirt first?',
-                a: 'No. The shirt is one way in, but you can also sponsor directly from this page. If you do buy a shirt, it covers your first month and the number on the tag connects you to a specific child.',
+                a: 'No. The shirt is one way in. You can also sponsor directly from this page. If you did buy a shirt, it covered your first month and the number on the tag connects you to a specific child. If you didn\u2019t, pick a child above and you\u2019re in the same place.',
+              },
+              {
+                q: 'What makes this different from other child sponsorship programs?',
+                a: 'Most sponsorship programs are top-down: an international org places staff in a region, runs programs, and sends you a photo twice a year. Be A Number is a community-systems model. We built a six-acre campus in partnership with Acholi leadership on Acholi land. A nursery and primary school, a medical center, vocational training, and a local workforce of 30 community members running everything. Your sponsorship plugs into a system that was designed to outlast any single donor.',
+              },
+              {
+                q: 'Who\u2019s on the ground doing this work?',
+                a: 'Youth Development Organisation Uganda (YDO), led by Simon Peter Wilobo in Gulu District. YDO was born out of Northern Uganda\u2019s post-conflict recovery and has deep roots in the community. Every program is designed and run by Ugandan leadership. Be A Number provides the systems architecture, funding pipeline, and international bridge. The community owns the work.',
               },
               {
                 q: 'How often will I hear about my child?',
-                a: 'About one touchpoint a month. Every month, a newsletter from the campus in Gulu. Every few months, a photo of your specific child. Once a year, a handwritten letter from them and a year-end report card. Everything lands in your sponsor portal.',
+                a: 'Roughly one touchpoint a month. A campus newsletter from the team in Gulu every month. Photos of your specific child every few months. A handwritten letter from them once a year. A year-end report card with grades, attendance, and teacher comments. Everything lands in your sponsor portal, accessible anytime.',
               },
               {
                 q: 'Can I write to my child?',
-                a: 'Yes. Send letters and messages through the sponsor portal. Our field team in Uganda delivers them, and your child writes back.',
+                a: 'Yes. Send letters and messages through the sponsor portal. Our field team in Uganda prints and delivers them. Your child writes back, and we scan the original for you.',
               },
               {
                 q: 'What if I need to cancel?',
-                a: 'Cancel anytime from your sponsor portal with no penalty. If you cancel, we work to find your child a new sponsor so their education continues.',
+                a: 'Cancel anytime from your sponsor portal. No penalty, no guilt, no questions. If you cancel, we work to find your child additional sponsors so their education continues uninterrupted. Nobody loses their seat because one sponsor left.',
+              },
+              {
+                q: 'Can I actually visit?',
+                a: 'Yes. We have an international lodge on the campus in Northern Uganda built specifically for sponsor visits and university cohorts. Meeting your child in person is something we actively encourage, not a theoretical perk buried in fine print. Contact us and we\u2019ll help you plan the trip.',
               },
               {
                 q: 'Is my donation tax-deductible?',
-                a: 'Yes. Be A Number is a registered 501(c)(3). You\u2019ll receive a year-end giving statement for your records.',
-              },
-              {
-                q: 'Can I visit my sponsored child?',
-                a: 'We welcome it. We have an international lodge on the campus in Northern Uganda. Email us to plan a trip.',
+                a: 'Yes. Be A Number, International is a registered 501(c)(3) (EIN 93-1948872). You\u2019ll receive a year-end giving statement for your records.',
               },
             ].map(item => (
-              <div key={item.q} className="border-b border-[#e8e0d4] pb-5">
+              <div key={item.q} className="border-b border-[#e8e0d4] pb-6">
                 <h3 className="font-semibold text-[#0d0d0d] mb-2">{item.q}</h3>
                 <p className="text-[#777] text-sm leading-relaxed">{item.a}</p>
               </div>
