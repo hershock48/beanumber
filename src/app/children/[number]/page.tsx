@@ -239,7 +239,7 @@ export default async function ChildProfilePage({ params }: ChildPageProps) {
             <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
             </svg>
-            Back to all children
+            Back to home
           </Link>
 
           <div className="text-center">
@@ -468,6 +468,14 @@ export default async function ChildProfilePage({ params }: ChildPageProps) {
               >
                 Become a sponsor
               </Link>
+              <p className="text-center mt-4">
+                <Link
+                  href="/sponsor/login"
+                  className="text-xs text-[#aaa] hover:text-[#D4A843] transition-colors"
+                >
+                  Already sponsoring? Log in to your portal
+                </Link>
+              </p>
             </div>
 
             {/* What your $25 does — concrete, named, specific. Replaces the
