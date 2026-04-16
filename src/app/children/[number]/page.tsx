@@ -481,7 +481,7 @@ export default async function ChildProfilePage({ params }: ChildPageProps) {
                 Keeps {firstName} in school at the YDO campus in Omoro District —
                 school fees, books, a uniform, morning porridge and a midday meal,
                 access to the on-site medical center, and a place where teachers
-                and 380 other kids know their name.
+                and other kids know their name.
               </p>
             </div>
           </div>
