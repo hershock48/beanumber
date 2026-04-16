@@ -1103,7 +1103,7 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
     const currency = session.currency || 'usd';
     const isRecurring = session.mode === 'subscription';
     const subscriptionId = session.subscription as string | null;
-    const donationDate = new Date().toISOString();
+    const donationDate = new Date().toISOString().split('T')[0];
     // session.payment_status is 'paid' | 'unpaid' | 'no_payment_required'.
     // For checkout.session.completed, it's always 'paid'.
     const status = session.payment_status === 'paid' ? 'Succeeded' : 'Pending';
