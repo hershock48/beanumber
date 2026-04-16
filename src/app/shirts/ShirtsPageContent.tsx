@@ -397,7 +397,7 @@ const SHIRTS_SOURCE: Shirt[] = [
     name: 'Nigeria.',
     tagline: 'For the ones who can\'t wear it there',
     price: 25,
-    description: 'The killing of Christians in Nigeria is one of the most underreported stories in the world right now. Tens of thousands dead, mostly in the Middle Belt, and it barely makes Western news. We operate in Uganda, not Nigeria. But they\'re our brothers. This shirt puts the name where people have to see it. That\'s the start.',
+    description: 'The killing of Christians in Nigeria is one of the most underreported stories in the world right now. Tens of thousands dead, mostly in the Middle Belt, and it barely makes Western news. They\'re our brothers. This shirt puts the name where people have to see it. That\'s the start.',
     Front: SharedFront,
     Back: NigeriaBack,
     badge: 'Solidarity',
