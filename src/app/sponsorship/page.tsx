@@ -2,7 +2,6 @@
 
 import { Suspense, useState, useEffect, useRef, useMemo } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import { useSearchParams } from 'next/navigation';
 import { BANNavigation } from '@/components/BANNavigation';
 import { BANFooter } from '@/components/BANFooter';
@@ -136,6 +135,7 @@ function SponsorshipPageContent() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [sponsoringId, setSponsoringId] = useState<string | null>(null);
+  const [visibleCount, setVisibleCount] = useState(3);
 
   const carouselRef = useRef<HTMLDivElement | null>(null);
   const scrollCarousel = (direction: 'left' | 'right') => {
@@ -470,19 +470,23 @@ function SponsorshipPageContent() {
                         key={child.recordId + '-thumb'}
                         type="button"
                         onClick={() => {
-                          const el = document.getElementById('child-' + child.recordId);
-                          if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                          // If the card isn't visible yet, expand to show it
+                          const idx = displayChildren.indexOf(child);
+                          if (idx >= visibleCount) setVisibleCount(idx + 1);
+                          // Scroll after a tick so the DOM has rendered
+                          setTimeout(() => {
+                            const el = document.getElementById('child-' + child.recordId);
+                            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                          }, 100);
                         }}
                         className="snap-start shrink-0 w-[140px] sm:w-[160px] bg-white border border-[#e8e0d4] overflow-hidden hover:border-[#D4A843] transition-colors text-left"
                       >
                         <div className="aspect-square relative bg-[#f5f0e8]">
                           {child.photo?.url ? (
-                            <Image
+                            <img
                               src={child.photo.url}
                               alt={child.displayName}
-                              fill
-                              className="object-cover"
-                              sizes="160px"
+                              className="absolute inset-0 w-full h-full object-cover"
                             />
                           ) : (
                             <div className="absolute inset-0 flex items-center justify-center">
@@ -500,9 +504,9 @@ function SponsorshipPageContent() {
                 </div>
               </div>
 
-              {/* --- Expanded profile cards --- */}
+              {/* --- Expanded profile cards (paginated) --- */}
               <div className="space-y-10">
-                {displayChildren.map((child) => {
+                {displayChildren.slice(0, visibleCount).map((child) => {
                   const firstName = child.displayName?.split(' ')[0] || 'them';
                   return (
                     <div
@@ -514,12 +518,10 @@ function SponsorshipPageContent() {
                         {/* Photo side */}
                         <div className="aspect-[4/5] md:aspect-auto relative bg-[#f5f0e8]">
                           {child.photo?.url ? (
-                            <Image
+                            <img
                               src={child.photo.url}
                               alt={`Photo of ${child.displayName}`}
-                              fill
-                              className="object-cover"
-                              sizes="(max-width: 768px) 100vw, 50vw"
+                              className="absolute inset-0 w-full h-full object-cover"
                             />
                           ) : (
                             <div className="absolute inset-0 flex items-center justify-center">
@@ -605,6 +607,18 @@ function SponsorshipPageContent() {
                   );
                 })}
               </div>
+
+              {visibleCount < displayChildren.length && (
+                <div className="text-center mt-10">
+                  <button
+                    type="button"
+                    onClick={() => setVisibleCount(prev => Math.min(prev + 3, displayChildren.length))}
+                    className="px-8 py-4 border border-[#e8e0d4] text-[#0d0d0d] font-bold uppercase tracking-wider text-sm hover:border-[#D4A843] hover:text-[#D4A843] transition-colors"
+                  >
+                    Meet more kids ({displayChildren.length - visibleCount} more)
+                  </button>
+                </div>
+              )}
             </>
           )}
         </div>
