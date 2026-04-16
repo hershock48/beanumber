@@ -156,15 +156,17 @@ function SponsorshipPageContent() {
     fetchAvailableChildren();
   }, []);
 
-  // Shuffle once per page load. If a specific child was preselected,
-  // that child gets pulled to the front; the rest are randomized.
+  // Only show children with photos, shuffled. If a specific child was
+  // preselected, that child gets pulled to the front regardless.
   const displayChildren = useMemo(() => {
+    const withPhotos = children.filter(c => !!c.photo?.url);
     if (preselectedChildId) {
-      const target = children.find(c => c.id === preselectedChildId);
-      const rest = shuffle(children.filter(c => c.id !== preselectedChildId));
+      const target = withPhotos.find(c => c.id === preselectedChildId)
+        || children.find(c => c.id === preselectedChildId);
+      const rest = shuffle(withPhotos.filter(c => c.id !== preselectedChildId));
       return target ? [target, ...rest] : rest;
     }
-    return shuffle(children);
+    return shuffle(withPhotos);
   }, [children, preselectedChildId]);
 
   async function handleSponsor(child: AvailableChild) {
