@@ -23,6 +23,13 @@ Key fields:
 - `Unsubscribed` (checkbox) — checked = respect unsub on all non-transactional email.
 - Reverse links: `Donations`, `Sponsorships`, `Communications`.
 
+Drip nurture fields (added April 16 for post-purchase conversion pipelines):
+- `DripPipeline` (singleSelect: shirt_nurture, sponsor_onboard, donor_convert) — which sequence, if any.
+- `DripStage` (number) — 0 = first email pending, 1–3 = sent that many, 4 = done. Null = not in drip.
+- `DripNextSend` (date, ISO) — next scheduled send. Cron at `/api/cron/drip` checks daily.
+- `DripChildName` (single line text) — child's first name for email personalization.
+- `DripShirtNumber` (number) — for building `/children/N` and `/sponsorship?child=N` links.
+
 Upsert key: `Email` (lowercased). If no match by email, try `Stripe Customer ID` as a secondary key before creating a new record.
 
 ### Donations

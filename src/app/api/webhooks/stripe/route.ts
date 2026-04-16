@@ -1574,6 +1574,41 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
         console.error('[WH] admin notify failed:', String(err?.message || err).slice(0, 200));
       }
 
+      // Step 8: Enroll shirt-only buyer into the nurture drip sequence.
+      // The cron at /api/cron/drip will pick them up and send 4 follow-up
+      // emails over ~30 days nudging toward monthly sponsorship. If they
+      // later convert (subscription.created fires), the drip gets cleared.
+      if (assignedChild) {
+        try {
+          const dripStartDate = new Date();
+          dripStartDate.setUTCDate(dripStartDate.getUTCDate() + 6);
+          const dripNextSend = dripStartDate.toISOString().split('T')[0];
+
+          await airtableAPICall(() =>
+            fetch(
+              `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_DONORS_TABLE}/${donorId}`,
+              {
+                method: 'PATCH',
+                headers: getAirtableHeaders(),
+                body: JSON.stringify({
+                  fields: {
+                    DripPipeline: 'shirt_nurture',
+                    DripStage: 0,
+                    DripNextSend: dripNextSend,
+                    DripChildName: assignedChild.displayName?.split(' ')[0] || '',
+                    DripShirtNumber: assignedChild.shirtNumber,
+                  },
+                }),
+              }
+            )
+          );
+          console.log('[WH] Enrolled in shirt_nurture drip, next send:', dripNextSend);
+        } catch (err: any) {
+          // Non-fatal — the purchase still succeeded even if drip enrollment fails
+          console.error('[WH] Drip enrollment failed:', String(err?.message || err).slice(0, 200));
+        }
+      }
+
       return { donorId, donationId, assignedChild };
 
     } else {
@@ -1877,7 +1912,49 @@ export async function POST(request: NextRequest) {
       case 'customer.subscription.updated': {
         const subscription = event.data.object as Stripe.Subscription;
         console.log('[Webhook] Subscription event:', event.type, subscription.id);
-        // You can add subscription-specific handling here if needed
+
+        // When a subscription is created, the buyer has converted — clear any
+        // active shirt_nurture drip so they stop getting conversion emails.
+        if (event.type === 'customer.subscription.created') {
+          try {
+            const subEmail = subscription.metadata?.email
+              || (typeof subscription.customer === 'string' ? '' : '');
+            // Look up donor by Stripe customer ID
+            const custId = typeof subscription.customer === 'string'
+              ? subscription.customer
+              : subscription.customer?.id || '';
+            if (custId && AIRTABLE_API_KEY && AIRTABLE_BASE_ID) {
+              const formula = `{Stripe Customer ID} = "${custId}"`;
+              const lookupRes = await fetch(
+                `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_DONORS_TABLE}?filterByFormula=${encodeURIComponent(formula)}&maxRecords=1`,
+                { headers: getAirtableHeaders() }
+              );
+              if (lookupRes.ok) {
+                const lookupData = await lookupRes.json();
+                const donorRecord = lookupData.records?.[0];
+                if (donorRecord?.fields?.DripPipeline) {
+                  await fetch(
+                    `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_DONORS_TABLE}/${donorRecord.id}`,
+                    {
+                      method: 'PATCH',
+                      headers: getAirtableHeaders(),
+                      body: JSON.stringify({
+                        fields: {
+                          DripPipeline: null,
+                          DripStage: null,
+                          DripNextSend: null,
+                        },
+                      }),
+                    }
+                  );
+                  console.log('[WH] Cleared drip for converted subscriber:', donorRecord.id);
+                }
+              }
+            }
+          } catch (err: any) {
+            console.error('[WH] Drip clear on conversion failed (non-fatal):', String(err?.message || err).slice(0, 200));
+          }
+        }
         break;
       }
 
