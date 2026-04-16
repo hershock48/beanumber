@@ -128,10 +128,9 @@ function DesignContainer({
  * higher (closer to the top of the box).
  */
 function SharedFront({ theme, mode = 'tee', className = '' }: DesignProps) {
-  // Real-shirt proportions: chest mark is ~3–4" on a ~20" body. The body
-  // fills ~54% of the SVG viewBox, so ~15% of body ≈ 8% of the container.
+  // Bump the chest mark on mobile tee so it's not a dot.
   const top = mode === 'tee' ? '28%' : '17%';
-  const width = mode === 'tee' ? '8%' : '18%';
+  const width = mode === 'tee' ? '12%' : '18%';
 
   return (
     <DesignContainer theme={theme} mode={mode} side="front" className={className}>
@@ -162,7 +161,7 @@ function SharedFront({ theme, mode = 'tee', className = '' }: DesignProps) {
  */
 function FlagshipFront({ theme, mode = 'tee', className = '' }: DesignProps) {
   const top = mode === 'tee' ? '28%' : '17%';
-  const width = mode === 'tee' ? '8%' : '18%';
+  const width = mode === 'tee' ? '12%' : '18%';
 
   return (
     <DesignContainer theme={theme} mode={mode} side="front" className={className}>
@@ -229,12 +228,12 @@ function TextBack({
   // `scale` shrinks text for longer words (e.g. "Everything / Hallelujah.")
   // so they don't overflow the shirt body.
   const topPos = mode === 'tee' ? '23%' : '14%';
-  const teeSize = 10.5 * scale;
+  const teeSize = 12 * scale;
   const teeMax = Math.round(64 * scale);
   const flatSize = 12.5 * scale;
   const flatMax = Math.round(80 * scale);
   const fontSize = mode === 'tee'
-    ? `clamp(20px, ${teeSize}cqw, ${teeMax}px)`
+    ? `clamp(22px, ${teeSize}cqw, ${teeMax}px)`
     : `clamp(26px, ${flatSize}cqw, ${flatMax}px)`;
 
   return (
@@ -280,9 +279,11 @@ function PeacemakerBack(props: DesignProps) {
 function EverythingHallelujahBack({ theme, mode = 'tee', className = '' }: DesignProps) {
   // Tee mode: small like the front chest logo. Flat/hover mode: scaled up
   // so the text is actually readable when someone hovers to inspect.
-  const blockWidth = mode === 'tee' ? '16%' : '40%';
+  // On mobile tee mode, make it wider + fewer reps so the text is legible.
+  // On desktop tee the original proportions work fine.
+  const blockWidth = mode === 'tee' ? '26%' : '40%';
   const fontSize = mode === 'tee'
-    ? 'clamp(3.5px, 1.8cqw, 9px)'
+    ? 'clamp(5px, 2.6cqw, 11px)'
     : 'clamp(7px, 3.8cqw, 18px)';
   // Spread the 5 repetitions evenly down the back body area
   const startTop = mode === 'tee' ? 20 : 10;
@@ -321,8 +322,8 @@ function EverythingHallelujahBack({ theme, mode = 'tee', className = '' }: Desig
  */
 function NigeriaBack({ theme, mode = 'tee', className = '' }: DesignProps) {
   const topPos = mode === 'tee' ? '28%' : '20%';
-  const fontSize = mode === 'tee' ? 'clamp(16px, 8.5cqw, 52px)' : 'clamp(22px, 10.5cqw, 68px)';
-  const crossSize = mode === 'tee' ? 'clamp(20px, 10cqw, 60px)' : 'clamp(28px, 12cqw, 76px)';
+  const fontSize = mode === 'tee' ? 'clamp(18px, 10cqw, 52px)' : 'clamp(22px, 10.5cqw, 68px)';
+  const crossSize = mode === 'tee' ? 'clamp(22px, 11cqw, 60px)' : 'clamp(28px, 12cqw, 76px)';
 
   return (
     <DesignContainer theme={theme} mode={mode} side="back" className={className}>
@@ -488,7 +489,7 @@ function PreviewMockup({
 
   return (
     <div
-      className="p-4 flex flex-col items-center border transition-colors duration-300"
+      className="p-2 sm:p-4 flex flex-col items-center border transition-colors duration-300"
       style={{ backgroundColor: theme.cardBg, borderColor: theme.cardBorder }}
     >
       <div
@@ -593,10 +594,10 @@ function ShirtCard({ shirt, reversed, initialColor }: { shirt: Shirt; reversed: 
 
   return (
     <div className="scroll-mt-24" id={shirt.id}>
-      <div className={`flex flex-col ${reversed ? 'md:flex-row-reverse' : 'md:flex-row'} gap-8 md:gap-14 items-center`}>
+      <div className={`flex flex-col ${reversed ? 'md:flex-row-reverse' : 'md:flex-row'} gap-6 md:gap-14 items-center`}>
         {/* Mockup previews */}
         <div className="flex-1 w-full">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-2 sm:gap-4">
             <PreviewMockup Design={Front} theme={previewTheme} label="Front" />
             <PreviewMockup Design={Back} theme={previewTheme} label="Back" />
           </div>
@@ -608,7 +609,7 @@ function ShirtCard({ shirt, reversed, initialColor }: { shirt: Shirt; reversed: 
           {/* Inside-collar detail: mini mockup of the actual stamp the buyer
               will find inside the neck. Uses a mono type to mimic the stamped
               look, with a clear "sample" caption so no one expects #0007. */}
-          <div className="mt-5 bg-white border border-dashed border-[#e8e0d4] px-5 py-4 flex items-center gap-5">
+          <div className="mt-3 sm:mt-5 bg-white border border-dashed border-[#e8e0d4] px-3 sm:px-5 py-3 sm:py-4 flex items-center gap-3 sm:gap-5">
             {/* Stamp mockup — centered inside a faux collar tape. */}
             <div
               className="flex-none bg-[#faf6ee] border border-[#e8e0d4] px-3 py-2 text-center"
@@ -661,7 +662,7 @@ function ShirtCard({ shirt, reversed, initialColor }: { shirt: Shirt; reversed: 
           >
             ${shirt.price}
           </p>
-          <p className="text-[#666] leading-relaxed mb-2">
+          <p className="text-sm sm:text-base text-[#666] leading-relaxed mb-2">
             {shirt.description}
           </p>
           <p className="text-xs text-[#aaa] mb-0">{shirt.specs}</p>
@@ -826,7 +827,7 @@ export default function ShirtsPageContent() {
       <BANNavigation currentPath="/shirts" />
 
       {/* Hero */}
-      <section className="py-20 md:py-28 px-5">
+      <section className="py-12 md:py-28 px-5">
         <div className="max-w-4xl mx-auto text-center">
           <p className="text-xs font-bold text-[#D4A843] uppercase tracking-[0.3em] mb-6">The Collection</p>
           <h1
@@ -844,7 +845,7 @@ export default function ShirtsPageContent() {
 
       {/* Shirt Grid */}
       <section className="px-5 pb-24">
-        <div className="max-w-6xl mx-auto space-y-28">
+        <div className="max-w-6xl mx-auto space-y-16 md:space-y-28">
           {shirts.map((shirt, i) => (
             <ShirtCard key={shirt.id} shirt={shirt} reversed={i % 2 !== 0} initialColor={previewColors[i]} />
           ))}
