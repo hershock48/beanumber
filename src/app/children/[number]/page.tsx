@@ -468,14 +468,6 @@ export default async function ChildProfilePage({ params }: ChildPageProps) {
               >
                 Become a sponsor
               </Link>
-              <p className="text-center mt-4">
-                <Link
-                  href="/sponsor/login"
-                  className="text-xs text-[#aaa] hover:text-[#D4A843] transition-colors"
-                >
-                  Already sponsoring? Log in to your portal
-                </Link>
-              </p>
             </div>
 
             {/* What your $25 does — concrete, named, specific. Replaces the
