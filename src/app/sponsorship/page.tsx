@@ -381,10 +381,10 @@ function SponsorshipPageContent() {
                 className="text-3xl text-[#0d0d0d] mb-2 text-center"
                 style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
               >
-                Meet the Kids
+                Skip the shirt, pick a child.
               </h2>
               <p className="text-[#777] text-center mb-10 max-w-lg mx-auto">
-                Every child here is already enrolled at the YDO campus. Your $25/month joins the team that keeps them there. Skip the shirt, pick a child, and start.
+                $25/month pays for their school, daily meals, medical care through the on-site clinic, and a mentor who knows their name. You get letters, photos, and a year-end report card.
               </p>
             </>
           )}
@@ -503,6 +503,9 @@ function SponsorshipPageContent() {
                   })}
                 </div>
               </div>
+
+              {/* --- Section header --- */}
+              <p className="text-xs font-bold text-[#D4A843] uppercase tracking-[0.3em] mb-8 text-center">Change their lives</p>
 
               {/* --- Expanded profile cards (paginated) --- */}
               <div className="space-y-10">
