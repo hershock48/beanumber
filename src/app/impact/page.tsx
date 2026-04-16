@@ -16,9 +16,29 @@ export const metadata: Metadata = {
   },
 };
 
+const impactJsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'Article',
+  headline: 'Six Acres. One Year. Here\'s What Happened.',
+  description: 'What happened on six acres in Northern Uganda in 2025. 700+ patients treated, 68 adults trained, 30 local jobs, and 96.7% of every dollar went to programs.',
+  author: { '@type': 'Person', name: 'Kevin Hershock' },
+  publisher: {
+    '@type': 'NonprofitOrganization',
+    name: 'Be A Number, International',
+    logo: { '@type': 'ImageObject', url: 'https://www.beanumber.org/icon.svg' },
+  },
+  url: 'https://www.beanumber.org/impact',
+  image: 'https://www.beanumber.org/images/impact-page/lead-image-kevin.png',
+  mainEntityOfPage: 'https://www.beanumber.org/impact',
+};
+
 export default function Impact() {
   return (
     <div className="min-h-screen bg-[#FFF8F0]">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(impactJsonLd) }}
+      />
       <BANNavigation currentPath="/impact" />
 
       {/* ========== HERO ========== */}

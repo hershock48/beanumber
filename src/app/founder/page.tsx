@@ -13,9 +13,29 @@ export const metadata: Metadata = {
   },
 };
 
+const founderJsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'Article',
+  headline: 'When the War Ended, Everyone Left',
+  description: 'When the war in Northern Uganda ended, most organizations left. Kevin and Simon stayed. This is the story of how they built something that lasts.',
+  author: { '@type': 'Person', name: 'Kevin Hershock' },
+  publisher: {
+    '@type': 'NonprofitOrganization',
+    name: 'Be A Number, International',
+    logo: { '@type': 'ImageObject', url: 'https://www.beanumber.org/icon.svg' },
+  },
+  url: 'https://www.beanumber.org/founder',
+  image: 'https://www.beanumber.org/images/founder/hero-sewing-classroom.jpg',
+  mainEntityOfPage: 'https://www.beanumber.org/founder',
+};
+
 export default function Founder() {
   return (
     <div className="min-h-screen bg-[#FFF8F0]">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(founderJsonLd) }}
+      />
       <BANNavigation currentPath="/founder" />
 
       <main className="py-24 px-6">

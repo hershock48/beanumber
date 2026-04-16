@@ -73,6 +73,48 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="scroll-smooth">
+      <head>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              '@context': 'https://schema.org',
+              '@type': 'NonprofitOrganization',
+              name: 'Be A Number, International',
+              alternateName: 'BAN',
+              url: 'https://www.beanumber.org',
+              logo: 'https://www.beanumber.org/icon.svg',
+              description:
+                'US 501(c)(3) funding education, meals, medical care, and mentorship for children at the YDO campus in Omoro District, Northern Uganda.',
+              foundingDate: '2023',
+              founder: {
+                '@type': 'Person',
+                name: 'Kevin Hershock',
+              },
+              address: {
+                '@type': 'PostalAddress',
+                streetAddress: '108 N. Sycamore Street',
+                addressLocality: 'Marshall',
+                addressRegion: 'MI',
+                postalCode: '49068',
+                addressCountry: 'US',
+              },
+              contactPoint: {
+                '@type': 'ContactPoint',
+                email: 'kevin@beanumber.org',
+                contactType: 'customer service',
+              },
+              sameAs: [
+                'https://instagram.com/beanumber_',
+                'https://www.facebook.com/beanumber',
+                'https://www.tiktok.com/@beanumber',
+              ],
+              taxID: '93-1948872',
+              nonprofitStatus: '501c3',
+            }),
+          }}
+        />
+      </head>
       <body className={`${lora.variable} ${inter.variable} antialiased`}>
         {children}
       </body>

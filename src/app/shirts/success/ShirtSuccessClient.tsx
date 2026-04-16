@@ -136,8 +136,8 @@ function ShippingConfirmation({
         </h1>
 
         <p className="text-lg text-[#555] leading-relaxed max-w-md mx-auto mb-4">
-          We&rsquo;ll ship it by hand within 5&ndash;7 business days. When it
-          arrives, there&rsquo;s a number on the tag — that number belongs to
+          Expect it within 5&ndash;7 business days. When it
+          arrives, there&rsquo;s a number on the tag &mdash; that number belongs to
           a real child in Northern Uganda, and they&rsquo;re waiting to meet
           you.
         </p>
@@ -196,7 +196,7 @@ function ShippingConfirmation({
         </h3>
         <div className="space-y-4 text-left">
           <Step num="I">
-            We&rsquo;ll make your shirt by hand and ship it within 5–7 business
+            Your shirt is made to order and ships within 5&ndash;7 business
             days. A confirmation email is on its way to you now.
           </Step>
           <Step num="II">
