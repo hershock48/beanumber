@@ -364,7 +364,7 @@ const SHIRTS_SOURCE: Shirt[] = [
     name: 'Do Not Fear.',
     tagline: 'A reminder you can wear',
     price: 25,
-    description: '"Do not fear" appears over 100 times in the Bible. More than any other repeated command. Not because it\'s easy, but because God knows we need to hear it constantly. Move forward. Trust in love. The thing you\'re afraid of is smaller than the one who told you not to be.',
+    description: '"Do not fear" appears over 100 times in the Bible. More than any other repeated command. Not because it\'s easy, but because God knows we need to hear it constantly. Whatever you\'re afraid of is not bigger than the God who said it. Move forward. Trust in love.',
     Front: SharedFront,
     Back: DoNotFearBack,
     badge: 'Courage',
