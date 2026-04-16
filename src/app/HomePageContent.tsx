@@ -8,6 +8,44 @@ import { BANNavigation } from '@/components/BANNavigation';
 import { BANFooter } from '@/components/BANFooter';
 import { Logo } from '@/components/Logo';
 
+// ---------------------------------------------------------------------------
+// Animated count-up hook — fires once when the element scrolls into view.
+// ---------------------------------------------------------------------------
+function useCountUp(end: number, duration = 1800) {
+  const [count, setCount] = useState(0);
+  const ref = useRef<HTMLDivElement>(null);
+  const started = useRef(false);
+
+  useEffect(() => {
+    const node = ref.current;
+    if (!node) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting && !started.current) {
+          started.current = true;
+          const start = performance.now();
+          const step = (now: number) => {
+            const elapsed = now - start;
+            const progress = Math.min(elapsed / duration, 1);
+            // ease-out quad
+            const eased = 1 - (1 - progress) * (1 - progress);
+            setCount(Math.round(eased * end));
+            if (progress < 1) requestAnimationFrame(step);
+          };
+          requestAnimationFrame(step);
+        }
+      },
+      { threshold: 0.3 }
+    );
+
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [end, duration]);
+
+  return { ref, count };
+}
+
 interface Child {
   id: string;
   child_id: string;
@@ -330,24 +368,7 @@ export function HomePageContent() {
             and 30 people from the community employed to run it. Your $25 keeps it going.
           </p>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {[
-              { number: '380', label: 'Students' },
-              { number: '700+', label: 'Patients Served' },
-              { number: '68', label: 'Adults Trained' },
-              { number: '30', label: 'Local Jobs' },
-            ].map((stat) => (
-              <div key={stat.label} className="bg-[#FFF8F0] border border-[#e8e0d4] p-6 text-center">
-                <div
-                  className="text-3xl md:text-4xl text-[#D4A843] mb-1"
-                  style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 700 }}
-                >
-                  {stat.number}
-                </div>
-                <div className="text-xs text-[#999] uppercase tracking-wider">{stat.label}</div>
-              </div>
-            ))}
-          </div>
+          <StatsGrid />
 
           <div className="text-center mt-10">
             <Link
@@ -404,6 +425,35 @@ export function HomePageContent() {
       </section>
 
       <BANFooter />
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Stats grid with animated count-up on scroll
+// ---------------------------------------------------------------------------
+function AnimatedStat({ end, suffix, label }: { end: number; suffix?: string; label: string }) {
+  const { ref, count } = useCountUp(end);
+  return (
+    <div ref={ref} className="bg-[#FFF8F0] border border-[#e8e0d4] p-6 text-center">
+      <div
+        className="text-3xl md:text-4xl text-[#D4A843] mb-1 tabular-nums"
+        style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 700 }}
+      >
+        {count.toLocaleString()}{suffix || ''}
+      </div>
+      <div className="text-xs text-[#999] uppercase tracking-wider">{label}</div>
+    </div>
+  );
+}
+
+function StatsGrid() {
+  return (
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <AnimatedStat end={380} label="Students" />
+      <AnimatedStat end={700} suffix="+" label="Patients Served" />
+      <AnimatedStat end={68} label="Adults Trained" />
+      <AnimatedStat end={30} label="Local Jobs" />
     </div>
   );
 }

@@ -1,9 +1,11 @@
 import Link from 'next/link';
 import { Logo } from '@/components/Logo';
+import { ConfettiBurst } from '@/components/ConfettiBurst';
 
 export default function DonateSuccess() {
   return (
     <div className="min-h-screen bg-gray-50">
+      <ConfettiBurst />
       {/* Navigation */}
       <nav className="bg-white border-b border-gray-200">
         <div className="max-w-6xl mx-auto px-6 py-4">
