@@ -263,6 +263,54 @@ function PeacemakerBack(props: DesignProps) {
   return <TextBack {...props} lines={['Peace', 'maker.']} />;
 }
 
+function EverythingHallelujahBack(props: DesignProps) {
+  return <TextBack {...props} lines={['Everything', 'Hallelujah.']} />;
+}
+
+/**
+ * Nigeria back — "NIGERIA" in tracked uppercase Lora centered on the back,
+ * with a thin cross centered below the text.
+ */
+function NigeriaBack({ theme, mode = 'tee', className = '' }: DesignProps) {
+  const topPos = mode === 'tee' ? '28%' : '20%';
+  const fontSize = mode === 'tee' ? 'clamp(16px, 8.5cqw, 52px)' : 'clamp(22px, 10.5cqw, 68px)';
+  const crossSize = mode === 'tee' ? 'clamp(20px, 10cqw, 60px)' : 'clamp(28px, 12cqw, 76px)';
+
+  return (
+    <DesignContainer theme={theme} mode={mode} side="back" className={className}>
+      <div
+        className="absolute flex flex-col items-center"
+        style={{
+          left: '50%',
+          top: topPos,
+          transform: 'translateX(-50%)',
+        }}
+      >
+        <div
+          style={{
+            fontFamily: 'var(--font-lora), Georgia, serif',
+            fontWeight: 700,
+            color: theme.vinyl,
+            fontSize,
+            letterSpacing: '0.06em',
+            textAlign: 'center',
+          }}
+        >
+          NIGERIA
+        </div>
+        <svg
+          viewBox="0 0 40 56"
+          style={{ width: crossSize, marginTop: '12%' }}
+          aria-hidden
+        >
+          <rect x="18" y="0" width="4" height="56" fill={theme.vinyl} />
+          <rect x="4" y="18" width="32" height="4" fill={theme.vinyl} />
+        </svg>
+      </div>
+    </DesignContainer>
+  );
+}
+
 
 /* ── Shirt data ─────────────────────────────────────────────── */
 
@@ -321,6 +369,28 @@ const shirts: Shirt[] = [
     Front: SharedFront,
     Back: PeacemakerBack,
     badge: 'Faith',
+    specs: 'S – 2XL · Unisex · Heavyweight cotton',
+  },
+  {
+    id: 'everything-hallelujah',
+    name: 'Everything Hallelujah.',
+    tagline: 'The whole thing, all of it',
+    price: 25,
+    description: 'Small # mark on the front, "Everything / Hallelujah." stacked in large Lora serif across the back. Two words that say it all when the good news is too big for a paragraph. Wear it like you mean it.',
+    Front: SharedFront,
+    Back: EverythingHallelujahBack,
+    badge: 'Faith',
+    specs: 'S – 2XL · Unisex · Heavyweight cotton',
+  },
+  {
+    id: 'nigeria',
+    name: 'Nigeria.',
+    tagline: 'For the ones who can\'t wear it there',
+    price: 25,
+    description: 'Small # mark on the front, "NIGERIA" in tracked uppercase with a cross centered below it on the back. This shirt exists because Christians in Nigeria are being killed and most of the world isn\'t talking about it. Wearing the name is the least you can do. It\'s also the start.',
+    Front: SharedFront,
+    Back: NigeriaBack,
+    badge: 'Solidarity',
     specs: 'S – 2XL · Unisex · Heavyweight cotton',
   },
 ];

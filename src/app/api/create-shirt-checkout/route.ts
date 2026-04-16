@@ -21,6 +21,8 @@ const SHIRTS: Record<string, { name: string }> = {
   'thank-you': { name: 'Thank you.' },
   'do-not-fear': { name: 'Do Not Fear.' },
   peacemaker: { name: 'Peacemaker.' },
+  'everything-hallelujah': { name: 'Everything Hallelujah.' },
+  nigeria: { name: 'Nigeria.' },
 };
 
 const VALID_SIZES = ['S', 'M', 'L', 'XL', '2XL'];
