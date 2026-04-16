@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { Logo } from '@/components/Logo';
-import confetti from 'canvas-confetti';
+import { ConfettiBurst } from '@/components/ConfettiBurst';
 
 // The success page intentionally does NOT reveal the child here. The magic
 // of Be A Number is the physical shirt arriving with a number on the tag,
@@ -116,22 +116,10 @@ function ShippingConfirmation({
   alreadySponsoring: boolean;
   note?: string;
 }) {
-  // Party time — two-burst confetti when the order lands (not on error).
-  useEffect(() => {
-    if (note) return; // error state, skip
-    const colors = ['#D4A843', '#FFF8F0', '#0d0d0d', '#e8e0d4'];
-    const burst = (opts: confetti.Options) =>
-      confetti({ ...opts, colors });
-    burst({ particleCount: 80, spread: 70, origin: { x: 0.3, y: 0.6 } });
-    burst({ particleCount: 80, spread: 70, origin: { x: 0.7, y: 0.6 } });
-    // second wave, slightly delayed
-    setTimeout(() => {
-      burst({ particleCount: 50, spread: 90, origin: { x: 0.5, y: 0.5 } });
-    }, 400);
-  }, [note]);
-
   return (
     <div>
+      {/* Confetti on successful orders (not error state) */}
+      {!note && <ConfettiBurst />}
       {/* Hero */}
       <div className="text-center mb-10">
         <Logo variant="cross" className="w-14 h-14 text-[#D4A843] mx-auto mb-8" />
