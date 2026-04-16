@@ -219,10 +219,66 @@ export async function generateMetadata({ params }: ChildPageProps) {
 export default async function ChildProfilePage({ params }: ChildPageProps) {
   const { number } = await params;
   const num = parseInt(number, 10);
-  if (isNaN(num)) notFound();
+  // Treat non-numeric input the same as "not found" — show the friendly page,
+  // not a hard 404 that makes people think the site is broken.
+  const child = !isNaN(num) ? await getChildByShirtNumber(num) : null;
 
-  const child = await getChildByShirtNumber(num);
-  if (!child) notFound();
+  // Instead of a 404, show a warm "not found" view. Someone may have typed
+  // the wrong number, or this shirt number hasn't been assigned yet.
+  if (!child) {
+    return (
+      <div className="min-h-screen bg-[#FFF8F0]">
+        <BANNavigation currentPath={'/children/' + number} />
+
+        <main className="max-w-3xl mx-auto px-5 py-16 md:py-24">
+          <Link
+            href="/"
+            className="inline-flex items-center gap-2 text-sm text-[#aaa] hover:text-[#D4A843] transition-colors mb-10"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+            </svg>
+            Back to home
+          </Link>
+
+          <div className="text-center">
+            <h1
+              className="text-4xl md:text-5xl text-[#0d0d0d] mb-4"
+              style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
+            >
+              We don&rsquo;t have a #{number} yet
+            </h1>
+
+            <p className="text-lg text-[#666] leading-relaxed max-w-xl mx-auto mb-4">
+              Double-check your shirt tag — the number is printed on the inside label.
+              If you&rsquo;re sure it&rsquo;s #{number}, reach out and we&rsquo;ll sort it out.
+            </p>
+
+            <p className="text-[#999] mb-10">
+              <a href="mailto:Kevin@beanumber.org" className="text-[#D4A843] hover:underline">Kevin@beanumber.org</a>
+            </p>
+
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <Link
+                href="/shirts"
+                className="inline-block bg-[#D4A843] text-[#0d0d0d] font-bold uppercase tracking-wider py-4 px-8 hover:bg-[#c49a3a] transition-colors"
+              >
+                Browse shirts
+              </Link>
+              <Link
+                href="/"
+                className="inline-block bg-white border border-[#e8e0d4] text-[#0d0d0d] font-bold uppercase tracking-wider py-4 px-8 hover:bg-[#f5f0e8] transition-colors"
+              >
+                Back to home
+              </Link>
+            </div>
+          </div>
+        </main>
+
+        <BANFooter />
+      </div>
+    );
+  }
 
   // Reserved-for-auction numbers get a dedicated view. The Child record exists
   // in Airtable only to hold the number, so we don't expose a profile.
