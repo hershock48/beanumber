@@ -272,6 +272,22 @@ export function SponsorDashboard({ sponsorCode, email }: SponsorDashboardProps) 
   const [requestingUpdate, setRequestingUpdate] = useState(false);
   const [requestSuccess, setRequestSuccess] = useState(false);
 
+  // "New" badge tracking — store last visit time in localStorage so we can
+  // highlight updates that arrived since the sponsor last checked.
+  const [lastVisited, setLastVisited] = useState<string | null>(null);
+
+  useEffect(() => {
+    const key = `ban_last_visited_${sponsorCode}`;
+    const stored = localStorage.getItem(key);
+    if (stored) setLastVisited(stored);
+    // Update the timestamp after a short delay so the sponsor sees the
+    // "New" badges for a moment before they clear on the next visit.
+    const timer = setTimeout(() => {
+      localStorage.setItem(key, new Date().toISOString());
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, [sponsorCode]);
+
   // Write-to-child state
   const [messageText, setMessageText] = useState('');
   const [sendingMessage, setSendingMessage] = useState(false);
@@ -1066,8 +1082,15 @@ export function SponsorDashboard({ sponsorCode, email }: SponsorDashboardProps) 
                         : 'bg-white border-[#888]'
                   }`} />
 
-                  {/* Date */}
-                  <p className="text-xs text-[#aaa] mb-1.5">{formatDate(entry.date)}</p>
+                  {/* Date + New badge */}
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <p className="text-xs text-[#aaa]">{formatDate(entry.date)}</p>
+                    {lastVisited && entry.kind !== 'milestone' && new Date(entry.date) > new Date(lastVisited) && (
+                      <span className="inline-block px-1.5 py-0.5 bg-[#D4A843] text-[#0d0d0d] text-[9px] font-bold uppercase tracking-wider leading-none">
+                        New
+                      </span>
+                    )}
+                  </div>
 
                   {/* MILESTONE */}
                   {entry.kind === 'milestone' && (
