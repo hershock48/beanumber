@@ -4,7 +4,7 @@ import { cookies } from 'next/headers';
 const AIRTABLE_API_KEY = process.env.AIRTABLE_API_KEY;
 const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID;
 const AIRTABLE_SPONSORSHIPS_TABLE = process.env.AIRTABLE_SPONSORSHIPS_TABLE || 'Sponsorships';
-const AIRTABLE_UPDATES_TABLE = process.env.AIRTABLE_UPDATES_TABLE || 'Updates';
+const AIRTABLE_UPDATES_TABLE = process.env.AIRTABLE_UPDATES_TABLE || 'Child Updates';
 
 async function verifySession(sponsorCode: string): Promise<boolean> {
   const cookieStore = await cookies();
@@ -135,7 +135,7 @@ export async function POST(request: NextRequest) {
           fields: {
             'ChildID': childID,
             'SponsorCode': sponsorCode,
-            'UpdateType': 'Requested Update',
+            'UpdateType': 'Special Note',
             'Title': `Update Request from ${email}`,
             'Content': `Sponsor ${email} has requested an update about their sponsored child.`,
             'Status': 'Pending Review',
