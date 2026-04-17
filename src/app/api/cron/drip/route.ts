@@ -110,7 +110,7 @@ function shirtNurtureEmail(
 ): { subject: string; html: string } | null {
   const { firstName, childName, shirtNumber } = donor;
   const childUrl = `${SITE_URL}/children/${shirtNumber}`;
-  const sponsorUrl = `${SITE_URL}/sponsorship?child=${shirtNumber}`;
+  const sponsorUrl = `${SITE_URL}/api/sponsor-checkout?number=${shirtNumber}`;
 
   switch (stage) {
     // ── Email 2: "It's on its way" (Day ~6) ───────────────────────────────

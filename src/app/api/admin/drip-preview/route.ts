@@ -41,7 +41,7 @@ const firstName = 'Kevin';
 const childName = 'Grace';
 const shirtNumber = 12;
 const childUrl = `${SITE_URL}/children/${shirtNumber}`;
-const sponsorUrl = `${SITE_URL}/sponsorship?child=${shirtNumber}`;
+const sponsorUrl = `${SITE_URL}/api/sponsor-checkout?number=${shirtNumber}`;
 const portalUrl = `${SITE_URL}/sponsor/login`;
 
 type PreviewEmail = { pipeline: string; subject: string; html: string };
