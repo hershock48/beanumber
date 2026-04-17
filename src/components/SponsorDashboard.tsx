@@ -113,6 +113,68 @@ function daysBetween(start: Date, end: Date): number {
   return Math.max(0, Math.floor((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
 }
 
+// ---------------------------------------------------------------------------
+// Conversation starter pools — randomly sampled each time the prompt
+// drawer opens so the experience stays fresh across visits.
+// ---------------------------------------------------------------------------
+
+// Templates use CHILD as a placeholder replaced with the actual first name.
+const SHARE_PROMPTS = [
+  'Hi CHILD! I wanted to introduce myself. I work as _____ and I live in _____.',
+  'One thing I love doing on weekends is _____. What do you do on weekends?',
+  'My favorite food is _____. What\u2019s yours?',
+  'I have _____ siblings. Do you have brothers or sisters?',
+  'My favorite animal is _____. Do you have a favorite animal?',
+  'Something that made me smile this week was _____.',
+  'Right now where I live the weather is _____. What is the weather like where you are?',
+  'When I was your age, I really loved _____.',
+  'I\u2019m learning how to _____. It\u2019s harder than I thought!',
+  'My favorite holiday is _____ because _____.',
+  'I just finished reading a book called _____. Do you like reading?',
+  'If I could visit anywhere in the world, I\u2019d go to _____.',
+  'The best meal I ever had was _____.',
+  'One of my favorite memories is _____.',
+  'I work as a _____ and the best part of my job is _____.',
+  'I\u2019m from a place called _____. It\u2019s known for _____.',
+  'My favorite song right now is _____. Do you like music?',
+  'I play _____ for fun. Do you play any sports or games?',
+  'If I could have any superpower, I\u2019d pick _____.',
+  'My favorite color is _____. What\u2019s yours?',
+];
+
+const ASK_PROMPTS = [
+  'What is your favorite subject in school and why?',
+  'What do you like to do with your friends?',
+  'What do you want to be when you grow up?',
+  'What made you happy this week?',
+  'What\u2019s your favorite game to play?',
+  'Do you have a best friend? What do you like to do together?',
+  'What\u2019s the funniest thing that happened to you recently?',
+  'What are you most proud of?',
+  'If you could learn anything in the world, what would it be?',
+  'What is your favorite thing about your school?',
+  'What\u2019s your favorite time of day and why?',
+  'What do you like to do after school?',
+  'What\u2019s your favorite thing to eat for lunch?',
+  'Is there a teacher at school you really like? What makes them special?',
+  'Do you like to draw or make things? What do you make?',
+  'What\u2019s a song you like to sing?',
+  'What\u2019s the best thing that happened at school this term?',
+  'If you could have any animal as a pet, what would you pick?',
+  'What do you want to tell me about yourself?',
+  'What is something you\u2019re really good at?',
+];
+
+/** Fisher-Yates shuffle (non-mutating) and return the first `n` items. */
+function pickRandom<T>(pool: T[], n: number): T[] {
+  const a = [...pool];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a.slice(0, n);
+}
+
 function isBirthdaySoon(birthday: string | undefined): { upcoming: boolean; daysAway: number; dateLabel: string } {
   if (!birthday) return { upcoming: false, daysAway: 999, dateLabel: '' };
 
@@ -216,6 +278,9 @@ export function SponsorDashboard({ sponsorCode, email }: SponsorDashboardProps) 
   const [messageSent, setMessageSent] = useState(false);
   const [messageError, setMessageError] = useState('');
   const [showPrompts, setShowPrompts] = useState(false);
+  // Counter that increments every time the prompt drawer opens so we
+  // get a fresh random selection each time.
+  const [promptSeed, setPromptSeed] = useState(0);
 
   useEffect(() => {
     loadSponsorData();
@@ -256,6 +321,15 @@ export function SponsorDashboard({ sponsorCode, email }: SponsorDashboardProps) 
 
   // Birthday
   const birthdayInfo = isBirthdaySoon(childInfo?.birthday);
+
+  // Random conversation starters — 3 "share" + 3 "ask" picked fresh
+  // each time the drawer opens (keyed on promptSeed).
+  const randomPrompts = useMemo(() => {
+    const share = pickRandom(SHARE_PROMPTS, 3).map((p) => p.replace(/CHILD/g, firstName));
+    const ask = pickRandom(ASK_PROMPTS, 3).map((p) => p.replace(/CHILD/g, firstName));
+    return { share, ask };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [promptSeed, firstName]);
 
   // -------------------------------------------------------------------
   // Build the timeline — merges updates, messages, and milestones
@@ -858,10 +932,10 @@ export function SponsorDashboard({ sponsorCode, email }: SponsorDashboardProps) 
                 Kevin relays every message through the YDO team.
               </p>
 
-              {/* Prompt suggestions — expandable nudge, not a wizard */}
+              {/* Prompt suggestions — expandable, randomized each open */}
               {!showPrompts ? (
                 <button
-                  onClick={() => setShowPrompts(true)}
+                  onClick={() => { setPromptSeed((s) => s + 1); setShowPrompts(true); }}
                   className="text-xs text-[#D4A843] hover:underline font-medium mb-3 block"
                 >
                   Not sure what to say? Here are some ideas.
@@ -870,21 +944,25 @@ export function SponsorDashboard({ sponsorCode, email }: SponsorDashboardProps) 
                 <div className="bg-[#FFF8F0] border border-[#e8e0d4] p-3 mb-3 text-sm">
                   <div className="flex items-center justify-between mb-2">
                     <p className="text-xs font-semibold text-[#888] uppercase tracking-wider">Conversation starters</p>
-                    <button
-                      onClick={() => setShowPrompts(false)}
-                      className="text-xs text-[#aaa] hover:text-[#666]"
-                    >
-                      Hide
-                    </button>
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={() => setPromptSeed((s) => s + 1)}
+                        className="text-xs text-[#D4A843] hover:underline"
+                      >
+                        Shuffle
+                      </button>
+                      <button
+                        onClick={() => setShowPrompts(false)}
+                        className="text-xs text-[#aaa] hover:text-[#666]"
+                      >
+                        Hide
+                      </button>
+                    </div>
                   </div>
                   <p className="text-xs text-[#999] mb-2">Tap any to add it to your message:</p>
                   <div className="space-y-1.5">
                     <p className="text-xs font-semibold text-[#D4A843] uppercase tracking-wider mt-1">Tell {firstName} about you</p>
-                    {[
-                      `Hi ${firstName}! I wanted to introduce myself. I work as _____ and I live in _____.`,
-                      `One thing I love doing on weekends is _____. What do you do on weekends?`,
-                      `My favorite food is _____. What\u2019s yours?`,
-                    ].map((prompt) => (
+                    {randomPrompts.share.map((prompt) => (
                       <button
                         key={prompt}
                         onClick={() => setMessageText((prev) => prev ? `${prev}\n\n${prompt}` : prompt)}
@@ -894,12 +972,7 @@ export function SponsorDashboard({ sponsorCode, email }: SponsorDashboardProps) 
                       </button>
                     ))}
                     <p className="text-xs font-semibold text-[#D4A843] uppercase tracking-wider mt-3">Ask {firstName} something</p>
-                    {[
-                      `What is your favorite subject in school and why?`,
-                      `What do you like to do with your friends?`,
-                      `What do you want to be when you grow up?`,
-                      `What made you happy this week?`,
-                    ].map((prompt) => (
+                    {randomPrompts.ask.map((prompt) => (
                       <button
                         key={prompt}
                         onClick={() => setMessageText((prev) => prev ? `${prev}\n\n${prompt}` : prompt)}
