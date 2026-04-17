@@ -836,7 +836,7 @@ export function SponsorDashboard({ sponsorCode, email }: SponsorDashboardProps) 
               </p>
               <div className="bg-white border border-[#e8e0d4] p-3 text-xs text-[#888] mb-3">
                 <p className="font-semibold text-[#666] mb-1">What happens next</p>
-                <p>Your message goes to Kevin, then to the YDO team, then to {firstName}. If you asked a question, {firstName}&rsquo;s response comes back the same way. Expect 2&ndash;4 weeks &mdash; mail between here and Northern Uganda takes time, and that&rsquo;s okay.</p>
+                <p>Your message goes to Kevin, then to the YDO team, then to {firstName}. If you asked a question, {firstName}&rsquo;s response comes back the same way. Expect 2&ndash;4 weeks.</p>
               </div>
               <button
                 onClick={() => setMessageSent(false)}
@@ -930,7 +930,7 @@ export function SponsorDashboard({ sponsorCode, email }: SponsorDashboardProps) 
                 <svg className="w-4 h-4 text-[#D4A843] mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                <span>Messages travel from Kevin to the YDO team to {firstName} in Northern Uganda. Expect a response in 2&ndash;4 weeks. That&rsquo;s the reality of the distance &mdash; and part of what makes it real.</span>
+                <span>Messages travel from Kevin to the YDO team to {firstName} in Northern Uganda. Expect a response in 2&ndash;4 weeks.</span>
               </div>
 
               <div className="flex justify-end">

@@ -88,8 +88,8 @@ function validateCronAuth(request: NextRequest): boolean {
 //   Stage 2 → Day 25: "Last one from me" — final respectful nudge
 //
 // shirt_sponsor (4 emails, ~25 days):
-//   Stage 0 → Day 3:  "Shirt + sponsor welcome" — shirt shipping, portal + code
-//   Stage 1 → Day 8:  "Did the shirt land?" — the reveal + meet your child
+//   Stage 0 → Day 3:  "Shirt on the way" — shipping, teases portal (no code yet)
+//   Stage 1 → Day 8:  "Did the shirt land?" — reveal + sponsor code + portal
 //   Stage 2 → Day 15: "What your first month did" — impact, updates coming
 //   Stage 3 → Day 25: "Thank you for staying" — celebrate, tell one friend
 //
@@ -363,7 +363,7 @@ function shirtSponsorEmail(
   const portalUrl = `${SITE_URL}/sponsor/login`;
 
   switch (stage) {
-    // ── Email 1: "Welcome + shirt shipping + portal" (Day ~3) ───────────
+    // ── Email 1: "Your shirt is on the way" (Day ~3) ────────────────────
     case 0:
       return {
         subject: childName
@@ -371,26 +371,16 @@ function shirtSponsorEmail(
           : "Your shirt is being made, and something else happened too.",
         html: wrapEmail(`
           <p style="margin-top: 0;">Hey ${firstName},</p>
-          <p>I wanted to reach out personally because what you did is a big deal. You bought a shirt and you became a monthly sponsor in the same breath. That doesn&rsquo;t happen every day, and I don&rsquo;t take it lightly.</p>
-          <p>First, your shirt: I&rsquo;m making it by hand right now. I heat-press every single one myself. It&rsquo;ll ship within a few days, and when it arrives, the number on it will connect you to a real child at our campus in Northern Uganda.</p>
-          <p>Second, your sponsorship: your $25/month covers breakfast and lunch every day, school fees, and access to the medical clinic on campus for ${childName || 'a specific child'}. For some of these kids, those two meals are all they eat. That&rsquo;s not a slogan. That&rsquo;s what your money does.</p>
-          <p>I set up a sponsor portal where you can see updates, photos, and letters as they come in from the campus. To log in, you&rsquo;ll need your email and your sponsor code:</p>
-          ${sponsorCode
-            ? `<div style="background: #FFF8F0; border: 1px solid #e8e0d4; padding: 16px 20px; margin: 16px 0; text-align: center;">
-                <p style="color: #999; font-size: 13px; margin: 0 0 4px 0;">Your sponsor code</p>
-                <p style="font-size: 22px; color: #0d0d0d; margin: 0; font-weight: bold; letter-spacing: 0.1em; font-family: monospace;">${sponsorCode}</p>
-              </div>`
-            : `<p style="color: #666; font-size: 14px;">(Your sponsor code was in your confirmation email. If you can&rsquo;t find it, reply to this email and I&rsquo;ll get it to you.)</p>`
-          }
-          <p style="text-align: center; margin: 24px 0;">
-            <a href="${portalUrl}" style="display: inline-block; background: #D4A843; color: #0d0d0d; font-weight: bold; text-decoration: none; padding: 14px 32px; font-size: 15px; letter-spacing: 0.05em;">LOG IN TO YOUR PORTAL</a>
-          </p>
-          <p>Thank you for going all in. It means more than you know.</p>
+          <p>I&rsquo;m heat-pressing your shirt right now. Every Be A Number shirt is made by hand &mdash; just me, an iron, and a lot of vinyl &mdash; and yours will ship within the next few days.</p>
+          <p>When it arrives, check the tag. There&rsquo;s a number on it, and that number belongs to a real child at our campus in Northern Uganda. That&rsquo;s your child. You&rsquo;ll come back to the site, enter the number, and meet them.</p>
+          <p>You also signed up for monthly sponsorship, which means your $25/month covers breakfast and lunch, school fees, and medical care for ${childName || 'your child'} starting right now. That&rsquo;s already happening.</p>
+          <p>Once you&rsquo;ve opened your shirt and met your child, I&rsquo;ll send you access to your sponsor portal &mdash; a spot where you can see updates, photos, and write to them directly. I want you to have that moment with the shirt first.</p>
+          <p>More soon.</p>
           <p>Kevin</p>
         `),
       };
 
-    // ── Email 2: "Did the shirt land?" + the reveal (Day ~8) ────────────
+    // ── Email 2: "Did the shirt land?" + code + reveal (Day ~8) ────────
     case 1:
       return {
         subject: childName
@@ -398,13 +388,23 @@ function shirtSponsorEmail(
           : "Quick question about your shirt.",
         html: wrapEmail(`
           <p style="margin-top: 0;">Hey ${firstName},</p>
-          <p>Just checking: did your shirt arrive yet? I always wonder once they leave my hands.</p>
+          <p>Just checking &mdash; did your shirt arrive yet?</p>
           ${childName
-            ? `<p>If it did, you&rsquo;ve seen the number. That number belongs to ${childName}. <a href="${childUrl}" style="color: #D4A843; font-weight: bold;">Here&rsquo;s their page.</a> I&rsquo;d love for you to take a look when you get a minute. That&rsquo;s the kid you&rsquo;re keeping in school.</p>`
+            ? `<p>If it did, you&rsquo;ve seen the number. That number belongs to <strong>${childName}</strong>. <a href="${childUrl}" style="color: #D4A843; font-weight: bold;">Here&rsquo;s their page.</a> Take a look when you get a minute &mdash; that&rsquo;s the kid you&rsquo;re keeping in school.</p>`
             : `<p>When it arrives, the number on it belongs to a real child at our campus. Check the tag, then visit <a href="${SITE_URL}/children" style="color: #D4A843; font-weight: bold;">beanumber.org/children</a> to meet them.</p>`
           }
-          <p>And because you&rsquo;re a monthly sponsor, this isn&rsquo;t a one-time connection. You&rsquo;ll get letters, photos, and updates from ${childName || 'your child'} over the coming months. The YDO team on the ground sends those to your <a href="${portalUrl}" style="color: #D4A843; font-weight: bold;">portal</a> and by email.</p>
-          <p>If you want to write back to ${childName || 'your child'}, reply to this email. I&rsquo;ll make sure it gets to them through the YDO team on the ground.</p>
+          <p>As promised, here&rsquo;s your sponsor portal access. This is where updates, photos, and letters from ${childName || 'your child'} will show up over the coming months:</p>
+          ${sponsorCode
+            ? `<div style="background: #FFF8F0; border: 1px solid #e8e0d4; padding: 16px 20px; margin: 16px 0; text-align: center;">
+                <p style="color: #999; font-size: 13px; margin: 0 0 4px 0;">Your sponsor code</p>
+                <p style="font-size: 22px; color: #0d0d0d; margin: 0; font-weight: bold; letter-spacing: 0.1em; font-family: monospace;">${sponsorCode}</p>
+              </div>`
+            : `<p style="color: #666; font-size: 14px;">(I wasn&rsquo;t able to pull your sponsor code automatically. Reply to this email and I&rsquo;ll get it to you right away.)</p>`
+          }
+          <p style="text-align: center; margin: 24px 0;">
+            <a href="${portalUrl}" style="display: inline-block; background: #D4A843; color: #0d0d0d; font-weight: bold; text-decoration: none; padding: 14px 32px; font-size: 15px; letter-spacing: 0.05em;">LOG IN TO YOUR PORTAL</a>
+          </p>
+          <p>You can also write to ${childName || 'your child'} from the portal or by replying to this email. I relay everything through the YDO team on the ground.</p>
           <p>Kevin</p>
         `),
       };
