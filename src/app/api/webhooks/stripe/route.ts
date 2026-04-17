@@ -1684,6 +1684,36 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
         console.error('[WH] admin notify failed:', String(err?.message || err).slice(0, 200));
       }
 
+      // Step 9: Enroll one-time donors into donor_convert drip.
+      // Monthly donors (isRecurring) skip this — they're already committed.
+      if (!isRecurring && donorId) {
+        try {
+          const dripStartDate = new Date();
+          dripStartDate.setUTCDate(dripStartDate.getUTCDate() + 5);
+          const dripNextSend = dripStartDate.toISOString().split('T')[0];
+
+          await airtableAPICall(() =>
+            fetch(
+              `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_DONORS_TABLE}/${donorId}`,
+              {
+                method: 'PATCH',
+                headers: getAirtableHeaders(),
+                body: JSON.stringify({
+                  fields: {
+                    DripPipeline: 'donor_convert',
+                    DripStage: 0,
+                    DripNextSend: dripNextSend,
+                  },
+                }),
+              }
+            )
+          );
+          console.log('[WH] Enrolled in donor_convert drip, next send:', dripNextSend);
+        } catch (err: any) {
+          console.error('[WH] donor_convert drip enrollment failed:', String(err?.message || err).slice(0, 200));
+        }
+      }
+
       return { donorId, donationId };
     }
   } catch (error: any) {
@@ -1917,8 +1947,6 @@ export async function POST(request: NextRequest) {
         // active shirt_nurture drip so they stop getting conversion emails.
         if (event.type === 'customer.subscription.created') {
           try {
-            const subEmail = subscription.metadata?.email
-              || (typeof subscription.customer === 'string' ? '' : '');
             // Look up donor by Stripe customer ID
             const custId = typeof subscription.customer === 'string'
               ? subscription.customer
@@ -1932,7 +1960,13 @@ export async function POST(request: NextRequest) {
               if (lookupRes.ok) {
                 const lookupData = await lookupRes.json();
                 const donorRecord = lookupData.records?.[0];
-                if (donorRecord?.fields?.DripPipeline) {
+                if (donorRecord) {
+                  // Replace any existing drip (shirt_nurture, donor_convert)
+                  // with the sponsor_onboard sequence.
+                  const dripStartDate = new Date();
+                  dripStartDate.setUTCDate(dripStartDate.getUTCDate() + 3);
+                  const dripNextSend = dripStartDate.toISOString().split('T')[0];
+
                   await fetch(
                     `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_DONORS_TABLE}/${donorRecord.id}`,
                     {
@@ -1940,19 +1974,20 @@ export async function POST(request: NextRequest) {
                       headers: getAirtableHeaders(),
                       body: JSON.stringify({
                         fields: {
-                          DripPipeline: null,
-                          DripStage: null,
-                          DripNextSend: null,
+                          DripPipeline: 'sponsor_onboard',
+                          DripStage: 0,
+                          DripNextSend: dripNextSend,
+                          // Keep existing DripChildName/DripShirtNumber if set
                         },
                       }),
                     }
                   );
-                  console.log('[WH] Cleared drip for converted subscriber:', donorRecord.id);
+                  console.log('[WH] Enrolled in sponsor_onboard drip:', donorRecord.id);
                 }
               }
             }
           } catch (err: any) {
-            console.error('[WH] Drip clear on conversion failed (non-fatal):', String(err?.message || err).slice(0, 200));
+            console.error('[WH] sponsor_onboard drip enrollment failed (non-fatal):', String(err?.message || err).slice(0, 200));
           }
         }
         break;
