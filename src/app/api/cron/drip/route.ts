@@ -146,68 +146,65 @@ function shirtNurtureEmail(
   const sponsorUrl = `${SITE_URL}/api/sponsor-checkout?number=${shirtNumber}`;
 
   switch (stage) {
-    // ── Email 2: "It's on its way" (Day ~6) ───────────────────────────────
+    // ── Email 1: "Shirt's coming" (Day ~6) ────────────────────────────────
     case 0:
       return {
-        subject: "Your shirt is on its way.",
+        subject: "Your shirt's almost there.",
         html: wrapEmail(`
           <p style="margin-top: 0;">Hey ${firstName},</p>
-          <p>I wanted to give you a heads up that your shirt should be arriving soon. I actually make these by hand, so yours was cut and pressed specifically for you.</p>
-          <p>When it shows up, flip the collar. There&rsquo;s a number stamped inside. That number belongs to a real child at our campus in Northern Uganda. Their name, their face, their story. Head over to <a href="${SITE_URL}" style="color: #D4A843; font-weight: bold;">beanumber.org</a> and enter it when you&rsquo;re ready.</p>
-          <p>I think that moment is going to stick with you.</p>
+          <p>Your shirt should be arriving soon. I make every one by hand, so yours was pressed specifically for you.</p>
+          <p>When it shows up, check the tag inside the collar. There&rsquo;s a number on it. That number belongs to a child at our campus in Northern Uganda. Head to <a href="${SITE_URL}" style="color: #D4A843; font-weight: bold;">beanumber.org</a>, enter it, and you&rsquo;ll meet them: their name, their face, their story.</p>
           <p>Talk soon,<br>Kevin</p>
         `),
       };
 
-    // ── Email 3: "Did it land?" (Day ~12) ─────────────────────────────────
+    // ── Email 2: "Did it land?" (Day ~12) ─────────────────────────────────
     case 1:
       return {
-        subject: "Quick question for you.",
+        subject: "Did your shirt make it?",
         html: wrapEmail(`
           <p style="margin-top: 0;">Hey ${firstName},</p>
-          <p>Did your shirt make it? I always get a little anxious until I know they&rsquo;ve landed safely.</p>
-          <p>If it&rsquo;s there, I hope you&rsquo;ve had a chance to check the number inside the collar. If not, no rush. But when you do, enter it here and you&rsquo;ll meet the child behind your number:</p>
+          <p>Checking in. Did it arrive?</p>
+          <p>If so, the number inside the collar is yours. Enter it here and you&rsquo;ll meet the child on the other side:</p>
           <p style="text-align: center; margin: 24px 0;">
             <a href="${SITE_URL}" style="display: inline-block; background: #D4A843; color: #0d0d0d; font-weight: bold; text-decoration: none; padding: 14px 32px; font-size: 15px; letter-spacing: 0.05em;">ENTER YOUR NUMBER</a>
           </p>
-          <p>That&rsquo;s the part of this that I love the most. You bought a shirt, but there&rsquo;s a kid on the other side of it who&rsquo;s already enrolled at the campus because of you.</p>
+          <p>No rush. Whenever you&rsquo;re ready.</p>
           <p>Kevin</p>
         `),
       };
 
-    // ── Email 4: "Here's what happened" + ask (Day ~20) ──────────────────
+    // ── Email 3: "Here's what your shirt did" + ask (Day ~20) ────────────
     case 2:
       return {
         subject: childName
-          ? `I wanted to tell you about ${childName}.`
-          : "Something I wanted you to see.",
+          ? `Something about ${childName}.`
+          : "Something about the kid behind your shirt.",
         html: wrapEmail(`
           <p style="margin-top: 0;">Hey ${firstName},</p>
           ${childName
-            ? `<p>I wanted to circle back to you about ${childName}, the child connected to your shirt. If you haven&rsquo;t met them yet, <a href="${childUrl}" style="color: #D4A843; font-weight: bold;">take a look</a>. I think you&rsquo;ll be glad you did.</p>
-               <p>Here&rsquo;s what I can tell you: this past month, ${childName} had a seat in school every day. They ate breakfast and lunch every day. And they had a nurse on campus if they needed one. That&rsquo;s real, and it happened because people like you showed up.</p>`
-            : `<p>I wanted to tell you what your purchase actually did this past month. The child connected to your shirt had a seat in school every day, ate breakfast and lunch every day, and had a nurse on campus if they needed one. That&rsquo;s not a talking point. That&rsquo;s what happened.</p>`
+            ? `<p>The child connected to your shirt is ${childName}. If you haven&rsquo;t met them yet, <a href="${childUrl}" style="color: #D4A843; font-weight: bold;">here&rsquo;s their page</a>.</p>
+               <p>This past month, ${childName} went to school every day, ate breakfast and lunch at the campus, and had a nurse available if they needed one. That happened because of the people who fund their spot. Right now, that spot costs $25/month.</p>`
+            : `<p>The child connected to your shirt went to school every day this month, ate breakfast and lunch at the campus, and had a nurse available if they needed one. That&rsquo;s what it looks like when someone funds a child&rsquo;s spot. Right now, that spot costs $25/month.</p>`
           }
-          <p>Here&rsquo;s the thing I keep coming back to: $25 a month is what it costs to keep ${childName || 'a child'} in that seat. To keep the meals coming. To keep the clinic staffed. And for that $25, you don&rsquo;t get a generic thank-you. You get letters. Photos. Report cards. A real connection to ${childName ? `${childName} specifically` : 'a real kid who knows your name'}.</p>
-          <p>If that sounds like something you want to be part of, I&rsquo;d love to have you.</p>
+          <p>For that, you get a direct connection to ${childName || 'a specific child'}: letters, photos, report cards, and a place to write to them. One person, one kid.</p>
           <p style="text-align: center; margin: 24px 0;">
-            <a href="${sponsorUrl}" style="display: inline-block; background: #D4A843; color: #0d0d0d; font-weight: bold; text-decoration: none; padding: 14px 32px; font-size: 15px; letter-spacing: 0.05em;">SPONSOR ${childName ? childName.toUpperCase() : 'A CHILD'} FOR $25/MO</a>
+            <a href="${sponsorUrl}" style="display: inline-block; background: #D4A843; color: #0d0d0d; font-weight: bold; text-decoration: none; padding: 14px 32px; font-size: 15px; letter-spacing: 0.05em;">SPONSOR ${childName ? childName.toUpperCase() : 'A CHILD'} &mdash; $25/MO</a>
           </p>
-          <p>Either way, thank you for what you&rsquo;ve already done. It mattered.</p>
           <p>Kevin</p>
         `),
       };
 
-    // ── Email 5: "Last one from me" (Day ~30) ────────────────────────────
+    // ── Email 4: "Last one" (Day ~30) ────────────────────────────────────
     case 3:
       return {
-        subject: "One last thing.",
+        subject: "Last email from me on this.",
         html: wrapEmail(`
           <p style="margin-top: 0;">Hey ${firstName},</p>
-          <p>This is the last email I&rsquo;m going to send you about this, and I want to be straight with you about why I&rsquo;m sending it at all.</p>
-          <p>I started Be A Number because I met these kids and couldn&rsquo;t walk away. ${childName ? `${childName} is one of them.` : 'Every single one of them is real to me.'} The shirts are how most people find us, but sponsorship is how we actually keep the doors open. $25 a month keeps a child in school, fed, and cared for. And the sponsor gets to be part of that child&rsquo;s life in a way that I think is pretty rare.</p>
-          <p>If that&rsquo;s something you want to do, <a href="${sponsorUrl}" style="color: #D4A843; font-weight: bold;">sponsor ${childName || 'a child'} for $25/mo</a>. If not, I genuinely appreciate you buying the shirt. Wear it well. It starts conversations, and those conversations have changed kids&rsquo; lives before.</p>
-          <p>Thank you for being part of this, ${firstName}.</p>
+          <p>Last one, I promise.</p>
+          <p>The shirts are how people find us. Sponsorship is how we keep the campus running. $25/month covers school fees, two meals a day, and medical care for one child. For some of these kids, those two meals are the only ones they get. The sponsor gets letters, photos, and a real connection to that kid by name.</p>
+          <p>If you want in: <a href="${sponsorUrl}" style="color: #D4A843; font-weight: bold;">sponsor ${childName || 'a child'} for $25/mo</a>.</p>
+          <p>If not, thank you for the shirt. Wear it. It starts conversations, and those conversations find us new sponsors.</p>
           <p>Kevin</p>
         `),
       };
@@ -229,20 +226,20 @@ function sponsorOnboardEmail(
   const portalUrl = `${SITE_URL}/sponsor/login`;
 
   switch (stage) {
-    // ── Email 1: "Here's your portal" (Day ~3) ──────────────────────────
+    // ── Email 1: "Your portal is ready" (Day ~3) ─────────────────────────
     case 0:
       return {
         subject: childName
-          ? `${childName} is waiting for you.`
-          : "Welcome to the family.",
+          ? `${childName}'s page is live.`
+          : "Your sponsor portal is ready.",
         html: wrapEmail(`
           <p style="margin-top: 0;">Hey ${firstName},</p>
-          <p>I&rsquo;m so glad you&rsquo;re here. I mean that. Every new sponsor changes what&rsquo;s possible for us, and it changes everything for one specific kid.</p>
+          <p>Your sponsorship is active. Here&rsquo;s what that means right now.</p>
           ${childName
-            ? `<p>${childName} is the child your sponsorship supports. <a href="${childUrl}" style="color: #D4A843; font-weight: bold;">Here&rsquo;s their page.</a> Your $25/month covers their school fees, breakfast and lunch every day, and access to the medical clinic on campus. For some of these kids, those two meals are all they eat. That&rsquo;s not a summary. That&rsquo;s literally where the money goes.</p>`
-            : `<p>Your $25/month covers school fees, breakfast and lunch every day, and access to the on-site medical clinic for a specific child at our campus. For some of these kids, those two meals are all they eat. That&rsquo;s not a summary. That&rsquo;s literally where the money goes.</p>`
+            ? `<p>$25/month covers school fees, two meals a day, and medical care for ${childName} at the YDO campus in Northern Uganda. <a href="${childUrl}" style="color: #D4A843; font-weight: bold;">Here&rsquo;s their page.</a> For some of the kids on campus, those two meals are the only ones they get. That&rsquo;s where your money goes.</p>`
+            : `<p>$25/month covers school fees, two meals a day, and medical care for a specific child at the YDO campus in Northern Uganda. For some of the kids on campus, those two meals are the only ones they get. That&rsquo;s where your money goes.</p>`
           }
-          <p>I set up a sponsor portal where you can see updates, photos, and letters as they come in from the campus. To log in, you&rsquo;ll need your email and your sponsor code:</p>
+          <p>I built a sponsor portal where you can see updates, photos, and letters as they come in. To log in, you need your email and your sponsor code:</p>
           ${sponsorCode
             ? `<div style="background: #FFF8F0; border: 1px solid #e8e0d4; padding: 16px 20px; margin: 16px 0; text-align: center;">
                 <p style="color: #999; font-size: 13px; margin: 0 0 4px 0;">Your sponsor code</p>
@@ -253,12 +250,12 @@ function sponsorOnboardEmail(
           <p style="text-align: center; margin: 24px 0;">
             <a href="${portalUrl}" style="display: inline-block; background: #D4A843; color: #0d0d0d; font-weight: bold; text-decoration: none; padding: 14px 32px; font-size: 15px; letter-spacing: 0.05em;">LOG IN TO YOUR PORTAL</a>
           </p>
-          <p>If you ever have questions, or if you want to send a note to ${childName || 'your child'}, reply to this email. I&rsquo;ll make sure it gets to them through the YDO team on the ground.</p>
+          <p>You can write to ${childName || 'your child'} from the portal or by replying to this email. The YDO team on the ground delivers everything and translates when needed.</p>
           <p>Kevin</p>
         `),
       };
 
-    // ── Email 2: "Your first update is coming" (Day ~10) ────────────────
+    // ── Email 2: "Updates are coming" (Day ~10) ──────────────────────────
     case 1:
       return {
         subject: childName
@@ -266,24 +263,24 @@ function sponsorOnboardEmail(
           : "Your first update is almost here.",
         html: wrapEmail(`
           <p style="margin-top: 0;">Hey ${firstName},</p>
-          <p>I wanted to let you know what to expect over the next few weeks. The YDO team on the ground in Uganda sends sponsor updates from the campus. ${childName ? `You&rsquo;ll hear about ${childName} specifically` : 'You&rsquo;ll hear about your child specifically'}: what subjects they&rsquo;re studying, how they&rsquo;re doing in class, sometimes a photo or a handwritten letter.</p>
-          <p>These show up in your portal and by email. The first one usually lands within your first month, and I always love hearing from sponsors when they get theirs. It makes the whole thing feel different when you&rsquo;re reading words from an actual kid who knows your name.</p>
-          <p>And if you want to write back? You can. The YDO team reads every note sponsors send and translates when needed. ${childName ? `${childName} will` : 'Your child will'} actually receive it.</p>
+          <p>The YDO team on the ground sends sponsor updates from the campus. ${childName ? `You&rsquo;ll hear about ${childName} specifically` : 'You&rsquo;ll hear about your child specifically'}: what subjects they&rsquo;re studying, how they&rsquo;re doing, sometimes a photo or a handwritten letter.</p>
+          <p>These show up in your portal and by email. The first one usually lands within your first month.</p>
+          <p>If you want to write first, you can. Reply to this email or use the portal. The YDO team reads every note and translates when needed. ${childName ? `${childName} will` : 'Your child will'} actually receive it.</p>
           <p>Kevin</p>
         `),
       };
 
-    // ── Email 3: "You've been here a month" (Day ~21) ───────────────────
+    // ── Email 3: "One month in" (Day ~21) ─────────────────────────────────
     case 2:
       return {
-        subject: "Thank you for staying.",
+        subject: "One month in.",
         html: wrapEmail(`
           <p style="margin-top: 0;">Hey ${firstName},</p>
-          <p>You&rsquo;ve been a sponsor for about a month now, and I wanted to take a second to say something I don&rsquo;t say enough: thank you for not leaving.</p>
-          <p>That might sound weird, but the truth is, a lot of people sign up for things and quietly cancel. You didn&rsquo;t. And because you didn&rsquo;t, ${childName ? `${childName} went` : 'your child went'} to school every day this month, ate breakfast and lunch every day, and had a nurse on campus every day. For some of these kids, those are the only meals they get. That&rsquo;s not a pitch. That is literally what your $25 did.</p>
-          <p>One thing that really helps us: if you know one person who&rsquo;d get what we do, send them a text. Not a social media blast. One friend. &ldquo;Hey, I sponsor a kid in Uganda through this org called Be A Number. Check it out.&rdquo; That&rsquo;s how most of our sponsors find us.</p>
-          <p>And if you haven&rsquo;t checked your <a href="${portalUrl}" style="color: #D4A843; font-weight: bold;">sponsor portal</a> lately, updates show up there first.</p>
-          <p>Grateful for you,<br>Kevin</p>
+          <p>You&rsquo;ve been here about a month. Here&rsquo;s what your $25 did: ${childName ? `${childName} went` : 'your child went'} to school every day, ate breakfast and lunch at the campus, and had a nurse available if they needed one.</p>
+          <p>That&rsquo;ll happen again next month because you&rsquo;re still here.</p>
+          <p>One thing that helps us more than anything: tell one person. Not a social post. One friend, one text. &ldquo;I sponsor a kid in Uganda through Be A Number. Check it out.&rdquo; That&rsquo;s how most of our sponsors find us.</p>
+          <p>Your <a href="${portalUrl}" style="color: #D4A843; font-weight: bold;">portal</a> has the latest updates.</p>
+          <p>Kevin</p>
         `),
       };
 
@@ -302,46 +299,43 @@ function donorConvertEmail(
   const sponsorUrl = `${SITE_URL}/sponsorship`;
 
   switch (stage) {
-    // ── Email 1: "Here's what your donation did" (Day ~5) ───────────────
+    // ── Email 1: "Where your donation went" (Day ~5) ─────────────────────
     case 0:
       return {
         subject: "Wanted you to know where this went.",
         html: wrapEmail(`
           <p style="margin-top: 0;">Hey ${firstName},</p>
-          <p>I know you probably get a lot of donation receipts and never hear anything again. I didn&rsquo;t want to do that to you.</p>
-          <p>Your donation went to the YDO campus in Northern Uganda, where we fund school fees, breakfast and lunch, and medical care for specific children. For some of these kids, those two meals are all they eat in a day. Not a general fund. Not overhead. Real kids, real meals, real school days.</p>
-          <p>We&rsquo;re small on purpose. One campus, one team on the ground, and a model where every dollar goes through the same door. I run this myself, and I take it personally when someone trusts us with their money.</p>
-          <p>So thank you. I wanted you to know it landed somewhere real.</p>
+          <p>Your donation went to the YDO campus in Northern Uganda. One campus, one team on the ground. It funds school fees, two meals a day, and medical care for specific children by name.</p>
+          <p>We&rsquo;re small on purpose. Every dollar goes through the same door, and I know exactly where yours went.</p>
+          <p>Thank you for trusting us with it.</p>
           <p>Kevin</p>
         `),
       };
 
-    // ── Email 2: "Meet the kids" (Day ~14) ──────────────────────────────
+    // ── Email 2: "The kids behind the numbers" (Day ~14) ──────────────────
     case 1:
       return {
-        subject: "Can I show you something?",
+        subject: "The kids behind the numbers.",
         html: wrapEmail(`
           <p style="margin-top: 0;">Hey ${firstName},</p>
-          <p>I&rsquo;ve been thinking about something, and I wanted to share it with you because you already showed up for these kids once.</p>
-          <p>At our campus, every child has a number. That number connects them to a specific sponsor. One person, one child. The sponsor pays $25 a month, and that covers school, meals, and medical care. In return, the sponsor gets letters, photos, and report cards. The child knows their sponsor&rsquo;s name. It&rsquo;s not abstract. It&rsquo;s a real relationship between two real people.</p>
-          <p>I built Be A Number around that idea because I think most of us want to help but don&rsquo;t trust where the money goes. This way, you know exactly where it goes. You can see it.</p>
+          <p>Every child at our campus has a number. That number connects them to one sponsor. $25/month covers school, two meals a day, and medical care. The sponsor gets letters, photos, and report cards. The child knows their sponsor&rsquo;s name.</p>
+          <p>That&rsquo;s the whole model. One person, one kid, and you can see exactly where the money goes.</p>
           <p style="text-align: center; margin: 24px 0;">
             <a href="${sponsorUrl}" style="display: inline-block; background: #D4A843; color: #0d0d0d; font-weight: bold; text-decoration: none; padding: 14px 32px; font-size: 15px; letter-spacing: 0.05em;">MEET THE KIDS</a>
           </p>
-          <p>No pressure at all. I&rsquo;m grateful for what you already gave.</p>
           <p>Kevin</p>
         `),
       };
 
-    // ── Email 3: "Last one from me" (Day ~25) ───────────────────────────
+    // ── Email 3: "Last one" (Day ~25) ─────────────────────────────────────
     case 2:
       return {
-        subject: "Last thing, then I'll leave you alone.",
+        subject: "Last email from me on this.",
         html: wrapEmail(`
           <p style="margin-top: 0;">Hey ${firstName},</p>
-          <p>I promise this is the last time I&rsquo;m going to email you about this. I don&rsquo;t want to be that guy.</p>
-          <p>But I do want to say one more time: what you gave mattered. It fed kids. It kept them in school. And if you ever feel pulled to go deeper, whether that&rsquo;s sponsoring a child for $25 a month or grabbing a shirt that connects you to one by number, <a href="${SITE_URL}" style="color: #D4A843; font-weight: bold;">we&rsquo;re here</a>.</p>
-          <p>Either way, you&rsquo;re part of this story now, and I&rsquo;m thankful for that.</p>
+          <p>Last one.</p>
+          <p>What you gave fed kids and kept them in school. If you ever want to go deeper &mdash; sponsor a child for $25/month, or grab a shirt that connects you to one by number &mdash; <a href="${SITE_URL}" style="color: #D4A843; font-weight: bold;">we&rsquo;re here</a>.</p>
+          <p>Either way, thank you.</p>
           <p>God bless,<br>Kevin</p>
         `),
       };
@@ -415,25 +409,23 @@ function shirtSponsorEmail(
         subject: "Here's what your first month did.",
         html: wrapEmail(`
           <p style="margin-top: 0;">Hey ${firstName},</p>
-          <p>You&rsquo;ve been a sponsor for about two weeks now, and I wanted to give you a picture of what that actually looks like on the ground.</p>
-          <p>This month, ${childName ? `${childName} had` : 'your child had'} a seat in school every day. They ate breakfast and lunch every day. They had a nurse on campus if they needed one. For some of these kids, those two meals are all they eat in a day. Your $25 made that real.</p>
-          <p>Over the next few weeks, expect your first update from the campus. The YDO team sends photos, report cards, and sometimes handwritten letters from the kids. They show up in your <a href="${portalUrl}" style="color: #D4A843; font-weight: bold;">sponsor portal</a> and by email.</p>
-          <p>I know two weeks isn&rsquo;t long, but I want you to know: ${childName || 'your child'} already knows they have a sponsor. That matters to them more than I can explain in an email.</p>
+          <p>Two weeks in. Here&rsquo;s what happened on the ground.</p>
+          <p>${childName ? `${childName} had` : 'Your child had'} a seat in school every day. Ate breakfast and lunch every day. Had a nurse on campus if they needed one. That&rsquo;s your $25 at work.</p>
+          <p>Your first update from the campus is coming soon &mdash; photos, report cards, sometimes a handwritten letter. They show up in your <a href="${portalUrl}" style="color: #D4A843; font-weight: bold;">portal</a> and by email.</p>
           <p>Kevin</p>
         `),
       };
 
-    // ── Email 4: "Thank you for staying" (Day ~25) ──────────────────────
+    // ── Email 4: "One month check-in" (Day ~25) ──────────────────────────
     case 3:
       return {
-        subject: "Thank you for staying.",
+        subject: "Quick check-in.",
         html: wrapEmail(`
           <p style="margin-top: 0;">Hey ${firstName},</p>
-          <p>A lot of people sign up for things and quietly cancel. You didn&rsquo;t. I notice that, and so does ${childName || 'the child you sponsor'}.</p>
-          <p>Your shirt started this, and your monthly sponsorship is what keeps it going. I don&rsquo;t think most people realize how rare that is. You went from buying a shirt to funding a child&rsquo;s education, meals, and medical care in one decision. That&rsquo;s not normal. That&rsquo;s extraordinary.</p>
-          <p>One thing that really helps us: if you know one person who&rsquo;d get what we do, send them a text. Not a social media blast. One friend. "Hey, I sponsor a kid in Uganda through this org called Be A Number. Check it out." That&rsquo;s how most of our sponsors find us.</p>
-          <p>And if you haven&rsquo;t checked your <a href="${portalUrl}" style="color: #D4A843; font-weight: bold;">portal</a> lately, updates show up there first.</p>
-          <p>Grateful for you,<br>Kevin</p>
+          <p>You bought a shirt and signed up to sponsor ${childName || 'a child'} in the same decision. That covers school fees, two meals a day, and medical care &mdash; and it&rsquo;s already been running for a month.</p>
+          <p>One thing that helps us: tell one friend. One text. &ldquo;I sponsor a kid in Uganda through Be A Number.&rdquo; That&rsquo;s how most of our sponsors find us.</p>
+          <p>If you haven&rsquo;t checked your <a href="${portalUrl}" style="color: #D4A843; font-weight: bold;">portal</a> lately, updates show up there first.</p>
+          <p>Kevin</p>
         `),
       };
 
@@ -451,44 +443,42 @@ function monthlyDonorEmail(
   const { firstName } = donor;
 
   switch (stage) {
-    // ── Email 1: "Thank you for going monthly" (Day ~3) ─────────────────
+    // ── Email 1: "Where your monthly gift goes" (Day ~3) ─────────────────
     case 0:
       return {
-        subject: "This is going to matter every single month.",
+        subject: "Here's where your monthly gift goes.",
         html: wrapEmail(`
           <p style="margin-top: 0;">Hey ${firstName},</p>
-          <p>I wanted to reach out because what you did is different from a one-time gift. You committed to showing up every month, and I don&rsquo;t take that lightly.</p>
-          <p>Your monthly donation goes to the YDO campus in Northern Uganda. One campus, one team on the ground, 380 kids in school, 700+ patients through the clinic, and 60 women in vocational training. Every dollar that comes in goes through the same door, and I run this myself.</p>
-          <p>What your gift covers each month: breakfast and lunch for kids who might not eat otherwise, school fees that keep them in class, and a medical clinic that serves the whole community. For some of these kids, those two meals are all they eat in a day.</p>
-          <p>I&rsquo;ll keep you posted on what&rsquo;s happening on the ground so you can see where this goes. Thank you for trusting us with this.</p>
+          <p>Your monthly donation goes to the YDO campus in Northern Uganda. One campus, one team on the ground: 380 kids in school, 700+ patients through the clinic, 60 women in vocational training.</p>
+          <p>Each month, your gift covers meals for kids who might not eat otherwise, school fees that keep them in class, and a medical clinic that serves the whole community.</p>
+          <p>I&rsquo;ll keep you posted on what&rsquo;s happening on the ground.</p>
           <p>Kevin</p>
         `),
       };
 
-    // ── Email 2: "Inside the campus" (Day ~12) ─────────────────────────
+    // ── Email 2: "How it works" (Day ~12) ─────────────────────────────────
     case 1:
       return {
-        subject: "Wanted to show you something from the campus.",
+        subject: "How it works on the ground.",
         html: wrapEmail(`
           <p style="margin-top: 0;">Hey ${firstName},</p>
-          <p>I&rsquo;ve been thinking about what to share with you, and I keep coming back to the same thing: I want you to see who your money is reaching.</p>
-          <p>At the YDO campus, every child has a number. That number is printed on a shirt, and when someone buys that shirt or sponsors that child, the two of them get connected. The sponsor gets letters, photos, and report cards. The child knows their sponsor by name. It&rsquo;s not a big faceless program. It&rsquo;s one person and one kid.</p>
-          <p>Your monthly gift keeps the whole system running. The meals, the teachers, the clinic, the campus itself. Without monthly donors, none of the one-to-one stuff works.</p>
-          <p>If you want to see the kids your gift supports, <a href="${SITE_URL}/children" style="color: #D4A843; font-weight: bold;">here they are</a>. Real names, real faces, real stories.</p>
+          <p>Every child at the campus has a number. That number goes on a shirt, and when someone buys that shirt or sponsors that child, they&rsquo;re connected one-to-one. The sponsor gets letters, photos, and report cards. The child knows their sponsor by name.</p>
+          <p>Your monthly gift is what keeps the whole campus running &mdash; the meals, the teachers, the clinic. Without monthly donors, none of the one-to-one connections work.</p>
+          <p>If you want to see the kids: <a href="${SITE_URL}/children" style="color: #D4A843; font-weight: bold;">here they are</a>. Real names, real faces.</p>
           <p>Kevin</p>
         `),
       };
 
-    // ── Email 3: "Something I want to show you" (Day ~22) ──────────────
+    // ── Email 3: "Last one — sponsorship intro" (Day ~22) ─────────────────
     case 2:
       return {
-        subject: "One more thing, then I'll let your donation do the talking.",
+        subject: "Last one from me.",
         html: wrapEmail(`
           <p style="margin-top: 0;">Hey ${firstName},</p>
-          <p>This is the last email in this series, and I want to be upfront about why I&rsquo;m sending it.</p>
-          <p>Your monthly donation already makes a real difference. But there&rsquo;s something we offer that takes it further, and I&rsquo;d feel wrong not mentioning it.</p>
-          <p>For $25 a month, you can sponsor a specific child. You&rsquo;d be connected to them by name and number. You&rsquo;d get letters, photos, and report cards from the campus. They&rsquo;d know who you are. It&rsquo;s the most personal version of what we do, and sponsors tell me all the time it&rsquo;s not like anything else they&rsquo;ve experienced.</p>
-          <p>If that sounds like something you&rsquo;d want, <a href="${SITE_URL}/sponsorship" style="color: #D4A843; font-weight: bold;">you can meet the kids here</a>. If not, your monthly gift is already doing more than you know, and I&rsquo;m grateful for it.</p>
+          <p>Last email in this series. I want to mention one thing before I go.</p>
+          <p>For $25/month, you can sponsor a specific child. Connected by name and number. You get letters, photos, and report cards from the campus. They know who you are.</p>
+          <p>If that sounds right: <a href="${SITE_URL}/sponsorship" style="color: #D4A843; font-weight: bold;">meet the kids here</a>.</p>
+          <p>If not, your monthly gift keeps the campus running, and that matters.</p>
           <p>God bless,<br>Kevin</p>
         `),
       };
