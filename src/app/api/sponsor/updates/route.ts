@@ -4,7 +4,9 @@ import { cookies } from 'next/headers';
 const AIRTABLE_API_KEY = process.env.AIRTABLE_API_KEY;
 const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID;
 const AIRTABLE_SPONSORSHIPS_TABLE = process.env.AIRTABLE_SPONSORSHIPS_TABLE || 'Sponsorships';
-const AIRTABLE_UPDATES_TABLE = process.env.AIRTABLE_UPDATES_TABLE || 'Child Updates';
+// Use table ID directly — the env var AIRTABLE_UPDATES_TABLE was set to 'Updates'
+// but the table was renamed to 'Child Updates'. IDs never change.
+const AIRTABLE_UPDATES_TABLE = 'tblrmtVBVzL7zCQDE';
 const AIRTABLE_CHILDREN_TABLE = process.env.AIRTABLE_CHILDREN_TABLE || 'Children';
 
 const headers = () => ({

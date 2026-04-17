@@ -3,7 +3,8 @@ import { NextRequest, NextResponse } from 'next/server';
 const AIRTABLE_API_KEY = process.env.AIRTABLE_API_KEY;
 const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID;
 const AIRTABLE_SPONSORSHIPS_TABLE = process.env.AIRTABLE_SPONSORSHIPS_TABLE || 'Sponsorships';
-const AIRTABLE_UPDATES_TABLE = process.env.AIRTABLE_UPDATES_TABLE || 'Child Updates';
+// Use table ID directly — env var was stale.
+const AIRTABLE_UPDATES_TABLE = 'tblrmtVBVzL7zCQDE';
 
 export async function POST(request: NextRequest) {
   try {
