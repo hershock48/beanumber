@@ -100,6 +100,7 @@ export async function POST(request: NextRequest) {
             'RequestedBySponsor': true,
             'RequestedAt': now,
           },
+          typecast: true,
         }),
       }
     );
