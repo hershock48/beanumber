@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 
@@ -130,6 +130,64 @@ function isBirthdaySoon(birthday: string | undefined): { upcoming: boolean; days
   const dateLabel = nextOccurrence.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
 
   return { upcoming, daysAway, dateLabel };
+}
+
+// ---------------------------------------------------------------------------
+// Animated counter — counts up from 0 when the element scrolls into view
+// ---------------------------------------------------------------------------
+
+function useCountUp(end: number, duration = 1800) {
+  const [count, setCount] = useState(0);
+  const ref = useRef<HTMLDivElement>(null);
+  const started = useRef(false);
+
+  useEffect(() => {
+    const node = ref.current;
+    if (!node) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting && !started.current) {
+          started.current = true;
+          const start = performance.now();
+          const step = (now: number) => {
+            const elapsed = now - start;
+            const progress = Math.min(elapsed / duration, 1);
+            // ease-out quad
+            const eased = 1 - (1 - progress) * (1 - progress);
+            setCount(Math.round(eased * end));
+            if (progress < 1) requestAnimationFrame(step);
+          };
+          requestAnimationFrame(step);
+        }
+      },
+      { threshold: 0.3 }
+    );
+
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [end, duration]);
+
+  return { ref, count };
+}
+
+function ImpactStat({ end, prefix, sublabel, detail }: {
+  end: number;
+  prefix?: string;
+  sublabel: string;
+  detail?: string;
+}) {
+  const { ref, count } = useCountUp(end);
+  return (
+    <div ref={ref}>
+      <p className="text-2xl md:text-3xl text-[#0d0d0d] font-semibold tabular-nums"
+        style={{ fontFamily: 'var(--font-lora), serif' }}>
+        {prefix || ''}{count.toLocaleString()}
+      </p>
+      <p className="text-sm text-[#888] mt-1">{sublabel}</p>
+      {detail && <p className="text-xs text-[#bbb] mt-0.5">{detail}</p>}
+    </div>
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -667,38 +725,25 @@ export function SponsorDashboard({ sponsorCode, email }: SponsorDashboardProps) 
             return (
               <>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
-                  <div>
-                    <p className="text-2xl md:text-3xl text-[#0d0d0d] font-semibold"
-                      style={{ fontFamily: 'var(--font-lora), serif' }}>
-                      {days.toLocaleString()}
-                    </p>
-                    <p className="text-sm text-[#888] mt-1">
-                      {days === 1 ? 'day' : 'days'} sponsoring {firstName}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-2xl md:text-3xl text-[#0d0d0d] font-semibold"
-                      style={{ fontFamily: 'var(--font-lora), serif' }}>
-                      ${contributed.toLocaleString()}
-                    </p>
-                    <p className="text-sm text-[#888] mt-1">contributed</p>
-                  </div>
-                  <div>
-                    <p className="text-2xl md:text-3xl text-[#0d0d0d] font-semibold"
-                      style={{ fontFamily: 'var(--font-lora), serif' }}>
-                      {meals.toLocaleString()}
-                    </p>
-                    <p className="text-sm text-[#888] mt-1">meals covered</p>
-                    <p className="text-xs text-[#bbb] mt-0.5">breakfast + lunch, every school day</p>
-                  </div>
-                  <div>
-                    <p className="text-2xl md:text-3xl text-[#0d0d0d] font-semibold"
-                      style={{ fontFamily: 'var(--font-lora), serif' }}>
-                      {schoolDays.toLocaleString()}
-                    </p>
-                    <p className="text-sm text-[#888] mt-1">school days covered</p>
-                    <p className="text-xs text-[#bbb] mt-0.5">fees, medical care, mentorship</p>
-                  </div>
+                  <ImpactStat
+                    end={days}
+                    sublabel={`${days === 1 ? 'day' : 'days'} sponsoring ${firstName}`}
+                  />
+                  <ImpactStat
+                    end={contributed}
+                    prefix="$"
+                    sublabel="contributed"
+                  />
+                  <ImpactStat
+                    end={meals}
+                    sublabel="meals covered"
+                    detail="breakfast + lunch, every school day"
+                  />
+                  <ImpactStat
+                    end={schoolDays}
+                    sublabel="school days covered"
+                    detail="fees, medical care, mentorship"
+                  />
                 </div>
                 <p className="text-xs text-[#aaa] mt-5">
                   ${sponsorship.monthlyAmount}/mo covers breakfast and lunch at the campus, school fees, basic medical care, and mentorship through the YDO team.

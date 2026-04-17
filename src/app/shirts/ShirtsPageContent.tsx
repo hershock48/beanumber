@@ -414,7 +414,7 @@ const SHIRTS_SOURCE: Shirt[] = [
     name: 'Peacemaker.',
     tagline: 'Blessed are those who show up',
     price: 25,
-    description: '"Blessed are the peacemakers. But woe to those who manipulate religion and the very name of God for their own military, economic and political gain." That\'s Pope Leo XIV, standing in Cameroon while the President of the United States called him weak and terrible for opposing war. He didn\'t flinch. He said "I have no fear." This shirt is for the person who heard that and meant it.',
+    description: '"Blessed are the peacemakers. But woe to those who manipulate religion and the very name of God for their own military, economic and political gain." That\'s Pope Leo XIV, speaking in Cameroon on his first trip as pope. When the world pushed back, he didn\'t flinch. He said "I have no fear." This shirt is for the person who heard that and meant it.',
     Front: SharedFront,
     Back: PeacemakerBack,
     badge: 'Conviction',
@@ -919,7 +919,7 @@ export default function ShirtsPageContent() {
               },
               {
                 q: 'What makes this different from other nonprofits that sell shirts?',
-                a: 'Most charity merch funds a general cause. This shirt is a direct, named connection to a specific child. And the organization behind it isn\'t a traditional top-down aid model; Be A Number is a community-systems organization. We built a six-acre campus in partnership with Acholi leadership on Acholi land: a nursery and primary school serving 380 students, a medical center, vocational training facilities, and a local workforce of 30 community members running the whole thing. Your shirt plugs you into that system.',
+                a: 'Most charity merch funds a general cause. This shirt is a direct, named connection to a specific child at our campus in Northern Uganda. When you buy it, you\'re not donating to a budget line. You\'re matched with a kid by name, and your $25/month keeps them in school, fed, and cared for. The campus itself is run by 30 community members on six acres of Acholi land: a nursery and primary school, a medical center, and vocational training facilities. Your shirt is how you enter that relationship.',
               },
               {
                 q: 'Where does the $25 actually go?',

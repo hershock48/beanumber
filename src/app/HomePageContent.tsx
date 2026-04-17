@@ -357,7 +357,7 @@ export function HomePageContent() {
           >
             &ldquo;You have not lived today until you have done something for someone who can never repay you.&rdquo;
           </blockquote>
-          <p className="text-xs text-[#999] uppercase tracking-[0.3em] mt-4">John Bosco</p>
+          <p className="text-xs text-[#999] uppercase tracking-[0.3em] mt-4">St. John Bosco, Italian priest &amp; educator</p>
         </div>
       </section>
 
