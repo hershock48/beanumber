@@ -45,6 +45,14 @@ export function SponsorDashboard({ sponsorCode, email }: SponsorDashboardProps) 
   const [nextRequestEligibleAt, setNextRequestEligibleAt] = useState<string | null>(null);
   const [canRequestUpdate, setCanRequestUpdate] = useState(false);
   const [revealing, setRevealing] = useState(false);
+  const [requestingUpdate, setRequestingUpdate] = useState(false);
+  const [requestSuccess, setRequestSuccess] = useState(false);
+
+  // Write-to-child form state
+  const [messageText, setMessageText] = useState('');
+  const [sendingMessage, setSendingMessage] = useState(false);
+  const [messageSent, setMessageSent] = useState(false);
+  const [messageError, setMessageError] = useState('');
 
   useEffect(() => {
     loadSponsorData();
@@ -77,7 +85,10 @@ export function SponsorDashboard({ sponsorCode, email }: SponsorDashboardProps) 
   }
 
   async function handleRequestUpdate() {
-    if (!canRequestUpdate) return;
+    if (!canRequestUpdate || requestingUpdate) return;
+
+    setRequestingUpdate(true);
+    setRequestSuccess(false);
 
     try {
       const response = await fetch('/api/sponsor/request-update', {
@@ -87,8 +98,7 @@ export function SponsorDashboard({ sponsorCode, email }: SponsorDashboardProps) 
       });
 
       if (response.ok) {
-        alert('Update request submitted! Our field team will prepare an update for you.');
-        // Reload data to get updated NextRequestEligibleAt
+        setRequestSuccess(true);
         await loadSponsorData();
       } else {
         const errorData = await response.json();
@@ -96,11 +106,41 @@ export function SponsorDashboard({ sponsorCode, email }: SponsorDashboardProps) 
       }
     } catch (error) {
       alert('Failed to submit request. Please try again.');
+    } finally {
+      setRequestingUpdate(false);
+    }
+  }
+
+  async function handleSendMessage() {
+    if (!messageText.trim() || sendingMessage) return;
+
+    setSendingMessage(true);
+    setMessageError('');
+    setMessageSent(false);
+
+    try {
+      const response = await fetch('/api/sponsor/send-message', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sponsorCode, email, message: messageText.trim() }),
+      });
+
+      if (response.ok) {
+        setMessageSent(true);
+        setMessageText('');
+      } else {
+        const errorData = await response.json();
+        setMessageError(errorData.error || 'Failed to send message. Please try again.');
+      }
+    } catch (error) {
+      setMessageError('Failed to send message. Please try again.');
+    } finally {
+      setSendingMessage(false);
     }
   }
 
   // Manual reveal — used when the sponsor has lost the shirt or just
-  // doesn't want to wait. Confirmed click, since it intentionally breaks
+  // doesn't want to wait. Confirmed inline, since it intentionally breaks
   // the surprise.
   async function handleRevealAnyway() {
     const ok = confirm(
@@ -121,8 +161,6 @@ export function SponsorDashboard({ sponsorCode, email }: SponsorDashboardProps) 
       if (res.ok && data?.revealed) {
         await loadSponsorData();
       } else if (data?.reason === 'airtable_patch_failed') {
-        // Field doesn't exist yet on the Airtable side. Tell the sponsor
-        // the portal hasn't finished setup and to try again later.
         alert(
           "Your portal is still being set up on our end. Please try again in a bit, or email kevin@beanumber.org and we'll unlock it for you."
         );
@@ -136,30 +174,30 @@ export function SponsorDashboard({ sponsorCode, email }: SponsorDashboardProps) 
     }
   }
 
+  // -------------------------------------------------------------------
+  // LOADING STATE
+  // -------------------------------------------------------------------
   if (isLoading) {
     return (
       <div className="max-w-4xl mx-auto px-6 py-16">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading...</p>
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-[#D4A843] mx-auto"></div>
+          <p className="mt-4 text-[#888]">Loading your portal...</p>
         </div>
       </div>
     );
   }
 
-  // ---------------------------------------------------------------
+  // -------------------------------------------------------------------
   // LOCKBOX VIEW — no child details until the reveal has happened.
-  // The sponsor sees a confirmation that the sponsorship is active,
-  // a clear explanation of why the portal is waiting, and a small
-  // "reveal anyway" escape hatch for when the shirt is lost.
-  // ---------------------------------------------------------------
+  // -------------------------------------------------------------------
   if (!childRevealed) {
     return (
-      <div className="max-w-2xl mx-auto px-6 py-16">
-        <div className="bg-white rounded-lg shadow-lg p-10 text-center">
-          <div className="w-14 h-14 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
+      <div className="max-w-2xl mx-auto px-4 py-12 md:py-20">
+        <div className="bg-white border border-[#e8e0d4] p-8 md:p-10 text-center">
+          <div className="w-14 h-14 bg-[#FFF8F0] border border-[#e8e0d4] rounded-full flex items-center justify-center mx-auto mb-6">
             <svg
-              className="w-7 h-7 text-gray-500"
+              className="w-7 h-7 text-[#D4A843]"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -168,58 +206,61 @@ export function SponsorDashboard({ sponsorCode, email }: SponsorDashboardProps) 
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 strokeWidth={1.8}
-                d="M12 11c.828 0 1.5-.672 1.5-1.5S12.828 8 12 8s-1.5.672-1.5 1.5S11.172 11 12 11zM20 12a8 8 0 11-16 0 8 8 0 0116 0z"
-              />
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={1.8}
-                d="M12 11v4"
+                d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
               />
             </svg>
           </div>
 
-          <p className="text-xs font-bold uppercase tracking-[0.2em] text-gray-500 mb-3">
+          <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-3">
             Your sponsorship is active
           </p>
 
-          <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-4">
+          <h1
+            className="text-2xl md:text-3xl text-[#0d0d0d] mb-4"
+            style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
+          >
             Your child is waiting for you to open the package.
           </h1>
 
-          <p className="text-gray-600 leading-relaxed mb-6 max-w-md mx-auto">
+          <p className="text-[#666] leading-relaxed mb-6 max-w-md mx-auto">
             Be A Number works like this: when your shirt arrives, look at the
             tag. There&rsquo;s a number on it. That number belongs to a real
-            child in Northern Uganda. Go to <Link href="/" className="text-gray-900 font-medium underline underline-offset-2">beanumber.org</Link>, enter your number, and meet them.
+            child in Northern Uganda. Go to{' '}
+            <Link href="/" className="text-[#D4A843] font-medium hover:underline">
+              beanumber.org
+            </Link>
+            , enter your number, and meet them.
           </p>
 
-          <p className="text-gray-600 leading-relaxed mb-8 max-w-md mx-auto">
+          <p className="text-[#666] leading-relaxed mb-8 max-w-md mx-auto">
             Once you&rsquo;ve met them, this portal will unlock with their
             full profile, updates from our team on the campus, and a place
             to write back.
           </p>
 
-          <div className="bg-gray-50 border border-gray-200 rounded-md p-4 mb-8 text-sm text-gray-600">
+          <div className="bg-[#FFF8F0] border border-[#e8e0d4] p-4 mb-8 text-sm text-[#666] inline-block">
             <p className="mb-1">
-              <strong className="text-gray-800">Your sponsor code:</strong>{' '}
-              <span className="font-mono">{sponsorCode}</span>
+              <strong className="text-[#0d0d0d]">Your sponsor code:</strong>{' '}
+              <span className="font-mono tracking-wider">{sponsorCode}</span>
             </p>
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-[#aaa]">
               Keep this somewhere safe. You&rsquo;ll use it to log back in.
             </p>
           </div>
 
-          <button
-            onClick={handleRevealAnyway}
-            disabled={revealing}
-            className="text-sm text-gray-500 hover:text-gray-900 underline underline-offset-4 disabled:opacity-50"
-          >
-            {revealing ? 'Unlocking…' : "Can't wait? Reveal anyway."}
-          </button>
+          <div className="mb-8">
+            <button
+              onClick={handleRevealAnyway}
+              disabled={revealing}
+              className="text-sm text-[#aaa] hover:text-[#D4A843] underline underline-offset-4 transition-colors disabled:opacity-50"
+            >
+              {revealing ? 'Unlocking...' : "Can't wait? Reveal anyway."}
+            </button>
+          </div>
 
-          <p className="text-xs text-gray-400 mt-8">
+          <p className="text-xs text-[#aaa]">
             Questions? Email{' '}
-            <a href="mailto:kevin@beanumber.org" className="underline">
+            <a href="mailto:kevin@beanumber.org" className="text-[#D4A843] hover:underline">
               kevin@beanumber.org
             </a>
           </p>
@@ -228,24 +269,18 @@ export function SponsorDashboard({ sponsorCode, email }: SponsorDashboardProps) 
     );
   }
 
-  // ---------------------------------------------------------------
+  // -------------------------------------------------------------------
   // FULL DASHBOARD — reveal has happened, show everything.
-  // ---------------------------------------------------------------
+  // -------------------------------------------------------------------
   const daysUntilCanRequest = nextRequestEligibleAt
     ? Math.max(0, Math.ceil((new Date(nextRequestEligibleAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
     : 0;
 
-  // Derive a single first-name token for labels like "What {firstName} loves".
-  // Falls back through FirstName → first word of display name → "them" so a
-  // partial record never renders "What undefined loves".
   const firstName =
     childInfo?.firstName ||
     childInfo?.name?.split(' ')[0] ||
     'them';
 
-  // True if ANY of the structured intake fields are populated. When none
-  // are, we fall back to the Notes prose so older records still render
-  // something human rather than an empty scaffold.
   const hasStructured = Boolean(
     childInfo?.homeVillage ||
     childInfo?.familyContext ||
@@ -255,13 +290,10 @@ export function SponsorDashboard({ sponsorCode, email }: SponsorDashboardProps) 
   );
 
   return (
-    <div className="max-w-4xl mx-auto px-6 py-12">
-      {/* Child Profile Header — mirrors the structured treatment on
-          /children/[number]. Cream/gold/Lora instead of the portal's
-          gray chrome, because this card is the emotional anchor of the
-          page and should feel like the brand, not like a SaaS dashboard. */}
+    <div className="max-w-4xl mx-auto px-4 md:px-6 py-8 md:py-12">
+      {/* Child Profile Header — cream/gold/Lora, the emotional anchor. */}
       {childInfo && (
-        <div className="bg-[#FFF8F0] border border-[#e8e0d4] p-8 md:p-10 mb-8">
+        <div className="bg-white border border-[#e8e0d4] p-6 md:p-10 mb-6">
           <div className="grid md:grid-cols-[minmax(0,1fr)_1.6fr] gap-8 md:gap-10 items-start">
             {/* Photo */}
             <div className="aspect-[4/5] bg-[#f5f0e8] border border-[#e8e0d4] overflow-hidden relative">
@@ -294,8 +326,7 @@ export function SponsorDashboard({ sponsorCode, email }: SponsorDashboardProps) 
                 {childInfo.location && <span className="text-base">{childInfo.location}</span>}
               </div>
 
-              {/* Pull quote from the child — in their own voice. The single
-                  strongest element on the card when it's present. */}
+              {/* Pull quote from the child */}
               {childInfo.childQuote && (
                 <div className="mb-6">
                   <p
@@ -310,9 +341,7 @@ export function SponsorDashboard({ sponsorCode, email }: SponsorDashboardProps) 
                 </div>
               )}
 
-              {/* Structured fact lines. Each block hides itself when its
-                  field is empty, so a half-filled profile still looks
-                  intentional instead of leaving dead scaffold. */}
+              {/* Structured fact lines */}
               {hasStructured && (
                 <div className="mb-6 space-y-4">
                   {childInfo.homeVillage && (
@@ -342,10 +371,9 @@ export function SponsorDashboard({ sponsorCode, email }: SponsorDashboardProps) 
                 </div>
               )}
 
-              {/* Teacher quote — attributed, second human voice on the card.
-                  Only appears when TeacherQuote is present. */}
+              {/* Teacher quote */}
               {childInfo.teacherQuote && (
-                <div className="bg-white border border-[#e8e0d4] p-5 mb-6">
+                <div className="bg-[#FFF8F0] border border-[#e8e0d4] p-5 mb-6">
                   <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-3">
                     From {firstName}&rsquo;s teacher
                   </p>
@@ -358,15 +386,9 @@ export function SponsorDashboard({ sponsorCode, email }: SponsorDashboardProps) 
                 </div>
               )}
 
-              {/* Placeholder when no structured intake fields are populated.
-                  IMPORTANT: we do NOT fall back to childInfo.notes. The legacy
-                  Notes field on most records is AI-template boilerplate
-                  ("bright and hopeful", "peasant farmers", "humble background",
-                  "life full of potential and hope") that violates voice.md.
-                  Better to show an honest, dignified "story coming" line than
-                  to ship savior-narrative copy under our brand. */}
+              {/* No structured intake yet */}
               {!hasStructured && (
-                <div className="bg-white border border-[#e8e0d4] p-5 mb-6">
+                <div className="bg-[#FFF8F0] border border-[#e8e0d4] p-5 mb-6">
                   <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-2">
                     {firstName}&rsquo;s story
                   </p>
@@ -389,79 +411,176 @@ export function SponsorDashboard({ sponsorCode, email }: SponsorDashboardProps) 
         </div>
       )}
 
-      {/* Request Update Section */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-8">
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-          <div>
-            <h2 className="text-lg font-semibold text-gray-900 mb-1">
-              Request an Update
-            </h2>
-            <p className="text-sm text-gray-600">
-              {canRequestUpdate
-                ? 'You can request a new update about your sponsored child.'
-                : `You can request your next update in ${daysUntilCanRequest} days.`}
-            </p>
-          </div>
-          <button
-            onClick={handleRequestUpdate}
-            disabled={!canRequestUpdate}
-            className="px-6 py-2 bg-gray-900 text-white rounded-md hover:bg-gray-800 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
-          >
-            Request Update
-          </button>
+      {/* Two-column action row on desktop: request update + write to child */}
+      <div className="grid md:grid-cols-2 gap-6 mb-6">
+        {/* Request Update */}
+        <div className="bg-white border border-[#e8e0d4] p-6">
+          <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-3">
+            Request an Update
+          </p>
+          {requestSuccess ? (
+            <div className="bg-[#FFF8F0] border border-[#e8e0d4] p-4 text-sm text-[#444]">
+              <p className="font-medium text-[#0d0d0d] mb-1">Request submitted.</p>
+              <p className="text-[#666]">
+                Our team on the ground at YDO will put together a fresh update about {firstName}.
+                You&rsquo;ll see it here when it&rsquo;s ready.
+              </p>
+            </div>
+          ) : (
+            <>
+              <p className="text-sm text-[#666] leading-relaxed mb-4">
+                {canRequestUpdate
+                  ? `Ask our field team at YDO for a new update about ${firstName}. Photos, a note from their teacher, how they're doing in class.`
+                  : `You can request your next update in ${daysUntilCanRequest} days. We limit requests to once per quarter so the YDO team can focus on the kids.`}
+              </p>
+              <button
+                onClick={handleRequestUpdate}
+                disabled={!canRequestUpdate || requestingUpdate}
+                className="px-5 py-2.5 bg-[#D4A843] text-[#0d0d0d] font-bold text-sm tracking-[0.05em] hover:bg-[#c49a3a] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {requestingUpdate ? 'SUBMITTING...' : 'REQUEST UPDATE'}
+              </button>
+            </>
+          )}
+        </div>
+
+        {/* Write to Your Child */}
+        <div className="bg-white border border-[#e8e0d4] p-6">
+          <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-3">
+            Write to {firstName}
+          </p>
+          {messageSent ? (
+            <div className="bg-[#FFF8F0] border border-[#e8e0d4] p-4 text-sm text-[#444]">
+              <p className="font-medium text-[#0d0d0d] mb-1">Message sent.</p>
+              <p className="text-[#666]">
+                Kevin will make sure it gets to {firstName} through the YDO team on the ground.
+              </p>
+              <button
+                onClick={() => setMessageSent(false)}
+                className="mt-3 text-sm text-[#D4A843] hover:underline font-medium"
+              >
+                Write another message
+              </button>
+            </div>
+          ) : (
+            <>
+              <p className="text-sm text-[#666] leading-relaxed mb-3">
+                Send a note, a question, encouragement — whatever you want {firstName} to hear.
+                Kevin relays every message through the YDO team.
+              </p>
+              {messageError && (
+                <div className="bg-[#FFF8F0] border border-[#D4A843] text-[#0d0d0d] px-3 py-2 text-sm mb-3">
+                  {messageError}
+                </div>
+              )}
+              <textarea
+                value={messageText}
+                onChange={(e) => setMessageText(e.target.value)}
+                placeholder={`Hey ${firstName}...`}
+                rows={3}
+                maxLength={2000}
+                className="w-full px-4 py-3 border border-[#e8e0d4] bg-white text-[#0d0d0d] text-sm leading-relaxed focus:outline-none focus:border-[#D4A843] focus:ring-1 focus:ring-[#D4A843] transition-colors resize-none mb-3"
+              />
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-[#aaa]">{messageText.length}/2000</span>
+                <button
+                  onClick={handleSendMessage}
+                  disabled={!messageText.trim() || sendingMessage}
+                  className="px-5 py-2.5 bg-[#D4A843] text-[#0d0d0d] font-bold text-sm tracking-[0.05em] hover:bg-[#c49a3a] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {sendingMessage ? 'SENDING...' : 'SEND MESSAGE'}
+                </button>
+              </div>
+            </>
+          )}
         </div>
       </div>
 
       {/* Updates Feed */}
-      <div className="space-y-6">
-        <h2 className="text-2xl font-bold text-gray-900 mb-4">Updates</h2>
+      <div>
+        <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-4">
+          Updates
+        </p>
 
         {updates.length === 0 ? (
-          <div className="bg-white rounded-lg shadow-lg p-12 text-center">
-            <p className="text-gray-600 mb-4">
-              No updates yet. Check back soon or request an update above.
+          <div className="bg-white border border-[#e8e0d4] p-8 md:p-10">
+            <h2
+              className="text-xl md:text-2xl text-[#0d0d0d] mb-3"
+              style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
+            >
+              Welcome to your portal.
+            </h2>
+            <p className="text-[#666] leading-relaxed mb-4 max-w-lg">
+              This is where updates about {firstName} will live — photos from the campus,
+              notes from their teacher, and anything the YDO team wants you to see.
+              The first update is on its way.
+            </p>
+            <p className="text-[#666] leading-relaxed mb-6 max-w-lg">
+              In the meantime, you can request an update or write {firstName} a message
+              using the forms above. Every message gets delivered through our team on
+              the ground in Omoro District.
+            </p>
+            <p className="text-sm text-[#aaa]">
+              Questions about anything? Email{' '}
+              <a href="mailto:kevin@beanumber.org" className="text-[#D4A843] hover:underline">
+                kevin@beanumber.org
+              </a>
             </p>
           </div>
         ) : (
-          updates.map((update) => (
-            <div key={update.id} className="bg-white rounded-lg shadow-lg overflow-hidden">
-              <div className="p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <div>
-                    <span className="inline-block px-3 py-1 bg-gray-100 text-gray-700 text-sm font-medium rounded-full mb-2">
-                      {update.type}
-                    </span>
-                    <h3 className="text-xl font-bold text-gray-900">{update.title}</h3>
+          <div className="space-y-6">
+            {updates.map((update) => (
+              <div key={update.id} className="bg-white border border-[#e8e0d4] overflow-hidden">
+                <div className="p-6 md:p-8">
+                  <div className="flex items-start justify-between mb-4">
+                    <div>
+                      <span className="inline-block px-3 py-1 bg-[#FFF8F0] border border-[#e8e0d4] text-[#888] text-xs font-bold uppercase tracking-[0.1em] mb-2">
+                        {update.type}
+                      </span>
+                      <h3
+                        className="text-xl text-[#0d0d0d]"
+                        style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
+                      >
+                        {update.title}
+                      </h3>
+                    </div>
+                    <time className="text-sm text-[#aaa] whitespace-nowrap ml-4">
+                      {new Date(update.date).toLocaleDateString()}
+                    </time>
                   </div>
-                  <time className="text-sm text-gray-500">
-                    {new Date(update.date).toLocaleDateString()}
-                  </time>
-                </div>
 
-                <div className="prose max-w-none mb-4">
-                  <p className="text-gray-700 leading-relaxed whitespace-pre-line">
-                    {update.content}
-                  </p>
-                </div>
-
-                {update.photos && update.photos.length > 0 && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
-                    {update.photos.map((photo, idx) => (
-                      <div key={idx} className="relative aspect-video bg-gray-200 rounded-lg overflow-hidden">
-                        <Image
-                          src={photo}
-                          alt={`Update photo ${idx + 1}`}
-                          fill
-                          className="object-cover"
-                        />
-                      </div>
-                    ))}
+                  <div className="mb-4">
+                    <p className="text-[#444] leading-relaxed whitespace-pre-line">
+                      {update.content}
+                    </p>
                   </div>
-                )}
+
+                  {update.photos && update.photos.length > 0 && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
+                      {update.photos.map((photo, idx) => (
+                        <div key={idx} className="relative aspect-video bg-[#f5f0e8] border border-[#e8e0d4] overflow-hidden">
+                          <Image
+                            src={photo}
+                            alt={`Update photo ${idx + 1}`}
+                            fill
+                            className="object-cover"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          ))
+            ))}
+          </div>
         )}
+      </div>
+
+      {/* Sponsor code reminder at bottom */}
+      <div className="mt-8 text-center">
+        <p className="text-xs text-[#aaa]">
+          Your sponsor code: <span className="font-mono tracking-wider">{sponsorCode}</span>
+        </p>
       </div>
     </div>
   );

@@ -1,8 +1,8 @@
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import type { Metadata } from 'next';
-import { Logo } from '@/components/Logo';
-import Link from 'next/link';
+import { BANNavigation } from '@/components/BANNavigation';
+import { BANFooter } from '@/components/BANFooter';
 import { SponsorDashboard } from '@/components/SponsorDashboard';
 
 interface SponsorPageProps {
@@ -93,32 +93,15 @@ export default async function SponsorPage({ params }: SponsorPageProps) {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Navigation */}
-      <nav className="bg-white border-b border-gray-200">
-        <div className="max-w-6xl mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <Link href="/" className="flex items-center gap-3">
-              <Logo className="h-8 w-8 text-gray-900" />
-              <span className="text-xl font-semibold text-gray-900">Be A Number</span>
-            </Link>
-            <div className="flex items-center gap-4">
-              <span className="text-sm text-gray-600">Sponsor Code: {code}</span>
-              <form action="/api/sponsor/logout" method="POST">
-                <button
-                  type="submit"
-                  className="text-sm text-gray-600 hover:text-gray-900"
-                >
-                  Logout
-                </button>
-              </form>
-            </div>
-          </div>
-        </div>
-      </nav>
+    <div className="min-h-screen bg-[#FFF8F0] flex flex-col">
+      <BANNavigation currentPath="/sponsor" />
 
       {/* Dashboard */}
-      <SponsorDashboard sponsorCode={code} email={session.email} />
+      <main className="flex-1">
+        <SponsorDashboard sponsorCode={code} email={session.email} />
+      </main>
+
+      <BANFooter />
     </div>
   );
 }
