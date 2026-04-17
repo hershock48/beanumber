@@ -23,9 +23,15 @@ export async function GET() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          type: 'singleSelect',
           options: {
             choices: [
+              // Existing choices (must include with IDs or they get deleted)
+              { id: 'selwKJNMYIffyT08g', name: 'Progress Report', color: 'blueBright' },
+              { id: 'selaFlfWb4I7lQs3T', name: 'Photo Update', color: 'greenBright' },
+              { id: 'selsITGV1kc9EWAhj', name: 'Special Note', color: 'purpleBright' },
+              { id: 'sel0Rg2L5dtuo82r7', name: 'Holiday Greeting', color: 'yellowBright' },
+              { id: 'selOx1tUDJqvze8P5', name: 'Milestone', color: 'orangeBright' },
+              // New choices
               { name: 'Sponsor Message', color: 'pinkBright' },
               { name: 'Requested Update', color: 'redBright' },
             ],
