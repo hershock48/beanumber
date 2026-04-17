@@ -152,8 +152,8 @@ function shirtNurtureEmail(
           <p style="margin-top: 0;">Hey ${firstName},</p>
           ${childName
             ? `<p>I wanted to circle back to you about ${childName}, the child connected to your shirt. If you haven&rsquo;t met them yet, <a href="${childUrl}" style="color: #D4A843; font-weight: bold;">take a look</a>. I think you&rsquo;ll be glad you did.</p>
-               <p>Here&rsquo;s what I can tell you: this past month, ${childName} had a seat in school every day. They ate a full meal every day. And they had a nurse on campus if they needed one. That&rsquo;s real, and it happened because people like you showed up.</p>`
-            : `<p>I wanted to tell you what your purchase actually did this past month. The child connected to your shirt had a seat in school every day, ate a full meal every day, and had a nurse on campus if they needed one. That&rsquo;s not a talking point. That&rsquo;s what happened.</p>`
+               <p>Here&rsquo;s what I can tell you: this past month, ${childName} had a seat in school every day. They ate breakfast and lunch every day. And they had a nurse on campus if they needed one. That&rsquo;s real, and it happened because people like you showed up.</p>`
+            : `<p>I wanted to tell you what your purchase actually did this past month. The child connected to your shirt had a seat in school every day, ate breakfast and lunch every day, and had a nurse on campus if they needed one. That&rsquo;s not a talking point. That&rsquo;s what happened.</p>`
           }
           <p>Here&rsquo;s the thing I keep coming back to: $25 a month is what it costs to keep ${childName || 'a child'} in that seat. To keep the meals coming. To keep the clinic staffed. And for that $25, you don&rsquo;t get a generic thank-you. You get letters. Photos. Report cards. A real connection to ${childName ? `${childName} specifically` : 'a real kid who knows your name'}.</p>
           <p>If that sounds like something you want to be part of, I&rsquo;d love to have you.</p>
@@ -205,8 +205,8 @@ function sponsorOnboardEmail(
           <p style="margin-top: 0;">Hey ${firstName},</p>
           <p>I&rsquo;m so glad you&rsquo;re here. I mean that. Every new sponsor changes what&rsquo;s possible for us, and it changes everything for one specific kid.</p>
           ${childName
-            ? `<p>${childName} is the child your sponsorship supports. <a href="${childUrl}" style="color: #D4A843; font-weight: bold;">Here&rsquo;s their page.</a> Your $25/month covers their school fees, a daily meal, and access to the medical clinic on campus. That&rsquo;s not a summary. That&rsquo;s literally where the money goes.</p>`
-            : `<p>Your $25/month covers school fees, a daily meal, and access to the on-site medical clinic for a specific child at our campus. That&rsquo;s not a summary. That&rsquo;s literally where the money goes.</p>`
+            ? `<p>${childName} is the child your sponsorship supports. <a href="${childUrl}" style="color: #D4A843; font-weight: bold;">Here&rsquo;s their page.</a> Your $25/month covers their school fees, breakfast and lunch every day, and access to the medical clinic on campus. For some of these kids, those two meals are all they eat. That&rsquo;s not a summary. That&rsquo;s literally where the money goes.</p>`
+            : `<p>Your $25/month covers school fees, breakfast and lunch every day, and access to the on-site medical clinic for a specific child at our campus. For some of these kids, those two meals are all they eat. That&rsquo;s not a summary. That&rsquo;s literally where the money goes.</p>`
           }
           <p>I set up a sponsor portal where you&rsquo;ll be able to see updates, photos, and letters as they come in from the campus. I&rsquo;d recommend bookmarking it:</p>
           <p style="text-align: center; margin: 24px 0;">
@@ -239,7 +239,7 @@ function sponsorOnboardEmail(
         html: wrapEmail(`
           <p style="margin-top: 0;">Hey ${firstName},</p>
           <p>You&rsquo;ve been a sponsor for about a month now, and I wanted to take a second to say something I don&rsquo;t say enough: thank you for not leaving.</p>
-          <p>That might sound weird, but the truth is, a lot of people sign up for things and quietly cancel. You didn&rsquo;t. And because you didn&rsquo;t, ${childName ? `${childName} went` : 'your child went'} to school every day this month, ate a real meal every day, and had a nurse on campus every day. That&rsquo;s not a pitch. That is literally what your $25 did.</p>
+          <p>That might sound weird, but the truth is, a lot of people sign up for things and quietly cancel. You didn&rsquo;t. And because you didn&rsquo;t, ${childName ? `${childName} went` : 'your child went'} to school every day this month, ate breakfast and lunch every day, and had a nurse on campus every day. For some of these kids, those are the only meals they get. That&rsquo;s not a pitch. That is literally what your $25 did.</p>
           <p>One thing that really helps us: if you know one person who&rsquo;d get what we do, send them a text. Not a social media blast. One friend. &ldquo;Hey, I sponsor a kid in Uganda through this org called Be A Number. Check it out.&rdquo; That&rsquo;s how most of our sponsors find us.</p>
           <p>And if you haven&rsquo;t checked your <a href="${portalUrl}" style="color: #D4A843; font-weight: bold;">sponsor portal</a> lately, updates show up there first.</p>
           <p>Grateful for you,<br>Kevin</p>
@@ -268,7 +268,7 @@ function donorConvertEmail(
         html: wrapEmail(`
           <p style="margin-top: 0;">Hey ${firstName},</p>
           <p>I know you probably get a lot of donation receipts and never hear anything again. I didn&rsquo;t want to do that to you.</p>
-          <p>Your donation went to the YDO campus in Northern Uganda, where we fund school fees, daily meals, and medical care for specific children. Not a general fund. Not overhead. Real kids, real meals, real school days.</p>
+          <p>Your donation went to the YDO campus in Northern Uganda, where we fund school fees, breakfast and lunch, and medical care for specific children. For some of these kids, those two meals are all they eat in a day. Not a general fund. Not overhead. Real kids, real meals, real school days.</p>
           <p>We&rsquo;re small on purpose. One campus, one team on the ground, and a model where every dollar goes through the same door. I run this myself, and I take it personally when someone trusts us with their money.</p>
           <p>So thank you. I wanted you to know it landed somewhere real.</p>
           <p>Kevin</p>
