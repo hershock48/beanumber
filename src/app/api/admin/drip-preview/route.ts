@@ -100,7 +100,7 @@ function getShirtNurtureEmails(): PreviewEmail[] {
         <p style="margin-top: 0;">Hey ${firstName},</p>
         <p>This is the last email I&rsquo;m going to send you about this, and I want to be straight with you about why I&rsquo;m sending it at all.</p>
         <p>I started Be A Number because I met these kids and couldn&rsquo;t walk away. ${childName} is one of them. The shirts are how most people find us, but sponsorship is how we actually keep the doors open. $25 a month keeps a child in school, fed, and cared for. And the sponsor gets to be part of that child&rsquo;s life in a way that I think is pretty rare.</p>
-        <p>If that&rsquo;s something you want to do, <a href="${sponsorUrl}" style="color: #D4A843; font-weight: bold;">I&rsquo;d be honored</a>. If not, I genuinely appreciate you buying the shirt. Wear it well. It starts conversations, and those conversations have changed kids&rsquo; lives before.</p>
+        <p>If that&rsquo;s something you want to do, <a href="${sponsorUrl}" style="color: #D4A843; font-weight: bold;">sponsor ${childName} for $25/mo</a>. If not, I genuinely appreciate you buying the shirt. Wear it well. It starts conversations, and those conversations have changed kids&rsquo; lives before.</p>
         <p>Thank you for being part of this, ${firstName}.</p>
         <p>Kevin</p>
       `),
