@@ -240,7 +240,7 @@ function sponsorOnboardEmail(
           <p style="text-align: center; margin: 24px 0;">
             <a href="${portalUrl}" style="display: inline-block; background: #D4A843; color: #0d0d0d; font-weight: bold; text-decoration: none; padding: 14px 32px; font-size: 15px; letter-spacing: 0.05em;">LOG IN TO YOUR PORTAL</a>
           </p>
-          <p>If you ever have questions or want to send a message to ${childName || 'your child'}, reply to this email. I read every one.</p>
+          <p>If you ever have questions, or if you want to send a note to ${childName || 'your child'}, reply to this email. I&rsquo;ll make sure it gets to them through the YDO team on the ground.</p>
           <p>Kevin</p>
         `),
       };
