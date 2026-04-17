@@ -105,7 +105,7 @@ export function BANNavigation({ currentPath = '/', transparent = false }: BANNav
 
         {/* Mobile Menu */}
         {mobileOpen && (
-          <div className="md:hidden mt-4 pb-4 border-t border-[#e8e0d4] pt-4 space-y-1">
+          <div className="md:hidden mt-4 pb-4 border-t border-[#e8e0d4] pt-4 space-y-1 overflow-hidden">
             {navLinks.map(link => (
               <Link
                 key={link.href}
@@ -120,13 +120,15 @@ export function BANNavigation({ currentPath = '/', transparent = false }: BANNav
                 {link.label}
               </Link>
             ))}
-            <Link
-              href="/donate"
-              className="block w-full text-center px-4 py-3 bg-[#D4A843] text-[#0d0d0d] mt-3 font-bold uppercase tracking-wider text-sm"
-              onClick={() => setMobileOpen(false)}
-            >
-              Donate
-            </Link>
+            <div className="px-3 pt-2">
+              <Link
+                href="/donate"
+                className="block w-full text-center py-3 bg-[#D4A843] text-[#0d0d0d] font-bold uppercase tracking-wider text-sm hover:bg-[#c49a3a] transition-colors"
+                onClick={() => setMobileOpen(false)}
+              >
+                Donate
+              </Link>
+            </div>
           </div>
         )}
       </div>

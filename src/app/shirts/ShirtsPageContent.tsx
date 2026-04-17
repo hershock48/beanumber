@@ -59,21 +59,142 @@ type DesignProps = {
  * viewBox is 300 × 380 and children are placed in absolute % coords that
  * map onto the body region (roughly x ∈ [24%, 76%], y ∈ [18%, 92%]).
  */
+/**
+ * Parse a hex colour into 0-255 RGB components so we can use them in SVG
+ * feFlood / feColorMatrix values without pulling in a library.
+ */
+function hexToRgb(hex: string): { r: number; g: number; b: number } {
+  const h = hex.replace('#', '');
+  return {
+    r: parseInt(h.substring(0, 2), 16),
+    g: parseInt(h.substring(2, 4), 16),
+    b: parseInt(h.substring(4, 6), 16),
+  };
+}
+
 function TeeOutline({ theme, side }: { theme: ShirtTheme; side: 'front' | 'back' }) {
   // Deeper neckline on the front; subtle dip on the back.
   const neckCurve = side === 'front' ? 'Q 150 72 175 28' : 'Q 150 42 175 28';
   const path = `M 60 28 L 125 28 ${neckCurve} L 240 28 L 272 84 L 258 104 L 232 96 L 232 352 L 68 352 L 68 96 L 42 104 L 28 84 Z`;
+
+  // Determine if the shirt colour is light so we can tune overlay intensity.
+  const { r, g, b } = hexToRgb(theme.shirt);
+  const luma = 0.299 * r + 0.587 * g + 0.114 * b;
+  const isLight = luma > 160;
+
+  // Unique ID prefix so multiple instances on the same page don't collide.
+  const uid = `tee-${side}-${theme.shirt.replace('#', '')}`;
 
   return (
     <svg
       viewBox="0 0 300 380"
       className="absolute inset-0 w-full h-full"
       preserveAspectRatio="xMidYMid meet"
-      style={{ filter: 'drop-shadow(0 2px 3px rgba(0,0,0,0.08))' }}
+      style={{ filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.15)) drop-shadow(0 1px 2px rgba(0,0,0,0.08))' }}
       aria-hidden
     >
-      <path d={path} fill={theme.shirt} />
-      {/* Subtle seam suggestion along the neckline for definition. */}
+      <defs>
+        {/* ── Clipping path so every overlay stays inside the shirt ── */}
+        <clipPath id={`${uid}-clip`}>
+          <path d={path} />
+        </clipPath>
+
+        {/* ── Cotton fabric texture ── */}
+        <filter id={`${uid}-texture`} x="0%" y="0%" width="100%" height="100%">
+          <feTurbulence
+            type="fractalNoise"
+            baseFrequency="0.65"
+            numOctaves={4}
+            seed={42}
+            stitchTiles="stitch"
+            result="noise"
+          />
+          <feColorMatrix
+            in="noise"
+            type="saturate"
+            values="0"
+            result="mono"
+          />
+          <feBlend in="SourceGraphic" in2="mono" mode="soft-light" result="textured" />
+          <feComposite in="textured" in2="SourceGraphic" operator="in" />
+        </filter>
+
+        {/* ── Centre-to-edge body gradient for 3D curvature ── */}
+        <radialGradient id={`${uid}-body`} cx="50%" cy="40%" r="60%">
+          <stop offset="0%" stopColor={isLight ? 'rgba(255,255,255,0.18)' : 'rgba(255,255,255,0.07)'} />
+          <stop offset="70%" stopColor="rgba(0,0,0,0)" />
+          <stop offset="100%" stopColor={isLight ? 'rgba(0,0,0,0.10)' : 'rgba(0,0,0,0.18)'} />
+        </radialGradient>
+
+        {/* ── Vertical fold shadow down the centre ── */}
+        <linearGradient id={`${uid}-fold`} x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stopColor="rgba(0,0,0,0.04)" />
+          <stop offset="30%" stopColor="rgba(255,255,255,0.02)" />
+          <stop offset="50%" stopColor="rgba(0,0,0,0.03)" />
+          <stop offset="70%" stopColor="rgba(255,255,255,0.02)" />
+          <stop offset="100%" stopColor="rgba(0,0,0,0.04)" />
+        </linearGradient>
+
+        {/* ── Side crease accents ── */}
+        <linearGradient id={`${uid}-side-l`} x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stopColor={isLight ? 'rgba(0,0,0,0.08)' : 'rgba(0,0,0,0.15)'} />
+          <stop offset="100%" stopColor="rgba(0,0,0,0)" />
+        </linearGradient>
+        <linearGradient id={`${uid}-side-r`} x1="100%" y1="0%" x2="0%" y2="0%">
+          <stop offset="0%" stopColor={isLight ? 'rgba(0,0,0,0.08)' : 'rgba(0,0,0,0.15)'} />
+          <stop offset="100%" stopColor="rgba(0,0,0,0)" />
+        </linearGradient>
+
+        {/* ── Under-sleeve shadow ── */}
+        <linearGradient id={`${uid}-sleeve`} x1="50%" y1="0%" x2="50%" y2="100%">
+          <stop offset="0%" stopColor={isLight ? 'rgba(0,0,0,0.06)' : 'rgba(0,0,0,0.12)'} />
+          <stop offset="100%" stopColor="rgba(0,0,0,0)" />
+        </linearGradient>
+
+        {/* ── Bottom hem shadow ── */}
+        <linearGradient id={`${uid}-hem`} x1="50%" y1="100%" x2="50%" y2="0%">
+          <stop offset="0%" stopColor={isLight ? 'rgba(0,0,0,0.06)' : 'rgba(0,0,0,0.10)'} />
+          <stop offset="100%" stopColor="rgba(0,0,0,0)" />
+        </linearGradient>
+      </defs>
+
+      {/* ── 1. Base shirt with fabric texture ── */}
+      <path d={path} fill={theme.shirt} filter={`url(#${uid}-texture)`} />
+
+      {/* ── 2. All shading layers clipped to the shirt ── */}
+      <g clipPath={`url(#${uid}-clip)`}>
+        {/* Body curvature */}
+        <path d={path} fill={`url(#${uid}-body)`} />
+
+        {/* Vertical fold lines */}
+        <path d={path} fill={`url(#${uid}-fold)`} />
+
+        {/* Left edge shadow */}
+        <rect x="58" y="28" width="40" height="324" fill={`url(#${uid}-side-l)`} />
+
+        {/* Right edge shadow */}
+        <rect x="202" y="28" width="40" height="324" fill={`url(#${uid}-side-r)`} />
+
+        {/* Under-sleeve shadow band */}
+        <rect x="68" y="90" width="164" height="30" fill={`url(#${uid}-sleeve)`} />
+
+        {/* Bottom hem shadow */}
+        <rect x="68" y="326" width="164" height="26" fill={`url(#${uid}-hem)`} />
+
+        {/* Subtle collar/neckline shadow — gives depth where the neck hole is */}
+        <path
+          d={
+            side === 'front'
+              ? 'M 125 28 Q 150 72 175 28'
+              : 'M 125 28 Q 150 42 175 28'
+          }
+          fill="none"
+          stroke={isLight ? 'rgba(0,0,0,0.10)' : 'rgba(0,0,0,0.20)'}
+          strokeWidth={2.5}
+        />
+      </g>
+
+      {/* ── 3. Seam stitching detail ── */}
       <path
         d={
           side === 'front'
@@ -82,8 +203,20 @@ function TeeOutline({ theme, side }: { theme: ShirtTheme; side: 'front' | 'back'
         }
         fill="none"
         stroke={theme.muted}
-        strokeWidth={1}
+        strokeWidth={0.8}
+        strokeDasharray="2 1.5"
       />
+
+      {/* Shoulder seam stitching */}
+      <line x1="68" y1="96" x2="68" y2="352" stroke={theme.muted} strokeWidth={0.4} strokeDasharray="3 2" opacity={0.5} />
+      <line x1="232" y1="96" x2="232" y2="352" stroke={theme.muted} strokeWidth={0.4} strokeDasharray="3 2" opacity={0.5} />
+
+      {/* Hem stitch line */}
+      <line x1="72" y1="348" x2="228" y2="348" stroke={theme.muted} strokeWidth={0.4} strokeDasharray="3 2" opacity={0.4} />
+
+      {/* Sleeve hem stitch */}
+      <path d="M 42 104 L 68 96" stroke={theme.muted} strokeWidth={0.4} strokeDasharray="2 2" opacity={0.4} />
+      <path d="M 258 104 L 232 96" stroke={theme.muted} strokeWidth={0.4} strokeDasharray="2 2" opacity={0.4} />
     </svg>
   );
 }
