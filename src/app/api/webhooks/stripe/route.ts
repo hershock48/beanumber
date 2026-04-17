@@ -1439,6 +1439,39 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
         console.error('[WH] admin notify failed:', String(err?.message || err).slice(0, 200));
       }
 
+      // Step 9: Enroll shirt+monthly buyer into the combined drip sequence.
+      // This pipeline covers both shirt anticipation AND sponsor onboarding
+      // in one coherent sequence, so they don't get bombarded by two pipelines.
+      if (assignedChild && donorId) {
+        try {
+          const dripStartDate = new Date();
+          dripStartDate.setUTCDate(dripStartDate.getUTCDate() + 3);
+          const dripNextSend = dripStartDate.toISOString().split('T')[0];
+
+          await airtableAPICall(() =>
+            fetch(
+              `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_DONORS_TABLE}/${donorId}`,
+              {
+                method: 'PATCH',
+                headers: getAirtableHeaders(),
+                body: JSON.stringify({
+                  fields: {
+                    DripPipeline: 'shirt_sponsor',
+                    DripStage: 0,
+                    DripNextSend: dripNextSend,
+                    DripChildName: assignedChild.displayName?.split(' ')[0] || '',
+                    DripShirtNumber: assignedChild.shirtNumber,
+                  },
+                }),
+              }
+            )
+          );
+          console.log('[WH] Enrolled in shirt_sponsor drip, next send:', dripNextSend);
+        } catch (err: any) {
+          console.error('[WH] shirt_sponsor drip enrollment failed (non-fatal):', String(err?.message || err).slice(0, 200));
+        }
+      }
+
       console.log('[Webhook] Successfully processed shirt + monthly:', {
         sessionId: session.id,
         donorId,
@@ -1961,6 +1994,12 @@ export async function POST(request: NextRequest) {
                 const lookupData = await lookupRes.json();
                 const donorRecord = lookupData.records?.[0];
                 if (donorRecord) {
+                  // If the donor is already in shirt_sponsor, leave them there.
+                  // That pipeline already covers both shirt + sponsor onboarding.
+                  const currentPipeline = donorRecord.fields?.DripPipeline || '';
+                  if (currentPipeline === 'shirt_sponsor') {
+                    console.log('[WH] Donor already in shirt_sponsor drip, skipping sponsor_onboard enrollment');
+                  } else {
                   // Replace any existing drip (shirt_nurture, donor_convert)
                   // with the sponsor_onboard sequence.
                   const dripStartDate = new Date();
@@ -1983,6 +2022,7 @@ export async function POST(request: NextRequest) {
                     }
                   );
                   console.log('[WH] Enrolled in sponsor_onboard drip:', donorRecord.id);
+                  } // close else (not shirt_sponsor)
                 }
               }
             }

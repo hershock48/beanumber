@@ -86,6 +86,12 @@ function validateCronAuth(request: NextRequest): boolean {
 //   Stage 0 → Day 5:  "Here's what your donation did" — specific impact
 //   Stage 1 → Day 14: "Meet the kids" — introduce sponsorship model
 //   Stage 2 → Day 25: "Last one from me" — final respectful nudge
+//
+// shirt_sponsor (4 emails, ~25 days):
+//   Stage 0 → Day 3:  "Shirt + sponsor welcome" — shirt shipping, portal + code
+//   Stage 1 → Day 8:  "Did the shirt land?" — the reveal + meet your child
+//   Stage 2 → Day 15: "What your first month did" — impact, updates coming
+//   Stage 3 → Day 25: "Thank you for staying" — celebrate, tell one friend
 
 type PipelineConfig = { gaps: number[]; maxStages: number };
 
@@ -93,6 +99,7 @@ const PIPELINE_CONFIGS: Record<string, PipelineConfig> = {
   shirt_nurture:    { gaps: [6, 6, 8, 10], maxStages: 4 },
   sponsor_onboard:  { gaps: [3, 7, 11],    maxStages: 3 },
   donor_convert:    { gaps: [5, 9, 11],    maxStages: 3 },
+  shirt_sponsor:    { gaps: [3, 5, 7, 10], maxStages: 4 },
 };
 
 type DripDonor = {
@@ -338,6 +345,97 @@ function donorConvertEmail(
   }
 }
 
+// ── Shirt + sponsor combo emails ────────────────────────────────────────────
+
+function shirtSponsorEmail(
+  stage: number,
+  donor: DripDonor,
+  sponsorCode?: string | null
+): { subject: string; html: string } | null {
+  const { firstName, childName, shirtNumber } = donor;
+  const childUrl = `${SITE_URL}/children/${shirtNumber}`;
+  const portalUrl = `${SITE_URL}/sponsor/login`;
+
+  switch (stage) {
+    // ── Email 1: "Welcome + shirt shipping + portal" (Day ~3) ───────────
+    case 0:
+      return {
+        subject: childName
+          ? `Your shirt and ${childName} are both waiting for you.`
+          : "Your shirt is being made, and something else happened too.",
+        html: wrapEmail(`
+          <p style="margin-top: 0;">Hey ${firstName},</p>
+          <p>I wanted to reach out personally because what you did is a big deal. You bought a shirt and you became a monthly sponsor in the same breath. That doesn&rsquo;t happen every day, and I don&rsquo;t take it lightly.</p>
+          <p>First, your shirt: I&rsquo;m making it by hand right now. I heat-press every single one myself. It&rsquo;ll ship within a few days, and when it arrives, the number on it will connect you to a real child at our campus in Northern Uganda.</p>
+          <p>Second, your sponsorship: your $25/month covers breakfast and lunch every day, school fees, and access to the medical clinic on campus for ${childName || 'a specific child'}. For some of these kids, those two meals are all they eat. That&rsquo;s not a slogan. That&rsquo;s what your money does.</p>
+          <p>I set up a sponsor portal where you can see updates, photos, and letters as they come in from the campus. To log in, you&rsquo;ll need your email and your sponsor code:</p>
+          ${sponsorCode
+            ? `<div style="background: #FFF8F0; border: 1px solid #e8e0d4; padding: 16px 20px; margin: 16px 0; text-align: center;">
+                <p style="color: #999; font-size: 13px; margin: 0 0 4px 0;">Your sponsor code</p>
+                <p style="font-size: 22px; color: #0d0d0d; margin: 0; font-weight: bold; letter-spacing: 0.1em; font-family: monospace;">${sponsorCode}</p>
+              </div>`
+            : `<p style="color: #666; font-size: 14px;">(Your sponsor code was in your confirmation email. If you can&rsquo;t find it, reply to this email and I&rsquo;ll get it to you.)</p>`
+          }
+          <p style="text-align: center; margin: 24px 0;">
+            <a href="${portalUrl}" style="display: inline-block; background: #D4A843; color: #0d0d0d; font-weight: bold; text-decoration: none; padding: 14px 32px; font-size: 15px; letter-spacing: 0.05em;">LOG IN TO YOUR PORTAL</a>
+          </p>
+          <p>Thank you for going all in. It means more than you know.</p>
+          <p>Kevin</p>
+        `),
+      };
+
+    // ── Email 2: "Did the shirt land?" + the reveal (Day ~8) ────────────
+    case 1:
+      return {
+        subject: childName
+          ? `Quick question (and something about ${childName}).`
+          : "Quick question about your shirt.",
+        html: wrapEmail(`
+          <p style="margin-top: 0;">Hey ${firstName},</p>
+          <p>Just checking: did your shirt arrive yet? I always wonder once they leave my hands.</p>
+          ${childName
+            ? `<p>If it did, you&rsquo;ve seen the number. That number belongs to ${childName}. <a href="${childUrl}" style="color: #D4A843; font-weight: bold;">Here&rsquo;s their page.</a> I&rsquo;d love for you to take a look when you get a minute. That&rsquo;s the kid you&rsquo;re keeping in school.</p>`
+            : `<p>When it arrives, the number on it belongs to a real child at our campus. Check the tag, then visit <a href="${SITE_URL}/children" style="color: #D4A843; font-weight: bold;">beanumber.org/children</a> to meet them.</p>`
+          }
+          <p>And because you&rsquo;re a monthly sponsor, this isn&rsquo;t a one-time connection. You&rsquo;ll get letters, photos, and updates from ${childName || 'your child'} over the coming months. The YDO team on the ground sends those to your <a href="${portalUrl}" style="color: #D4A843; font-weight: bold;">portal</a> and by email.</p>
+          <p>If you want to write back to ${childName || 'your child'}, reply to this email. I&rsquo;ll make sure it gets to them through the YDO team on the ground.</p>
+          <p>Kevin</p>
+        `),
+      };
+
+    // ── Email 3: "What your first month did" (Day ~15) ──────────────────
+    case 2:
+      return {
+        subject: "Here's what your first month did.",
+        html: wrapEmail(`
+          <p style="margin-top: 0;">Hey ${firstName},</p>
+          <p>You&rsquo;ve been a sponsor for about two weeks now, and I wanted to give you a picture of what that actually looks like on the ground.</p>
+          <p>This month, ${childName ? `${childName} had` : 'your child had'} a seat in school every day. They ate breakfast and lunch every day. They had a nurse on campus if they needed one. For some of these kids, those two meals are all they eat in a day. Your $25 made that real.</p>
+          <p>Over the next few weeks, expect your first update from the campus. The YDO team sends photos, report cards, and sometimes handwritten letters from the kids. They show up in your <a href="${portalUrl}" style="color: #D4A843; font-weight: bold;">sponsor portal</a> and by email.</p>
+          <p>I know two weeks isn&rsquo;t long, but I want you to know: ${childName || 'your child'} already knows they have a sponsor. That matters to them more than I can explain in an email.</p>
+          <p>Kevin</p>
+        `),
+      };
+
+    // ── Email 4: "Thank you for staying" (Day ~25) ──────────────────────
+    case 3:
+      return {
+        subject: "Thank you for staying.",
+        html: wrapEmail(`
+          <p style="margin-top: 0;">Hey ${firstName},</p>
+          <p>A lot of people sign up for things and quietly cancel. You didn&rsquo;t. I notice that, and so does ${childName || 'the child you sponsor'}.</p>
+          <p>Your shirt started this, and your monthly sponsorship is what keeps it going. I don&rsquo;t think most people realize how rare that is. You went from buying a shirt to funding a child&rsquo;s education, meals, and medical care in one decision. That&rsquo;s not normal. That&rsquo;s extraordinary.</p>
+          <p>One thing that really helps us: if you know one person who&rsquo;d get what we do, send them a text. Not a social media blast. One friend. "Hey, I sponsor a kid in Uganda through this org called Be A Number. Check it out." That&rsquo;s how most of our sponsors find us.</p>
+          <p>And if you haven&rsquo;t checked your <a href="${portalUrl}" style="color: #D4A843; font-weight: bold;">portal</a> lately, updates show up there first.</p>
+          <p>Grateful for you,<br>Kevin</p>
+        `),
+      };
+
+    default:
+      return null;
+  }
+}
+
 // ── Pipeline router ─────────────────────────────────────────────────────────
 
 function getEmailForPipeline(
@@ -350,6 +448,7 @@ function getEmailForPipeline(
     case 'shirt_nurture':    return shirtNurtureEmail(stage, donor);
     case 'sponsor_onboard':  return sponsorOnboardEmail(stage, donor, sponsorCode);
     case 'donor_convert':    return donorConvertEmail(stage, donor);
+    case 'shirt_sponsor':    return shirtSponsorEmail(stage, donor, sponsorCode);
     default:                 return null;
   }
 }
@@ -489,8 +588,8 @@ export async function GET(request: NextRequest) {
       continue;
     }
 
-    // Look up sponsor code for sponsor_onboard emails (needed for portal login instructions)
-    const sponsorCode = donor.pipeline === 'sponsor_onboard'
+    // Look up sponsor code for pipelines that include portal login instructions
+    const sponsorCode = (donor.pipeline === 'sponsor_onboard' || donor.pipeline === 'shirt_sponsor')
       ? await getSponsorCode(donor.email)
       : null;
 

@@ -204,6 +204,71 @@ function getDonorConvertEmails(): PreviewEmail[] {
   ];
 }
 
+function getShirtSponsorEmails(): PreviewEmail[] {
+  return [
+    {
+      pipeline: 'shirt_sponsor',
+      subject: `[SHIRT+SPONSOR 1/4] Your shirt and ${childName} are both waiting for you.`,
+      html: wrap(`
+        ${banner('shirt_sponsor — Stage 0 (Day 3). Shirt+monthly combo buyer. Shirt shipping, portal + code, impact.')}
+        <p style="margin-top: 0;">Hey ${firstName},</p>
+        <p>I wanted to reach out personally because what you did is a big deal. You bought a shirt and you became a monthly sponsor in the same breath. That doesn&rsquo;t happen every day, and I don&rsquo;t take it lightly.</p>
+        <p>First, your shirt: I&rsquo;m making it by hand right now. I heat-press every single one myself. It&rsquo;ll ship within a few days, and when it arrives, the number on it will connect you to a real child at our campus in Northern Uganda.</p>
+        <p>Second, your sponsorship: your $25/month covers breakfast and lunch every day, school fees, and access to the medical clinic on campus for ${childName}. For some of these kids, those two meals are all they eat. That&rsquo;s not a slogan. That&rsquo;s what your money does.</p>
+        <p>I set up a sponsor portal where you can see updates, photos, and letters as they come in from the campus. To log in, you&rsquo;ll need your email and your sponsor code:</p>
+        <div style="background: #FFF8F0; border: 1px solid #e8e0d4; padding: 16px 20px; margin: 16px 0; text-align: center;">
+          <p style="color: #999; font-size: 13px; margin: 0 0 4px 0;">Your sponsor code</p>
+          <p style="font-size: 22px; color: #0d0d0d; margin: 0; font-weight: bold; letter-spacing: 0.1em; font-family: monospace;">BAN-2026-001</p>
+        </div>
+        <p style="text-align: center; margin: 24px 0;">
+          <a href="${portalUrl}" style="display: inline-block; background: #D4A843; color: #0d0d0d; font-weight: bold; text-decoration: none; padding: 14px 32px; font-size: 15px; letter-spacing: 0.05em;">LOG IN TO YOUR PORTAL</a>
+        </p>
+        <p>Thank you for going all in. It means more than you know.</p>
+        <p>Kevin</p>
+      `),
+    },
+    {
+      pipeline: 'shirt_sponsor',
+      subject: `[SHIRT+SPONSOR 2/4] Quick question (and something about ${childName}).`,
+      html: wrap(`
+        ${banner('shirt_sponsor — Stage 1 (Day 8). Shirt arrival check + child reveal + portal reminder.')}
+        <p style="margin-top: 0;">Hey ${firstName},</p>
+        <p>Just checking: did your shirt arrive yet? I always wonder once they leave my hands.</p>
+        <p>If it did, you&rsquo;ve seen the number. That number belongs to ${childName}. <a href="${childUrl}" style="color: #D4A843; font-weight: bold;">Here&rsquo;s their page.</a> I&rsquo;d love for you to take a look when you get a minute. That&rsquo;s the kid you&rsquo;re keeping in school.</p>
+        <p>And because you&rsquo;re a monthly sponsor, this isn&rsquo;t a one-time connection. You&rsquo;ll get letters, photos, and updates from ${childName} over the coming months. The YDO team on the ground sends those to your <a href="${portalUrl}" style="color: #D4A843; font-weight: bold;">portal</a> and by email.</p>
+        <p>If you want to write back to ${childName}, reply to this email. I&rsquo;ll make sure it gets to them through the YDO team on the ground.</p>
+        <p>Kevin</p>
+      `),
+    },
+    {
+      pipeline: 'shirt_sponsor',
+      subject: "[SHIRT+SPONSOR 3/4] Here's what your first month did.",
+      html: wrap(`
+        ${banner('shirt_sponsor — Stage 2 (Day 15). First month impact. Updates incoming. Personal note.')}
+        <p style="margin-top: 0;">Hey ${firstName},</p>
+        <p>You&rsquo;ve been a sponsor for about two weeks now, and I wanted to give you a picture of what that actually looks like on the ground.</p>
+        <p>This month, ${childName} had a seat in school every day. They ate breakfast and lunch every day. They had a nurse on campus if they needed one. For some of these kids, those two meals are all they eat in a day. Your $25 made that real.</p>
+        <p>Over the next few weeks, expect your first update from the campus. The YDO team sends photos, report cards, and sometimes handwritten letters from the kids. They show up in your <a href="${portalUrl}" style="color: #D4A843; font-weight: bold;">sponsor portal</a> and by email.</p>
+        <p>I know two weeks isn&rsquo;t long, but I want you to know: ${childName} already knows they have a sponsor. That matters to them more than I can explain in an email.</p>
+        <p>Kevin</p>
+      `),
+    },
+    {
+      pipeline: 'shirt_sponsor',
+      subject: '[SHIRT+SPONSOR 4/4] Thank you for staying.',
+      html: wrap(`
+        ${banner('shirt_sponsor — Stage 3 (Day 25). Celebrate commitment. Ask for one referral.')}
+        <p style="margin-top: 0;">Hey ${firstName},</p>
+        <p>A lot of people sign up for things and quietly cancel. You didn&rsquo;t. I notice that, and so does ${childName}.</p>
+        <p>Your shirt started this, and your monthly sponsorship is what keeps it going. I don&rsquo;t think most people realize how rare that is. You went from buying a shirt to funding a child&rsquo;s education, meals, and medical care in one decision. That&rsquo;s not normal. That&rsquo;s extraordinary.</p>
+        <p>One thing that really helps us: if you know one person who&rsquo;d get what we do, send them a text. Not a social media blast. One friend. "Hey, I sponsor a kid in Uganda through this org called Be A Number. Check it out." That&rsquo;s how most of our sponsors find us.</p>
+        <p>And if you haven&rsquo;t checked your <a href="${portalUrl}" style="color: #D4A843; font-weight: bold;">portal</a> lately, updates show up there first.</p>
+        <p>Grateful for you,<br>Kevin</p>
+      `),
+    },
+  ];
+}
+
 export async function POST(request: NextRequest) {
   const to = 'kevin@beanumber.org';
   const from = { email: process.env.SENDGRID_FROM_EMAIL || 'Kevin@beanumber.org', name: 'Kevin at Be A Number' };
@@ -221,6 +286,9 @@ export async function POST(request: NextRequest) {
   }
   if (!filterPipeline || filterPipeline === 'donor_convert') {
     allEmails = allEmails.concat(getDonorConvertEmails());
+  }
+  if (!filterPipeline || filterPipeline === 'shirt_sponsor') {
+    allEmails = allEmails.concat(getShirtSponsorEmails());
   }
 
   const results = [];
