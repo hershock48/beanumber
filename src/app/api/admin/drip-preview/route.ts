@@ -1,5 +1,5 @@
 /**
- * POST /api/admin/drip-preview
+ * GET|POST /api/admin/drip-preview
  *
  * Sends all 4 shirt_nurture drip emails to Kevin for copy review.
  * Uses sample data. Not a production endpoint — delete after review.
@@ -103,4 +103,9 @@ export async function POST(request: NextRequest) {
   }
 
   return NextResponse.json({ sent: results });
+}
+
+// Also accept GET so the Vercel fetch tool can trigger it
+export async function GET(request: NextRequest) {
+  return POST(request);
 }
