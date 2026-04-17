@@ -1998,10 +1998,15 @@ export async function POST(request: NextRequest) {
                   // That pipeline already covers both shirt + sponsor onboarding.
                   const currentPipeline = donorRecord.fields?.DripPipeline || '';
                   if (currentPipeline === 'shirt_sponsor') {
-                    console.log('[WH] Donor already in shirt_sponsor drip, skipping sponsor_onboard enrollment');
+                    console.log('[WH] Donor already in shirt_sponsor drip, skipping enrollment');
                   } else {
-                  // Replace any existing drip (shirt_nurture, donor_convert)
-                  // with the sponsor_onboard sequence.
+                  // Determine which pipeline: sponsorship subscriptions have
+                  // order_type='sponsorship' in metadata. Monthly donations from
+                  // the donate page have donation_type='monthly' but no order_type.
+                  const subMeta = subscription.metadata || {};
+                  const isSponsorship = subMeta.order_type === 'sponsorship';
+                  const targetPipeline = isSponsorship ? 'sponsor_onboard' : 'monthly_donor';
+
                   const dripStartDate = new Date();
                   dripStartDate.setUTCDate(dripStartDate.getUTCDate() + 3);
                   const dripNextSend = dripStartDate.toISOString().split('T')[0];
@@ -2013,7 +2018,7 @@ export async function POST(request: NextRequest) {
                       headers: getAirtableHeaders(),
                       body: JSON.stringify({
                         fields: {
-                          DripPipeline: 'sponsor_onboard',
+                          DripPipeline: targetPipeline,
                           DripStage: 0,
                           DripNextSend: dripNextSend,
                           // Keep existing DripChildName/DripShirtNumber if set
@@ -2021,8 +2026,7 @@ export async function POST(request: NextRequest) {
                       }),
                     }
                   );
-                  console.log('[WH] Enrolled in sponsor_onboard drip:', donorRecord.id);
-                  } // close else (not shirt_sponsor)
+                  console.log(`[WH] Enrolled in ${targetPipeline} drip:`, donorRecord.id);
                 }
               }
             }

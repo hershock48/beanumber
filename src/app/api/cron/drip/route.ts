@@ -92,6 +92,11 @@ function validateCronAuth(request: NextRequest): boolean {
 //   Stage 1 → Day 8:  "Did the shirt land?" — the reveal + meet your child
 //   Stage 2 → Day 15: "What your first month did" — impact, updates coming
 //   Stage 3 → Day 25: "Thank you for staying" — celebrate, tell one friend
+//
+// monthly_donor (3 emails, ~22 days):
+//   Stage 0 → Day 3:  "Thank you for going monthly" — impact, what $X/mo does
+//   Stage 1 → Day 12: "Inside the campus" — how it works, meet the kids
+//   Stage 2 → Day 22: "Something I want to show you" — gentle intro to sponsorship
 
 type PipelineConfig = { gaps: number[]; maxStages: number };
 
@@ -100,6 +105,7 @@ const PIPELINE_CONFIGS: Record<string, PipelineConfig> = {
   sponsor_onboard:  { gaps: [3, 7, 11],    maxStages: 3 },
   donor_convert:    { gaps: [5, 9, 11],    maxStages: 3 },
   shirt_sponsor:    { gaps: [3, 5, 7, 10], maxStages: 4 },
+  monthly_donor:    { gaps: [3, 9, 10],    maxStages: 3 },
 };
 
 type DripDonor = {
@@ -436,6 +442,62 @@ function shirtSponsorEmail(
   }
 }
 
+// ── Monthly donor emails (not a sponsor, gave monthly via donate page) ──────
+
+function monthlyDonorEmail(
+  stage: number,
+  donor: DripDonor
+): { subject: string; html: string } | null {
+  const { firstName } = donor;
+
+  switch (stage) {
+    // ── Email 1: "Thank you for going monthly" (Day ~3) ─────────────────
+    case 0:
+      return {
+        subject: "This is going to matter every single month.",
+        html: wrapEmail(`
+          <p style="margin-top: 0;">Hey ${firstName},</p>
+          <p>I wanted to reach out because what you did is different from a one-time gift. You committed to showing up every month, and I don&rsquo;t take that lightly.</p>
+          <p>Your monthly donation goes to the YDO campus in Northern Uganda. One campus, one team on the ground, 380 kids in school, 700+ patients through the clinic, and 60 women in vocational training. Every dollar that comes in goes through the same door, and I run this myself.</p>
+          <p>What your gift covers each month: breakfast and lunch for kids who might not eat otherwise, school fees that keep them in class, and a medical clinic that serves the whole community. For some of these kids, those two meals are all they eat in a day.</p>
+          <p>I&rsquo;ll keep you posted on what&rsquo;s happening on the ground so you can see where this goes. Thank you for trusting us with this.</p>
+          <p>Kevin</p>
+        `),
+      };
+
+    // ── Email 2: "Inside the campus" (Day ~12) ─────────────────────────
+    case 1:
+      return {
+        subject: "Wanted to show you something from the campus.",
+        html: wrapEmail(`
+          <p style="margin-top: 0;">Hey ${firstName},</p>
+          <p>I&rsquo;ve been thinking about what to share with you, and I keep coming back to the same thing: I want you to see who your money is reaching.</p>
+          <p>At the YDO campus, every child has a number. That number is printed on a shirt, and when someone buys that shirt or sponsors that child, the two of them get connected. The sponsor gets letters, photos, and report cards. The child knows their sponsor by name. It&rsquo;s not a big faceless program. It&rsquo;s one person and one kid.</p>
+          <p>Your monthly gift keeps the whole system running. The meals, the teachers, the clinic, the campus itself. Without monthly donors, none of the one-to-one stuff works.</p>
+          <p>If you want to see the kids your gift supports, <a href="${SITE_URL}/children" style="color: #D4A843; font-weight: bold;">here they are</a>. Real names, real faces, real stories.</p>
+          <p>Kevin</p>
+        `),
+      };
+
+    // ── Email 3: "Something I want to show you" (Day ~22) ──────────────
+    case 2:
+      return {
+        subject: "One more thing, then I'll let your donation do the talking.",
+        html: wrapEmail(`
+          <p style="margin-top: 0;">Hey ${firstName},</p>
+          <p>This is the last email in this series, and I want to be upfront about why I&rsquo;m sending it.</p>
+          <p>Your monthly donation already makes a real difference. But there&rsquo;s something we offer that takes it further, and I&rsquo;d feel wrong not mentioning it.</p>
+          <p>For $25 a month, you can sponsor a specific child. You&rsquo;d be connected to them by name and number. You&rsquo;d get letters, photos, and report cards from the campus. They&rsquo;d know who you are. It&rsquo;s the most personal version of what we do, and sponsors tell me all the time it&rsquo;s not like anything else they&rsquo;ve experienced.</p>
+          <p>If that sounds like something you&rsquo;d want, <a href="${SITE_URL}/sponsorship" style="color: #D4A843; font-weight: bold;">you can meet the kids here</a>. If not, your monthly gift is already doing more than you know, and I&rsquo;m grateful for it.</p>
+          <p>God bless,<br>Kevin</p>
+        `),
+      };
+
+    default:
+      return null;
+  }
+}
+
 // ── Pipeline router ─────────────────────────────────────────────────────────
 
 function getEmailForPipeline(
@@ -449,6 +511,7 @@ function getEmailForPipeline(
     case 'sponsor_onboard':  return sponsorOnboardEmail(stage, donor, sponsorCode);
     case 'donor_convert':    return donorConvertEmail(stage, donor);
     case 'shirt_sponsor':    return shirtSponsorEmail(stage, donor, sponsorCode);
+    case 'monthly_donor':    return monthlyDonorEmail(stage, donor);
     default:                 return null;
   }
 }
