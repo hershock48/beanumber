@@ -36,6 +36,26 @@ function getHeaders() {
   };
 }
 
+const SPONSORSHIPS_TABLE = process.env.AIRTABLE_SPONSORSHIPS_TABLE || 'Sponsorships';
+
+// ── Sponsor code lookup ─────────────────────────────────────────────────────
+
+async function getSponsorCode(email: string): Promise<string | null> {
+  const formula = encodeURIComponent(
+    `AND({SponsorEmail}="${email}",{AuthStatus}="Active")`
+  );
+  const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${SPONSORSHIPS_TABLE}?filterByFormula=${formula}&maxRecords=1&fields%5B%5D=SponsorCode`;
+
+  try {
+    const res = await fetch(url, { headers: getHeaders() });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data.records?.[0]?.fields?.SponsorCode || null;
+  } catch {
+    return null;
+  }
+}
+
 // ── Auth ─────────────────────────────────────────────────────────────────────
 
 function validateCronAuth(request: NextRequest): boolean {
@@ -188,7 +208,8 @@ function shirtNurtureEmail(
 
 function sponsorOnboardEmail(
   stage: number,
-  donor: DripDonor
+  donor: DripDonor,
+  sponsorCode?: string | null
 ): { subject: string; html: string } | null {
   const { firstName, childName, shirtNumber } = donor;
   const childUrl = `${SITE_URL}/children/${shirtNumber}`;
@@ -208,9 +229,16 @@ function sponsorOnboardEmail(
             ? `<p>${childName} is the child your sponsorship supports. <a href="${childUrl}" style="color: #D4A843; font-weight: bold;">Here&rsquo;s their page.</a> Your $25/month covers their school fees, breakfast and lunch every day, and access to the medical clinic on campus. For some of these kids, those two meals are all they eat. That&rsquo;s not a summary. That&rsquo;s literally where the money goes.</p>`
             : `<p>Your $25/month covers school fees, breakfast and lunch every day, and access to the on-site medical clinic for a specific child at our campus. For some of these kids, those two meals are all they eat. That&rsquo;s not a summary. That&rsquo;s literally where the money goes.</p>`
           }
-          <p>I set up a sponsor portal where you&rsquo;ll be able to see updates, photos, and letters as they come in from the campus. I&rsquo;d recommend bookmarking it:</p>
+          <p>I set up a sponsor portal where you can see updates, photos, and letters as they come in from the campus. To log in, you&rsquo;ll need your email and your sponsor code:</p>
+          ${sponsorCode
+            ? `<div style="background: #FFF8F0; border: 1px solid #e8e0d4; padding: 16px 20px; margin: 16px 0; text-align: center;">
+                <p style="color: #999; font-size: 13px; margin: 0 0 4px 0;">Your sponsor code</p>
+                <p style="font-size: 22px; color: #0d0d0d; margin: 0; font-weight: bold; letter-spacing: 0.1em; font-family: monospace;">${sponsorCode}</p>
+              </div>`
+            : `<p style="color: #666; font-size: 14px;">(Your sponsor code was in your confirmation email. If you can&rsquo;t find it, reply to this email and I&rsquo;ll get it to you.)</p>`
+          }
           <p style="text-align: center; margin: 24px 0;">
-            <a href="${portalUrl}" style="display: inline-block; background: #D4A843; color: #0d0d0d; font-weight: bold; text-decoration: none; padding: 14px 32px; font-size: 15px; letter-spacing: 0.05em;">YOUR SPONSOR PORTAL</a>
+            <a href="${portalUrl}" style="display: inline-block; background: #D4A843; color: #0d0d0d; font-weight: bold; text-decoration: none; padding: 14px 32px; font-size: 15px; letter-spacing: 0.05em;">LOG IN TO YOUR PORTAL</a>
           </p>
           <p>If you ever have questions or want to send a message to ${childName || 'your child'}, reply to this email. I read every one.</p>
           <p>Kevin</p>
@@ -315,11 +343,12 @@ function donorConvertEmail(
 function getEmailForPipeline(
   pipeline: string,
   stage: number,
-  donor: DripDonor
+  donor: DripDonor,
+  sponsorCode?: string | null
 ): { subject: string; html: string } | null {
   switch (pipeline) {
     case 'shirt_nurture':    return shirtNurtureEmail(stage, donor);
-    case 'sponsor_onboard':  return sponsorOnboardEmail(stage, donor);
+    case 'sponsor_onboard':  return sponsorOnboardEmail(stage, donor, sponsorCode);
     case 'donor_convert':    return donorConvertEmail(stage, donor);
     default:                 return null;
   }
@@ -460,7 +489,12 @@ export async function GET(request: NextRequest) {
       continue;
     }
 
-    const emailContent = getEmailForPipeline(donor.pipeline, donor.dripStage, donor);
+    // Look up sponsor code for sponsor_onboard emails (needed for portal login instructions)
+    const sponsorCode = donor.pipeline === 'sponsor_onboard'
+      ? await getSponsorCode(donor.email)
+      : null;
+
+    const emailContent = getEmailForPipeline(donor.pipeline, donor.dripStage, donor, sponsorCode);
 
     if (!emailContent) {
       // Past the last stage — clear drip

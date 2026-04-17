@@ -118,9 +118,13 @@ function getSponsorOnboardEmails(): PreviewEmail[] {
         <p style="margin-top: 0;">Hey ${firstName},</p>
         <p>I&rsquo;m so glad you&rsquo;re here. I mean that. Every new sponsor changes what&rsquo;s possible for us, and it changes everything for one specific kid.</p>
         <p>${childName} is the child your sponsorship supports. <a href="${childUrl}" style="color: #D4A843; font-weight: bold;">Here&rsquo;s their page.</a> Your $25/month covers their school fees, breakfast and lunch every day, and access to the medical clinic on campus. For some of these kids, those two meals are all they eat. That&rsquo;s not a summary. That&rsquo;s literally where the money goes.</p>
-        <p>I set up a sponsor portal where you&rsquo;ll be able to see updates, photos, and letters as they come in from the campus. I&rsquo;d recommend bookmarking it:</p>
+        <p>I set up a sponsor portal where you can see updates, photos, and letters as they come in from the campus. To log in, you&rsquo;ll need your email and your sponsor code:</p>
+        <div style="background: #FFF8F0; border: 1px solid #e8e0d4; padding: 16px 20px; margin: 16px 0; text-align: center;">
+          <p style="color: #999; font-size: 13px; margin: 0 0 4px 0;">Your sponsor code</p>
+          <p style="font-size: 22px; color: #0d0d0d; margin: 0; font-weight: bold; letter-spacing: 0.1em; font-family: monospace;">BAN-2026-001</p>
+        </div>
         <p style="text-align: center; margin: 24px 0;">
-          <a href="${portalUrl}" style="display: inline-block; background: #D4A843; color: #0d0d0d; font-weight: bold; text-decoration: none; padding: 14px 32px; font-size: 15px; letter-spacing: 0.05em;">YOUR SPONSOR PORTAL</a>
+          <a href="${portalUrl}" style="display: inline-block; background: #D4A843; color: #0d0d0d; font-weight: bold; text-decoration: none; padding: 14px 32px; font-size: 15px; letter-spacing: 0.05em;">LOG IN TO YOUR PORTAL</a>
         </p>
         <p>If you ever have questions or want to send a message to ${childName}, reply to this email. I read every one.</p>
         <p>Kevin</p>
