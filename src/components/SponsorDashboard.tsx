@@ -87,6 +87,29 @@ function formatDate(iso: string): string {
   }
 }
 
+/** Count weekdays (Mon–Fri) between two dates. Uganda school calendar runs
+ *  ~40 weeks per year with three terms and holidays, but we approximate with
+ *  weekdays and discount 25% for term breaks, which lands close to reality. */
+function countSchoolDays(start: Date, end: Date): number {
+  let weekdays = 0;
+  const d = new Date(start);
+  d.setHours(0, 0, 0, 0);
+  const e = new Date(end);
+  e.setHours(0, 0, 0, 0);
+  while (d <= e) {
+    const day = d.getDay();
+    if (day !== 0 && day !== 6) weekdays++;
+    d.setDate(d.getDate() + 1);
+  }
+  // Discount ~25% for term breaks (Uganda has ~3 months of holidays per year)
+  return Math.round(weekdays * 0.75);
+}
+
+/** Days between two dates. */
+function daysBetween(start: Date, end: Date): number {
+  return Math.max(0, Math.floor((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
+}
+
 function isBirthdaySoon(birthday: string | undefined): { upcoming: boolean; daysAway: number; dateLabel: string } {
   if (!birthday) return { upcoming: false, daysAway: 999, dateLabel: '' };
 
@@ -213,11 +236,11 @@ export function SponsorDashboard({ sponsorCode, email }: SponsorDashboardProps) 
       });
     }
 
-    // Anniversary milestones
+    // Anniversary milestones (month-based)
     if (sponsorship.startDate) {
       const start = new Date(sponsorship.startDate);
       const now = new Date();
-      const milestonesMonths = [6, 12, 24, 36, 48, 60];
+      const milestonesMonths = [3, 6, 12, 24, 36, 48, 60];
       for (const m of milestonesMonths) {
         const milestoneDate = new Date(start);
         milestoneDate.setMonth(milestoneDate.getMonth() + m);
@@ -225,14 +248,69 @@ export function SponsorDashboard({ sponsorCode, email }: SponsorDashboardProps) 
           const label = m < 12
             ? `${m} months of sponsorship.`
             : m === 12
-              ? `1 year of sponsorship.`
-              : `${m / 12} years of sponsorship.`;
+              ? `1 year of sponsorship!`
+              : `${m / 12} years of sponsorship!`;
           entries.push({
             id: `milestone-${m}mo`,
             date: milestoneDate.toISOString().split('T')[0],
             kind: 'milestone',
             milestoneLabel: label,
-            milestoneIcon: 'star',
+            milestoneIcon: m >= 12 ? 'trophy' : 'star',
+          });
+        }
+      }
+
+      // Day-count milestones
+      const dayMilestones = [100, 365, 500, 1000];
+      for (const d of dayMilestones) {
+        const milestoneDate = new Date(start);
+        milestoneDate.setDate(milestoneDate.getDate() + d);
+        if (milestoneDate <= now) {
+          entries.push({
+            id: `milestone-${d}days`,
+            date: milestoneDate.toISOString().split('T')[0],
+            kind: 'milestone',
+            milestoneLabel: d === 365
+              ? `365 days together.`
+              : `${d.toLocaleString()} days of sponsorship.`,
+            milestoneIcon: 'calendar',
+          });
+        }
+      }
+    }
+
+    // First message milestone
+    if (sponsorMessages.length > 0) {
+      const firstMsg = [...sponsorMessages].sort(
+        (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+      )[0];
+      if (firstMsg) {
+        entries.push({
+          id: 'milestone-first-message',
+          date: firstMsg.date,
+          kind: 'milestone',
+          milestoneLabel: `You wrote your first message to ${firstName}.`,
+          milestoneIcon: 'pencil',
+        });
+      }
+    }
+
+    // Child's birthday (each year since sponsorship started)
+    if (childInfo?.birthday && sponsorship.startDate) {
+      const start = new Date(sponsorship.startDate);
+      const now = new Date();
+      const bday = new Date(childInfo.birthday);
+      // Add birthday milestone for each year the sponsor has been active
+      for (let year = start.getFullYear(); year <= now.getFullYear(); year++) {
+        const bdayThisYear = new Date(year, bday.getMonth(), bday.getDate());
+        if (bdayThisYear >= start && bdayThisYear <= now) {
+          const age = year - bday.getFullYear();
+          entries.push({
+            id: `milestone-birthday-${year}`,
+            date: bdayThisYear.toISOString().split('T')[0],
+            kind: 'milestone',
+            milestoneLabel: `${firstName} turned ${age}.`,
+            milestoneIcon: 'cake',
           });
         }
       }
@@ -242,7 +320,7 @@ export function SponsorDashboard({ sponsorCode, email }: SponsorDashboardProps) 
     entries.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
     return entries;
-  }, [updates, sponsorMessages, sponsorship.startDate, firstName]);
+  }, [updates, sponsorMessages, sponsorship.startDate, firstName, childInfo?.birthday]);
 
   // Collect all photos from updates for the gallery
   const allPhotos = useMemo(() => {
@@ -572,48 +650,62 @@ export function SponsorDashboard({ sponsorCode, email }: SponsorDashboardProps) 
       {/* ============================================================
           IMPACT MATH — what your money has done
           ============================================================ */}
-      {sponsorship.monthsActive > 0 && (
+      {sponsorship.startDate && (
         <div className="bg-white border border-[#e8e0d4] p-6 md:p-8 mb-6">
           <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-4">
             Your partnership so far
           </p>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
-            <div>
-              <p className="text-2xl md:text-3xl text-[#0d0d0d] font-semibold"
-                style={{ fontFamily: 'var(--font-lora), serif' }}>
-                {sponsorship.monthsActive}
-              </p>
-              <p className="text-sm text-[#888] mt-1">
-                {sponsorship.monthsActive === 1 ? 'month' : 'months'} sponsoring
-              </p>
-            </div>
-            <div>
-              <p className="text-2xl md:text-3xl text-[#0d0d0d] font-semibold"
-                style={{ fontFamily: 'var(--font-lora), serif' }}>
-                ${sponsorship.totalPaid > 0 ? sponsorship.totalPaid.toLocaleString() : (sponsorship.monthsActive * sponsorship.monthlyAmount).toLocaleString()}
-              </p>
-              <p className="text-sm text-[#888] mt-1">contributed</p>
-            </div>
-            <div>
-              <p className="text-2xl md:text-3xl text-[#0d0d0d] font-semibold"
-                style={{ fontFamily: 'var(--font-lora), serif' }}>
-                {sponsorship.monthsActive * 2}
-              </p>
-              <p className="text-sm text-[#888] mt-1">meals per day, every school day</p>
-            </div>
-            <div>
-              <p className="text-2xl md:text-3xl text-[#0d0d0d] font-semibold"
-                style={{ fontFamily: 'var(--font-lora), serif' }}>
-                {sponsorship.monthsActive}
-              </p>
-              <p className="text-sm text-[#888] mt-1">
-                {sponsorship.monthsActive === 1 ? 'month' : 'months'} of school fees + medical care
-              </p>
-            </div>
-          </div>
-          <p className="text-xs text-[#aaa] mt-5">
-            ${sponsorship.monthlyAmount}/mo covers breakfast and lunch at the campus, school fees, basic medical care, and mentorship through the YDO team.
-          </p>
+          {(() => {
+            const startDate = new Date(sponsorship.startDate!);
+            const now = new Date();
+            const days = daysBetween(startDate, now);
+            const schoolDays = countSchoolDays(startDate, now);
+            const meals = schoolDays * 2; // breakfast + lunch
+            const contributed = sponsorship.totalPaid > 0
+              ? sponsorship.totalPaid
+              : sponsorship.monthsActive * sponsorship.monthlyAmount;
+            return (
+              <>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
+                  <div>
+                    <p className="text-2xl md:text-3xl text-[#0d0d0d] font-semibold"
+                      style={{ fontFamily: 'var(--font-lora), serif' }}>
+                      {days.toLocaleString()}
+                    </p>
+                    <p className="text-sm text-[#888] mt-1">
+                      {days === 1 ? 'day' : 'days'} sponsoring {firstName}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-2xl md:text-3xl text-[#0d0d0d] font-semibold"
+                      style={{ fontFamily: 'var(--font-lora), serif' }}>
+                      ${contributed.toLocaleString()}
+                    </p>
+                    <p className="text-sm text-[#888] mt-1">contributed</p>
+                  </div>
+                  <div>
+                    <p className="text-2xl md:text-3xl text-[#0d0d0d] font-semibold"
+                      style={{ fontFamily: 'var(--font-lora), serif' }}>
+                      {meals.toLocaleString()}
+                    </p>
+                    <p className="text-sm text-[#888] mt-1">meals covered</p>
+                    <p className="text-xs text-[#bbb] mt-0.5">breakfast + lunch, every school day</p>
+                  </div>
+                  <div>
+                    <p className="text-2xl md:text-3xl text-[#0d0d0d] font-semibold"
+                      style={{ fontFamily: 'var(--font-lora), serif' }}>
+                      {schoolDays.toLocaleString()}
+                    </p>
+                    <p className="text-sm text-[#888] mt-1">school days covered</p>
+                    <p className="text-xs text-[#bbb] mt-0.5">fees, medical care, mentorship</p>
+                  </div>
+                </div>
+                <p className="text-xs text-[#aaa] mt-5">
+                  ${sponsorship.monthlyAmount}/mo covers breakfast and lunch at the campus, school fees, basic medical care, and mentorship through the YDO team.
+                </p>
+              </>
+            );
+          })()}
         </div>
       )}
 
