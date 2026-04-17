@@ -92,7 +92,7 @@ export async function POST(request: NextRequest) {
           fields: {
             'ChildID': childID,
             'SponsorCode': sponsorCode,
-            'UpdateType': 'Special Note',
+            'UpdateType': 'Sponsor Message',
             'Title': `Message from ${email}`,
             'Content': message,
             'Status': 'Pending Review',

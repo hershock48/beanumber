@@ -135,7 +135,7 @@ export async function POST(request: NextRequest) {
           fields: {
             'ChildID': childID,
             'SponsorCode': sponsorCode,
-            'UpdateType': 'Special Note',
+            'UpdateType': 'Requested Update',
             'Title': `Update Request from ${email}`,
             'Content': `Sponsor ${email} has requested an update about their sponsored child.`,
             'Status': 'Pending Review',

@@ -182,7 +182,7 @@ export async function GET(request: NextRequest) {
     // ---------------------------------------------------------------
     let sponsorMessages: any[] = [];
     if (childRevealed) {
-      const msgFormula = `AND({SponsorCode} = "${sponsorCode}", {RequestedBySponsor} = TRUE())`;
+      const msgFormula = `AND({SponsorCode} = "${sponsorCode}", {UpdateType} = "Sponsor Message")`;
       const msgRes = await fetch(
         `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_UPDATES_TABLE}?filterByFormula=${encodeURIComponent(msgFormula)}&sort[0][field]=RequestedAt&sort[0][direction]=desc`,
         { headers: headers() }
