@@ -163,6 +163,15 @@ export function SponsorDashboard({ sponsorCode, email }: SponsorDashboardProps) 
     }
   }
 
+  // Derive first name early — needed by useMemo below.
+  const firstName =
+    childInfo?.firstName ||
+    childInfo?.name?.split(' ')[0] ||
+    'them';
+
+  // Birthday
+  const birthdayInfo = isBirthdaySoon(childInfo?.birthday);
+
   // -------------------------------------------------------------------
   // Build the timeline — merges updates, messages, and milestones
   // -------------------------------------------------------------------
@@ -233,7 +242,7 @@ export function SponsorDashboard({ sponsorCode, email }: SponsorDashboardProps) 
     entries.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
     return entries;
-  }, [updates, sponsorMessages, sponsorship.startDate]);
+  }, [updates, sponsorMessages, sponsorship.startDate, firstName]);
 
   // Collect all photos from updates for the gallery
   const allPhotos = useMemo(() => {
@@ -247,15 +256,6 @@ export function SponsorDashboard({ sponsorCode, email }: SponsorDashboardProps) 
     }
     return photos;
   }, [updates]);
-
-  // Derive first name
-  const firstName =
-    childInfo?.firstName ||
-    childInfo?.name?.split(' ')[0] ||
-    'them';
-
-  // Birthday
-  const birthdayInfo = isBirthdaySoon(childInfo?.birthday);
 
   // -------------------------------------------------------------------
   // Actions
