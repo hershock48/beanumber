@@ -109,10 +109,12 @@ export async function POST(request: NextRequest) {
     );
 
     let childID = null;
+    let sponsorshipRecord: any = null;
     if (sponsorshipResponse.ok) {
       const sponsorshipData = await sponsorshipResponse.json();
       if (sponsorshipData.records && sponsorshipData.records.length > 0) {
-        childID = sponsorshipData.records[0].fields['ChildID'] || null;
+        sponsorshipRecord = sponsorshipData.records[0];
+        childID = sponsorshipRecord.fields['ChildID'] || null;
       }
     }
 
@@ -151,30 +153,27 @@ export async function POST(request: NextRequest) {
     );
 
     // Update Sponsorships table with LastRequestAt and NextRequestEligibleAt
-    if (response.ok) {
-      const sponsorshipData = await sponsorshipResponse.json();
-      if (sponsorshipData.records && sponsorshipData.records.length > 0) {
-        const sponsorshipId = sponsorshipData.records[0].id;
-        const nextEligible = new Date();
-        nextEligible.setDate(nextEligible.getDate() + 90); // 90 days from now
+    if (response.ok && sponsorshipRecord) {
+      const sponsorshipId = sponsorshipRecord.id;
+      const nextEligible = new Date();
+      nextEligible.setDate(nextEligible.getDate() + 90); // 90 days from now
 
-        await fetch(
-          `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_SPONSORSHIPS_TABLE}/${sponsorshipId}`,
-          {
-            method: 'PATCH',
-            headers: {
-              Authorization: `Bearer ${AIRTABLE_API_KEY}`,
-              'Content-Type': 'application/json',
+      await fetch(
+        `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_SPONSORSHIPS_TABLE}/${sponsorshipId}`,
+        {
+          method: 'PATCH',
+          headers: {
+            Authorization: `Bearer ${AIRTABLE_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            fields: {
+              'LastRequestAt': now,
+              'NextRequestEligibleAt': nextEligible.toISOString(),
             },
-            body: JSON.stringify({
-              fields: {
-                'LastRequestAt': now,
-                'NextRequestEligibleAt': nextEligible.toISOString(),
-              },
-            }),
-          }
-        );
-      }
+          }),
+        }
+      );
     }
 
     if (!response.ok) {

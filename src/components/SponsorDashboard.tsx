@@ -207,11 +207,15 @@ export function SponsorDashboard({ sponsorCode, email }: SponsorDashboardProps) 
   const [requestingUpdate, setRequestingUpdate] = useState(false);
   const [requestSuccess, setRequestSuccess] = useState(false);
 
-  // Write-to-child form state
+  // Write-to-child guided flow state
   const [messageText, setMessageText] = useState('');
   const [sendingMessage, setSendingMessage] = useState(false);
   const [messageSent, setMessageSent] = useState(false);
   const [messageError, setMessageError] = useState('');
+  const [msgStep, setMsgStep] = useState<1 | 2 | 3>(1); // 1 = tell about you, 2 = ask child, 3 = free-text
+  const [selectedSharePrompt, setSelectedSharePrompt] = useState<string | null>(null);
+  const [shareAnswer, setShareAnswer] = useState('');
+  const [selectedAskPrompt, setSelectedAskPrompt] = useState<string | null>(null);
 
   useEffect(() => {
     loadSponsorData();
@@ -424,7 +428,21 @@ export function SponsorDashboard({ sponsorCode, email }: SponsorDashboardProps) 
   }
 
   async function handleSendMessage() {
-    if (!messageText.trim() || sendingMessage) return;
+    // Compose the full message from guided prompts + free text
+    const parts: string[] = [];
+    if (selectedSharePrompt && shareAnswer.trim()) {
+      parts.push(`${selectedSharePrompt}\n${shareAnswer.trim()}`);
+    }
+    if (selectedAskPrompt) {
+      parts.push(`Question for ${firstName || 'the child'}: ${selectedAskPrompt}`);
+    }
+    if (messageText.trim()) {
+      parts.push(messageText.trim());
+    }
+
+    const fullMessage = parts.join('\n\n');
+    if (!fullMessage || sendingMessage) return;
+
     setSendingMessage(true);
     setMessageError('');
     setMessageSent(false);
@@ -433,12 +451,16 @@ export function SponsorDashboard({ sponsorCode, email }: SponsorDashboardProps) 
       const response = await fetch('/api/sponsor/send-message', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sponsorCode, email, message: messageText.trim() }),
+        body: JSON.stringify({ sponsorCode, email, message: fullMessage }),
       });
 
       if (response.ok) {
         setMessageSent(true);
         setMessageText('');
+        setShareAnswer('');
+        setSelectedSharePrompt(null);
+        setSelectedAskPrompt(null);
+        setMsgStep(1);
         // Reload so the message appears in the timeline
         await loadSponsorData();
       } else {
@@ -818,53 +840,230 @@ export function SponsorDashboard({ sponsorCode, email }: SponsorDashboardProps) 
           )}
         </div>
 
-        {/* Write to Your Child */}
+        {/* Write to Your Child — Guided Flow */}
         <div className="bg-white border border-[#e8e0d4] p-6">
           <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-3">
             Write to {firstName}
           </p>
+
           {messageSent ? (
             <div className="bg-[#FFF8F0] border border-[#e8e0d4] p-4 text-sm text-[#444]">
               <p className="font-medium text-[#0d0d0d] mb-1">Message sent.</p>
-              <p className="text-[#666]">
-                Kevin will make sure it gets to {firstName} through the YDO team on the ground.
+              <p className="text-[#666] mb-2">
+                Kevin will relay your message to {firstName} through the YDO team on the ground in Omoro District.
               </p>
+              <div className="bg-white border border-[#e8e0d4] p-3 text-xs text-[#888] mb-3">
+                <p className="font-semibold text-[#666] mb-1">What happens next</p>
+                <p>Your message goes to Kevin, then to the YDO team, then to {firstName}. If you asked a question, {firstName}&rsquo;s response comes back the same way. Expect 2&ndash;4 weeks &mdash; mail between here and Northern Uganda takes time, and that&rsquo;s okay.</p>
+              </div>
               <button
-                onClick={() => setMessageSent(false)}
-                className="mt-3 text-sm text-[#D4A843] hover:underline font-medium"
+                onClick={() => { setMessageSent(false); setMsgStep(1); }}
+                className="text-sm text-[#D4A843] hover:underline font-medium"
               >
                 Write another message
               </button>
             </div>
           ) : (
             <>
-              <p className="text-sm text-[#666] leading-relaxed mb-3">
-                Send a note, a question, encouragement — whatever you want {firstName} to hear.
-                Kevin relays every message through the YDO team.
-              </p>
               {messageError && (
                 <div className="bg-[#FFF8F0] border border-[#D4A843] text-[#0d0d0d] px-3 py-2 text-sm mb-3">
                   {messageError}
                 </div>
               )}
-              <textarea
-                value={messageText}
-                onChange={(e) => setMessageText(e.target.value)}
-                placeholder={`Hey ${firstName}...`}
-                rows={3}
-                maxLength={2000}
-                className="w-full px-4 py-3 border border-[#e8e0d4] bg-white text-[#0d0d0d] text-sm leading-relaxed focus:outline-none focus:border-[#D4A843] focus:ring-1 focus:ring-[#D4A843] transition-colors resize-none mb-3"
-              />
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-[#aaa]">{messageText.length}/2000</span>
-                <button
-                  onClick={handleSendMessage}
-                  disabled={!messageText.trim() || sendingMessage}
-                  className="px-5 py-2.5 bg-[#D4A843] text-[#0d0d0d] font-bold text-sm tracking-[0.05em] hover:bg-[#c49a3a] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {sendingMessage ? 'SENDING...' : 'SEND MESSAGE'}
-                </button>
+
+              {/* Step indicator */}
+              <div className="flex items-center gap-2 mb-4">
+                {[1, 2, 3].map((s) => (
+                  <div key={s} className="flex items-center gap-2">
+                    <div
+                      className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${
+                        msgStep === s
+                          ? 'bg-[#D4A843] text-[#0d0d0d]'
+                          : msgStep > s
+                          ? 'bg-[#D4A843]/20 text-[#D4A843]'
+                          : 'bg-[#f0ece4] text-[#bbb]'
+                      }`}
+                    >
+                      {msgStep > s ? '✓' : s}
+                    </div>
+                    {s < 3 && <div className={`w-6 h-px ${msgStep > s ? 'bg-[#D4A843]/40' : 'bg-[#e8e0d4]'}`} />}
+                  </div>
+                ))}
+                <span className="text-xs text-[#aaa] ml-2">
+                  {msgStep === 1 ? 'Share about you' : msgStep === 2 ? `Ask ${firstName} something` : 'Add a note'}
+                </span>
               </div>
+
+              {/* ── Step 1: Tell the child about yourself ── */}
+              {msgStep === 1 && (
+                <div>
+                  <p className="text-sm text-[#666] leading-relaxed mb-3">
+                    Pick a question to answer so {firstName} can get to know you.
+                  </p>
+                  <div className="space-y-2 mb-4">
+                    {[
+                      'What do you do for work or school?',
+                      'What do you like to do on weekends?',
+                      'What is your favorite food?',
+                      'Do you have any pets or siblings?',
+                    ].map((prompt) => (
+                      <button
+                        key={prompt}
+                        onClick={() => setSelectedSharePrompt(prompt)}
+                        className={`block w-full text-left px-4 py-3 border text-sm transition-colors ${
+                          selectedSharePrompt === prompt
+                            ? 'border-[#D4A843] bg-[#FFF8F0] text-[#0d0d0d]'
+                            : 'border-[#e8e0d4] bg-white text-[#666] hover:border-[#D4A843]/50'
+                        }`}
+                      >
+                        {prompt}
+                      </button>
+                    ))}
+                  </div>
+                  {selectedSharePrompt && (
+                    <div className="mb-4">
+                      <p className="text-xs font-semibold text-[#888] uppercase tracking-wider mb-2">Your answer</p>
+                      <textarea
+                        value={shareAnswer}
+                        onChange={(e) => setShareAnswer(e.target.value)}
+                        placeholder="Write your answer here..."
+                        rows={3}
+                        maxLength={500}
+                        className="w-full px-4 py-3 border border-[#e8e0d4] bg-white text-[#0d0d0d] text-sm leading-relaxed focus:outline-none focus:border-[#D4A843] focus:ring-1 focus:ring-[#D4A843] transition-colors resize-none"
+                      />
+                      <span className="text-xs text-[#aaa]">{shareAnswer.length}/500</span>
+                    </div>
+                  )}
+                  <div className="flex items-center justify-between">
+                    <button
+                      onClick={() => { setSelectedSharePrompt(null); setShareAnswer(''); setMsgStep(2); }}
+                      className="text-xs text-[#aaa] hover:text-[#666] transition-colors"
+                    >
+                      Skip this step
+                    </button>
+                    <button
+                      onClick={() => setMsgStep(2)}
+                      disabled={!selectedSharePrompt || !shareAnswer.trim()}
+                      className="px-5 py-2.5 bg-[#D4A843] text-[#0d0d0d] font-bold text-sm tracking-[0.05em] hover:bg-[#c49a3a] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      NEXT
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* ── Step 2: Ask the child a question ── */}
+              {msgStep === 2 && (
+                <div>
+                  <p className="text-sm text-[#666] leading-relaxed mb-3">
+                    Pick a question you&rsquo;d like to ask {firstName}.
+                  </p>
+                  <div className="space-y-2 mb-4">
+                    {[
+                      'What is your favorite subject in school?',
+                      'What do you like to do with your friends?',
+                      'What do you want to be when you grow up?',
+                      'What is something that made you happy this week?',
+                    ].map((prompt) => (
+                      <button
+                        key={prompt}
+                        onClick={() => setSelectedAskPrompt(selectedAskPrompt === prompt ? null : prompt)}
+                        className={`block w-full text-left px-4 py-3 border text-sm transition-colors ${
+                          selectedAskPrompt === prompt
+                            ? 'border-[#D4A843] bg-[#FFF8F0] text-[#0d0d0d]'
+                            : 'border-[#e8e0d4] bg-white text-[#666] hover:border-[#D4A843]/50'
+                        }`}
+                      >
+                        {prompt}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <button
+                      onClick={() => setMsgStep(1)}
+                      className="text-xs text-[#aaa] hover:text-[#666] transition-colors"
+                    >
+                      ← Back
+                    </button>
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={() => { setSelectedAskPrompt(null); setMsgStep(3); }}
+                        className="text-xs text-[#aaa] hover:text-[#666] transition-colors"
+                      >
+                        Skip
+                      </button>
+                      <button
+                        onClick={() => setMsgStep(3)}
+                        disabled={!selectedAskPrompt}
+                        className="px-5 py-2.5 bg-[#D4A843] text-[#0d0d0d] font-bold text-sm tracking-[0.05em] hover:bg-[#c49a3a] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        NEXT
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ── Step 3: Free-text + review + send ── */}
+              {msgStep === 3 && (
+                <div>
+                  {/* Summary of what they picked */}
+                  {(selectedSharePrompt || selectedAskPrompt) && (
+                    <div className="bg-[#FFF8F0] border border-[#e8e0d4] p-3 mb-4 text-sm space-y-2">
+                      {selectedSharePrompt && shareAnswer.trim() && (
+                        <div>
+                          <p className="text-xs font-semibold text-[#D4A843] uppercase tracking-wider">You shared</p>
+                          <p className="text-[#666] italic">&ldquo;{selectedSharePrompt}&rdquo;</p>
+                          <p className="text-[#444]">{shareAnswer.trim()}</p>
+                        </div>
+                      )}
+                      {selectedAskPrompt && (
+                        <div>
+                          <p className="text-xs font-semibold text-[#D4A843] uppercase tracking-wider">You asked {firstName}</p>
+                          <p className="text-[#444]">&ldquo;{selectedAskPrompt}&rdquo;</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  <p className="text-sm text-[#666] leading-relaxed mb-3">
+                    Anything else you want to say? A greeting, encouragement, anything at all. Or just send what you have.
+                  </p>
+                  <textarea
+                    value={messageText}
+                    onChange={(e) => setMessageText(e.target.value)}
+                    placeholder={`Hey ${firstName}...`}
+                    rows={3}
+                    maxLength={1000}
+                    className="w-full px-4 py-3 border border-[#e8e0d4] bg-white text-[#0d0d0d] text-sm leading-relaxed focus:outline-none focus:border-[#D4A843] focus:ring-1 focus:ring-[#D4A843] transition-colors resize-none mb-2"
+                  />
+                  <span className="text-xs text-[#aaa] block mb-3">{messageText.length}/1000</span>
+
+                  {/* Response time expectation */}
+                  <div className="bg-[#f9f6f0] border border-[#e8e0d4] px-3 py-2 text-xs text-[#888] mb-4 flex items-start gap-2">
+                    <svg className="w-4 h-4 text-[#D4A843] mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span>Messages travel from Kevin to the YDO team to {firstName} in Northern Uganda. If you asked a question, expect a response in 2&ndash;4 weeks. That&rsquo;s the reality of the distance &mdash; and part of what makes the connection real.</span>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <button
+                      onClick={() => setMsgStep(2)}
+                      className="text-xs text-[#aaa] hover:text-[#666] transition-colors"
+                    >
+                      ← Back
+                    </button>
+                    <button
+                      onClick={handleSendMessage}
+                      disabled={(!selectedSharePrompt || !shareAnswer.trim()) && !selectedAskPrompt && !messageText.trim() || sendingMessage}
+                      className="px-5 py-2.5 bg-[#D4A843] text-[#0d0d0d] font-bold text-sm tracking-[0.05em] hover:bg-[#c49a3a] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {sendingMessage ? 'SENDING...' : 'SEND MESSAGE'}
+                    </button>
+                  </div>
+                </div>
+              )}
             </>
           )}
         </div>
