@@ -2030,6 +2030,7 @@ export async function POST(request: NextRequest) {
                 }
               }
             }
+            }
           } catch (err: any) {
             console.error('[WH] sponsor_onboard drip enrollment failed (non-fatal):', String(err?.message || err).slice(0, 200));
           }
