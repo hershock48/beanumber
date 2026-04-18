@@ -128,9 +128,8 @@ function DesignContainer({
  * higher (closer to the top of the box).
  */
 function SharedFront({ theme, mode = 'tee', className = '' }: DesignProps) {
-  // Bump the chest mark on mobile tee so it's not a dot.
   const top = mode === 'tee' ? '28%' : '17%';
-  const width = mode === 'tee' ? '12%' : '18%';
+  const width = mode === 'tee' ? '10%' : '14%';
 
   return (
     <DesignContainer theme={theme} mode={mode} side="front" className={className}>
@@ -143,7 +142,7 @@ function SharedFront({ theme, mode = 'tee', className = '' }: DesignProps) {
           className="font-semibold uppercase"
           style={{
             color: theme.vinyl,
-            fontSize: mode === 'tee' ? 'clamp(4px, 1.7cqw, 8px)' : 'clamp(5px, 2.2cqw, 10px)',
+            fontSize: mode === 'tee' ? 'clamp(3px, 1.4cqw, 6px)' : 'clamp(4px, 1.8cqw, 8px)',
             letterSpacing: '0.18em',
             marginTop: '8%',
           }}
@@ -161,7 +160,7 @@ function SharedFront({ theme, mode = 'tee', className = '' }: DesignProps) {
  */
 function FlagshipFront({ theme, mode = 'tee', className = '' }: DesignProps) {
   const top = mode === 'tee' ? '28%' : '17%';
-  const width = mode === 'tee' ? '12%' : '18%';
+  const width = mode === 'tee' ? '10%' : '14%';
 
   return (
     <DesignContainer theme={theme} mode={mode} side="front" className={className}>
@@ -174,7 +173,7 @@ function FlagshipFront({ theme, mode = 'tee', className = '' }: DesignProps) {
           className="font-semibold uppercase"
           style={{
             color: theme.vinyl,
-            fontSize: mode === 'tee' ? 'clamp(4px, 1.7cqw, 8px)' : 'clamp(5px, 2.2cqw, 10px)',
+            fontSize: mode === 'tee' ? 'clamp(3px, 1.4cqw, 6px)' : 'clamp(4px, 1.8cqw, 8px)',
             letterSpacing: '0.18em',
             marginTop: '8%',
           }}
@@ -281,10 +280,10 @@ function EverythingHallelujahBack({ theme, mode = 'tee', className = '' }: Desig
   // so the text is actually readable when someone hovers to inspect.
   // On mobile tee mode, make it wider + fewer reps so the text is legible.
   // On desktop tee the original proportions work fine.
-  const blockWidth = mode === 'tee' ? '26%' : '40%';
+  const blockWidth = mode === 'tee' ? '23%' : '36%';
   const fontSize = mode === 'tee'
-    ? 'clamp(5px, 2.6cqw, 11px)'
-    : 'clamp(7px, 3.8cqw, 18px)';
+    ? 'clamp(4px, 2.3cqw, 10px)'
+    : 'clamp(6px, 3.4cqw, 16px)';
   // Spread the 5 repetitions evenly down the back body area
   const startTop = mode === 'tee' ? 20 : 10;
   const gap = mode === 'tee' ? 13 : 16;
@@ -322,8 +321,8 @@ function EverythingHallelujahBack({ theme, mode = 'tee', className = '' }: Desig
  */
 function NigeriaBack({ theme, mode = 'tee', className = '' }: DesignProps) {
   const topPos = mode === 'tee' ? '28%' : '20%';
-  const fontSize = mode === 'tee' ? 'clamp(18px, 10cqw, 52px)' : 'clamp(22px, 10.5cqw, 68px)';
-  const crossSize = mode === 'tee' ? 'clamp(22px, 11cqw, 60px)' : 'clamp(28px, 12cqw, 76px)';
+  const fontSize = mode === 'tee' ? 'clamp(16px, 9cqw, 47px)' : 'clamp(22px, 10.5cqw, 68px)';
+  const crossSize = mode === 'tee' ? 'clamp(20px, 10cqw, 54px)' : 'clamp(28px, 12cqw, 76px)';
 
   return (
     <DesignContainer theme={theme} mode={mode} side="back" className={className}>
