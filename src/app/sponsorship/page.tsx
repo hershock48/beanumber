@@ -270,9 +270,9 @@ function SponsorshipPageContent() {
                     className="text-4xl text-[#D4A843]"
                     style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 700 }}
                   >
-                    96.7%
+                    380
                   </div>
-                  <p className="text-[#777] text-sm mt-1">went directly to programs in 2025</p>
+                  <p className="text-[#777] text-sm mt-1">children enrolled at the campus</p>
                 </div>
               </div>
             </div>
@@ -692,7 +692,7 @@ function SponsorshipPageContent() {
             {[
               {
                 q: 'Where does my $25 actually go?',
-                a: 'In 2025, 96.7% of every dollar went directly to programs. Your $25 pools with other sponsors to fund education, daily meals, medical care through the on-site clinic, and mentorship for the children at the YDO campus. But it also supports the infrastructure around them: the 60 women in vocational training, the 700+ patients served through medical outreach, the construction apprenticeships. You\u2019re not funding one line item. You\u2019re funding the ecosystem that keeps a child safe.',
+                a: 'Your $25 pools with other sponsors to fund education, daily meals, medical care through the on-site clinic, and mentorship for the children at the YDO campus. But it also supports the infrastructure around them: the 60 women in vocational training, the 700+ patients served through medical outreach, the construction apprenticeships. You\u2019re not funding one line item. You\u2019re funding the ecosystem that keeps a child safe.',
               },
               {
                 q: 'What happens if multiple people sponsor the same child?',

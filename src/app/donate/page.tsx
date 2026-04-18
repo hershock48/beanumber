@@ -6,11 +6,11 @@ import { DonationSection } from '@/components/DonationSection';
 export const metadata: Metadata = {
   title: 'Donate | Be A Number',
   description:
-    'Your gift funds schools, clinics, vocational training, and trauma recovery in Northern Uganda. In 2025, 96.7% went directly to programs.',
+    'Your gift funds schools, clinics, vocational training, and trauma recovery in Northern Uganda.',
   openGraph: {
     title: 'Donate | Be A Number',
     description:
-      'Your gift funds schools, clinics, vocational training, and trauma recovery in Northern Uganda. In 2025, 96.7% went directly to programs.',
+      'Your gift funds schools, clinics, vocational training, and trauma recovery in Northern Uganda.',
   },
 };
 
@@ -34,7 +34,7 @@ export default function DonatePage() {
             <p className="text-lg text-[#777] max-w-2xl mx-auto leading-relaxed">
               Your gift supports a six-acre campus in Northern Uganda where 380 kids
               go to school, 700+ patients get medical care, and 60 women are learning
-              trades. In 2025, 96.7% of every dollar reached programs on the ground.
+              trades.
             </p>
           </div>
         </section>

@@ -7,11 +7,11 @@ import { BANFooter } from '@/components/BANFooter';
 export const metadata: Metadata = {
   title: '2025 Impact | Be A Number',
   description:
-    'What happened on six acres in Northern Uganda in 2025. 700+ patients treated, 68 adults trained, 30 local jobs, and 96.7% of every dollar went to programs.',
+    'What happened on six acres in Northern Uganda in 2025. 700+ patients treated, 68 adults trained, 30 local jobs, 380 children enrolled.',
   openGraph: {
     title: '2025 Impact | Be A Number',
     description:
-      '700+ patients, 68 adults trained, 30 community jobs, 96.7% program efficiency. Measured outcomes from a six-acre campus in Omoro District.',
+      '700+ patients, 68 adults trained, 30 community jobs, 380 children enrolled. Measured outcomes from a six-acre campus in Omoro District.',
     images: ['/images/impact-page/lead-image.jpg'],
   },
 };
@@ -20,7 +20,7 @@ const impactJsonLd = {
   '@context': 'https://schema.org',
   '@type': 'Article',
   headline: 'Six Acres. One Year. Here\'s What Happened.',
-  description: 'What happened on six acres in Northern Uganda in 2025. 700+ patients treated, 68 adults trained, 30 local jobs, and 96.7% of every dollar went to programs.',
+  description: 'What happened on six acres in Northern Uganda in 2025. 700+ patients treated, 68 adults trained, 30 local jobs, 380 children enrolled.',
   author: { '@type': 'Person', name: 'Kevin Hershock' },
   publisher: {
     '@type': 'NonprofitOrganization',
@@ -257,41 +257,27 @@ export default function Impact() {
                 className="text-4xl text-[#D4A843] mb-1"
                 style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 700 }}
               >
-                96.7%
+                30
               </p>
-              <p className="text-[#FFF8F0] text-sm font-semibold mb-1">To programs</p>
-              <p className="text-[#777] text-xs">Direct community program allocation</p>
+              <p className="text-[#FFF8F0] text-sm font-semibold mb-1">Local jobs</p>
+              <p className="text-[#777] text-xs">Community members employed on campus</p>
             </div>
             <div className="border border-[#333] p-6 text-center">
               <p
                 className="text-4xl text-[#D4A843] mb-1"
                 style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 700 }}
               >
-                3.3%
+                380
               </p>
-              <p className="text-[#FFF8F0] text-sm font-semibold mb-1">Overhead</p>
-              <p className="text-[#777] text-xs">Admin, compliance, and reporting</p>
+              <p className="text-[#FFF8F0] text-sm font-semibold mb-1">Children enrolled</p>
+              <p className="text-[#777] text-xs">Full-time school, meals, and medical care</p>
             </div>
           </div>
 
           <div className="max-w-2xl mx-auto">
-            {/* Visual bar */}
-            <div className="mb-6">
-              <div className="h-4 w-full bg-[#222] overflow-hidden flex">
-                <div className="h-full bg-[#D4A843]" style={{ width: '96.7%' }} />
-                <div className="h-full bg-[#555]" style={{ width: '3.3%' }} />
-              </div>
-              <div className="flex justify-between text-xs mt-2">
-                <span className="text-[#D4A843]">Programs: 96.7%</span>
-                <span className="text-[#777]">Admin: 3.3%</span>
-              </div>
-            </div>
-
-            <p className="text-[#999] text-sm leading-relaxed">
-              Administrative functions remain intentionally lean. Governance, compliance,
-              financial reporting, and long-term sustainability planning are handled at
-              minimal cost so that nearly every dollar reaches the ground. This isn&rsquo;t
-              accidental. It&rsquo;s structural.
+            <p className="text-[#999] text-sm leading-relaxed text-center">
+              Full financial reports are independently reviewed and available on
+              our <a href="/reports/2025-impact-financial-summary" className="text-[#D4A843] underline">2025 financial summary</a> page.
             </p>
           </div>
         </div>

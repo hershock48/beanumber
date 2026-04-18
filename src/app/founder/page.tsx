@@ -184,7 +184,7 @@ export default function Founder() {
             </p>
 
             <p className="text-[#555] leading-relaxed text-lg">
-              In 2025, more than 700 patients received medical care, 68 adults completed vocational and construction training, and over 60 youth joined sports and wellness programs. The organization raised and deployed $79,623, with 96.7% going directly to programs and almost nothing lost to overhead.
+              In 2025, more than 700 patients received medical care, 68 adults completed vocational and construction training, and over 60 youth joined sports and wellness programs. The organization raised and deployed $79,623.
             </p>
           </div>
 

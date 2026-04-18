@@ -37,9 +37,7 @@ export default function DonateSuccess() {
             </p>
 
             <p className="text-[#777] leading-relaxed">
-              We run at 96.7% program efficiency. Almost every dollar you gave
-              lands where it&rsquo;s supposed to. A tax-deductible receipt is on
-              its way to your inbox.
+              A tax-deductible receipt is on its way to your inbox.
             </p>
           </div>
 

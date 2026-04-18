@@ -22,7 +22,7 @@ const faqJsonLd = {
       name: 'Where does the $25 actually go?',
       acceptedAnswer: {
         '@type': 'Answer',
-        text: 'In 2025, 96.7% of every dollar went directly to programs. Your child\'s sponsorship funds education, daily meals, medical care through the on-site clinic, and mentorship. It also supports the community infrastructure around them.',
+        text: 'Your child\'s sponsorship funds education, daily meals, medical care through the on-site clinic, and mentorship. It also supports the community infrastructure around them: vocational training, medical outreach, construction apprenticeships.',
       },
     },
     {
