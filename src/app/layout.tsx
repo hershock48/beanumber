@@ -24,7 +24,7 @@ export const metadata: Metadata = {
   icons: {
     icon: '/favicon.ico',
     shortcut: '/favicon.ico',
-    apple: '/icon.svg',
+    apple: '/apple-icon.png',
   },
   description: "Every Be A Number shirt carries a unique number connected to a real child in Africa. Find your number, meet your child, become their sponsor.",
   keywords: ["child sponsorship", "Africa", "Northern Uganda", "nonprofit", "Be A Number", "sponsor a child", "education", "community development"],
