@@ -456,22 +456,23 @@ function monthlyDonorEmail(
         html: wrapEmail(`
           <p style="margin-top: 0;">Hey ${firstName},</p>
           <p>I wanted to give you a better picture of how things work on the ground, since your monthly gift is part of what makes it all run.</p>
-          <p>Every child at the campus has a number, and that number goes on a shirt. When someone buys that shirt or sponsors that child, they get connected one-to-one. The sponsor gets letters, photos, and report cards, and the child knows their sponsor by name. It&rsquo;s not a big faceless program. It&rsquo;s one person and one kid.</p>
-          <p>Your monthly gift is what keeps the whole campus going: the meals, the teachers, the clinic. Without monthly donors, none of the one-to-one stuff would work.</p>
+          <p>Every child at the campus has a number, and that number goes on a shirt. When someone buys that shirt or sponsors that child, they get connected to a real kid by name. The sponsor gets letters, photos, and report cards, and the child knows their sponsor. It&rsquo;s not a big faceless program.</p>
+          <p>Your monthly gift is what keeps the whole campus going: the meals, the teachers, the clinic. Without monthly donors, none of the rest of it would work.</p>
           <p>If you want to see the kids your gift is supporting, you can <a href="${SITE_URL}/sponsorship" style="color: #D4A843; font-weight: bold;">meet them here</a>.</p>
           <p>Kevin</p>
         `),
       };
 
-    // ── Email 3: Sponsorship intro (Day ~22) ─────────────────────────────
+    // ── Email 3: Spread the word (Day ~22) ─────────────────────────────
     case 2:
       return {
-        subject: "Last email from me in this series",
+        subject: "One thing that would really help",
         html: wrapEmail(`
           <p style="margin-top: 0;">Hey ${firstName},</p>
-          <p>This is the last email in this series, and I want to be straightforward about why I&rsquo;m sending it.</p>
-          <p>Your monthly donation already makes a real difference at the campus. But there&rsquo;s something else we offer that I&rsquo;d feel wrong not telling you about. For $25 a month, you can sponsor a specific child. You&rsquo;d be connected to them by name and number, you&rsquo;d get letters, photos, and report cards from the campus, and they&rsquo;d know who you are.</p>
-          <p>If that sounds like something you&rsquo;d want, you can <a href="${SITE_URL}/sponsorship" style="color: #D4A843; font-weight: bold;">meet the kids here</a>. If not, your monthly gift keeps the campus running, and I&rsquo;m grateful for it.</p>
+          <p>Your monthly gift keeps the campus running, and I wanted to ask you for one more thing that doesn&rsquo;t cost anything.</p>
+          <p>If you know someone who&rsquo;d be into what we do, send them our way. A text, an Instagram share, a conversation over coffee. Most of the people who support us found out because someone they trust told them about it. That&rsquo;s it. No ad campaign, no viral post. One person telling another person about a six-acre campus in Uganda where real things are happening for real kids.</p>
+          <p>Here&rsquo;s the link if you want to share it: <a href="${SITE_URL}" style="color: #D4A843; font-weight: bold;">beanumber.org</a></p>
+          <p>Thank you for being part of this.</p>
           <p>God bless,<br>Kevin</p>
         `),
       };
