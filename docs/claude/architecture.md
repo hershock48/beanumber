@@ -61,16 +61,22 @@ beanumber/
 **Webhook:**
 
 - `POST /api/webhooks/stripe` — The single most load-bearing file in the repo at `src/app/api/webhooks/stripe/route.ts` (~1900 lines). Verifies signature with `STRIPE_WEBHOOK_SECRET`, dispatches on event type:
-  - `checkout.session.completed` — creates Donation record, sends thank-you email, notifies admin (email + carrier SMS), creates Sponsorship record if applicable, links to Donor (creates if new).
+  - `checkout.session.completed` — creates Donation record, sends thank-you email, notifies admin (email only, no SMS), creates Sponsorship record if applicable, links to Donor (creates if new).
   - `customer.subscription.created` / `.updated` / `.deleted` — mirror subscription lifecycle into Airtable.
   - `invoice.payment_succeeded` — logs recurring payments as Donation records.
   - `charge.refunded` — flags Donation as refunded.
 
 **Cron (hit by Vercel Cron):**
 
+- `/api/cron/drip` — Daily drip email dispatch. Queries Donors where `DripPipeline` is set and `DripNextSend` ≤ today. Sends the next email in the pipeline, advances `DripStage`, sets the next `DripNextSend` based on per-pipeline gap arrays. Clears drip fields when the sequence completes. 5 pipelines, 17 total emails.
 - `/api/cron/newsletter` — Daily newsletter assembly from `Scheduled Posts` and dispatch.
 - `/api/cron/publish-scheduled` — Runs child-update publishing logic.
 - `/api/cron/compliance` — Compliance checks (retention windows, receipt deadlines).
+
+**Admin:**
+
+- `/api/admin/drip-preview` — Sends all 17 drip emails to kevin@beanumber.org with `[PIPELINE X/Y]` subject prefixes. Temporary — delete after review.
+- `/api/admin/updates/notify` — Sends update notification to a sponsor (requires admin auth).
 
 **Utility:**
 
@@ -81,8 +87,9 @@ beanumber/
 
 - `airtable.ts` — The one place the Airtable client is configured. All reads/writes route through here. Table names and field keys are strings; check `airtable_schema.md` before adding new ones — the webhook has 422'd more than once because we wrote to fields that don't exist.
 - `auth.ts` — Magic-link token generation + verification for sponsor portal. Admin auth lives alongside.
-- `email.ts` — `sendEmail()` abstraction over SendGrid. Branches on template ID. All transactional email (thank-you, magic link, receipt, admin notification) goes through here. Commit `5b8e42a` refactored to consolidate this.
-- `gmail.ts`, `googledrive.ts` — Google Workspace integrations for admin workflows (not customer-facing).
+- `email.ts` — `sendEmail()` abstraction that tries Gmail OAuth2 first, falls back to SendGrid if Gmail isn't configured. In production, Gmail is active. Contains several template functions (`sendSponsorWelcomeEmail`, `sendDonationReceiptEmail`, etc.) that still use old copy and need a voice.md rewrite. All transactional email routes through this file.
+- `gmail.ts` — Gmail OAuth2 send implementation. Builds raw MIME messages, handles plain-text-only mode, refresh token flow. This is the active email provider in production.
+- `googledrive.ts` — Google Workspace integration for admin workflows (not customer-facing).
 - `meta.ts` — OG/Twitter card metadata builders.
 - `rate-limit.ts` — In-memory rate limiter for public endpoints.
 - `unsubscribe-token.ts` — HMAC-signed unsubscribe tokens.
@@ -140,8 +147,8 @@ The `/children/[number]` page checks `hasStructured` (any of HomeVillage, Family
 
 - **Stripe** — Test mode and live mode are different environments. `hershock48` dashboard owns both. Webhook secret differs per endpoint; there's currently a stale endpoint somewhere in the dashboard causing 400 signature-verification failures (see `project_state.md`).
 - **Airtable** — Base `app73ZPGbM0BQTOZW` named `Donor Management`. Schema in `airtable_schema.md`. Metadata API (adding singleSelect options, creating fields) is blocked by the sandbox proxy, so schema changes have to happen in the Airtable UI.
-- **SendGrid** — Transactional email. Templates keyed by ID in `env.ts`.
-- **Carrier SMS gateway** — Admin-only alerts (new order, webhook error). Numbers + carriers configured in env.
+- **Gmail OAuth2** — Active email provider. All transactional email (thank-you, drip, admin notification, newsletter, magic link) sends through Gmail API via `src/lib/gmail.ts`. Credentials: `GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`, `GMAIL_REFRESH_TOKEN` in Vercel env.
+- **SendGrid** — Inactive fallback in `src/lib/email.ts`. Code exists but Gmail takes priority when configured. SendGrid API key is in env but not used in production.
 - **Vercel** — Two projects under team `kevins-projects-ec116b76`: `beanumber` (prod, `prj_IwSgQIaCFpVrkmjydT1HcLvufYeO`, serves `www.beanumber.org`) and `beanumber-live` (`prj_vuBv3enBM2LxEBYFMqaupqcRbcAn`, not currently prod). Auto-deploy on push to `main`.
 - **GitHub** — Repo `hershock48/beanumber`. Single `main` branch, no feature-branch workflow. Kevin ships from `main`.
 

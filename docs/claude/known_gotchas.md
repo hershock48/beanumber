@@ -54,6 +54,21 @@ When the approach is clear, ship. Don't re-discuss, don't re-ask. If the task is
 
 If Kevin asks for X, don't also do Y because Y looked related. Noise and drift. Finish X. Flag Y as a question if it's material.
 
+### Don't write emails that sound like AI
+
+Kevin's exact words: "why do these drip email campaigns literally sound like ai. They are so bad dude. Plz god put some effort into making these actually sound like a human." Specific patterns to avoid in ALL email copy:
+
+- **Choppy three-word punchline sentences.** "You did that. And that's a big deal. And you know what. That's enough." — this is the AI rhythm Kevin hates most.
+- **Em dashes for dramatic effect.** Zero em dashes in email content. Period.
+- **Narrating the reader's emotions.** "That's not normal. That's extraordinary." — don't tell people what to feel.
+- **Treating the reader like they have a small brain.** Write flowing, connected sentences. Assume adults. Don't break every thought into a separate line for emphasis.
+
+Write like Kevin writes: conversational, warm, flowing sentences, natural pauses, treats people like intelligent adults who chose to be here.
+
+### Don't proactively advertise the efficiency percentage
+
+Kevin decided on April 18 to remove the 96.7% program efficiency stat from all marketing pages. It's a 2025 number that will shift as the org scales toward 80/20, and proactively advertising it invites people to wonder where the other 3.3% goes instead of focusing on the work. The stat stays on the financial summary report and governance page — where people go looking for it. Don't add it back to marketing copy.
+
 ## Open bugs (known, not yet fixed)
 
 ### Stripe webhook 400 signature failure at 20:02:15 on 2026-04-15
@@ -111,9 +126,23 @@ The Cowork workspace at `/sessions/clever-modest-bell/mnt/beanumber/` is a virti
 
 Running `npm install` in the external clone (e.g. to test a build) can modify `package-lock.json`. If I then `git add` without checking, those changes get pulled into a commit unrelated to the real change. I did this once; the lockfile cleanup in commit `2307241` was incidental, not the point of the commit. Review `git status` + `git diff` before every commit.
 
-### SendGrid template IDs are environment-bound
+### Email provider is Gmail-first, SendGrid-fallback
 
-The template IDs in `env.ts` are for one SendGrid account. If keys get rotated or the account changes, the IDs have to be reissued and re-set in Vercel env. Don't hardcode template IDs in route handlers.
+`src/lib/email.ts` tries Gmail OAuth2 first, falls back to SendGrid. In production, Gmail is active. If Gmail credentials expire or break, email will silently fall through to SendGrid (if its API key is set) or fail entirely. The Gmail refresh token is the most fragile piece — if Kevin changes his Google password or revokes OAuth access, all outbound email stops until the token is refreshed. Don't assume SendGrid is active unless you've confirmed Gmail is down.
+
+### Legacy email templates in email.ts violate voice.md
+
+Several template functions in `src/lib/email.ts` were written before the brand voice was established and use banned phrases, wrong tone, and wrong visual styling:
+
+- `sendSponsorWelcomeEmail` — uses "Dear", "Thank you for partnering with us", "sustainable community systems", "empowerment", "The Be A Number Team". Uses Helvetica + dark `#1a1a1a` headers instead of Georgia + cream `#FFF8F0`.
+- `sendDonationReceiptEmail` — uses "Dear", "Thank you for changing lives", "Your generosity", "empowerment", "making a difference", "96-97% of your contribution". Also references a stale efficiency percentage.
+- `sendRecurringDonationThankYouEmail` — uses "Dear", "Your ongoing commitment is truly making a difference", "The Be A Number Team".
+- `sendUpdateNotificationEmail` — uses "Dear", wrong visual styling.
+- `sendUpdateRequestConfirmationEmail` — uses "Dear", wrong visual styling.
+
+The webhook thank-you email (in the webhook route itself, not in email.ts) was rewritten to match voice.md. The drip emails (in the drip cron route) were written from scratch in voice. These template functions in email.ts have not been touched yet.
+
+**Fix when revisiting:** rewrite each template to match voice.md and the email wrapper style (Georgia serif, 560px max-width, cream/gold/sand colors, "Hey ${firstName}," opening, signed "Kevin" not "The Be A Number Team").
 
 ### Cowork workspace layout is user-facing
 

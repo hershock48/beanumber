@@ -120,7 +120,7 @@ Stripe → `www.beanumber.org/api/webhooks/stripe`. One endpoint per mode. The s
    - A new record appears in the Donations table (status Succeeded, amount $5).
    - A new Donor record if the email was new (or updated if existing).
    - A thank-you email arrives at the address used.
-   - Admin notification fires (email to Kevin + SMS via carrier gateway, if configured).
+   - Admin notification email arrives at kevin@beanumber.org.
 5. If any of the above is missing, pull runtime logs for `/api/webhooks/stripe` at the timestamp of the test, filter to 400/500, cross-reference with Airtable schema.
 
 ## Logs from the app itself

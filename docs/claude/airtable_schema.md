@@ -24,8 +24,8 @@ Key fields:
 - Reverse links: `Donations`, `Sponsorships`, `Communications`.
 
 Drip nurture fields (added April 16 for post-purchase conversion pipelines):
-- `DripPipeline` (singleSelect: shirt_nurture, sponsor_onboard, donor_convert) — which sequence, if any.
-- `DripStage` (number) — 0 = first email pending, 1–3 = sent that many, 4 = done. Null = not in drip.
+- `DripPipeline` (singleSelect: shirt_nurture, sponsor_onboard, donor_convert, shirt_sponsor, monthly_donor) — which sequence, if any. 5 pipelines, 17 total emails.
+- `DripStage` (number) — 0 = first email pending, increments after each send, cleared when sequence completes. Max stages vary by pipeline (3–4).
 - `DripNextSend` (date, ISO) — next scheduled send. Cron at `/api/cron/drip` checks daily.
 - `DripChildName` (single line text) — child's first name for email personalization.
 - `DripShirtNumber` (number) — for building `/children/N` and `/sponsorship?child=N` links.
