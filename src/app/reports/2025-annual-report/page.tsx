@@ -39,7 +39,7 @@ export default function AnnualReport() {
           <section className="mb-12">
             <h2 className="text-2xl font-bold text-gray-900 mb-4">Overview</h2>
             <p className="text-gray-700 leading-relaxed">
-              In 2025, Be A Number continued to build sustainable community systems in Northern Uganda. Our model, focused on locally-led infrastructure, training, and income-generating activities, demonstrated measurable impact across health, education, workforce, and economic empowerment. Communities own and operate all programs, ensuring lasting change beyond initial investment.
+              In 2025, Be A Number continued to build sustainable community systems in Northern Uganda. Our model, focused on locally-led infrastructure, training, and income-generating activities, demonstrated measurable impact across health, education, workforce, and economic development. Communities own and operate all programs, ensuring lasting change beyond initial investment.
             </p>
           </section>
 
@@ -66,7 +66,7 @@ export default function AnnualReport() {
                 </p>
               </div>
               <div className="border-l-4 border-gray-900 pl-6">
-                <h3 className="text-xl font-semibold text-gray-900 mb-2">Economic Empowerment</h3>
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">Economic Development</h3>
                 <p className="text-gray-700 leading-relaxed">
                   Economic activities include local business support, job creation, and income-generating partnerships. 30 local jobs were supported through our programs. These activities ensure long-term program sustainability.
                 </p>

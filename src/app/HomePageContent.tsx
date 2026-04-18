@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -81,21 +81,22 @@ export function HomePageContent() {
     const delta = el.clientWidth * 0.8;
     el.scrollBy({ left: direction === 'right' ? delta : -delta, behavior: 'smooth' });
   };
-  // Shuffle once per page load so every visit surfaces different kids first.
-  const childrenWithPhotos = useMemo(() => {
-    const arr = children.filter(c => !!c.photo_url);
-    for (let i = arr.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [arr[i], arr[j]] = [arr[j], arr[i]];
-    }
-    return arr;
-  }, [children]);
+  // Shuffled client-side after fetch so every visit surfaces different kids.
+  const [childrenWithPhotos, setChildrenWithPhotos] = useState<Child[]>([]);
 
   useEffect(() => {
     fetch('/api/children')
       .then(res => res.json())
       .then(data => {
-        setChildren(data.children || []);
+        const all = (data.children || []) as Child[];
+        setChildren(all);
+        // Shuffle the subset that have photos (Fisher-Yates)
+        const arr = all.filter(c => !!c.photo_url);
+        for (let i = arr.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [arr[i], arr[j]] = [arr[j], arr[i]];
+        }
+        setChildrenWithPhotos(arr);
         setLoading(false);
       })
       .catch(() => setLoading(false));

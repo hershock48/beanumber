@@ -4,10 +4,10 @@ import Link from 'next/link';
 
 export const metadata: Metadata = {
   title: "Home",
-  description: "Youth Development Organisation Uganda (YDO) rehabilitates and empowers war-affected communities in Northern Uganda through education, psycho-social support, vocational training, and advocacy for children's rights.",
+  description: "Youth Development Organisation Uganda (YDO) rehabilitates war-affected communities in Northern Uganda through education, psycho-social support, vocational training, and advocacy for children's rights.",
   openGraph: {
     title: "Youth Development Organisation Uganda | Rehabilitating Post-War Communities",
-    description: "YDO focuses on rehabilitation and empowerment in war-affected regions of Northern Uganda, emphasizing education, psycho-social support, life skills, vocational training, and the welfare of children, women, and vulnerable populations.",
+    description: "YDO focuses on rehabilitation and workforce development in war-affected regions of Northern Uganda, emphasizing education, psycho-social support, life skills, vocational training, and the welfare of children, women, and vulnerable populations.",
     images: ["/images/homepage/hero-community-group.jpg"],
   },
 };
@@ -160,7 +160,7 @@ export default function YDOHome() {
         <div className="max-w-6xl mx-auto">
           <h2 className="text-3xl font-bold text-gray-900 mb-4">Our Programs</h2>
           <p className="text-gray-700 mb-12 max-w-3xl leading-relaxed">
-            YDO implements on-the-ground programming that aligns with community priorities, focusing on education, empowerment, and protection for vulnerable populations.
+            YDO implements on-the-ground programming that aligns with community priorities, focusing on education, skill development, and protection for vulnerable populations.
           </p>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -215,7 +215,7 @@ export default function YDOHome() {
                 This partnership ensures that programs reflect local context and community priorities, outcomes are locally measured and sustained, and investments build assets and capabilities owned by Ugandan partners.
               </p>
               <p className="text-gray-700 leading-relaxed mb-4">
-                Together, we work on community-driven development rooted in dignity, sustainability, and measurable outcomes. YDO is central to implementing education, youth development, and community empowerment initiatives that complement Be A Number's integrated systems approach.
+                Together, we work on community-driven development rooted in dignity, sustainability, and measurable outcomes. YDO is central to implementing education, youth development, and community development initiatives that complement Be A Number's integrated systems approach.
               </p>
               <Link
                 href="/ydo/partnership"
@@ -256,7 +256,7 @@ export default function YDOHome() {
             <div className="bg-white p-8 rounded-lg border border-green-200">
               <h3 className="text-xl font-semibold text-gray-900 mb-3">Skills Development</h3>
               <p className="text-gray-700 leading-relaxed">
-                Vocational and life-skills training tied to community needs, equipping youth and adults with practical skills for economic empowerment.
+                Vocational and life-skills training tied to community needs, equipping youth and adults with practical skills for economic independence.
               </p>
             </div>
             <div className="bg-white p-8 rounded-lg border border-green-200">

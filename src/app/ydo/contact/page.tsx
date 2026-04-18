@@ -195,7 +195,7 @@ export default function YDOContact() {
             <div className="bg-white p-8 rounded-lg border border-green-200">
               <h3 className="text-xl font-semibold text-gray-900 mb-4">Our Focus</h3>
               <p className="text-gray-700 leading-relaxed mb-4">
-                YDO focuses on rehabilitation and empowerment in war-affected regions, emphasizing:
+                YDO focuses on rehabilitation and workforce development in war-affected regions, emphasizing:
               </p>
               <ul className="space-y-2 text-gray-700">
                 <li>• Education and scholarship programs</li>

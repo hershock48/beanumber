@@ -1,5 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import type Stripe from 'stripe';
+import { z } from 'zod';
+
+const checkoutSchema = z.object({
+  amount: z.number().min(1).max(10000),
+  email: z.string().email().optional().or(z.literal('')),
+  name: z.string().max(255).optional().default(''),
+  isMonthly: z.boolean().optional().default(false),
+});
 
 // Initialize Stripe lazily using dynamic import to avoid issues during build
 async function getStripe() {
@@ -37,25 +45,18 @@ export async function POST(request: NextRequest) {
     validateEnvVars();
     
     const stripe = await getStripe();
-    const { amount, email, name, isMonthly } = await request.json();
+
+    const parsed = checkoutSchema.safeParse(await request.json());
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: parsed.error.issues.map(i => i.message).join('; ') },
+        { status: 400 }
+      );
+    }
+    const { amount, email, name, isMonthly } = parsed.data;
 
     // Get origin from request header (as per Stripe docs)
     const origin = request.headers.get('origin') || 'https://www.beanumber.org';
-
-    // Validate amount
-    const MAX_DONATION_AMOUNT = 10000; // $10,000 maximum per transaction
-    if (!amount || amount < 1) {
-      return NextResponse.json(
-        { error: 'Invalid donation amount. Minimum donation is $1.' },
-        { status: 400 }
-      );
-    }
-    if (amount > MAX_DONATION_AMOUNT) {
-      return NextResponse.json(
-        { error: `Donation amount exceeds maximum of $${MAX_DONATION_AMOUNT.toLocaleString()}. Please contact us for larger donations.` },
-        { status: 400 }
-      );
-    }
 
     const mode = isMonthly ? 'subscription' : 'payment';
     const donationType = isMonthly ? 'monthly' : 'one-time';
@@ -72,8 +73,8 @@ export async function POST(request: NextRequest) {
                 ? 'Monthly Donation to Be A Number, International'
                 : 'Donation to Be A Number, International',
               description: isMonthly
-                ? `Thank you for changing lives. Your monthly gift of $${amount} supports sustainable community systems in Northern Uganda: healthcare, education, workforce development, and economic empowerment that transform communities.`
-                : `Thank you for changing lives. Your contribution of $${amount} supports sustainable community systems in Northern Uganda: healthcare, education, workforce development, and economic empowerment that transform communities.`,
+                ? `Your $${amount}/month goes to a six-acre campus in Northern Uganda: school fees, daily meals, medical care, and vocational training for 380 children and their families.`
+                : `Your $${amount} goes to a six-acre campus in Northern Uganda: school fees, daily meals, medical care, and vocational training for 380 children and their families.`,
               // Add your logo image URL here (must be hosted publicly accessible)
               // images: [`${process.env.NEXT_PUBLIC_BASE_URL}/logo-be-a-number-primary-white.svg`],
             },

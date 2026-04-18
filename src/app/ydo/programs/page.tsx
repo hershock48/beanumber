@@ -57,7 +57,7 @@ export default function YDOPrograms() {
             Our Programs
           </h1>
           <p className="text-xl text-gray-700 max-w-3xl leading-relaxed">
-            YDO implements on-the-ground programming that aligns with community priorities, focusing on education, empowerment, and protection for vulnerable populations in Northern Uganda.
+            YDO implements on-the-ground programming that aligns with community priorities, focusing on education, skill development, and protection for vulnerable populations in Northern Uganda.
           </p>
         </div>
       </section>

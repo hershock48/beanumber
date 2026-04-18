@@ -5,7 +5,8 @@
  * Uses sample data. Not a production endpoint — delete after review.
  */
 
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
+import { requireAdminAuth } from '@/lib/auth';
 import {
   sendSponsorWelcomeEmail,
   sendDonationReceiptEmail,
@@ -16,7 +17,8 @@ import {
 
 const KEVIN = 'kevin@beanumber.org';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  requireAdminAuth(request);
   const results: { template: string; success: boolean; error?: string }[] = [];
 
   // 1. Sponsor Welcome

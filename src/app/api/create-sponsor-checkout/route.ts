@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import type Stripe from 'stripe';
+import { z } from 'zod';
 
 async function getStripe() {
   const StripeModule = (await import('stripe')).default;
@@ -18,34 +19,35 @@ const SPONSORSHIP_AMOUNT = 25; // $25/month per child
 export async function POST(request: NextRequest) {
   try {
     const stripe = await getStripe();
-    const {
-      childRecordId,
-      childId,
-      childDisplayName,
-      email,
-      name,
-      referringShirtSessionId,
-    } = await request.json();
+
+    const sponsorSchema = z.object({
+      childRecordId: z.string().min(1, 'Missing child identifier.'),
+      childId: z.string().optional().default(''),
+      childDisplayName: z.string().max(255).optional().default(''),
+      email: z.string().email().optional().or(z.literal('')),
+      name: z.string().max(255).optional().default(''),
+      referringShirtSessionId: z.string().optional().default(''),
+    });
+
+    const parsed = sponsorSchema.safeParse(await request.json());
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: parsed.error.issues.map(i => i.message).join('; ') },
+        { status: 400 }
+      );
+    }
+    const { childRecordId, childId, childDisplayName, email, name, referringShirtSessionId } = parsed.data;
 
     // Attribution breadcrumb. When a sponsor arrives via the shirt success
     // page, we thread the original shirt checkout session id here so the
     // retention dashboard can tie the subscription back to the exact shirt
     // purchase that led to it (not just customer id or email, which are
     // unreliable when buyers use guest checkout or different emails).
-    const shirtSessionRef =
-      typeof referringShirtSessionId === 'string' && referringShirtSessionId.startsWith('cs_')
-        ? referringShirtSessionId
-        : '';
+    const shirtSessionRef = referringShirtSessionId.startsWith('cs_')
+      ? referringShirtSessionId
+      : '';
 
     const origin = request.headers.get('origin') || 'https://www.beanumber.org';
-
-    // Validate required child identifiers
-    if (!childRecordId || typeof childRecordId !== 'string') {
-      return NextResponse.json(
-        { error: 'Missing child identifier.' },
-        { status: 400 }
-      );
-    }
 
     const sessionConfig: Stripe.Checkout.SessionCreateParams = {
       payment_method_types: ['card'],

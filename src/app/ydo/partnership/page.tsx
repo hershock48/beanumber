@@ -75,7 +75,7 @@ export default function YDOPartnership() {
                 This partnership ensures that programs reflect local context and community priorities, outcomes are locally measured and sustained, and investments build assets and capabilities owned by Ugandan partners.
               </p>
               <p className="text-gray-700 leading-relaxed">
-                Together, we work on community-driven development rooted in dignity, sustainability, and measurable outcomes. YDO is central to implementing education, youth development, and community empowerment initiatives that complement Be A Number's integrated systems approach.
+                Together, we work on community-driven development rooted in dignity, sustainability, and measurable outcomes. YDO is central to implementing education, youth development, and community development initiatives that complement Be A Number's integrated systems approach.
               </p>
             </div>
             <div className="w-full">
@@ -104,7 +104,7 @@ export default function YDOPartnership() {
             <div className="p-8 border border-green-200 rounded-lg bg-white">
               <h3 className="text-xl font-semibold text-gray-900 mb-4">Community-Led Approach</h3>
               <p className="text-gray-700 leading-relaxed">
-                Be A Number's framework prioritizes local leadership and ownership in the design and operation of sustainable systems. This aligns with YDO's emphasis on community rehabilitation and local empowerment.
+                Be A Number's framework prioritizes local leadership and ownership in the design and operation of sustainable systems. This aligns with YDO's emphasis on community rehabilitation and local ownership.
               </p>
             </div>
             <div className="p-8 border border-green-200 rounded-lg bg-white">
@@ -114,7 +114,7 @@ export default function YDOPartnership() {
               </p>
             </div>
             <div className="p-8 border border-green-200 rounded-lg bg-white">
-              <h3 className="text-xl font-semibold text-gray-900 mb-4">Economic Empowerment</h3>
+              <h3 className="text-xl font-semibold text-gray-900 mb-4">Economic Development</h3>
               <p className="text-gray-700 leading-relaxed">
                 Be A Number's vocational training feeds into local job creation and cooperatives. YDO's focus on livelihood support and community capacity complements these pathways, especially for vulnerable populations.
               </p>

@@ -69,7 +69,7 @@ export default function YDOAbout() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center mb-12">
             <div>
               <p className="text-gray-700 text-lg leading-relaxed mb-4">
-                Youth Development Organisation Uganda (YDO) is a community development organization that focuses on rehabilitation and empowerment in war-affected regions of Northern Uganda.
+                Youth Development Organisation Uganda (YDO) is a community development organization that focuses on rehabilitation and workforce development in war-affected regions of Northern Uganda.
               </p>
               <p className="text-gray-700 leading-relaxed mb-4">
                 We emphasize education, psycho-social support, life skills, vocational training, scholarship programs, and the welfare of children, women, and vulnerable populations. Our mission centers on rebuilding community resilience and creating protective environments for children outside armed conflict.
@@ -147,7 +147,7 @@ export default function YDOAbout() {
         <div className="max-w-6xl mx-auto">
           <h2 className="text-3xl font-bold text-gray-900 mb-6">How We Work</h2>
           <p className="text-gray-700 mb-12 max-w-3xl leading-relaxed">
-            YDO implements on-the-ground programming that aligns with community priorities, focusing on education, empowerment, and protection for vulnerable populations.
+            YDO implements on-the-ground programming that aligns with community priorities, focusing on education, skill development, and protection for vulnerable populations.
           </p>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
@@ -194,7 +194,7 @@ export default function YDOAbout() {
                 As a leader who has experienced the challenges of post-conflict recovery firsthand, Simon Peter understands the importance of locally grounded solutions and community ownership. Under his leadership, YDO has become a trusted partner in Northern Uganda's development landscape.
               </p>
               <p className="text-gray-700 leading-relaxed">
-                His commitment to child protection, education, and community empowerment drives YDO's mission to create lasting change in war-affected communities.
+                His commitment to child protection, education, and community development drives YDO's mission to build resilient systems in war-affected communities.
               </p>
             </div>
             <div className="w-full">

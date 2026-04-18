@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import type Stripe from 'stripe';
+import { z } from 'zod';
 
 async function getStripe() {
   const StripeModule = (await import('stripe')).default;
@@ -32,24 +33,27 @@ const SHIRT_PRICE = 25; // $25 per shirt (and per month when opted in)
 export async function POST(request: NextRequest) {
   try {
     const stripe = await getStripe();
-    const { shirtId, size, color, email, name, continueMonthly } = await request.json();
+
+    const shirtSchema = z.object({
+      shirtId: z.enum(['flagship', 'thank-you', 'do-not-fear', 'peacemaker', 'everything-hallelujah', 'nigeria']),
+      size: z.enum(['S', 'M', 'L', 'XL', '2XL']),
+      color: z.enum(['Black', 'White', 'Grey', 'Pink', 'Yellow']),
+      email: z.string().email().optional().or(z.literal('')),
+      name: z.string().max(255).optional().default(''),
+      continueMonthly: z.boolean().optional().default(false),
+    });
+
+    const parsed = shirtSchema.safeParse(await request.json());
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: parsed.error.issues.map(i => i.message).join('; ') },
+        { status: 400 }
+      );
+    }
+    const { shirtId, size, color, email, name, continueMonthly } = parsed.data;
     const origin = request.headers.get('origin') || 'https://www.beanumber.org';
 
-    // Validate shirt
-    const shirt = SHIRTS[shirtId];
-    if (!shirt) {
-      return NextResponse.json({ error: 'Invalid shirt selection.' }, { status: 400 });
-    }
-
-    // Validate size
-    if (!size || !VALID_SIZES.includes(size)) {
-      return NextResponse.json({ error: 'Please select a valid size.' }, { status: 400 });
-    }
-
-    // Validate color
-    if (!color || !VALID_COLORS.includes(color)) {
-      return NextResponse.json({ error: 'Please select a valid color.' }, { status: 400 });
-    }
+    const shirt = SHIRTS[shirtId]!;
 
     // Normalize the opt-in to a strict boolean. Default false — the shirt
     // always works on its own and we never start a subscription by accident.
