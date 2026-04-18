@@ -216,24 +216,24 @@ function getShirtSponsorEmails(): PreviewEmail[] {
       pipeline: 'shirt_sponsor',
       subject: '[SHIRT+SPONSOR 1/4] Your shirt is being made right now',
       html: wrap(`
-        ${banner('shirt_sponsor — Stage 0 (Day 3). Shirt on the way, teases portal. No code yet.')}
+        ${banner('shirt_sponsor — Stage 0 (Day 3). Shirt in transit + sponsorship active. NO child name reveal.')}
         <p style="margin-top: 0;">Hey ${firstName},</p>
         <p>Your shirt is being made right now. I heat-press every one by hand, and yours will ship within the next few days.</p>
-        <p>When it arrives, check the tag inside the collar. There&rsquo;s a number on it, and that number belongs to a real child at our campus in Northern Uganda. You&rsquo;ll come back to the site, enter the number, and meet them.</p>
-        <p>You also signed up for monthly sponsorship, which means your $25 a month is already covering breakfast and lunch, school fees, and medical care for ${childName}. That started the day you signed up.</p>
-        <p>Once you&rsquo;ve gotten your shirt and had a chance to meet your child, I&rsquo;ll send you access to your sponsor portal where you can see updates, photos, and write to them directly. I want you to have that moment with the shirt first.</p>
+        <p>When it arrives, check the tag inside the collar. There&rsquo;s a number on it, and that number belongs to a real child at our campus in Northern Uganda. You&rsquo;ll come back to the site, enter the number, and meet them by name.</p>
+        <p>You also signed up for monthly sponsorship, which means your $25 a month is already at work. It covers school fees, two meals a day, and medical care for the children at the campus, and that started the day you signed up. You&rsquo;re a sponsor right now, even before the shirt arrives.</p>
+        <p>Once you&rsquo;ve gotten your shirt and had that moment where you meet your child, I&rsquo;ll follow up with your sponsor portal access so you can see updates, photos, and write to them directly. I want you to have the shirt in hand first.</p>
         <p>Kevin</p>
       `),
     },
     {
       pipeline: 'shirt_sponsor',
-      subject: '[SHIRT+SPONSOR 2/4] Did your shirt arrive? (plus something about Grace)',
+      subject: '[SHIRT+SPONSOR 2/4] Meet Grace',
       html: wrap(`
-        ${banner('shirt_sponsor — Stage 1 (Day 8). Shirt arrival check + reveal + sponsor code + portal.')}
+        ${banner('shirt_sponsor — Stage 1 (Day 8). THE REVEAL. Child name + portal access + sponsor code.')}
         <p style="margin-top: 0;">Hey ${firstName},</p>
-        <p>Checking in to see if your shirt made it.</p>
-        <p>If it did, you&rsquo;ve already seen the number. That number belongs to <strong>${childName}</strong>. <a href="${childUrl}" style="color: #D4A843; font-weight: bold;">Here&rsquo;s their page</a> if you want to take a look.</p>
-        <p>As promised, here&rsquo;s your sponsor portal access. This is where updates, photos, and letters from ${childName} will show up over the coming months:</p>
+        <p>Your shirt should be there by now, and if it is, you&rsquo;ve seen the number.</p>
+        <p>That number belongs to <strong>${childName}</strong>. <a href="${childUrl}" style="color: #D4A843; font-weight: bold;">Here&rsquo;s their page.</a> This is the child your sponsorship is covering, and the one you&rsquo;ll be connected to from here on out.</p>
+        <p>Now that you&rsquo;ve met ${childName}, here&rsquo;s your sponsor portal. This is where updates, photos, and letters will show up over the coming months:</p>
         <div style="background: #FFF8F0; border: 1px solid #e8e0d4; padding: 16px 20px; margin: 16px 0; text-align: center;">
           <p style="color: #999; font-size: 13px; margin: 0 0 4px 0;">Your sponsor code</p>
           <p style="font-size: 22px; color: #0d0d0d; margin: 0; font-weight: bold; letter-spacing: 0.1em; font-family: monospace;">${sponsorCode}</p>
@@ -241,18 +241,18 @@ function getShirtSponsorEmails(): PreviewEmail[] {
         <p style="text-align: center; margin: 24px 0;">
           <a href="${portalUrl}" style="display: inline-block; background: #D4A843; color: #0d0d0d; font-weight: bold; text-decoration: none; padding: 14px 32px; font-size: 15px; letter-spacing: 0.05em;">LOG IN TO YOUR PORTAL</a>
         </p>
-        <p>You can also write to ${childName} through the portal or by replying to this email. The YDO team on the ground handles delivery and translation.</p>
+        <p>You can write to ${childName} through the portal or by replying to this email. The YDO team on the ground handles delivery and translation.</p>
         <p>Kevin</p>
       `),
     },
     {
       pipeline: 'shirt_sponsor',
-      subject: '[SHIRT+SPONSOR 3/4] Your first two weeks as a sponsor',
+      subject: '[SHIRT+SPONSOR 3/4] Two weeks with Grace',
       html: wrap(`
-        ${banner('shirt_sponsor — Stage 2 (Day 15). First month impact.')}
+        ${banner('shirt_sponsor — Stage 2 (Day 15). Two weeks in. Child name used freely now.')}
         <p style="margin-top: 0;">Hey ${firstName},</p>
         <p>You&rsquo;ve been sponsoring for about two weeks now, and I wanted to give you a picture of what that looks like on the ground.</p>
-        <p>${childName} had a seat in school every day this month, ate breakfast and lunch at the campus every day, and had a nurse available whenever they needed one. Your $25 is what makes that possible.</p>
+        <p>Your $25 this month went toward school fees, breakfast and lunch every day, and a nurse on campus whenever ${childName} needed one. That&rsquo;s what sponsorship looks like in practice, and it happens every month you&rsquo;re here.</p>
         <p>Your first update from the campus should be coming soon. The YDO team sends photos, report cards, and sometimes handwritten letters from the kids, and they show up in your <a href="${portalUrl}" style="color: #D4A843; font-weight: bold;">portal</a> and by email.</p>
         <p>Kevin</p>
       `),
