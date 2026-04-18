@@ -915,16 +915,11 @@ async function sendSponsorWelcomeEmail(data: {
 // Admin order notification — ping Kevin whenever money lands.
 //
 // Fires once per completed checkout alongside whatever customer-facing email
-// already goes out. Sends TWO messages in a single SendGrid API call using
-// multiple personalizations:
+// already goes out. Sends a rich HTML summary to ADMIN_NOTIFY_EMAIL
+// (default: kevin@beanumber.org) with customer name/email, order details,
+// amount, and a Stripe session link.
 //
-//   1. Rich HTML summary to ADMIN_NOTIFY_EMAIL (default: kevin@beanumber.org)
-//      — customer name/email, order details, amount, Stripe session link.
-//   2. Short plain-text ping to ADMIN_NOTIFY_SMS_EMAIL (default:
-//      2692743203@tmomail.net — T-Mobile's email-to-SMS gateway) so Kevin
-//      gets a phone text the moment an order clears.
-//
-// Both are best-effort. Any failure is logged but does NOT fail the webhook;
+// Best-effort. Any failure is logged but does NOT fail the webhook;
 // order records + customer emails must still go through.
 // ────────────────────────────────────────────────────────────────────────────
 async function sendAdminOrderNotification(data: {
@@ -947,14 +942,9 @@ async function sendAdminOrderNotification(data: {
 }): Promise<void> {
   const fromEmail = process.env.SENDGRID_FROM_EMAIL || 'Kevin@beanumber.org';
   const adminEmail = process.env.ADMIN_NOTIFY_EMAIL || 'kevin@beanumber.org';
-  const smsEmail = process.env.ADMIN_NOTIFY_SMS_EMAIL || '2692743203@tmomail.net';
-
   const amountStr = `$${data.amount.toFixed(2)}`;
   const recurringTag = data.isRecurring ? '/mo' : '';
 
-  // Short subject lines do double duty: for email inbox previews AND for the
-  // carrier SMS gateway (which often uses subject as the text body for old
-  // phones, or concatenates subject + body into one MMS blob).
   const shortLine = (() => {
     switch (data.kind) {
       case 'Shirt':
@@ -967,9 +957,6 @@ async function sendAdminOrderNotification(data: {
         return `${data.customerName} donated ${amountStr}${recurringTag}`;
     }
   })();
-
-  // Plain-text SMS body — keep it dead simple for carrier gateways.
-  const smsText = `New ${data.kind.toLowerCase()}: ${shortLine}`;
 
   const stripeLink = data.stripeSessionId
     ? `https://dashboard.stripe.com/payments/${data.stripeSessionId}`
@@ -1018,44 +1005,27 @@ async function sendAdminOrderNotification(data: {
     </html>
   `;
 
-  // Two separate sends: one rich HTML to the admin inbox, one plaintext to
-  // the carrier SMS gateway. The sendEmail() abstraction routes through
-  // Gmail (preferred) or SendGrid depending on what's configured in env.
-  // Both calls are best-effort — any failure is logged, never thrown.
+  // Send admin email notification. Best-effort — any failure is logged
+  // but does NOT fail the webhook.
   try {
     const from = { email: fromEmail, name: 'BAN Orders' };
 
-    const [adminResult, smsResult] = await Promise.all([
-      sendEmail({
-        to: { email: adminEmail },
-        from,
-        subject: shortLine,
-        html,
-        text: smsText,
-      }),
-      sendEmail({
-        to: { email: smsEmail },
-        from,
-        subject: 'BAN Order',
-        html: smsText,  // required by sendEmail interface but ignored in plainTextOnly mode
-        text: smsText,
-        plainTextOnly: true,  // carrier gateways choke on multipart MIME
-      }),
-    ]);
+    const adminResult = await sendEmail({
+      to: { email: adminEmail },
+      from,
+      subject: shortLine,
+      html,
+      text: `New ${data.kind.toLowerCase()}: ${shortLine}`,
+    });
 
     if (!adminResult.success) {
       console.error('[Webhook] Admin notification email failed:', adminResult.error);
-    }
-    if (!smsResult.success) {
-      console.error('[Webhook] Admin notification SMS failed:', smsResult.error);
     }
 
     console.log('[Webhook] Admin notification sent:', {
       kind: data.kind,
       admin: adminEmail,
       adminProvider: adminResult.data?.provider,
-      sms: smsEmail,
-      smsProvider: smsResult.data?.provider,
     });
   } catch (error) {
     console.error('[Webhook] Admin notification failed (non-fatal):', error);
