@@ -186,7 +186,7 @@ function getDonorConvertEmails(): PreviewEmail[] {
         <p style="margin-top: 0;">Hey ${firstName},</p>
         <p>I wanted to tell you a little more about how we work, since you already took a chance on us once.</p>
         <p>Every child at our campus has a number, and that number connects them to one specific sponsor. The sponsor pays $25 a month, which covers school, two meals a day, and medical care. In return, the sponsor gets letters, photos, and report cards from the campus. The child knows their sponsor&rsquo;s name. It&rsquo;s a real relationship between two real people, and that&rsquo;s kind of the whole point of what we built.</p>
-        <p>If you want to see the kids, you can <a href="${sponsorUrl}" style="color: #D4A843; font-weight: bold;">meet them here</a>.</p>
+        <p>If you want to see the kids, you can <a href="${sponsorUrl}" style="color: #D4A843; font-weight: bold;">meet them here</a>. Or if you want to grab a shirt and get randomly matched to a child by number, <a href="${SITE_URL}/shirts" style="color: #D4A843; font-weight: bold;">check out the shirts here</a>.</p>
         <p style="text-align: center; margin: 24px 0;">
           <a href="${sponsorUrl}" style="display: inline-block; background: #D4A843; color: #0d0d0d; font-weight: bold; text-decoration: none; padding: 14px 32px; font-size: 15px; letter-spacing: 0.05em;">MEET THE KIDS</a>
         </p>
