@@ -73,8 +73,8 @@ export async function POST(request: NextRequest) {
                 ? 'Monthly Donation to Be A Number, International'
                 : 'Donation to Be A Number, International',
               description: isMonthly
-                ? `Your $${amount}/month goes to a six-acre campus in Northern Uganda: school fees, daily meals, medical care, and vocational training for 380 children and their families.`
-                : `Your $${amount} goes to a six-acre campus in Northern Uganda: school fees, daily meals, medical care, and vocational training for 380 children and their families.`,
+                ? `Your $${amount}/month goes to a six-acre campus in Northern Uganda: school fees, daily meals, medical care, and vocational training on a campus built for 380 children.`
+                : `Your $${amount} goes to a six-acre campus in Northern Uganda: school fees, daily meals, medical care, and vocational training on a campus built for 380 children.`,
               // Add your logo image URL here (must be hosted publicly accessible)
               // images: [`${process.env.NEXT_PUBLIC_BASE_URL}/logo-be-a-number-primary-white.svg`],
             },

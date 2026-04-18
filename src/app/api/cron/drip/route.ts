@@ -441,7 +441,7 @@ function monthlyDonorEmail(
         html: wrapEmail(`
           <p style="margin-top: 0;">Hey ${firstName},</p>
           <p>I wanted to reach out and let you know where your monthly donation goes.</p>
-          <p>It goes to the YDO campus in Northern Uganda. One campus, one team on the ground. Right now we have 380 kids in school, more than 700 patients through the medical clinic, and 60 women in vocational training. Your gift each month helps cover meals for kids who might not eat otherwise, school fees that keep them in class, and a medical clinic that serves the whole community.</p>
+          <p>It goes to the YDO campus in Northern Uganda. One campus, one team on the ground. We built a school for 380 kids, a medical clinic that has treated more than 700 patients, and vocational programs where 60 women are learning trades. Your gift each month helps cover meals for kids who might not eat otherwise, school fees that keep them in class, and a medical clinic that serves the whole community.</p>
           <p>I&rsquo;ll keep you in the loop on what&rsquo;s happening at the campus.</p>
           <p>Kevin</p>
         `),

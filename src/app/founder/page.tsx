@@ -176,7 +176,7 @@ export default function Founder() {
             </p>
 
             <p className="text-[#555] leading-relaxed text-lg">
-              On those six acres they built a nursery and primary school serving 380 students, a medical center, vocational training facilities where 60 women learn marketable trades, construction apprenticeship programs, and an international lodge for visiting sponsors and university cohorts.
+              On those six acres they built a nursery and primary school with capacity for 380 students, a medical center, vocational training facilities where 60 women learn marketable trades, construction apprenticeship programs, and an international lodge for visiting sponsors and university cohorts.
             </p>
 
             <p className="text-[#555] leading-relaxed text-lg">

@@ -7,11 +7,11 @@ import { BANFooter } from '@/components/BANFooter';
 export const metadata: Metadata = {
   title: '2025 Impact | Be A Number',
   description:
-    'What happened on six acres in Northern Uganda in 2025. 700+ patients treated, 68 adults trained, 30 local jobs, 380 children enrolled.',
+    'What happened on six acres in Northern Uganda in 2025. 700+ patients treated, 68 adults trained, 30 local jobs, school capacity for 380.',
   openGraph: {
     title: '2025 Impact | Be A Number',
     description:
-      '700+ patients, 68 adults trained, 30 community jobs, 380 children enrolled. Measured outcomes from a six-acre campus in Omoro District.',
+      '700+ patients, 68 adults trained, 30 community jobs, school capacity for 380. Measured outcomes from a six-acre campus in Omoro District.',
     images: ['/images/impact-page/lead-image.jpg'],
   },
 };
@@ -20,7 +20,7 @@ const impactJsonLd = {
   '@context': 'https://schema.org',
   '@type': 'Article',
   headline: 'Six Acres. One Year. Here\'s What Happened.',
-  description: 'What happened on six acres in Northern Uganda in 2025. 700+ patients treated, 68 adults trained, 30 local jobs, 380 children enrolled.',
+  description: 'What happened on six acres in Northern Uganda in 2025. 700+ patients treated, 68 adults trained, 30 local jobs, school capacity for 380.',
   author: { '@type': 'Person', name: 'Kevin Hershock' },
   publisher: {
     '@type': 'NonprofitOrganization',
@@ -151,7 +151,7 @@ export default function Impact() {
                 Education
               </h3>
               <p className="text-[#555] leading-relaxed">
-                A nursery and primary school with capacity for 380 students, staffed by
+                A nursery and primary school built for 380 students, staffed by
                 teachers from the local community. Every child gets daily meals (morning
                 porridge and a midday meal prepared on campus), school supplies, a uniform,
                 and access to the medical center. The school doesn&rsquo;t exist to check a

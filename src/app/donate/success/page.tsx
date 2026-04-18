@@ -31,9 +31,9 @@ export default function DonateSuccess() {
 
             <p className="text-lg text-[#555] leading-relaxed mb-6">
               Your gift goes directly to the ground. To a six-acre campus in
-              Northern Uganda where 380 kids go to school, 700+ patients get
-              medical care, and 60 women are learning trades that will change
-              their families.
+              Northern Uganda with a school built for 380 kids, a medical clinic
+              that has treated 700+ patients, and vocational training where 60
+              women are learning trades.
             </p>
 
             <p className="text-[#777] leading-relaxed">

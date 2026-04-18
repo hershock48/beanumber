@@ -56,7 +56,7 @@ export default function AnnualReport() {
               <div className="border-l-4 border-gray-900 pl-6">
                 <h3 className="text-xl font-semibold text-gray-900 mb-2">Education</h3>
                 <p className="text-gray-700 leading-relaxed">
-                  School infrastructure serves 380 students. Scholarships support children from early childhood through secondary education. School fees sustain operations long-term, creating a self-financing education system.
+                  School infrastructure has capacity for 380 students. Scholarships support children from early childhood through secondary education. School fees sustain operations long-term, creating a self-financing education system.
                 </p>
               </div>
               <div className="border-l-4 border-gray-900 pl-6">

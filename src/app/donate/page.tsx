@@ -32,9 +32,9 @@ export default function DonatePage() {
               Fund the rebuilding.
             </h1>
             <p className="text-lg text-[#777] max-w-2xl mx-auto leading-relaxed">
-              Your gift supports a six-acre campus in Northern Uganda where 380 kids
-              go to school, 700+ patients get medical care, and 60 women are learning
-              trades.
+              Your gift supports a six-acre campus in Northern Uganda with a school
+              built for 380 kids, a medical clinic that has treated 700+ patients,
+              and vocational training where 60 women are learning trades.
             </p>
           </div>
         </section>

@@ -394,7 +394,7 @@ export async function sendDonationReceiptEmail(
       <p style="margin: 4px 0 0 0; font-size: 13px; color: #999;">Transaction: ${transactionId}</p>
     </div>
 
-    <p>Your donation goes to a six-acre campus in Northern Uganda where 380 kids go to school, 700+ patients get medical care, and 60 women are learning trades. If you ever want to see more about where it goes, the <a href="${SITE_URL}/impact" style="color: #D4A843;">impact page</a> has the full picture.</p>
+    <p>Your donation goes to a six-acre campus in Northern Uganda with a school built for 380 kids, a medical clinic that has treated 700+ patients, and vocational training where 60 women are learning trades. If you ever want to see more about where it goes, the <a href="${SITE_URL}/impact" style="color: #D4A843;">impact page</a> has the full picture.</p>
 
     <p>Thank you for this,<br>
     <strong>Kevin</strong></p>
@@ -451,7 +451,7 @@ export async function sendRecurringDonationThankYouEmail(
   const html = wrapTransactionalEmail(`
     <p style="margin-top: 0;">Hey ${firstName},</p>
 
-    <p>Your monthly donation of $${formattedAmount} was processed on ${dateStr}. It goes to the same place as last month: a six-acre campus in Northern Uganda where 380 kids go to school, 700+ patients get medical care, and 60 women are learning trades.</p>
+    <p>Your monthly donation of $${formattedAmount} was processed on ${dateStr}. It goes to the same place as last month: a six-acre campus in Northern Uganda with a school built for 380 kids, a medical clinic that has treated 700+ patients, and vocational training where 60 women are learning trades.</p>
 
     <p>If you ever want to see what your monthly support adds up to, the <a href="${SITE_URL}/impact" style="color: #D4A843;">impact page</a> has the full breakdown. And if you need to change or cancel your donation for any reason, reply to this email and I will take care of it.</p>
 
