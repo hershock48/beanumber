@@ -87,8 +87,8 @@ function getShirtNurtureEmails(): PreviewEmail[] {
         ${banner('shirt_nurture — Stage 2 (Day 20). Uses child name, makes the sponsorship ask.')}
         <p style="margin-top: 0;">Hey ${firstName},</p>
         <p>The child connected to your shirt is ${childName}. If you haven&rsquo;t met them yet, <a href="${childUrl}" style="color: #D4A843; font-weight: bold;">here&rsquo;s their page</a>.</p>
-        <p>This past month, ${childName} went to school every day, ate breakfast and lunch at the campus, and had access to a nurse whenever they needed one. That&rsquo;s what it looks like when someone funds a child&rsquo;s spot here, and right now a spot costs $25 a month. It covers everything: school fees, meals, and medical care.</p>
-        <p>If you sponsor ${childName}, you get a direct connection to them. Letters, photos, report cards, and a place to write to them whenever you want. It&rsquo;s one person connected to one kid.</p>
+        <p>Right now, $25 a month covers school fees, two meals a day, and medical care for the children at the campus. That&rsquo;s what sponsorship funds, and it starts the day you sign up.</p>
+        <p>If you sponsor ${childName}, you get a direct connection to them. Letters, photos, report cards, and a place to write to them whenever you want.</p>
         <p style="text-align: center; margin: 24px 0;">
           <a href="${sponsorUrl}" style="display: inline-block; background: #D4A843; color: #0d0d0d; font-weight: bold; text-decoration: none; padding: 14px 32px; font-size: 15px; letter-spacing: 0.05em;">SPONSOR ${childName.toUpperCase()} FOR $25/MO</a>
         </p>
@@ -102,8 +102,8 @@ function getShirtNurtureEmails(): PreviewEmail[] {
         ${banner('shirt_nurture — Stage 3 (Day 30). Final nudge — respectful close.')}
         <p style="margin-top: 0;">Hey ${firstName},</p>
         <p>This is the last email I&rsquo;ll send you about this, and I&rsquo;ll keep it short.</p>
-        <p>The shirts are how most people find us, and sponsorship is how we keep the campus running. $25 a month covers school fees, two meals a day, and medical care for one child, and the sponsor gets letters, photos, and a real relationship with that kid by name. For a lot of these kids, those meals at school are the only ones they get all day.</p>
-        <p>If you want in, you can <a href="${sponsorUrl}" style="color: #D4A843; font-weight: bold;">sponsor ${childName} here</a>. And if not, I&rsquo;m glad you bought the shirt. Wear it around. It starts conversations, and those conversations are how we find new sponsors.</p>
+        <p>The shirts are how most people find us, and sponsorship is how we keep the campus running. $25 a month covers school fees, two meals a day, and medical care for all the children at the campus, and the sponsor gets letters, photos, and a real relationship with a specific kid by name.</p>
+        <p>If you want in, you can <a href="${sponsorUrl}" style="color: #D4A843; font-weight: bold;">sponsor ${childName} here</a>. And if not, wear that shirt with pride. You can always come back to <a href="${sponsorUrl}" style="color: #D4A843;">sponsor ${childName}</a> in the future, or grab another design and get matched to a different child, giving them a month in school.</p>
         <p>Kevin</p>
       `),
     },
