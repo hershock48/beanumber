@@ -161,10 +161,35 @@ export async function sendEmail(options: EmailOptions): Promise<EmailSendResult>
   }
 }
 
+// ============================================================================
+// SHARED EMAIL WRAPPER
+// Matches the drip email style: Georgia serif, 560px, cream/gold/sand.
+// ============================================================================
+
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.beanumber.org';
+
+function wrapTransactionalEmail(body: string): string {
+  return `<!DOCTYPE html>
+<html>
+  <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+  <body style="font-family: Georgia, 'Times New Roman', serif; line-height: 1.7; color: #333; max-width: 560px; margin: 0 auto; padding: 30px 20px;">
+    ${body}
+    <hr style="border: none; border-top: 1px solid #e8e0d4; margin: 30px 0;">
+    <p style="font-size: 12px; color: #999; line-height: 1.5;">
+      Be A Number, International<br>
+      <a href="${SITE_URL}" style="color: #D4A843;">beanumber.org</a> &nbsp;&middot;&nbsp;
+      <a href="mailto:Kevin@beanumber.org" style="color: #D4A843;">Kevin@beanumber.org</a>
+    </p>
+  </body>
+</html>`;
+}
+
+// ============================================================================
+// TEMPLATE FUNCTIONS
+// ============================================================================
+
 /**
  * Send welcome email to new sponsor
- *
- * @returns Structured result with success/failure and data/error
  */
 export async function sendSponsorWelcomeEmail(
   sponsorEmail: string,
@@ -172,67 +197,33 @@ export async function sendSponsorWelcomeEmail(
   childName: string,
   sponsorCode: string
 ): Promise<EmailSendResult> {
-  const dashboardUrl = `${process.env.NEXT_PUBLIC_SITE_URL || 'https://www.beanumber.org'}/sponsor/login`;
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.beanumber.org';
+  const dashboardUrl = `${siteUrl}/sponsor/login`;
+  const firstName = (sponsorName || 'Friend').trim().split(/\s+/)[0] || 'Friend';
 
-  const html = `
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <style>
-          body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; line-height: 1.6; color: #333; }
-          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-          .header { background-color: #1a1a1a; color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0; }
-          .content { background-color: #f9f9f9; padding: 30px; border-radius: 0 0 8px 8px; }
-          .button { display: inline-block; background-color: #1a1a1a; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; margin: 20px 0; }
-          .footer { text-align: center; margin-top: 30px; font-size: 12px; color: #666; }
-          .credentials { background-color: #fff; padding: 20px; border-left: 4px solid #1a1a1a; margin: 20px 0; }
-        </style>
-      </head>
-      <body>
-        <div class="container">
-          <div class="header">
-            <h1>Welcome to Be A Number!</h1>
-          </div>
-          <div class="content">
-            <p>Dear ${sponsorName},</p>
+  const html = wrapTransactionalEmail(`
+    <p style="margin-top: 0;">Hey ${firstName},</p>
 
-            <p>Thank you for partnering with us to support ${childName}! Your sponsorship directly enables sustainable community systems in Northern Uganda: healthcare, education, workforce development, and economic infrastructure that transform lives.</p>
+    <p>Your sponsorship of ${childName} is active. That means ${childName} has school fees, daily meals, and access to the on-site clinic covered, and you have a direct connection to them through your sponsor portal.</p>
 
-            <div class="credentials">
-              <h3>Your Sponsor Dashboard</h3>
-              <p>Access your personalized dashboard to see updates, photos, and impact reports about ${childName}:</p>
-              <p><strong>Sponsor Code:</strong> ${sponsorCode}</p>
-              <p><strong>Email:</strong> ${sponsorEmail}</p>
-            </div>
+    <div style="background: #f5f0e8; border: 1px solid #e8e0d4; padding: 16px 20px; margin: 24px 0;">
+      <p style="margin: 0 0 8px 0; font-size: 13px; color: #999; text-transform: uppercase; letter-spacing: 0.1em;">Your portal access</p>
+      <p style="margin: 0; font-size: 15px;"><strong>Sponsor Code:</strong> ${sponsorCode}</p>
+      <p style="margin: 4px 0 0 0; font-size: 15px;"><strong>Email:</strong> ${sponsorEmail}</p>
+    </div>
 
-            <div style="text-align: center;">
-              <a href="${dashboardUrl}" class="button">Access Your Dashboard</a>
-            </div>
+    <p style="text-align: center; margin: 24px 0;">
+      <a href="${dashboardUrl}" style="display: inline-block; background: #D4A843; color: #0d0d0d; font-weight: bold; text-decoration: none; padding: 14px 32px; font-size: 15px; letter-spacing: 0.05em;">LOG IN TO YOUR PORTAL</a>
+    </p>
 
-            <h3>What Happens Next</h3>
-            <ul>
-              <li><strong>Monthly campus newsletter</strong> from our team in Gulu</li>
-              <li><strong>Photos every few months</strong> from the campus and community</li>
-              <li><strong>A handwritten letter from ${childName}</strong> once a year</li>
-              <li><strong>A year-end report card</strong> summarizing the impact of your sponsorship</li>
-            </ul>
+    <p>From there you can see updates about ${childName}, write them a letter, and request photos. You will also get a monthly campus newsletter from our team in Northern Uganda, and a year-end report card.</p>
 
-            <p>Your support makes a lasting difference. Thank you for being a number that counts.</p>
-
-            <p>With gratitude,<br>The Be A Number Team</p>
-          </div>
-          <div class="footer">
-            <p>Be A Number, International | 501(c)(3) Nonprofit</p>
-            <p><a href="${process.env.NEXT_PUBLIC_SITE_URL || 'https://www.beanumber.org'}">www.beanumber.org</a></p>
-          </div>
-        </div>
-      </body>
-    </html>
-  `;
+    <p>Kevin</p>
+  `);
 
   return sendEmail({
     to: { email: sponsorEmail, name: sponsorName },
-    subject: `Welcome! You're now supporting ${childName}`,
+    subject: `Your sponsorship of ${childName} is active`,
     html,
   });
 }
@@ -340,8 +331,6 @@ function escapeAttr(s: string): string {
 
 /**
  * Send update notification to sponsor
- *
- * @returns Structured result with success/failure and data/error
  */
 export async function sendUpdateNotificationEmail(
   sponsorEmail: string,
@@ -350,67 +339,35 @@ export async function sendUpdateNotificationEmail(
   updateTitle: string,
   updatePreview: string
 ): Promise<EmailSendResult> {
-  const dashboardUrl = `${process.env.NEXT_PUBLIC_SITE_URL || 'https://www.beanumber.org'}/sponsor/login`;
+  const dashboardUrl = `${SITE_URL}/sponsor/login`;
+  const firstName = (sponsorName || 'Friend').trim().split(/\s+/)[0] || 'Friend';
 
-  const html = `
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <style>
-          body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; line-height: 1.6; color: #333; }
-          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-          .header { background-color: #1a1a1a; color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0; }
-          .content { background-color: #f9f9f9; padding: 30px; border-radius: 0 0 8px 8px; }
-          .button { display: inline-block; background-color: #1a1a1a; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; margin: 20px 0; }
-          .footer { text-align: center; margin-top: 30px; font-size: 12px; color: #666; }
-          .update-box { background-color: #fff; padding: 20px; border-left: 4px solid #1a1a1a; margin: 20px 0; }
-        </style>
-      </head>
-      <body>
-        <div class="container">
-          <div class="header">
-            <h1>New Update from ${childName}!</h1>
-          </div>
-          <div class="content">
-            <p>Hi ${sponsorName},</p>
+  const html = wrapTransactionalEmail(`
+    <p style="margin-top: 0;">Hey ${firstName},</p>
 
-            <p>We have a new update to share about ${childName}:</p>
+    <p>There is a new update about ${childName} waiting for you in your portal.</p>
 
-            <div class="update-box">
-              <h3>${updateTitle}</h3>
-              <p>${updatePreview}</p>
-            </div>
+    <div style="background: #f5f0e8; border: 1px solid #e8e0d4; padding: 16px 20px; margin: 24px 0;">
+      <p style="margin: 0 0 6px 0; font-weight: bold; color: #0d0d0d;">${updateTitle}</p>
+      <p style="margin: 0; font-size: 14px; color: #555;">${updatePreview}</p>
+    </div>
 
-            <div style="text-align: center;">
-              <a href="${dashboardUrl}" class="button">Read Full Update</a>
-            </div>
+    <p style="text-align: center; margin: 24px 0;">
+      <a href="${dashboardUrl}" style="display: inline-block; background: #D4A843; color: #0d0d0d; font-weight: bold; text-decoration: none; padding: 14px 32px; font-size: 15px; letter-spacing: 0.05em;">READ THE FULL UPDATE</a>
+    </p>
 
-            <p>Log in to your sponsor dashboard to see the complete update with photos and details.</p>
-
-            <p>Thank you for your continued support!</p>
-
-            <p>With gratitude,<br>The Be A Number Team</p>
-          </div>
-          <div class="footer">
-            <p>Be A Number, International | 501(c)(3) Nonprofit</p>
-            <p><a href="${process.env.NEXT_PUBLIC_SITE_URL || 'https://www.beanumber.org'}">www.beanumber.org</a></p>
-          </div>
-        </div>
-      </body>
-    </html>
-  `;
+    <p>Kevin</p>
+  `);
 
   return sendEmail({
     to: { email: sponsorEmail, name: sponsorName },
-    subject: `New update from ${childName}`,
+    subject: `New update about ${childName}`,
     html,
   });
 }
 
 /**
  * Send donation receipt email
- *
- * @returns Structured result with success/failure and data/error
  */
 export async function sendDonationReceiptEmail(
   donorEmail: string,
@@ -421,78 +378,37 @@ export async function sendDonationReceiptEmail(
   date: string
 ): Promise<EmailSendResult> {
   const formattedAmount = (amount / 100).toFixed(2);
-  const donationTypeText = donationType === 'monthly' ? 'Monthly Donation' : 'One-Time Donation';
+  const firstName = (donorName || 'Friend').trim().split(/\s+/)[0] || 'Friend';
+  const dateStr = new Date(date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
 
-  const html = `
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <style>
-          body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; line-height: 1.6; color: #333; }
-          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-          .header { background-color: #1a1a1a; color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0; }
-          .content { background-color: #f9f9f9; padding: 30px; border-radius: 0 0 8px 8px; }
-          .receipt-box { background-color: #fff; padding: 20px; border: 2px solid #1a1a1a; margin: 20px 0; }
-          .footer { text-align: center; margin-top: 30px; font-size: 12px; color: #666; }
-          .amount { font-size: 32px; font-weight: bold; color: #1a1a1a; }
-        </style>
-      </head>
-      <body>
-        <div class="container">
-          <div class="header">
-            <h1>Thank You for Your Donation!</h1>
-          </div>
-          <div class="content">
-            <p>Dear ${donorName},</p>
+  const html = wrapTransactionalEmail(`
+    <p style="margin-top: 0;">Hey ${firstName},</p>
 
-            <p>Thank you for changing lives. Your generosity supports sustainable community systems in Northern Uganda: healthcare, education, workforce development, and economic empowerment that transform communities.</p>
+    <p>This is your tax-deductible receipt for your ${donationType === 'monthly' ? 'monthly ' : ''}donation to Be A Number. We are a 501(c)(3) public charity (EIN 93-1948872), and no goods or services were provided in exchange for this contribution.</p>
 
-            <div class="receipt-box">
-              <h3>Tax-Deductible Receipt</h3>
-              <div class="amount">$${formattedAmount}</div>
-              <p><strong>Donation Type:</strong> ${donationTypeText}</p>
-              <p><strong>Transaction ID:</strong> ${transactionId}</p>
-              <p><strong>Date:</strong> ${date}</p>
-              <p><strong>Tax ID:</strong> 93-1948872</p>
-              <p style="margin-top: 20px; font-size: 12px; color: #666;">
-                Be A Number, International is a 501(c)(3) nonprofit organization. Your donation is tax-deductible to the fullest extent allowed by law. No goods or services were provided in exchange for this donation.
-              </p>
-            </div>
+    <div style="background: #f5f0e8; border: 1px solid #e8e0d4; padding: 16px 20px; margin: 24px 0;">
+      <p style="margin: 0; font-size: 22px; font-weight: bold; color: #0d0d0d;">$${formattedAmount}</p>
+      <p style="margin: 4px 0 0 0; font-size: 14px; color: #555;">
+        ${donationType === 'monthly' ? 'Monthly recurring' : 'One-time'} &middot; ${dateStr}
+      </p>
+      <p style="margin: 4px 0 0 0; font-size: 13px; color: #999;">Transaction: ${transactionId}</p>
+    </div>
 
-            <h3>Your Impact</h3>
-            <p>96-97% of your contribution directly supports programs and community impact:</p>
-            <ul>
-              <li><strong>Healthcare:</strong> Medical services and outreach programs</li>
-              <li><strong>Education:</strong> School support and student sponsorships</li>
-              <li><strong>Workforce Development:</strong> Vocational training programs</li>
-              <li><strong>Economic Systems:</strong> Income-generating infrastructure</li>
-            </ul>
+    <p>Your donation goes to a six-acre campus in Northern Uganda where 380 kids go to school, 700+ patients get medical care, and 60 women are learning trades. If you ever want to see more about where it goes, the <a href="${SITE_URL}/impact" style="color: #D4A843;">impact page</a> has the full picture.</p>
 
-            <p>You'll hear from us monthly through our campus newsletter, with photos every few months and a year-end report card showing how your contribution created lasting change.</p>
-
-            <p>With gratitude,<br>The Be A Number Team</p>
-          </div>
-          <div class="footer">
-            <p>Be A Number, International | 501(c)(3) Nonprofit | Tax ID: 93-1948872</p>
-            <p><a href="${process.env.NEXT_PUBLIC_SITE_URL || 'https://www.beanumber.org'}">www.beanumber.org</a></p>
-            <p>Questions? Email us at info@beanumber.org</p>
-          </div>
-        </div>
-      </body>
-    </html>
-  `;
+    <p>Thank you for this,<br>
+    <strong>Kevin</strong></p>
+  `);
 
   return sendEmail({
     to: { email: donorEmail, name: donorName },
-    subject: `Donation Receipt - $${formattedAmount} to Be A Number`,
+    subject: `Your receipt from Be A Number`,
     html,
   });
 }
 
 /**
  * Send update request confirmation to sponsor
- *
- * @returns Structured result with success/failure and data/error
  */
 export async function sendUpdateRequestConfirmationEmail(
   sponsorEmail: string,
@@ -500,54 +416,17 @@ export async function sendUpdateRequestConfirmationEmail(
   childName: string,
   nextEligibleDate: string
 ): Promise<EmailSendResult> {
-  const html = `
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <style>
-          body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; line-height: 1.6; color: #333; }
-          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-          .header { background-color: #1a1a1a; color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0; }
-          .content { background-color: #f9f9f9; padding: 30px; border-radius: 0 0 8px 8px; }
-          .footer { text-align: center; margin-top: 30px; font-size: 12px; color: #666; }
-          .info-box { background-color: #fff; padding: 20px; border-left: 4px solid #1a1a1a; margin: 20px 0; }
-        </style>
-      </head>
-      <body>
-        <div class="container">
-          <div class="header">
-            <h1>Update Request Received</h1>
-          </div>
-          <div class="content">
-            <p>Hi ${sponsorName},</p>
+  const firstName = (sponsorName || 'Friend').trim().split(/\s+/)[0] || 'Friend';
 
-            <p>We've received your request for an update about ${childName}!</p>
+  const html = wrapTransactionalEmail(`
+    <p style="margin-top: 0;">Hey ${firstName},</p>
 
-            <div class="info-box">
-              <h3>What Happens Next</h3>
-              <p>Our field team in Northern Uganda will prepare a personalized update with:</p>
-              <ul>
-                <li>Recent photos of ${childName}</li>
-                <li>Information about their activities and progress</li>
-                <li>Community and program updates</li>
-              </ul>
-              <p>You'll receive an email notification when the update is ready, typically within 2-4 weeks.</p>
-            </div>
+    <p>Got your update request for ${childName}. I am passing it along to the team on the ground, and they will put together recent photos and a progress update. Expect it within 2 to 4 weeks. I will email you when it is ready in your portal.</p>
 
-            <p><strong>Next Request Date:</strong> You can request your next update on ${nextEligibleDate}.</p>
+    <p>Your next update request opens up on ${nextEligibleDate}.</p>
 
-            <p>Thank you for your patience and continued support!</p>
-
-            <p>With gratitude,<br>The Be A Number Team</p>
-          </div>
-          <div class="footer">
-            <p>Be A Number, International | 501(c)(3) Nonprofit</p>
-            <p><a href="${process.env.NEXT_PUBLIC_SITE_URL || 'https://www.beanumber.org'}">www.beanumber.org</a></p>
-          </div>
-        </div>
-      </body>
-    </html>
-  `;
+    <p>Kevin</p>
+  `);
 
   return sendEmail({
     to: { email: sponsorEmail, name: sponsorName },
@@ -557,9 +436,7 @@ export async function sendUpdateRequestConfirmationEmail(
 }
 
 /**
- * Send recurring donation thank-you email
- *
- * @returns Structured result with success/failure and data/error
+ * Send recurring donation thank-you email (fires on each invoice.payment_succeeded)
  */
 export async function sendRecurringDonationThankYouEmail(
   donorEmail: string,
@@ -568,71 +445,22 @@ export async function sendRecurringDonationThankYouEmail(
   currency: string
 ): Promise<EmailSendResult> {
   const formattedAmount = amount.toFixed(2);
-  const impactUrl = `${process.env.NEXT_PUBLIC_SITE_URL || 'https://www.beanumber.org'}/impact`;
+  const firstName = (donorName || 'Friend').trim().split(/\s+/)[0] || 'Friend';
+  const dateStr = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
 
-  const html = `
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <style>
-          body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; line-height: 1.6; color: #333; }
-          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-          .header { background-color: #1a1a1a; color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0; }
-          .content { background-color: #f9f9f9; padding: 30px; border-radius: 0 0 8px 8px; }
-          .button { display: inline-block; background-color: #1a1a1a; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; margin: 20px 0; }
-          .footer { text-align: center; margin-top: 30px; font-size: 12px; color: #666; }
-          .amount-box { background-color: #fff; padding: 20px; text-align: center; border-radius: 8px; margin: 20px 0; }
-          .amount { font-size: 28px; font-weight: bold; color: #1a1a1a; }
-        </style>
-      </head>
-      <body>
-        <div class="container">
-          <div class="header">
-            <h1>Thank You for Your Continued Support!</h1>
-          </div>
-          <div class="content">
-            <p>Dear ${donorName},</p>
+  const html = wrapTransactionalEmail(`
+    <p style="margin-top: 0;">Hey ${firstName},</p>
 
-            <p>Your monthly donation has been processed. Thank you for your ongoing commitment to creating lasting change in Northern Uganda!</p>
+    <p>Your monthly donation of $${formattedAmount} was processed on ${dateStr}. It goes to the same place as last month: a six-acre campus in Northern Uganda where 380 kids go to school, 700+ patients get medical care, and 60 women are learning trades.</p>
 
-            <div class="amount-box">
-              <p style="margin: 0; color: #666;">Monthly Donation</p>
-              <div class="amount">$${formattedAmount} ${currency.toUpperCase()}</div>
-              <p style="margin: 0; font-size: 12px; color: #666;">Processed ${new Date().toLocaleDateString()}</p>
-            </div>
+    <p>If you ever want to see what your monthly support adds up to, the <a href="${SITE_URL}/impact" style="color: #D4A843;">impact page</a> has the full breakdown. And if you need to change or cancel your donation for any reason, reply to this email and I will take care of it.</p>
 
-            <p>Your consistent support enables us to:</p>
-            <ul>
-              <li>Plan long-term healthcare programs</li>
-              <li>Provide continuous education support</li>
-              <li>Sustain vocational training initiatives</li>
-              <li>Build lasting community infrastructure</li>
-            </ul>
-
-            <p>Monthly donors like you make it possible to create sustainable change rather than one-time interventions. Your ongoing commitment is truly making a difference.</p>
-
-            <div style="text-align: center;">
-              <a href="${impactUrl}" class="button">See Your Impact</a>
-            </div>
-
-            <p>With gratitude,<br>
-            <strong>Kevin C. Hershock</strong><br>
-            Founder & Executive Director<br>
-            Be A Number, International</p>
-          </div>
-          <div class="footer">
-            <p>Be A Number, International | 501(c)(3) Nonprofit | Tax ID: 93-1948872</p>
-            <p><a href="${process.env.NEXT_PUBLIC_SITE_URL || 'https://www.beanumber.org'}">www.beanumber.org</a></p>
-            <p>To update or cancel your subscription, reply to this email.</p>
-          </div>
-        </div>
-      </body>
-    </html>
-  `;
+    <p>Kevin</p>
+  `);
 
   return sendEmail({
     to: { email: donorEmail, name: donorName },
-    subject: `Thank you for your continued support - $${formattedAmount}/month`,
+    subject: `Your monthly donation was processed`,
     html,
   });
 }
