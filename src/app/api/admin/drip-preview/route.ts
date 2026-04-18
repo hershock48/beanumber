@@ -173,7 +173,7 @@ function getDonorConvertEmails(): PreviewEmail[] {
         ${banner('donor_convert — Stage 0 (Day 5). One-time donor. Close the loop.')}
         <p style="margin-top: 0;">Hey ${firstName},</p>
         <p>I wanted to follow up and let you know where your donation actually went, because I think that matters.</p>
-        <p>It went to the YDO campus in Northern Uganda. One campus, one team on the ground. We use it to cover school fees, meals, and medical care for specific kids by name. We&rsquo;re small on purpose, and every dollar that comes in goes through the same door, so I can tell you exactly where it ends up.</p>
+        <p>It went to the YDO campus in Northern Uganda. One campus, one team on the ground. We use it to cover school fees, meals, and medical care for specific kids by name. We&rsquo;re small on purpose, which means I can tell you exactly where your money ends up.</p>
         <p>Thank you for trusting us with it.</p>
         <p>Kevin</p>
       `),
