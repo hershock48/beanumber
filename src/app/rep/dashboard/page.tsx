@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import RepDashboardContent from './RepDashboardContent';
 
 export const metadata = {
@@ -7,5 +8,13 @@ export const metadata = {
 };
 
 export default function RepDashboardPage() {
-  return <RepDashboardContent />;
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-[#FFF8F0] flex items-center justify-center">
+        <p className="text-[#777]">Loading...</p>
+      </div>
+    }>
+      <RepDashboardContent />
+    </Suspense>
+  );
 }

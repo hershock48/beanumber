@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import ShirtsPageContent from './ShirtsPageContent';
 
 export const metadata = {
@@ -59,7 +60,9 @@ export default function ShirtsPage() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
       />
-      <ShirtsPageContent />
+      <Suspense>
+        <ShirtsPageContent />
+      </Suspense>
     </>
   );
 }
