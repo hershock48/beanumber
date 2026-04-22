@@ -30,6 +30,7 @@ interface OrderStatusResponse {
   // checkout. The success page uses this to swap the "Sponsor $25/mo" CTA
   // for a "You're already sponsoring {name}. Welcome." confirmation.
   alreadySponsoring: boolean;
+  itemCount: number;
   status: 'pending' | 'ready' | 'unavailable';
 }
 
@@ -83,23 +84,56 @@ export async function GET(request: NextRequest) {
     // Gate by order_type so this endpoint can't be used to probe non-shirt sessions.
     // Accept both pure shirt orders and shirt+monthly opt-ins.
     const orderType = session.metadata?.order_type;
-    if (orderType !== 'shirt' && orderType !== 'shirt_plus_monthly') {
+    if (orderType !== 'shirt' && orderType !== 'shirt_plus_monthly' && orderType !== 'cart') {
       return NextResponse.json(
         { error: 'Not a shirt order' },
         { status: 400 }
       );
     }
 
-    const shirt = {
-      name: session.metadata?.shirt_name || 'Be A Number shirt',
-      color: session.metadata?.shirt_color || '',
-      size: session.metadata?.shirt_size || '',
-    };
+    const isCart = orderType === 'cart';
 
-    // alreadySponsoring drives the success-page copy swap. True only when
-    // the buyer actively opted in at checkout (not just any subscription
-    // that happens to have shirt metadata).
-    const alreadySponsoring = orderType === 'shirt_plus_monthly';
+    // For cart orders, build shirt info from the first item or summarize.
+    // For single-shirt orders, use the direct metadata fields.
+    let shirt: { name: string; color: string; size: string } | null;
+    let alreadySponsoring: boolean;
+    let itemCount = 1;
+
+    if (isCart) {
+      const monthlyCount = parseInt(session.metadata?.monthly_count || '0', 10);
+      itemCount = parseInt(session.metadata?.item_count || '1', 10);
+      alreadySponsoring = monthlyCount > 0;
+
+      // Parse items_json for display
+      try {
+        const itemsMeta = JSON.parse(session.metadata?.items_json || '[]');
+        if (itemsMeta.length === 1) {
+          shirt = {
+            name: itemsMeta[0].n || 'Be A Number shirt',
+            color: itemsMeta[0].c || '',
+            size: itemsMeta[0].z || '',
+          };
+        } else {
+          shirt = {
+            name: `${itemsMeta.length} shirts`,
+            color: '',
+            size: '',
+          };
+        }
+      } catch {
+        shirt = { name: `${itemCount} shirt${itemCount !== 1 ? 's' : ''}`, color: '', size: '' };
+      }
+    } else {
+      shirt = {
+        name: session.metadata?.shirt_name || 'Be A Number shirt',
+        color: session.metadata?.shirt_color || '',
+        size: session.metadata?.shirt_size || '',
+      };
+      // alreadySponsoring drives the success-page copy swap. True only when
+      // the buyer actively opted in at checkout (not just any subscription
+      // that happens to have shirt metadata).
+      alreadySponsoring = orderType === 'shirt_plus_monthly';
+    }
 
     // Look up the Donation row the webhook created. If it doesn't exist yet,
     // the webhook hasn't fired — tell the client to keep polling.
@@ -109,6 +143,7 @@ export async function GET(request: NextRequest) {
       shirt,
       child,
       alreadySponsoring,
+      itemCount,
       status: child ? 'ready' : 'pending',
     };
 

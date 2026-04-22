@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { BANNavigation } from '@/components/BANNavigation';
 import { BANFooter } from '@/components/BANFooter';
 import { Logo } from '@/components/Logo';
+import { CartProvider, useCart } from '@/components/CartContext';
+import { CartDrawer, CartButton } from '@/components/CartDrawer';
 
 /* ── Color palette + per-color theme ────────────────────────── */
 
@@ -540,17 +542,18 @@ function PreviewMockup({
 function ShirtCard({ shirt, reversed, initialColor }: { shirt: Shirt; reversed: boolean; initialColor: ColorName }) {
   const [selectedColor, setSelectedColor] = useState<ColorName | null>(null);
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Unchecked by default. Opting in converts this purchase into a monthly
   // sponsorship from day one — the $25 today IS month one, then $25/month.
   const [continueMonthly, setContinueMonthly] = useState(false);
+  const [justAdded, setJustAdded] = useState(false);
+  const { addItem } = useCart();
 
   const previewTheme = THEMES[selectedColor ?? initialColor];
   const Front = shirt.Front;
   const Back = shirt.Back;
 
-  async function handleBuy() {
+  function handleAddToCart() {
     if (!selectedColor) {
       setError('Please select a color.');
       return;
@@ -560,35 +563,20 @@ function ShirtCard({ shirt, reversed, initialColor }: { shirt: Shirt; reversed: 
       return;
     }
 
-    setLoading(true);
     setError(null);
+    addItem({
+      shirtId: shirt.id,
+      shirtName: shirt.name,
+      color: selectedColor,
+      size: selectedSize,
+      continueMonthly,
+      price: shirt.price,
+    });
 
-    try {
-      const res = await fetch('/api/create-shirt-checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          shirtId: shirt.id,
-          size: selectedSize,
-          color: selectedColor,
-          continueMonthly,
-        }),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || 'Something went wrong.');
-      }
-
-      if (data.url) {
-        window.location.href = data.url;
-      }
-    } catch (err: any) {
-      setError(err.message || 'Something went wrong. Please try again.');
-    } finally {
-      setLoading(false);
-    }
+    // Flash confirmation, then reset selections for another add
+    setJustAdded(true);
+    setTimeout(() => setJustAdded(false), 1500);
+    setContinueMonthly(false);
   }
 
   return (
@@ -803,28 +791,23 @@ function ShirtCard({ shirt, reversed, initialColor }: { shirt: Shirt; reversed: 
             </button>
 
             <button
-              onClick={handleBuy}
-              disabled={loading}
-              aria-busy={loading}
-              className={`w-full sm:w-auto px-10 py-4 font-bold uppercase tracking-wider text-sm transition-colors inline-flex items-center justify-center gap-3 ${
-                loading
-                  ? 'bg-[#D4A843]/70 text-[#0d0d0d] cursor-wait'
-                  : 'bg-[#D4A843] text-[#0d0d0d] hover:bg-[#c49a3a] cursor-pointer'
+              onClick={handleAddToCart}
+              className={`w-full sm:w-auto px-10 py-4 font-bold uppercase tracking-wider text-sm transition-colors inline-flex items-center justify-center gap-3 cursor-pointer ${
+                justAdded
+                  ? 'bg-[#2a7a2a] text-white'
+                  : 'bg-[#D4A843] text-[#0d0d0d] hover:bg-[#c49a3a]'
               }`}
             >
               <span>
-                {continueMonthly ? 'Get Shirt + Sponsor Monthly' : 'Get This Shirt · $25'}
+                {justAdded
+                  ? 'Added!'
+                  : continueMonthly
+                    ? 'Add Shirt + Sponsor · $25'
+                    : 'Add to Cart · $25'}
               </span>
-              {loading && (
-                <svg
-                  aria-hidden="true"
-                  className="animate-spin h-4 w-4 text-[#0d0d0d]"
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                >
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+              {justAdded && (
+                <svg viewBox="0 0 20 20" fill="none" className="w-4 h-4 text-white">
+                  <path d="M5 10l3.5 3.5L15 7" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               )}
             </button>
@@ -851,6 +834,7 @@ export default function ShirtsPageContent() {
   const [previewColors] = useState(() => assignPreviewColors(SHIRTS_SOURCE.length));
 
   return (
+    <CartProvider>
     <div className="min-h-screen bg-[#FFF8F0]">
       <BANNavigation currentPath="/shirts" />
 
@@ -947,6 +931,9 @@ export default function ShirtsPageContent() {
       </section>
 
       <BANFooter />
+      <CartDrawer />
+      <CartButton />
     </div>
+    </CartProvider>
   );
 }

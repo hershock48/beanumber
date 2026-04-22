@@ -7,6 +7,8 @@ import { sendEmail } from '@/lib/email';
 // email sends, and Stripe subscription backfills.
 export const maxDuration = 60;
 
+const SHIRT_PRICE = 25; // dollars — used for subscription unit_amount and sponsorship records
+
 // Initialize Stripe lazily
 async function getStripe() {
   const StripeModule = (await import('stripe')).default;
@@ -1072,6 +1074,7 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
     const isShirtOrder = session.metadata?.order_type === 'shirt';
     const isShirtPlusMonthly = session.metadata?.order_type === 'shirt_plus_monthly';
     const isSponsorship = session.metadata?.order_type === 'sponsorship';
+    const isCart = session.metadata?.order_type === 'cart';
 
     const donorArgs = {
       name,
@@ -1086,7 +1089,265 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
     console.log('[WH] S1: donor lookup starting, email=' + email);
     const donorPromise = findOrCreateDonor(stripeCustomerId, email, donorArgs);
 
-    if (isSponsorship) {
+    if (isCart) {
+      // --- CART ORDER FLOW ---
+      // Multiple shirts in one payment-mode checkout. Each shirt gets its
+      // own child assignment. Items with continueMonthly get a deferred
+      // Stripe subscription created using the saved payment method.
+      const itemsJson = session.metadata?.items_json || '[]';
+      let cartItems: Array<{ i: number; s: string; n: string; c: string; z: string; m: number }> = [];
+      try {
+        cartItems = JSON.parse(itemsJson);
+      } catch (e) {
+        console.error('[WH] Failed to parse cart items_json:', e);
+      }
+
+      console.log('[WH] S2: cart flow, items=' + cartItems.length);
+
+      const donorId = await donorPromise;
+      console.log('[WH] S3: donor resolved for cart, id=' + donorId);
+
+      // Assign a child for each shirt in the cart
+      const assignments: Array<{
+        itemIndex: number;
+        shirtName: string;
+        shirtColor: string;
+        shirtSize: string;
+        continueMonthly: boolean;
+        child: Awaited<ReturnType<typeof assignNextShirtChild>>;
+      }> = [];
+
+      for (const item of cartItems) {
+        let child: Awaited<ReturnType<typeof assignNextShirtChild>> = null;
+        try {
+          child = await assignNextShirtChild(email, name);
+        } catch (err) {
+          console.error('[WH] Cart child assignment failed for item ' + item.i + ':', err);
+        }
+        assignments.push({
+          itemIndex: item.i,
+          shirtName: item.n,
+          shirtColor: item.c,
+          shirtSize: item.z,
+          continueMonthly: item.m === 1,
+          child,
+        });
+      }
+
+      // Create one donation record for the full cart amount
+      const childRecordIds = assignments
+        .filter(a => a.child)
+        .map(a => a.child!.recordId);
+
+      const assignmentNotes = assignments.map(a => {
+        const childNote = a.child
+          ? `#${a.child.shirtNumber} (${a.child.displayName})`
+          : 'unassigned';
+        const monthlyNote = a.continueMonthly ? ' +monthly' : '';
+        return `${a.shirtName} / ${a.shirtColor} / ${a.shirtSize} → ${childNote}${monthlyNote}`;
+      });
+
+      console.log('[WH] S4: upsert donation (cart)');
+      const donationId = await upsertDonation(paymentIntentId, {
+        sessionId: session.id,
+        customerId: stripeCustomerId,
+        donorId,
+        amount,
+        currency,
+        donationDate,
+        isRecurring: false,
+        subscriptionId: null,
+        status,
+        email,
+        name,
+        organization: organization || undefined,
+        address,
+        donationSource: 'Shirt Order',
+        notes: `[Cart: ${cartItems.length} shirts]\n${assignmentNotes.join('\n')}`,
+        childRecordId: childRecordIds[0],
+      });
+
+      // For items with monthly opt-in, create deferred subscriptions
+      // using the customer's saved payment method.
+      const monthlyItems = assignments.filter(a => a.continueMonthly && a.child);
+      if (monthlyItems.length > 0 && stripeCustomerId) {
+        const stripe = await getStripe();
+
+        for (const item of monthlyItems) {
+          try {
+            // Get the customer's payment methods (saved via setup_future_usage)
+            const paymentMethods = await stripe.paymentMethods.list({
+              customer: stripeCustomerId,
+              type: 'card',
+            });
+            const pm = paymentMethods.data[0];
+
+            if (!pm) {
+              console.error('[WH] No saved payment method for cart subscription, item ' + item.itemIndex);
+              continue;
+            }
+
+            // Create a subscription starting 30 days from now.
+            // The $25 they already paid covers month one.
+            const billingAnchor = Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60;
+
+            const childName = item.child?.displayName ?? 'a child';
+            const sub = await stripe.subscriptions.create({
+              customer: stripeCustomerId,
+              items: [
+                {
+                  price_data: {
+                    currency: 'usd',
+                    product_data: {
+                      name: `Monthly Sponsorship (${childName})`,
+                    },
+                    unit_amount: SHIRT_PRICE * 100,
+                    recurring: { interval: 'month' },
+                  } as any,
+                },
+              ],
+              default_payment_method: pm.id,
+              billing_cycle_anchor: billingAnchor,
+              proration_behavior: 'none',
+              metadata: {
+                order_type: 'cart_monthly',
+                shirt_name: item.shirtName,
+                shirt_color: item.shirtColor,
+                shirt_size: item.shirtSize,
+                child_id: item.child!.childId,
+                child_record_id: item.child!.recordId,
+                child_display_name: item.child!.displayName,
+                referring_cart_session_id: session.id,
+              },
+            });
+
+            console.log('[WH] Created deferred subscription for cart item ' + item.itemIndex + ':', sub.id);
+
+            // Create a Sponsorship record for this child
+            try {
+              const childRecord = await fetchChildRecord(item.child!.recordId);
+              const childFields = childRecord?.fields || {};
+              await createSponsorshipRecord({
+                childRecordId: item.child!.recordId,
+                childId: item.child!.childId,
+                childDisplayName: item.child!.displayName,
+                childAge: childFields.DateOfBirth ? undefined : childFields.GradeClass,
+                childLocation: childFields.SchoolLocation,
+                childPhoto: childFields.ProfilePhoto,
+                sponsorEmail: email,
+                sponsorName: name,
+                donorRecordId: donorId,
+                subscriptionId: sub.id,
+                monthlyAmount: SHIRT_PRICE,
+              });
+            } catch (err) {
+              console.error('[WH] Failed to create sponsorship for cart item ' + item.itemIndex + ':', err);
+            }
+          } catch (err) {
+            console.error('[WH] Failed to create subscription for cart item ' + item.itemIndex + ':', err);
+          }
+        }
+      }
+
+      // Send one combined confirmation email
+      const firstAssigned = assignments.find(a => a.child);
+      let emailStatus = 'Sent';
+      try {
+        await sendShirtConfirmationEmail({
+          email,
+          name,
+          shirtName: cartItems.length === 1
+            ? assignments[0].shirtName
+            : `${cartItems.length} shirts`,
+          shirtColor: cartItems.length === 1
+            ? assignments[0].shirtColor
+            : 'assorted',
+          shirtSize: cartItems.length === 1
+            ? assignments[0].shirtSize
+            : 'assorted',
+          amount,
+          alreadySponsoring: monthlyItems.length > 0,
+        });
+      } catch (err) {
+        console.error('[WH] Cart confirmation email failed:', err);
+        emailStatus = 'Failed';
+      }
+
+      // Communication record
+      try {
+        await createCommunicationRecord(donationId, donorId, {
+          email,
+          subject: `Your ${cartItems.length} shirt${cartItems.length > 1 ? 's are' : ' is'} being made.`,
+          body: `Cart order: ${assignmentNotes.join('; ')}`,
+          status: emailStatus,
+        });
+      } catch (err) {
+        console.error('[WH] Cart communication record failed:', err);
+      }
+
+      // Admin notification
+      try {
+        await sendAdminOrderNotification({
+          kind: monthlyItems.length > 0 ? 'Shirt + Monthly' : 'Shirt',
+          customerName: name,
+          customerEmail: email,
+          amount,
+          isRecurring: monthlyItems.length > 0,
+          shirtName: cartItems.length === 1 ? assignments[0].shirtName : `${cartItems.length} shirts`,
+          shirtColor: cartItems.length === 1 ? assignments[0].shirtColor : 'assorted',
+          shirtSize: cartItems.length === 1 ? assignments[0].shirtSize : 'assorted',
+          childDisplayName: firstAssigned?.child?.displayName,
+          shirtNumber: firstAssigned?.child?.shirtNumber,
+          stripeSessionId: session.id,
+        });
+      } catch (err: any) {
+        console.error('[WH] Cart admin notify failed:', String(err?.message || err).slice(0, 200));
+      }
+
+      // Drip enrollment — enroll for the first assigned child (shirt_nurture
+      // for shirt-only carts, shirt_sponsor for carts with monthly).
+      if (firstAssigned?.child && donorId) {
+        try {
+          const pipeline = monthlyItems.length > 0 ? 'shirt_sponsor' : 'shirt_nurture';
+          const dripDelay = pipeline === 'shirt_sponsor' ? 3 : 6;
+          const dripStartDate = new Date();
+          dripStartDate.setUTCDate(dripStartDate.getUTCDate() + dripDelay);
+          const dripNextSend = dripStartDate.toISOString().split('T')[0];
+
+          await airtableAPICall(() =>
+            fetch(
+              `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_DONORS_TABLE}/${donorId}`,
+              {
+                method: 'PATCH',
+                headers: getAirtableHeaders(),
+                body: JSON.stringify({
+                  fields: {
+                    DripPipeline: pipeline,
+                    DripStage: 0,
+                    DripNextSend: dripNextSend,
+                    DripChildName: firstAssigned.child?.displayName?.split(' ')[0] || '',
+                    DripShirtNumber: firstAssigned.child?.shirtNumber ?? '',
+                  },
+                }),
+              }
+            )
+          );
+          console.log('[WH] Cart: enrolled in ' + pipeline + ' drip');
+        } catch (err: any) {
+          console.error('[WH] Cart drip enrollment failed:', String(err?.message || err).slice(0, 200));
+        }
+      }
+
+      console.log('[WH] Cart order complete:', {
+        sessionId: session.id,
+        items: cartItems.length,
+        assigned: assignments.filter(a => a.child).length,
+        subscriptions: monthlyItems.length,
+      });
+
+      return { donorId, donationId, assignments };
+
+    } else if (isSponsorship) {
       // --- SPONSORSHIP FLOW ---
       const childRecordId = session.metadata?.child_record_id || '';
       const childIdMeta = session.metadata?.child_id || '';

@@ -25,6 +25,7 @@ interface OrderStatus {
     size: string;
   } | null;
   alreadySponsoring?: boolean;
+  itemCount?: number;
 }
 
 export function ShirtSuccessClient() {
@@ -61,6 +62,7 @@ export function ShirtSuccessClient() {
         setStatus({
           shirt: data.shirt || null,
           alreadySponsoring: !!data.alreadySponsoring,
+          itemCount: data.itemCount || 1,
         });
       } catch {
         if (cancelled) return;
@@ -79,7 +81,7 @@ export function ShirtSuccessClient() {
   }, [sessionId]);
 
   if (error) {
-    return <ShippingConfirmation shirt={null} alreadySponsoring={false} note={error} />;
+    return <ShippingConfirmation shirt={null} alreadySponsoring={false} itemCount={1} note={error} />;
   }
 
   // Brief loading state — the API call is fast, so this rarely sticks.
@@ -98,6 +100,7 @@ export function ShirtSuccessClient() {
     <ShippingConfirmation
       shirt={status.shirt}
       alreadySponsoring={!!status.alreadySponsoring}
+      itemCount={status.itemCount || 1}
     />
   );
 }
@@ -110,12 +113,16 @@ export function ShirtSuccessClient() {
 function ShippingConfirmation({
   shirt,
   alreadySponsoring,
+  itemCount = 1,
   note,
 }: {
   shirt: OrderStatus['shirt'];
   alreadySponsoring: boolean;
+  itemCount?: number;
   note?: string;
 }) {
+  const multi = itemCount > 1;
+
   return (
     <div>
       {/* Confetti on successful orders (not error state) */}
@@ -132,14 +139,13 @@ function ShippingConfirmation({
           className="text-3xl md:text-4xl text-[#0d0d0d] mb-4"
           style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
         >
-          Your shirt is being made.
+          {multi ? 'Your shirts are being made.' : 'Your shirt is being made.'}
         </h1>
 
         <p className="text-lg text-[#555] leading-relaxed max-w-md mx-auto mb-4">
-          Expect it within 5&ndash;7 business days. When it
-          arrives, there&rsquo;s a number on the tag &mdash; that number belongs to
-          a real child in Northern Uganda, and they&rsquo;re waiting to meet
-          you.
+          {multi
+            ? <>Expect them within 5&ndash;7 business days. When they arrive, there&rsquo;s a number on each tag &mdash; every number belongs to a real child in Northern Uganda, and they&rsquo;re waiting to meet you.</>
+            : <>Expect it within 5&ndash;7 business days. When it arrives, there&rsquo;s a number on the tag &mdash; that number belongs to a real child in Northern Uganda, and they&rsquo;re waiting to meet you.</>}
         </p>
 
         <p className="text-[#777] leading-relaxed max-w-md mx-auto">
@@ -196,16 +202,17 @@ function ShippingConfirmation({
         </h3>
         <div className="space-y-4 text-left">
           <Step num="I">
-            Your shirt is made to order and ships within 5&ndash;7 business
-            days. A confirmation email is on its way to you now.
+            {multi
+              ? 'Your shirts are made to order and ship within 5–7 business days. A confirmation email is on its way to you now.'
+              : 'Your shirt is made to order and ships within 5–7 business days. A confirmation email is on its way to you now.'}
           </Step>
           <Step num="II">
-            You&rsquo;ll get another email the day it ships, with tracking.
+            You&rsquo;ll get another email the day {multi ? 'they ship' : 'it ships'}, with tracking.
           </Step>
           <Step num="III">
-            When your shirt arrives, look at the number on the tag. Go to
+            When {multi ? 'your shirts arrive, look at the number on each tag' : 'your shirt arrives, look at the number on the tag'}. Go to
             {' '}<code className="text-[#666]">beanumber.org</code>, enter
-            your number, and meet the child wearing it with you.
+            {multi ? ' each number' : ' your number'}, and meet the {multi ? 'children wearing them' : 'child wearing it'} with you.
           </Step>
         </div>
       </div>
