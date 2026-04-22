@@ -274,10 +274,7 @@ export default function RepDashboardContent() {
                 className="text-[#0d0d0d] font-semibold"
                 style={{ fontFamily: 'var(--font-lora), serif' }}
               >
-                You did it. Your trip is covered.
-              </p>
-              <p className="text-sm text-[#555] mt-1">
-                Kevin will be in touch about trip details.
+                Your trip is fully covered. Kevin will be in touch about the details.
               </p>
             </div>
           )}

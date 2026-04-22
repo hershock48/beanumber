@@ -87,9 +87,8 @@ export default function RepPageContent() {
                 1. Apply
               </h3>
               <p className="text-[#555] leading-relaxed">
-                Fill out the form below. Kevin reviews every application personally.
-                This isn&apos;t a mass sign-up — he wants to know who&apos;s representing BAN
-                and why it matters to them.
+                Fill out the form below. Kevin reviews every application personally
+                and wants to know who&apos;s representing BAN and why it matters to them.
               </p>
             </div>
 
@@ -101,10 +100,10 @@ export default function RepPageContent() {
                 2. Get your number
               </h3>
               <p className="text-[#555] leading-relaxed">
-                When you&apos;re approved, you&apos;re assigned a child — the child you&apos;ll meet
-                on the trip. You get a personal referral link and a content kit with everything
-                you need to share BAN with your people. Every shirt sold through your link is
-                tracked automatically.
+                When you&apos;re approved, you&apos;re assigned a child. That&apos;s the child
+                you&apos;ll meet on the trip. You get a personal referral link and a content kit
+                with everything you need to share BAN with your people. Every shirt sold through
+                your link is tracked automatically.
               </p>
             </div>
 
@@ -116,10 +115,10 @@ export default function RepPageContent() {
                 3. Build your team
               </h3>
               <p className="text-[#555] leading-relaxed">
-                Share your link. Sell shirts. The real goal isn&apos;t shirt sales — it&apos;s
-                sponsorship conversions. When someone buys a shirt and opts into the $25/month
-                sponsorship, that person is on your team. Your dashboard shows your progress
-                in real time, and you can see where you stand against other reps.
+                Share your link. Sell shirts. The real goal isn&apos;t moving inventory,
+                though. When someone buys a shirt and opts into the $25/month sponsorship,
+                that person is on your team. Your dashboard shows your progress in real time,
+                and you can see where you stand against other reps.
               </p>
             </div>
 
@@ -133,9 +132,8 @@ export default function RepPageContent() {
               <p className="text-[#555] leading-relaxed">
                 {SPONSOR_GOAL} monthly sponsors from your network and your trip is fully covered.
                 {' '}{TRIP_LENGTH} in Northern Uganda. You stay at the YDO campus, meet the children,
-                see the classrooms, eat the meals, walk the grounds. You meet the child whose number
-                you&apos;ve been carrying. And you come back with stories and photos that no marketing
-                budget can buy.
+                see the classrooms, eat the meals, walk the grounds. You meet the child whose
+                number you&apos;ve been carrying.
               </p>
             </div>
           </div>
@@ -163,14 +161,14 @@ export default function RepPageContent() {
                 going directly to a child&apos;s education, meals, and medical care at the YDO campus.
               </p>
               <p>
-                {SPONSOR_GOAL} monthly sponsors from your network = ${SPONSOR_GOAL * 25 * 12}/year
-                in recurring support for the campus. That&apos;s real, sustained funding — not a
-                one-time check. It covers your trip cost ({TRIP_COST}) and keeps funding the campus
-                long after you&apos;ve come home.
+                {SPONSOR_GOAL} monthly sponsors from your network means ${SPONSOR_GOAL * 25 * 12}/year
+                in recurring support for the campus. That covers your trip cost ({TRIP_COST})
+                and keeps funding education, meals, and medical care for the children long after
+                you&apos;ve come home.
               </p>
               <p>
-                You&apos;re not earning a reward. You&apos;re building something that lasts, and the
-                trip is the natural next step — you go meet the community your team is supporting.
+                You&apos;re not earning a reward. The sponsorships your team creates keep
+                children in school year after year, and the trip is how you see that firsthand.
               </p>
             </div>
           </div>
@@ -186,16 +184,16 @@ export default function RepPageContent() {
 
           <div className="space-y-4 text-[#555] leading-relaxed">
             <p>
-              College students who want to do something real. Campus ministry groups looking
-              for a mission that&apos;s sustained, not a week-long trip and done. Greek life
-              philanthropy chairs who want a cause their chapter can rally around. Social work
-              and global studies students who want field experience. Church groups who want
-              their giving to land on specific names.
+              College students who want their time to actually count for something specific.
+              Campus ministry groups looking for a mission that lasts longer than a week-long
+              trip. Greek life philanthropy chairs who want a cause their chapter can rally
+              around. Social work and global studies students who want field experience. Church
+              groups who want their giving to land on specific names.
             </p>
             <p>
               Also: anyone who isn&apos;t in college. If you have a network, a church, a gym,
-              a workplace, a friend group — and you want to build a sponsorship team and go
-              meet the kids — this is for you.
+              a workplace, or a friend group and you want to build a sponsorship team and go
+              meet the kids, this is for you.
             </p>
           </div>
         </div>
@@ -220,7 +218,7 @@ export default function RepPageContent() {
               },
               {
                 title: 'Rep dashboard',
-                desc: 'Real-time view of your shirts sold, sponsors converted, and progress toward the trip. Plus the cohort leaderboard.',
+                desc: 'Real-time view of your shirts sold, monthly sponsors signed up, and progress toward the trip. Plus the cohort leaderboard.',
               },
               {
                 title: 'Content kit',
@@ -232,7 +230,7 @@ export default function RepPageContent() {
               },
               {
                 title: 'The trip',
-                desc: `${TRIP_LENGTH} at the YDO campus in Northern Uganda. Flights, housing, meals, transport — fully covered when you hit ${SPONSOR_GOAL} sponsors.`,
+                desc: `${TRIP_LENGTH} at the YDO campus in Northern Uganda. Flights, housing, meals, and transport are fully covered when you hit ${SPONSOR_GOAL} sponsors.`,
               },
             ].map((item) => (
               <div key={item.title} className="bg-white border border-[#e8e0d4] p-6">
