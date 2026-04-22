@@ -41,6 +41,7 @@ export async function POST(request: NextRequest) {
       email: z.string().email().optional().or(z.literal('')),
       name: z.string().max(255).optional().default(''),
       continueMonthly: z.boolean().optional().default(false),
+      ref_code: z.string().max(50).optional().default(''),
     });
 
     const parsed = shirtSchema.safeParse(await request.json());
@@ -50,7 +51,7 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-    const { shirtId, size, color, email, name, continueMonthly } = parsed.data;
+    const { shirtId, size, color, email, name, continueMonthly, ref_code } = parsed.data;
     const origin = request.headers.get('origin') || 'https://www.beanumber.org';
 
     const shirt = SHIRTS[shirtId]!;
@@ -72,6 +73,7 @@ export async function POST(request: NextRequest) {
       shirt_size: size,
       customer_name: name || '',
       continue_monthly: optIn ? 'true' : 'false',
+      ...(ref_code ? { ref_code } : {}),
     };
 
     // --- One-time shirt purchase (default) ---------------------------------

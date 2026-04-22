@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useCart } from './CartContext';
 
 export function CartDrawer() {
-  const { items, removeItem, toggleMonthly, clearCart, isOpen, setIsOpen, totalOneTime, totalMonthly, itemCount } = useCart();
+  const { items, removeItem, toggleMonthly, clearCart, isOpen, setIsOpen, totalOneTime, totalMonthly, itemCount, refCode } = useCart();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -24,6 +24,7 @@ export function CartDrawer() {
             size: i.size,
             continueMonthly: i.continueMonthly,
           })),
+          ...(refCode ? { ref_code: refCode } : {}),
         }),
       });
 

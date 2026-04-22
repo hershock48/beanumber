@@ -23,6 +23,8 @@ type CartContextType = {
   totalOneTime: number;
   totalMonthly: number;
   itemCount: number;
+  refCode: string | null;
+  setRefCode: (code: string | null) => void;
 };
 
 const CartContext = createContext<CartContextType | null>(null);
@@ -38,6 +40,7 @@ let nextId = 1;
 export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
   const [isOpen, setIsOpen] = useState(false);
+  const [refCode, setRefCode] = useState<string | null>(null);
 
   const addItem = useCallback((item: Omit<CartItem, 'id'>) => {
     setItems(prev => [...prev, { ...item, id: `cart-${nextId++}` }]);
@@ -65,7 +68,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   return (
     <CartContext.Provider
-      value={{ items, addItem, removeItem, toggleMonthly, clearCart, isOpen, setIsOpen, totalOneTime, totalMonthly, itemCount }}
+      value={{ items, addItem, removeItem, toggleMonthly, clearCart, isOpen, setIsOpen, totalOneTime, totalMonthly, itemCount, refCode, setRefCode }}
     >
       {children}
     </CartContext.Provider>

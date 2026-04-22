@@ -1163,7 +1163,7 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
         organization: organization || undefined,
         address,
         donationSource: 'Shirt Order',
-        notes: `[Cart: ${cartItems.length} shirts]\n${assignmentNotes.join('\n')}`,
+        notes: `[Cart: ${cartItems.length} shirts]${session.metadata?.ref_code ? ` [Ref: ${session.metadata.ref_code}]` : ''}\n${assignmentNotes.join('\n')}`,
         childRecordId: childRecordIds[0],
       });
 
@@ -1571,7 +1571,7 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
         organization: organization || undefined,
         address,
         donationSource: 'Shirt + Monthly',
-        notes: `Shirt+Monthly: ${shirtName} / ${shirtColor} / ${shirtSize}${assignmentNote}${referral ? ` \u00b7 Heard via: ${referral}` : ''}`,
+        notes: `Shirt+Monthly: ${shirtName} / ${shirtColor} / ${shirtSize}${assignmentNote}${session.metadata?.ref_code ? ` [Ref: ${session.metadata.ref_code}]` : ''}${referral ? ` \u00b7 Heard via: ${referral}` : ''}`,
         childRecordId: assignedChild?.recordId,
       });
 
@@ -1764,7 +1764,7 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
         organization: organization || undefined,
         address,
         donationSource: 'Shirt Order',
-        notes: `Shirt: ${shirtName} / ${shirtColor} / ${shirtSize}${assignmentNote}`,
+        notes: `Shirt: ${shirtName} / ${shirtColor} / ${shirtSize}${assignmentNote}${session.metadata?.ref_code ? ` [Ref: ${session.metadata.ref_code}]` : ''}`,
         childRecordId: assignedChild?.recordId,
       });
 

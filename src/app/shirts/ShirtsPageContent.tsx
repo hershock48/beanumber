@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { BANNavigation } from '@/components/BANNavigation';
 import { BANFooter } from '@/components/BANFooter';
 import { Logo } from '@/components/Logo';
@@ -826,6 +827,17 @@ function ShirtCard({ shirt, reversed, initialColor }: { shirt: Shirt; reversed: 
 
 /* ── Page content ────────────────────────────────────────────── */
 
+/** Captures ?ref= from the URL and stores it in CartContext for checkout. */
+function RefCapture() {
+  const searchParams = useSearchParams();
+  const { setRefCode } = useCart();
+  useEffect(() => {
+    const ref = searchParams.get('ref');
+    if (ref) setRefCode(ref);
+  }, [searchParams, setRefCode]);
+  return null;
+}
+
 export default function ShirtsPageContent() {
   // Shuffle order and preview colors once on mount so every visitor sees
   // a different arrangement. Prevents any design from being permanently
@@ -835,6 +847,7 @@ export default function ShirtsPageContent() {
 
   return (
     <CartProvider>
+    <RefCapture />
     <div className="min-h-screen bg-[#FFF8F0]">
       <BANNavigation currentPath="/shirts" />
 

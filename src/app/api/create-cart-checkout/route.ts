@@ -35,6 +35,7 @@ const cartSchema = z.object({
   items: z.array(cartItemSchema).min(1).max(10),
   email: z.string().email().optional().or(z.literal('')),
   name: z.string().max(255).optional().default(''),
+  ref_code: z.string().max(50).optional().default(''),
 });
 
 export async function POST(request: NextRequest) {
@@ -49,7 +50,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { items, email, name } = parsed.data;
+    const { items, email, name, ref_code } = parsed.data;
     const origin = request.headers.get('origin') || 'https://www.beanumber.org';
 
     // Build Stripe line items — one per cart item, all payment mode.
@@ -95,6 +96,7 @@ export async function POST(request: NextRequest) {
       monthly_count: String(monthlyCount),
       items_json: JSON.stringify(itemsMeta),
       customer_name: name || '',
+      ...(ref_code ? { ref_code } : {}),
     };
 
     // Create a single payment-mode checkout session for ALL items.
