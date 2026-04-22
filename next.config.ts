@@ -45,6 +45,9 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  // Turbopack crashes on Vercel with "Dependency tracking is disabled"
+  // (turbo-tasks-backend mod.rs:1526). Use webpack until the bug is fixed.
+  bundler: 'webpack',
   async headers() {
     return [
       {
