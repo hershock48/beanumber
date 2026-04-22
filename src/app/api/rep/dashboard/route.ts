@@ -121,7 +121,7 @@ export async function GET(request: NextRequest) {
       console.error('[Rep Dashboard] Leaderboard query failed:', e);
     }
 
-    const SPONSOR_GOAL = 15;
+    const SPONSOR_GOAL = 20;
     const origin = request.headers.get('origin') || 'https://www.beanumber.org';
 
     return NextResponse.json({

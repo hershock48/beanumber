@@ -4,8 +4,7 @@ import { useState } from 'react';
 import { BANNavigation } from '@/components/BANNavigation';
 import { BANFooter } from '@/components/BANFooter';
 
-const SPONSOR_GOAL = 15;
-const TRIP_COST = '$5,000';
+const SPONSOR_GOAL = 20;
 const TRIP_LENGTH = '2 weeks';
 
 export default function RepPageContent() {
@@ -64,9 +63,9 @@ export default function RepPageContent() {
             Build a team.<br />Go meet the kids.
           </h1>
           <p className="text-lg md:text-xl text-[#555] max-w-2xl mx-auto leading-relaxed">
-            You don&apos;t ask people for money. You sell them a shirt. The shirt connects them
-            to a real child. And when enough of your people are in, you fly to Northern Uganda
-            and meet the kids your team supports.
+            There are kids in Northern Uganda who need sponsors. You have people in your
+            life who would show up if someone they trust asked them to. Be the person
+            who connects the two, and then go meet the kids yourself.
           </p>
         </div>
       </section>
@@ -100,10 +99,11 @@ export default function RepPageContent() {
                 2. Get your number
               </h3>
               <p className="text-[#555] leading-relaxed">
-                When you&apos;re approved, you&apos;re assigned a child. That&apos;s the child
-                you&apos;ll meet on the trip. You get a personal referral link and a content kit
-                with everything you need to share BAN with your people. Every shirt sold through
-                your link is tracked automatically.
+                When you&apos;re approved, you get a personal referral link and a content kit
+                with everything you need to share BAN with your people. You&apos;re also assigned
+                your own child at the campus, but the trip isn&apos;t about meeting one kid. Every
+                sponsor your team brings in is connected to a child, and you&apos;ll meet all
+                of them. Every shirt sold through your link is tracked automatically.
               </p>
             </div>
 
@@ -115,10 +115,9 @@ export default function RepPageContent() {
                 3. Build your team
               </h3>
               <p className="text-[#555] leading-relaxed">
-                Share your link. Sell shirts. The real goal isn&apos;t moving inventory,
-                though. When someone buys a shirt and opts into the $25/month sponsorship,
-                that person is on your team. Your dashboard shows your progress in real time,
-                and you can see where you stand against other reps.
+                Share your link with your people. When someone grabs a shirt and opts
+                into monthly sponsorship, that person is on your team. Your dashboard shows
+                your progress in real time, and you can see where you stand against other reps.
               </p>
             </div>
 
@@ -131,20 +130,22 @@ export default function RepPageContent() {
               </h3>
               <p className="text-[#555] leading-relaxed">
                 {SPONSOR_GOAL} monthly sponsors from your network and your trip is fully covered.
-                {' '}{TRIP_LENGTH} in Northern Uganda. You stay at the YDO campus, meet the children,
-                see the classrooms, eat the meals, walk the grounds. You meet the child whose
-                number you&apos;ve been carrying.
+                {' '}{TRIP_LENGTH} in Northern Uganda. You walk onto the YDO campus and the kids
+                already know your name because Kevin told them you were coming. You sit in
+                their classrooms, eat meals together, play football on the same pitch they
+                play on every day. You see what your team built, in person, with the children
+                standing right in front of you.
               </p>
             </div>
           </div>
         </div>
       </section>
 
-      {/* The math */}
+      {/* The goal */}
       <section className="py-16 px-5 border-t border-[#e8e0d4]">
         <div className="max-w-3xl mx-auto">
           <p className="text-xs font-bold text-[#D4A843] uppercase tracking-[0.3em] mb-8">
-            The math
+            The goal
           </p>
 
           <div className="bg-white border border-[#e8e0d4] p-8 md:p-10">
@@ -152,23 +153,25 @@ export default function RepPageContent() {
               className="text-2xl text-[#0d0d0d] mb-6"
               style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
             >
-              {SPONSOR_GOAL} sponsors = free trip
+              {SPONSOR_GOAL} monthly sponsors
             </h3>
 
             <div className="space-y-4 text-[#555] leading-relaxed">
               <p>
-                Each shirt is $25. When a buyer opts into monthly sponsorship, that&apos;s $25/month
-                going directly to a child&apos;s education, meals, and medical care at the YDO campus.
+                Every monthly sponsor you bring in is matched to a real child at the YDO
+                campus. Their sponsorship covers that child&apos;s education, daily meals, and
+                medical care through the on-site clinic. It&apos;s not a donation into a
+                general fund. It&apos;s a name.
               </p>
               <p>
-                {SPONSOR_GOAL} monthly sponsors from your network means ${SPONSOR_GOAL * 25 * 12}/year
-                in recurring support for the campus. That covers your trip cost ({TRIP_COST})
-                and keeps funding education, meals, and medical care for the children long after
-                you&apos;ve come home.
+                Get {SPONSOR_GOAL} people from your network sponsoring monthly, keep them
+                active for at least three months, and your trip is fully covered. Flights,
+                housing, meals, transport. {TRIP_LENGTH} at the campus in Northern Uganda,
+                meeting the children your team is keeping in school.
               </p>
               <p>
-                You&apos;re not earning a reward. The sponsorships your team creates keep
-                children in school year after year, and the trip is how you see that firsthand.
+                The trip isn&apos;t the point. The point is {SPONSOR_GOAL} kids with sponsors
+                who showed up because you told them about BAN. The trip is what happens after.
               </p>
             </div>
           </div>
@@ -184,16 +187,16 @@ export default function RepPageContent() {
 
           <div className="space-y-4 text-[#555] leading-relaxed">
             <p>
-              College students who want their time to actually count for something specific.
-              Campus ministry groups looking for a mission that lasts longer than a week-long
-              trip. Greek life philanthropy chairs who want a cause their chapter can rally
-              around. Social work and global studies students who want field experience. Church
-              groups who want their giving to land on specific names.
+              People who are tired of hearing about causes and want to actually know a child
+              by name. Campus ministry groups looking for something that lasts longer than a
+              week-long trip. Greek life philanthropy chairs who want their chapter behind
+              something real. Social work and global studies students who want to see the
+              field, not read about it. Church groups who want their faith to show up in
+              a specific place for specific people.
             </p>
             <p>
-              Also: anyone who isn&apos;t in college. If you have a network, a church, a gym,
-              a workplace, or a friend group and you want to build a sponsorship team and go
-              meet the kids, this is for you.
+              You don&apos;t have to be in college. If you have people in your life who would
+              care about this if you brought it to them, this is for you.
             </p>
           </div>
         </div>
@@ -210,7 +213,7 @@ export default function RepPageContent() {
             {[
               {
                 title: 'Your own number',
-                desc: 'A child at the YDO campus assigned to you. The child you\'ll meet on the trip.',
+                desc: 'A child at the YDO campus assigned to you, plus a connection to every child your team sponsors. The trip is about all of them.',
               },
               {
                 title: 'Personal referral link',
