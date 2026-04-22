@@ -100,22 +100,32 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Get all approved reps for the leaderboard
-    let leaderboard: Array<{ name: string; school: string; sponsorCount: number; shirtsSold: number }> = [];
+    // Get all approved reps for the school leaderboard
+    let schoolLeaderboard: Array<{ school: string; repCount: number; sponsorCount: number; shirtsSold: number }> = [];
     try {
       const allRepsResponse = await fetch(
-        `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${REPS_TABLE}?filterByFormula=${encodeURIComponent(`{Status}='Approved'`)}&sort${encodeURIComponent('[0][field]')}=SponsorCount&sort${encodeURIComponent('[0][direction]')}=desc`,
+        `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${REPS_TABLE}?filterByFormula=${encodeURIComponent(`{Status}='Approved'`)}`,
         { headers: getAirtableHeaders() }
       );
 
       if (allRepsResponse.ok) {
         const allRepsData = await allRepsResponse.json();
-        leaderboard = (allRepsData.records || []).map((r: any) => ({
-          name: r.fields.Name || 'Anonymous',
-          school: r.fields.School || '',
-          sponsorCount: r.fields.SponsorCount || 0,
-          shirtsSold: r.fields.ShirtsSold || 0,
-        }));
+        const schoolMap = new Map<string, { repCount: number; sponsorCount: number; shirtsSold: number }>();
+
+        for (const r of allRepsData.records || []) {
+          const school = r.fields.School || '';
+          if (!school || school.toLowerCase() === 'n/a') continue;
+
+          const existing = schoolMap.get(school) || { repCount: 0, sponsorCount: 0, shirtsSold: 0 };
+          existing.repCount += 1;
+          existing.sponsorCount += r.fields.SponsorCount || 0;
+          existing.shirtsSold += r.fields.ShirtsSold || 0;
+          schoolMap.set(school, existing);
+        }
+
+        schoolLeaderboard = Array.from(schoolMap.entries())
+          .map(([school, data]) => ({ school, ...data }))
+          .sort((a, b) => b.sponsorCount - a.sponsorCount);
       }
     } catch (e) {
       console.error('[Rep Dashboard] Leaderboard query failed:', e);
@@ -143,7 +153,7 @@ export async function GET(request: NextRequest) {
         shirtsSold,
       },
       referralLink: `${origin}/shirts?ref=${refCode}`,
-      leaderboard,
+      schoolLeaderboard,
     });
   } catch (error: any) {
     console.error('[Rep Dashboard] Error:', error);

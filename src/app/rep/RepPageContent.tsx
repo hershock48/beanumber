@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Image from 'next/image';
 import { BANNavigation } from '@/components/BANNavigation';
 import { BANFooter } from '@/components/BANFooter';
 
@@ -51,27 +52,38 @@ export default function RepPageContent() {
       <BANNavigation currentPath="/rep" />
 
       {/* Hero */}
-      <section className="py-16 md:py-28 px-5">
-        <div className="max-w-3xl mx-auto text-center">
-          <p className="text-xs font-bold text-[#D4A843] uppercase tracking-[0.3em] mb-6">
-            Ambassador Program
-          </p>
-          <h1
-            className="text-4xl md:text-5xl lg:text-6xl text-[#0d0d0d] mb-6"
-            style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
-          >
-            Build a team.<br />Go meet the kids.
-          </h1>
-          <p className="text-lg md:text-xl text-[#555] max-w-2xl mx-auto leading-relaxed">
-            There are kids in Northern Uganda who need sponsors. You have people in your
-            life who would show up if someone they trust asked them to. Be the person
-            who connects the two, and then go meet the kids yourself.
-          </p>
+      <section className="relative">
+        <div className="relative w-full h-[50vh] min-h-[400px] bg-[#0d0d0d]">
+          <Image
+            src="/images/impact-page/secondary-image.jpg"
+            alt="Kevin carrying water with children on the path to the YDO campus"
+            fill
+            className="object-cover opacity-60"
+            priority
+          />
+          <div className="absolute inset-0 flex items-center justify-center px-5">
+            <div className="max-w-3xl text-center">
+              <p className="text-xs font-bold text-[#D4A843] uppercase tracking-[0.3em] mb-6">
+                Ambassador Program
+              </p>
+              <h1
+                className="text-4xl md:text-5xl lg:text-6xl text-white mb-6"
+                style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
+              >
+                Build a team.<br />Go meet the kids.
+              </h1>
+              <p className="text-lg md:text-xl text-white/80 max-w-2xl mx-auto leading-relaxed">
+                There are kids in Northern Uganda who need sponsors. You have people in your
+                life who would show up if someone they trust asked them to. Be the person
+                who connects the two, and then go meet the kids yourself.
+              </p>
+            </div>
+          </div>
         </div>
       </section>
 
       {/* How it works */}
-      <section className="py-16 px-5 border-t border-[#e8e0d4]">
+      <section className="py-16 px-5">
         <div className="max-w-3xl mx-auto">
           <p className="text-xs font-bold text-[#D4A843] uppercase tracking-[0.3em] mb-8">
             How it works
@@ -116,8 +128,9 @@ export default function RepPageContent() {
               </h3>
               <p className="text-[#555] leading-relaxed">
                 Share your link with your people. When someone grabs a shirt and opts
-                into monthly sponsorship, that person is on your team. Your dashboard shows
-                your progress in real time, and you can see where you stand against other reps.
+                into monthly sponsorship, that person is on your team. Your dashboard
+                tracks your progress in real time, and you can see where your school
+                stands against other schools on the leaderboard.
               </p>
             </div>
 
@@ -137,6 +150,28 @@ export default function RepPageContent() {
                 standing right in front of you.
               </p>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Photo break */}
+      <section className="px-5 pb-8">
+        <div className="max-w-4xl mx-auto grid grid-cols-2 gap-4">
+          <div className="relative aspect-[4/3] bg-[#f5f0e8] overflow-hidden">
+            <Image
+              src="/images/story/kids-hugging.png"
+              alt="Children at the YDO campus"
+              fill
+              className="object-cover"
+            />
+          </div>
+          <div className="relative aspect-[4/3] bg-[#f5f0e8] overflow-hidden">
+            <Image
+              src="/images/impact-page/lead-image-kevin.png"
+              alt="Kevin with a mother and child in Northern Uganda"
+              fill
+              className="object-cover"
+            />
           </div>
         </div>
       </section>
@@ -221,7 +256,7 @@ export default function RepPageContent() {
               },
               {
                 title: 'Rep dashboard',
-                desc: 'Real-time view of your shirts sold, monthly sponsors signed up, and progress toward the trip. Plus the cohort leaderboard.',
+                desc: 'Real-time view of your progress toward the trip. See where your school ranks against other schools on the leaderboard.',
               },
               {
                 title: 'Content kit',
@@ -246,6 +281,20 @@ export default function RepPageContent() {
                 <p className="text-sm text-[#555] leading-relaxed">{item.desc}</p>
               </div>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Photo before form */}
+      <section className="px-5 pb-4">
+        <div className="max-w-4xl mx-auto">
+          <div className="relative w-full aspect-[21/9] bg-[#f5f0e8] overflow-hidden">
+            <Image
+              src="/images/homepage/hero-community-group.jpg"
+              alt="Community members gathered at the YDO campus"
+              fill
+              className="object-cover"
+            />
           </div>
         </div>
       </section>

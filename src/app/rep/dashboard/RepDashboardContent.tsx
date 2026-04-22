@@ -22,9 +22,9 @@ type ProgressData = {
   shirtsSold: number;
 };
 
-type LeaderboardEntry = {
-  name: string;
+type SchoolLeaderboardEntry = {
   school: string;
+  repCount: number;
   sponsorCount: number;
   shirtsSold: number;
 };
@@ -33,7 +33,7 @@ type DashboardData = {
   rep: RepData;
   progress: ProgressData;
   referralLink: string;
-  leaderboard: LeaderboardEntry[];
+  schoolLeaderboard: SchoolLeaderboardEntry[];
 };
 
 export default function RepDashboardContent() {
@@ -188,7 +188,7 @@ export default function RepDashboardContent() {
 
   // Dashboard state
   if (!data) return null;
-  const { rep, progress, referralLink, leaderboard } = data;
+  const { rep, progress, referralLink, schoolLeaderboard } = data;
 
   return (
     <div className="min-h-screen bg-[#FFF8F0]">
@@ -305,34 +305,34 @@ export default function RepDashboardContent() {
           </p>
         </div>
 
-        {/* Leaderboard */}
-        {leaderboard.length > 1 && (
+        {/* School Leaderboard */}
+        {schoolLeaderboard.length > 0 && (
           <div className="bg-white border border-[#e8e0d4] p-6 md:p-8">
             <p className="text-xs font-bold text-[#D4A843] uppercase tracking-[0.2em] mb-4">
-              Cohort Leaderboard
+              School Leaderboard
             </p>
 
             <div className="space-y-3">
-              {leaderboard.map((entry, i) => {
-                const isMe = entry.name === rep.name;
+              {schoolLeaderboard.map((entry, i) => {
+                const isMySchool = rep.school && entry.school === rep.school;
                 return (
                   <div
                     key={i}
                     className={`flex items-center gap-4 p-3 ${
-                      isMe ? 'bg-[#D4A843]/5 border border-[#D4A843]/30' : ''
+                      isMySchool ? 'bg-[#D4A843]/5 border border-[#D4A843]/30' : ''
                     }`}
                   >
                     <span className="w-8 text-center text-sm font-bold text-[#999]">
                       {i + 1}
                     </span>
                     <div className="flex-1 min-w-0">
-                      <p className={`text-sm font-semibold ${isMe ? 'text-[#D4A843]' : 'text-[#0d0d0d]'}`}>
-                        {entry.name}
-                        {isMe && <span className="text-[#999] font-normal ml-1">(you)</span>}
+                      <p className={`text-sm font-semibold ${isMySchool ? 'text-[#D4A843]' : 'text-[#0d0d0d]'}`}>
+                        {entry.school}
+                        {isMySchool && <span className="text-[#999] font-normal ml-1">(your school)</span>}
                       </p>
-                      {entry.school && (
-                        <p className="text-xs text-[#999]">{entry.school}</p>
-                      )}
+                      <p className="text-xs text-[#999]">
+                        {entry.repCount} {entry.repCount === 1 ? 'rep' : 'reps'}
+                      </p>
                     </div>
                     <div className="text-right">
                       <p className="text-sm font-semibold text-[#0d0d0d]">
