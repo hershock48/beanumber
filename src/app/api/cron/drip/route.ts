@@ -281,8 +281,15 @@ function sponsorOnboardEmail(
   sponsorCode?: string | null
 ): { subject: string; html: string } | null {
   const { firstName, childName, shirtNumber } = donor;
-  const childUrl = `${SITE_URL}/children/${shirtNumber}`;
+  const numbers = parseShirtNumbers(shirtNumber);
+  const names = parseChildNames(childName);
+  const firstNumber = numbers[0];
+  const firstName_ = names[0] || '';
+  // Use first child's page for direct links; sponsor_onboard is always single-sponsor
+  const childUrl = firstNumber ? `${SITE_URL}/children/${firstNumber}` : SITE_URL;
   const portalUrl = `${SITE_URL}/sponsor/login`;
+  // For display, use the parsed first name rather than raw (may be comma-separated)
+  const displayChildName = firstName_ || childName;
 
   switch (stage) {
     // ── Email 1: Portal access (Day ~3) ──────────────────────────────────
@@ -292,8 +299,8 @@ function sponsorOnboardEmail(
         html: wrapEmail(`
           <p style="margin-top: 0;">Hey ${firstName},</p>
           <p>Your sponsorship is active, and I wanted to make sure you have everything you need to get started.</p>
-          ${childName
-            ? `<p>Your $25 a month covers school fees, two meals a day, and medical care for ${childName} at the YDO campus in Northern Uganda. <a href="${childUrl}" style="color: #D4A843; font-weight: bold;">Here&rsquo;s their page.</a> For a lot of the kids on campus, those meals are the only ones they get all day, so this is making a real difference starting right now.</p>`
+          ${displayChildName
+            ? `<p>Your $25 a month covers school fees, two meals a day, and medical care for ${displayChildName} at the YDO campus in Northern Uganda. <a href="${childUrl}" style="color: #D4A843; font-weight: bold;">Here&rsquo;s their page.</a> For a lot of the kids on campus, those meals are the only ones they get all day, so this is making a real difference starting right now.</p>`
             : `<p>Your $25 a month covers school fees, two meals a day, and medical care for a specific child at the YDO campus in Northern Uganda. For a lot of the kids on campus, those meals are the only ones they get all day, so this is making a real difference starting right now.</p>`
           }
           <p>I built a sponsor portal where you can see updates, photos, and letters as they come in from the campus. To log in, you&rsquo;ll need your email and your sponsor code:</p>
@@ -307,7 +314,7 @@ function sponsorOnboardEmail(
           <p style="text-align: center; margin: 24px 0;">
             <a href="${portalUrl}" style="display: inline-block; background: #D4A843; color: #0d0d0d; font-weight: bold; text-decoration: none; padding: 14px 32px; font-size: 15px; letter-spacing: 0.05em;">LOG IN TO YOUR PORTAL</a>
           </p>
-          <p>If you ever want to write to ${childName || 'your child'}, you can do it through the portal or by replying to this email. The YDO team on the ground handles delivery and translation.</p>
+          <p>If you ever want to write to ${displayChildName || 'your child'}, you can do it through the portal or by replying to this email. The YDO team on the ground handles delivery and translation.</p>
           <p>Kevin</p>
         `),
       };
@@ -319,8 +326,8 @@ function sponsorOnboardEmail(
         html: wrapEmail(`
           <p style="margin-top: 0;">Hey ${firstName},</p>
           <p>Just wanted to give you a heads up on what to expect over the next few weeks.</p>
-          <p>The YDO team on the ground in Uganda sends regular updates from the campus. ${childName ? `You&rsquo;ll hear about ${childName} specifically` : 'You&rsquo;ll hear about your child specifically'}: what they&rsquo;re studying, how they&rsquo;re doing in class, sometimes a photo or a handwritten letter. Those updates show up in your portal and by email, and the first one usually comes within your first month.</p>
-          <p>If you want to write to ${childName || 'your child'} yourself, go for it. You can do it through the portal or reply to any email. The YDO team reads every note, translates when needed, and makes sure it actually gets to them.</p>
+          <p>The YDO team on the ground in Uganda sends regular updates from the campus. ${displayChildName ? `You&rsquo;ll hear about ${displayChildName} specifically` : 'You&rsquo;ll hear about your child specifically'}: what they&rsquo;re studying, how they&rsquo;re doing in class, sometimes a photo or a handwritten letter. Those updates show up in your portal and by email, and the first one usually comes within your first month.</p>
+          <p>If you want to write to ${displayChildName || 'your child'} yourself, go for it. You can do it through the portal or reply to any email. The YDO team reads every note, translates when needed, and makes sure it actually gets to them.</p>
           <p>Kevin</p>
         `),
       };
@@ -331,7 +338,7 @@ function sponsorOnboardEmail(
         subject: "Checking in after your first month",
         html: wrapEmail(`
           <p style="margin-top: 0;">Hey ${firstName},</p>
-          <p>You&rsquo;ve been sponsoring for about a month now, so I just wanted to check in and let you know what your $25 covered this month: ${childName ? `${childName} went` : 'your child went'} to school every day, ate breakfast and lunch at the campus every day, and had a nurse available whenever they needed one. Same thing will happen next month because you&rsquo;re still here.</p>
+          <p>You&rsquo;ve been sponsoring for about a month now, so I just wanted to check in and let you know what your $25 covered this month: ${displayChildName ? `${displayChildName} went` : 'your child went'} to school every day, ate breakfast and lunch at the campus every day, and had a nurse available whenever they needed one. Same thing will happen next month because you&rsquo;re still here.</p>
           <p>One thing that really helps us grow: if you know someone who&rsquo;d be into what we do, send them a quick text. It doesn&rsquo;t need to be a whole thing, something like &ldquo;I sponsor a kid in Uganda through this org called Be A Number, you should check it out.&rdquo; That&rsquo;s genuinely how most of our sponsors find us.</p>
           <p>Your <a href="${portalUrl}" style="color: #D4A843; font-weight: bold;">portal</a> has the latest updates whenever you want to check in.</p>
           <p>Kevin</p>
@@ -620,7 +627,7 @@ async function getDripDonorsDue(): Promise<DripDonor[]> {
     pipeline: r.fields['DripPipeline'] || '',
     dripStage: r.fields['DripStage'] ?? 0,
     childName: r.fields['DripChildName'] || '',
-    shirtNumber: r.fields['DripShirtNumber'] || 0,
+    shirtNumber: r.fields['DripShirtNumber'] || '',
   }));
 }
 
