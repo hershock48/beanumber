@@ -1304,15 +1304,25 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
         console.error('[WH] Cart admin notify failed:', String(err?.message || err).slice(0, 200));
       }
 
-      // Drip enrollment — enroll for the first assigned child (shirt_nurture
-      // for shirt-only carts, shirt_sponsor for carts with monthly).
-      if (firstAssigned?.child && donorId) {
+      // Drip enrollment — store ALL assigned children (comma-separated) so
+      // multi-shirt buyers get emails that reference every child, not just #1.
+      const assignedChildren = assignments.filter(a => a.child);
+      if (assignedChildren.length > 0 && donorId) {
         try {
           const pipeline = monthlyItems.length > 0 ? 'shirt_sponsor' : 'shirt_nurture';
-          const dripDelay = pipeline === 'shirt_sponsor' ? 3 : 6;
+          const dripDelay = 10; // Wait for shirt to arrive before first email
           const dripStartDate = new Date();
           dripStartDate.setUTCDate(dripStartDate.getUTCDate() + dripDelay);
           const dripNextSend = dripStartDate.toISOString().split('T')[0];
+
+          // Comma-separated for multi-shirt orders, single value for single
+          const allChildNames = assignedChildren
+            .map(a => a.child!.displayName?.split(' ')[0] || '')
+            .filter(Boolean)
+            .join(',');
+          const allShirtNumbers = assignedChildren
+            .map(a => String(a.child!.shirtNumber))
+            .join(',');
 
           await airtableAPICall(() =>
             fetch(
@@ -1325,14 +1335,14 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
                     DripPipeline: pipeline,
                     DripStage: 0,
                     DripNextSend: dripNextSend,
-                    DripChildName: firstAssigned.child?.displayName?.split(' ')[0] || '',
-                    DripShirtNumber: firstAssigned.child?.shirtNumber ?? '',
+                    DripChildName: allChildNames,
+                    DripShirtNumber: allShirtNumbers,
                   },
                 }),
               }
             )
           );
-          console.log('[WH] Cart: enrolled in ' + pipeline + ' drip');
+          console.log('[WH] Cart: enrolled in ' + pipeline + ' drip, children: ' + allShirtNumbers);
         } catch (err: any) {
           console.error('[WH] Cart drip enrollment failed:', String(err?.message || err).slice(0, 200));
         }
@@ -1674,7 +1684,7 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
       if (assignedChild && donorId) {
         try {
           const dripStartDate = new Date();
-          dripStartDate.setUTCDate(dripStartDate.getUTCDate() + 3);
+          dripStartDate.setUTCDate(dripStartDate.getUTCDate() + 10);
           const dripNextSend = dripStartDate.toISOString().split('T')[0];
 
           await airtableAPICall(() =>
@@ -1843,7 +1853,7 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
       if (assignedChild) {
         try {
           const dripStartDate = new Date();
-          dripStartDate.setUTCDate(dripStartDate.getUTCDate() + 6);
+          dripStartDate.setUTCDate(dripStartDate.getUTCDate() + 10);
           const dripNextSend = dripStartDate.toISOString().split('T')[0];
 
           await airtableAPICall(() =>
