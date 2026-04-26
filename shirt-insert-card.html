@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BAN Shirt Insert Card — 3.75" × 8.8" folded</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Lora:wght@400;600;700&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #f5f0ea;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 40px 20px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    gap: 40px;
+  }
+
+  .section-label {
+    font-size: 11px;
+    color: #999;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    margin-bottom: 12px;
+    text-align: center;
+  }
+
+  .panel-group {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  /* ── Front cover (half-size: what they see first) ── */
+  .front {
+    width: 3.75in;
+    height: 4.4in;
+    color: #2a1f14;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 0.5in 0.4in;
+    border: 1px solid #d4cfc7;
+    position: relative;
+  }
+
+  .front .cross-logo {
+    width: 0.7in;
+    height: 0.7in;
+    margin-bottom: 0.45in;
+    opacity: 0.8;
+  }
+
+  .front .headline {
+    font-family: 'Lora', serif;
+    font-weight: 600;
+    font-size: 24px;
+    line-height: 1.35;
+    color: #2a1f14;
+  }
+
+  .front .sub {
+    font-size: 11px;
+    color: #2a1f14;
+    opacity: 0.4;
+    margin-top: 0.55in;
+    letter-spacing: 0.06em;
+  }
+
+  /* ── Inside spread (full 8.8" when opened) ── */
+  .inside {
+    width: 3.75in;
+    height: 8.8in;
+    color: #2a1f14;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.55in 0.4in;
+    border: 1px solid #d4cfc7;
+    position: relative;
+  }
+
+  .inside::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 10%;
+    right: 10%;
+    height: 1px;
+    border-top: 1px dashed #ccc;
+  }
+
+  .inside-top {
+    text-align: center;
+    width: 100%;
+  }
+
+  .inside-top .body-text {
+    font-size: 12.5px;
+    line-height: 1.8;
+    color: #2a1f14;
+    opacity: 0.75;
+    margin-bottom: 0.3in;
+  }
+
+  .divider {
+    width: 36px;
+    height: 1px;
+    background: #2a1f14;
+    opacity: 0.25;
+    margin: 0.25in auto;
+  }
+
+  .inside-top .reveal-text {
+    font-family: 'Lora', serif;
+    font-weight: 600;
+    font-size: 15px;
+    line-height: 1.6;
+    color: #2a1f14;
+    margin-bottom: 0.05in;
+  }
+
+  .inside-bottom {
+    text-align: center;
+    width: 100%;
+  }
+
+  .qr-code {
+    width: 1.2in;
+    height: 1.2in;
+    margin: 0 auto 0.2in;
+  }
+
+  .qr-code img {
+    width: 100%;
+    height: 100%;
+    image-rendering: pixelated;
+  }
+
+  .url {
+    font-family: 'Lora', serif;
+    font-weight: 600;
+    font-size: 14px;
+    color: #2a1f14;
+    letter-spacing: 0.03em;
+    margin-bottom: 0.08in;
+  }
+
+  .instruction {
+    font-size: 12px;
+    color: #2a1f14;
+    opacity: 0.55;
+    letter-spacing: 0.06em;
+  }
+
+  .inside-bottom .note {
+    font-size: 10px;
+    color: #2a1f14;
+    opacity: 0.35;
+    margin-top: 0.35in;
+    line-height: 1.5;
+  }
+
+  /* ── Back (half-size) ── */
+  .back {
+    width: 3.75in;
+    height: 4.4in;
+    color: #2a1f14;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 0.5in 0.5in;
+    border: 1px solid #d4cfc7;
+  }
+
+  .back .cross-logo-small {
+    width: 0.45in;
+    height: 0.45in;
+    opacity: 0.35;
+    margin-bottom: 0.3in;
+  }
+
+  .back .back-text {
+    font-size: 11.5px;
+    line-height: 1.8;
+    color: #2a1f14;
+    opacity: 0.5;
+  }
+
+  .back .back-url {
+    font-family: 'Lora', serif;
+    font-weight: 600;
+    font-size: 12px;
+    color: #2a1f14;
+    opacity: 0.6;
+    margin-top: 0.3in;
+    letter-spacing: 0.03em;
+  }
+</style>
+</head>
+<body>
+
+<!-- ════════════════════════════════════════ -->
+<!-- FRONT COVER — 3.75" × 4.4"            -->
+<!-- ════════════════════════════════════════ -->
+<div class="panel-group">
+  <p class="section-label">Front cover — 3.75" &times; 4.4"</p>
+  <div class="front">
+
+    <!-- Cross logo -->
+    <svg class="cross-logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 92 92" fill="none">
+      <rect x="19" y="0" width="16" height="16" rx="1" fill="#2a1f14"/>
+      <rect x="57" y="0" width="16" height="16" rx="1" fill="#2a1f14"/>
+      <rect x="0" y="19" width="16" height="16" rx="1" fill="#2a1f14"/>
+      <rect x="76" y="19" width="16" height="16" rx="1" fill="#2a1f14"/>
+      <path d="M 19 38 L 35 38 L 35 57 L 57 57 L 57 38 L 73 38 L 73 57 L 92 57 L 92 73 L 73 73 L 73 92 L 57 92 L 57 73 L 35 73 L 35 92 L 19 92 L 19 73 L 0 73 L 0 57 L 19 57 Z" fill="#2a1f14"/>
+    </svg>
+
+    <h1 class="headline">This number<br>has a name.</h1>
+    <p class="sub">open to find out why</p>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════ -->
+<!-- INSIDE SPREAD — 3.75" × 8.8" (full)   -->
+<!-- ════════════════════════════════════════ -->
+<div class="panel-group">
+  <p class="section-label">Inside spread — 3.75" &times; 8.8" (unfolded)</p>
+  <div class="inside">
+
+    <div class="inside-top">
+      <p class="body-text">
+        There&rsquo;s a child in Northern Uganda waiting
+        to tell you their name. The number on your shirt
+        is theirs. Scan the code or visit the link below,
+        enter your number, and meet them.
+      </p>
+      <div class="divider"></div>
+      <p class="reveal-text">
+        Your shirt covers their first<br>
+        month of school.
+      </p>
+      <p class="reveal-text" style="margin-top: 0.15in;">
+        Stay for $25/month and you&rsquo;ll get<br>
+        letters, photos, and their report card.
+      </p>
+    </div>
+
+    <div class="inside-bottom">
+      <div class="qr-code">
+        <img src="data:image/png;base64,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" alt="QR code to beanumber.org/children">
+      </div>
+      <p class="url">beanumber.org/children</p>
+      <p class="instruction">Enter your number.</p>
+      <p class="note">
+        School fees, meals, medical care, and mentorship<br>
+        at the YDO campus in Omoro District, Northern Uganda.
+      </p>
+    </div>
+
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════ -->
+<!-- BACK — 3.75" × 4.4"                   -->
+<!-- ════════════════════════════════════════ -->
+<div class="panel-group">
+  <p class="section-label">Back — 3.75" &times; 4.4"</p>
+  <div class="back">
+
+    <!-- Small cross logo -->
+    <svg class="cross-logo-small" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 92 92" fill="none">
+      <rect x="19" y="0" width="16" height="16" rx="1" fill="#2a1f14"/>
+      <rect x="57" y="0" width="16" height="16" rx="1" fill="#2a1f14"/>
+      <rect x="0" y="19" width="16" height="16" rx="1" fill="#2a1f14"/>
+      <rect x="76" y="19" width="16" height="16" rx="1" fill="#2a1f14"/>
+      <path d="M 19 38 L 35 38 L 35 57 L 57 57 L 57 38 L 73 38 L 73 57 L 92 57 L 92 73 L 73 73 L 73 92 L 57 92 L 57 73 L 35 73 L 35 92 L 19 92 L 19 73 L 0 73 L 0 57 L 19 57 Z" fill="#2a1f14"/>
+    </svg>
+
+    <p class="back-text">
+      Be A Number is a 501(c)(3) nonprofit<br>
+      that connects sponsors to individual children<br>
+      at the YDO campus in Northern Uganda.<br>
+      Every child has a number. Every number has a name.
+    </p>
+    <p class="back-url">beanumber.org</p>
+  </div>
+</div>
+
+</body>
+</html>
