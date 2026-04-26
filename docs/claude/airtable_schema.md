@@ -27,8 +27,8 @@ Drip nurture fields (added April 16 for post-purchase conversion pipelines):
 - `DripPipeline` (singleSelect: shirt_nurture, sponsor_onboard, donor_convert, shirt_sponsor, monthly_donor) — which sequence, if any. 5 pipelines, 17 total emails.
 - `DripStage` (number) — 0 = first email pending, increments after each send, cleared when sequence completes. Max stages vary by pipeline (3–4).
 - `DripNextSend` (date, ISO) — next scheduled send. Cron at `/api/cron/drip` checks daily.
-- `DripChildName` (single line text) — child's first name for email personalization.
-- `DripShirtNumber` (number) — for building `/children/N` and `/sponsorship?child=N` links.
+- `DripChildName` (single line text) — child's first name for email personalization. May be comma-separated for multi-shirt/repeat orders (e.g. "Ayubu,Amito,Okello").
+- `DripShirtNumber` (single line text) — shirt number(s) for building `/children/N` links. May be comma-separated for multi-shirt/repeat orders (e.g. "24,25,26"). Changed from number to text on Apr 26 2026.
 
 Upsert key: `Email` (lowercased). If no match by email, try `Stripe Customer ID` as a secondary key before creating a new record.
 

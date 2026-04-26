@@ -1316,13 +1316,42 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
           const dripNextSend = dripStartDate.toISOString().split('T')[0];
 
           // Comma-separated for multi-shirt orders, single value for single
-          const allChildNames = assignedChildren
+          const newChildNames = assignedChildren
             .map(a => a.child!.displayName?.split(' ')[0] || '')
-            .filter(Boolean)
-            .join(',');
-          const allShirtNumbers = assignedChildren
-            .map(a => String(a.child!.shirtNumber))
-            .join(',');
+            .filter(Boolean);
+          const newShirtNumbers = assignedChildren
+            .map(a => String(a.child!.shirtNumber));
+
+          // Check for existing drip fields (repeat buyer with prior order)
+          let mergedNames = newChildNames;
+          let mergedNumbers = newShirtNumbers;
+          try {
+            const existingRes = await airtableAPICall(() =>
+              fetch(
+                `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_DONORS_TABLE}/${donorId}?fields%5B%5D=DripChildName&fields%5B%5D=DripShirtNumber`,
+                { headers: getAirtableHeaders() }
+              )
+            );
+            const existingData = await existingRes.json();
+            const existingNames = (existingData.fields?.DripChildName || '').split(',').filter(Boolean);
+            const existingNumbers = (existingData.fields?.DripShirtNumber || '').split(',').filter(Boolean);
+            if (existingNames.length > 0) {
+              // Prepend existing, dedup
+              const allNames = [...existingNames];
+              const allNums = [...existingNumbers];
+              for (let i = 0; i < newShirtNumbers.length; i++) {
+                if (!allNums.includes(newShirtNumbers[i])) {
+                  allNums.push(newShirtNumbers[i]);
+                  if (newChildNames[i]) allNames.push(newChildNames[i]);
+                }
+              }
+              mergedNames = allNames;
+              mergedNumbers = allNums;
+            }
+          } catch { /* first purchase — use new values only */ }
+
+          const allChildNames = mergedNames.join(',');
+          const allShirtNumbers = mergedNumbers.join(',');
 
           await airtableAPICall(() =>
             fetch(
@@ -1681,11 +1710,36 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
       // Step 9: Enroll shirt+monthly buyer into the combined drip sequence.
       // This pipeline covers both shirt anticipation AND sponsor onboarding
       // in one coherent sequence, so they don't get bombarded by two pipelines.
+      // For repeat buyers: append child info to existing drip fields.
       if (assignedChild && donorId) {
         try {
           const dripStartDate = new Date();
           dripStartDate.setUTCDate(dripStartDate.getUTCDate() + 10);
           const dripNextSend = dripStartDate.toISOString().split('T')[0];
+
+          const newChildName = assignedChild.displayName?.split(' ')[0] || '';
+          const newShirtNumber = String(assignedChild.shirtNumber);
+
+          // Check for existing drip fields (repeat buyer)
+          let mergedChildName = newChildName;
+          let mergedShirtNumber = newShirtNumber;
+          try {
+            const existingRes = await airtableAPICall(() =>
+              fetch(
+                `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_DONORS_TABLE}/${donorId}?fields%5B%5D=DripChildName&fields%5B%5D=DripShirtNumber`,
+                { headers: getAirtableHeaders() }
+              )
+            );
+            const existingData = await existingRes.json();
+            const existingName = existingData.fields?.DripChildName || '';
+            const existingNumber = existingData.fields?.DripShirtNumber || '';
+            if (existingName && !existingName.split(',').includes(newChildName)) {
+              mergedChildName = `${existingName},${newChildName}`;
+            }
+            if (existingNumber && !existingNumber.split(',').includes(newShirtNumber)) {
+              mergedShirtNumber = `${existingNumber},${newShirtNumber}`;
+            }
+          } catch { /* first purchase — no existing fields, use new values */ }
 
           await airtableAPICall(() =>
             fetch(
@@ -1698,14 +1752,14 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
                     DripPipeline: 'shirt_sponsor',
                     DripStage: 0,
                     DripNextSend: dripNextSend,
-                    DripChildName: assignedChild.displayName?.split(' ')[0] || '',
-                    DripShirtNumber: assignedChild.shirtNumber,
+                    DripChildName: mergedChildName,
+                    DripShirtNumber: mergedShirtNumber,
                   },
                 }),
               }
             )
           );
-          console.log('[WH] Enrolled in shirt_sponsor drip, next send:', dripNextSend);
+          console.log('[WH] Enrolled in shirt_sponsor drip, children:', mergedShirtNumber);
         } catch (err: any) {
           console.error('[WH] shirt_sponsor drip enrollment failed (non-fatal):', String(err?.message || err).slice(0, 200));
         }
@@ -1850,11 +1904,36 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
       // The cron at /api/cron/drip will pick them up and send 4 follow-up
       // emails over ~30 days nudging toward monthly sponsorship. If they
       // later convert (subscription.created fires), the drip gets cleared.
+      // For repeat buyers: append child info to existing drip fields.
       if (assignedChild) {
         try {
           const dripStartDate = new Date();
           dripStartDate.setUTCDate(dripStartDate.getUTCDate() + 10);
           const dripNextSend = dripStartDate.toISOString().split('T')[0];
+
+          const newChildName = assignedChild.displayName?.split(' ')[0] || '';
+          const newShirtNumber = String(assignedChild.shirtNumber);
+
+          // Check for existing drip fields (repeat buyer)
+          let mergedChildName = newChildName;
+          let mergedShirtNumber = newShirtNumber;
+          try {
+            const existingRes = await airtableAPICall(() =>
+              fetch(
+                `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_DONORS_TABLE}/${donorId}?fields%5B%5D=DripChildName&fields%5B%5D=DripShirtNumber`,
+                { headers: getAirtableHeaders() }
+              )
+            );
+            const existingData = await existingRes.json();
+            const existingName = existingData.fields?.DripChildName || '';
+            const existingNumber = existingData.fields?.DripShirtNumber || '';
+            if (existingName && !existingName.split(',').includes(newChildName)) {
+              mergedChildName = `${existingName},${newChildName}`;
+            }
+            if (existingNumber && !existingNumber.split(',').includes(newShirtNumber)) {
+              mergedShirtNumber = `${existingNumber},${newShirtNumber}`;
+            }
+          } catch { /* first purchase — no existing fields, use new values */ }
 
           await airtableAPICall(() =>
             fetch(
@@ -1867,14 +1946,14 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
                     DripPipeline: 'shirt_nurture',
                     DripStage: 0,
                     DripNextSend: dripNextSend,
-                    DripChildName: assignedChild.displayName?.split(' ')[0] || '',
-                    DripShirtNumber: assignedChild.shirtNumber,
+                    DripChildName: mergedChildName,
+                    DripShirtNumber: mergedShirtNumber,
                   },
                 }),
               }
             )
           );
-          console.log('[WH] Enrolled in shirt_nurture drip, next send:', dripNextSend);
+          console.log('[WH] Enrolled in shirt_nurture drip, children:', mergedShirtNumber);
         } catch (err: any) {
           // Non-fatal — the purchase still succeeded even if drip enrollment fails
           console.error('[WH] Drip enrollment failed:', String(err?.message || err).slice(0, 200));
