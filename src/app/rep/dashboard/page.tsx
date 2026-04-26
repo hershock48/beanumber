@@ -2,8 +2,8 @@ import { Suspense } from 'react';
 import RepDashboardContent from './RepDashboardContent';
 
 export const metadata = {
-  title: 'Rep Dashboard | Be A Number',
-  description: 'Track your progress, see your referral stats, and view the cohort leaderboard.',
+  title: 'Cohort Dashboard | Be A Number',
+  description: 'Track your scholarship progress, referral stats, and see the cohort leaderboard.',
   robots: { index: false, follow: false },
 };
 

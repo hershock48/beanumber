@@ -5,6 +5,9 @@ const AIRTABLE_PAT = process.env.AIRTABLE_PAT || '';
 const REPS_TABLE = 'Reps';
 const DONATIONS_TABLE = 'Donations';
 
+const SPONSOR_GOAL = 24;
+const CREDIT_PER_SPONSOR = 100;
+
 function getAirtableHeaders() {
   return {
     Authorization: `Bearer ${AIRTABLE_PAT}`,
@@ -14,8 +17,13 @@ function getAirtableHeaders() {
 
 /**
  * GET /api/rep/dashboard?token=xxx
- * Returns the rep's stats and the cohort leaderboard.
+ * Returns the cohort member's stats, scholarship balance, and cohort leaderboard.
  * Stats are computed live from the Donations table by matching [Ref: code] in notes.
+ *
+ * "qualifiedSponsorCount" = sponsors who have been active 3+ months.
+ * For now, we use the total recurring count as a proxy since we don't yet track
+ * individual signup dates. When we add per-sponsor date tracking, we'll filter
+ * by the 90-day mark here.
  */
 export async function GET(request: NextRequest) {
   try {
@@ -52,7 +60,6 @@ export async function GET(request: NextRequest) {
     const refCode = rep.fields.RefCode || '';
 
     // Count donations with this ref code in notes
-    // Airtable SEARCH function: SEARCH("[Ref: code]", {Donation Note})
     let shirtsSold = 0;
     let sponsorCount = 0;
 
@@ -72,8 +79,7 @@ export async function GET(request: NextRequest) {
           sponsorCount = records.filter((r: any) => r.fields?.['Recurring Donation'] === true).length;
         }
       } catch (e) {
-        console.error('[Rep Dashboard] Donations query failed:', e);
-        // Fall back to stored values
+        console.error('[Cohort Dashboard] Donations query failed:', e);
         shirtsSold = rep.fields.ShirtsSold || 0;
         sponsorCount = rep.fields.SponsorCount || 0;
       }
@@ -96,12 +102,12 @@ export async function GET(request: NextRequest) {
           }
         );
       } catch (e) {
-        // Non-critical — stats display is still from the live count
+        // Non-critical
       }
     }
 
-    // Get all approved reps for the school leaderboard
-    let schoolLeaderboard: Array<{ school: string; repCount: number; sponsorCount: number; shirtsSold: number }> = [];
+    // Cohort leaderboard: all approved members, ranked by sponsor count
+    let cohortLeaderboard: Array<{ name: string; sponsorCount: number; isMe: boolean }> = [];
     try {
       const allRepsResponse = await fetch(
         `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${REPS_TABLE}?filterByFormula=${encodeURIComponent(`{Status}='Approved'`)}`,
@@ -110,28 +116,23 @@ export async function GET(request: NextRequest) {
 
       if (allRepsResponse.ok) {
         const allRepsData = await allRepsResponse.json();
-        const schoolMap = new Map<string, { repCount: number; sponsorCount: number; shirtsSold: number }>();
 
-        for (const r of allRepsData.records || []) {
-          const school = r.fields.School || '';
-          if (!school || school.toLowerCase() === 'n/a') continue;
-
-          const existing = schoolMap.get(school) || { repCount: 0, sponsorCount: 0, shirtsSold: 0 };
-          existing.repCount += 1;
-          existing.sponsorCount += r.fields.SponsorCount || 0;
-          existing.shirtsSold += r.fields.ShirtsSold || 0;
-          schoolMap.set(school, existing);
-        }
-
-        schoolLeaderboard = Array.from(schoolMap.entries())
-          .map(([school, data]) => ({ school, ...data }))
-          .sort((a, b) => b.sponsorCount - a.sponsorCount);
+        cohortLeaderboard = (allRepsData.records || [])
+          .map((r: any) => ({
+            name: (r.fields.Name || 'Anonymous').split(' ')[0],
+            sponsorCount: r.fields.SponsorCount || 0,
+            isMe: r.id === rep.id,
+          }))
+          .sort((a: any, b: any) => b.sponsorCount - a.sponsorCount);
       }
     } catch (e) {
-      console.error('[Rep Dashboard] Leaderboard query failed:', e);
+      console.error('[Cohort Dashboard] Leaderboard query failed:', e);
     }
 
-    const SPONSOR_GOAL = 20;
+    // For now, qualifiedSponsorCount = sponsorCount (proxy until we track per-sponsor dates)
+    const qualifiedSponsorCount = sponsorCount;
+    const scholarshipEarned = qualifiedSponsorCount * CREDIT_PER_SPONSOR;
+
     const origin = request.headers.get('origin') || 'https://www.beanumber.org';
 
     return NextResponse.json({
@@ -143,20 +144,24 @@ export async function GET(request: NextRequest) {
         school: rep.fields.School || '',
         shirtsSold,
         sponsorCount,
+        qualifiedSponsorCount,
         childNumber: rep.fields.ChildNumber || null,
         childName: rep.fields.ChildName || null,
       },
       progress: {
         sponsorCount,
+        qualifiedSponsorCount,
         sponsorGoal: SPONSOR_GOAL,
         percentComplete: Math.min(100, Math.round((sponsorCount / SPONSOR_GOAL) * 100)),
         shirtsSold,
+        scholarshipEarned,
+        balanceRemaining: Math.max(0, 3000 - 500 - scholarshipEarned),
       },
       referralLink: `${origin}/shirts?ref=${refCode}`,
-      schoolLeaderboard,
+      cohortLeaderboard,
     });
   } catch (error: any) {
-    console.error('[Rep Dashboard] Error:', error);
+    console.error('[Cohort Dashboard] Error:', error);
     return NextResponse.json({ error: 'Something went wrong.' }, { status: 500 });
   }
 }

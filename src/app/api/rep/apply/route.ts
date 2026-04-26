@@ -20,6 +20,7 @@ const applySchema = z.object({
   school: z.string().max(255).optional().default(''),
   organization: z.string().max(255).optional().default(''),
   why: z.string().min(10).max(2000),
+  first_five: z.string().min(10).max(2000).optional().default(''),
   how_heard: z.string().max(500).optional().default(''),
 });
 
@@ -33,7 +34,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { name, email, phone, school, organization, why, how_heard } = parsed.data;
+    const { name, email, phone, school, organization, why, first_five, how_heard } = parsed.data;
 
     // Generate a unique referral code: first name + random 4 chars
     const firstName = name.split(' ')[0].toLowerCase().replace(/[^a-z]/g, '');
@@ -72,6 +73,7 @@ export async function POST(request: NextRequest) {
                 School: school || undefined,
                 Organization: organization || undefined,
                 Why: why,
+                FirstFive: first_five || undefined,
                 HowHeard: how_heard || undefined,
                 RefCode: refCode,
                 Status: 'Applied',
@@ -98,21 +100,22 @@ export async function POST(request: NextRequest) {
     try {
       await sendEmail({
         to: { email: 'kevin@beanumber.org', name: 'Kevin Hershock' },
-        subject: `New Rep Application: ${name}`,
-        text: `New ambassador application received.\n\nName: ${name}\nEmail: ${email}\nPhone: ${phone || 'N/A'}\nSchool: ${school || 'N/A'}\nOrganization: ${organization || 'N/A'}\nRef Code: ${refCode}\n\nWhy they want to be a rep:\n${why}\n\nHow they heard about BAN: ${how_heard || 'N/A'}`,
+        subject: `Cohort Application: ${name}`,
+        text: `New Founding Cohort application.\n\nName: ${name}\nEmail: ${email}\nPhone: ${phone || 'N/A'}\nSchool/Church: ${school || 'N/A'}\nOrganization: ${organization || 'N/A'}\nRef Code: ${refCode}\n\nWhy they want to go:\n${why}\n\nFirst 5 people they'd invite to sponsor:\n${first_five || 'N/A'}\n\nHow they heard about BAN: ${how_heard || 'N/A'}`,
         html: `
           <div style="font-family: Georgia, serif; max-width: 560px; margin: 0 auto; padding: 32px; background: #FFF8F0;">
-            <p style="color: #D4A843; font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.2em;">New Rep Application</p>
+            <p style="color: #D4A843; font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.2em;">Founding Cohort Application</p>
             <h2 style="font-family: Georgia, serif; color: #0d0d0d; margin: 16px 0 8px;">${name}</h2>
             <p style="color: #555; font-size: 14px; line-height: 1.6;">
               <strong>Email:</strong> ${email}<br/>
               <strong>Phone:</strong> ${phone || 'N/A'}<br/>
-              <strong>School:</strong> ${school || 'N/A'}<br/>
+              <strong>School/Church:</strong> ${school || 'N/A'}<br/>
               <strong>Organization:</strong> ${organization || 'N/A'}<br/>
               <strong>Ref Code:</strong> ${refCode}
             </p>
-            <p style="color: #0d0d0d; font-size: 14px; line-height: 1.6; margin-top: 16px;"><strong>Why:</strong></p>
+            <p style="color: #0d0d0d; font-size: 14px; line-height: 1.6; margin-top: 16px;"><strong>Why they want to go:</strong></p>
             <p style="color: #555; font-size: 14px; line-height: 1.6;">${why}</p>
+            ${first_five ? `<p style="color: #0d0d0d; font-size: 14px; line-height: 1.6; margin-top: 16px;"><strong>First 5 they'd invite:</strong></p><p style="color: #555; font-size: 14px; line-height: 1.6;">${first_five}</p>` : ''}
             <p style="color: #777; font-size: 13px; margin-top: 16px;">How they heard about BAN: ${how_heard || 'N/A'}</p>
           </div>
         `,

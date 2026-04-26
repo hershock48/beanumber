@@ -5,8 +5,15 @@ import Image from 'next/image';
 import { BANNavigation } from '@/components/BANNavigation';
 import { BANFooter } from '@/components/BANFooter';
 
-const SPONSOR_GOAL = 20;
-const TRIP_LENGTH = '2 weeks';
+const TRIP_COST = 3000;
+const DEPOSIT = 500;
+const CREDIT_PER_SPONSOR = 100;
+const SPONSOR_GOAL = 24;
+const TRIP_LENGTH = '10 days';
+const TRIP_DATE = 'October 2026';
+const COHORT_SIZE = 10;
+const RAMP_MONTHS = 6;
+const MIN_OUT_OF_POCKET = TRIP_COST - (SPONSOR_GOAL * CREDIT_PER_SPONSOR) + DEPOSIT;
 
 export default function RepPageContent() {
   const [formData, setFormData] = useState({
@@ -16,6 +23,7 @@ export default function RepPageContent() {
     school: '',
     organization: '',
     why: '',
+    first_five: '',
     how_heard: '',
   });
   const [submitting, setSubmitting] = useState(false);
@@ -55,8 +63,8 @@ export default function RepPageContent() {
       <section className="relative">
         <div className="relative w-full h-[50vh] min-h-[400px] bg-[#0d0d0d]">
           <Image
-            src="/images/impact-page/secondary-image.jpg"
-            alt="Kevin carrying water with children on the path to the YDO campus"
+            src="/images/homepage/hero-community-group.jpg"
+            alt="Community members gathered at the YDO campus in Northern Uganda"
             fill
             className="object-cover opacity-60"
             priority
@@ -64,42 +72,61 @@ export default function RepPageContent() {
           <div className="absolute inset-0 flex items-center justify-center px-5">
             <div className="max-w-3xl text-center">
               <p className="text-xs font-bold text-[#D4A843] uppercase tracking-[0.3em] mb-6">
-                Ambassador Program
+                Founding Cohort &middot; {TRIP_DATE}
               </p>
               <h1
                 className="text-4xl md:text-5xl lg:text-6xl text-white mb-6"
                 style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
               >
-                Build a team.<br />Go meet the kids.
+                Go meet the kids.
               </h1>
               <p className="text-lg md:text-xl text-white/80 max-w-2xl mx-auto leading-relaxed">
-                There are kids in Northern Uganda who need sponsors. You have people in your
-                life who would show up if someone they trust asked them to. Be the person
-                who connects the two, and then go meet the kids yourself.
+                {COHORT_SIZE} spots. {TRIP_LENGTH} on the ground in Northern Uganda.
+                The first group. The first trip. The kids already know you&apos;re coming.
               </p>
             </div>
           </div>
         </div>
       </section>
 
-      {/* How it works */}
+      {/* The deal */}
       <section className="py-16 px-5">
         <div className="max-w-3xl mx-auto">
           <p className="text-xs font-bold text-[#D4A843] uppercase tracking-[0.3em] mb-8">
-            How it works
+            The deal
           </p>
 
-          <div className="space-y-12">
+          <div className="bg-white border border-[#e8e0d4] p-8 md:p-10 mb-8">
+            <p className="text-[#555] leading-relaxed mb-6">
+              Be A Number is opening our first-ever Sponsorship Cohort Trip to the
+              campus in Northern Uganda. {COHORT_SIZE} spots. {TRIP_LENGTH}. Meet your
+              sponsored child. Walk the campus with Simon. See the school, the clinic,
+              the training center. Sit with the families your sponsorship supports.
+            </p>
+            <p
+              className="text-2xl text-[#0d0d0d] mb-2"
+              style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
+            >
+              ${TRIP_COST.toLocaleString()} all-in.
+            </p>
+            <p className="text-sm text-[#777]">
+              Flights, visas, lodging, meals, ground transport. Everything.
+            </p>
+          </div>
+
+          {/* How it works steps */}
+          <div className="space-y-10">
             <div>
               <h3
                 className="text-xl text-[#0d0d0d] mb-3"
                 style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
               >
-                1. Apply
+                1. Sponsor a child yourself
               </h3>
               <p className="text-[#555] leading-relaxed">
-                Fill out the form below. Kevin reviews every application personally
-                and wants to know who&apos;s representing BAN and why it matters to them.
+                Every cohort member is an active sponsor. You get your own number,
+                your own child, your own connection to the campus before you ever
+                set foot on it. $25/month.
               </p>
             </div>
 
@@ -108,14 +135,14 @@ export default function RepPageContent() {
                 className="text-xl text-[#0d0d0d] mb-3"
                 style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
               >
-                2. Get your number
+                2. Invite your people
               </h3>
               <p className="text-[#555] leading-relaxed">
-                When you&apos;re approved, you get a personal referral link and a content kit
-                with everything you need to share BAN with your people. You&apos;re also assigned
-                your own child at the campus, but the trip isn&apos;t about meeting one kid. Every
-                sponsor your team brings in is connected to a child, and you&apos;ll meet all
-                of them. Every shirt sold through your link is tracked automatically.
+                You get a personal referral link. For every new monthly sponsor you bring
+                in who stays active through month 3, you earn ${CREDIT_PER_SPONSOR} toward
+                your trip. Share it with friends, your church, your campus group, your
+                family. The people in your life who would care about this if you told
+                them about it.
               </p>
             </div>
 
@@ -124,13 +151,12 @@ export default function RepPageContent() {
                 className="text-xl text-[#0d0d0d] mb-3"
                 style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
               >
-                3. Build your team
+                3. Watch it add up
               </h3>
               <p className="text-[#555] leading-relaxed">
-                Share your link with your people. When someone grabs a shirt and opts
-                into monthly sponsorship, that person is on your team. Your dashboard
-                tracks your progress in real time, and you can see where your school
-                stands against other schools on the leaderboard.
+                Bring in {SPONSOR_GOAL} sponsors over {RAMP_MONTHS} months and your trip
+                is essentially covered. Your dashboard tracks every referral in real time.
+                You can see exactly where you stand and how the rest of the cohort is doing.
               </p>
             </div>
 
@@ -139,15 +165,14 @@ export default function RepPageContent() {
                 className="text-xl text-[#0d0d0d] mb-3"
                 style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
               >
-                4. Go meet the kids
+                4. Go
               </h3>
               <p className="text-[#555] leading-relaxed">
-                {SPONSOR_GOAL} monthly sponsors from your network and your trip is fully covered.
-                {' '}{TRIP_LENGTH} in Northern Uganda. You walk onto the YDO campus and the kids
-                already know your name because Kevin told them you were coming. You sit in
-                their classrooms, eat meals together, play football on the same pitch they
-                play on every day. You see what your team built, in person, with the children
-                standing right in front of you.
+                {TRIP_DATE}. You walk onto the YDO campus and the kids already know your
+                name because Kevin told them you were coming. You sit in their classrooms,
+                eat meals together, play football on the same pitch they play on every day.
+                You see what your network built, in person, with the children standing right
+                in front of you.
               </p>
             </div>
           </div>
@@ -176,111 +201,195 @@ export default function RepPageContent() {
         </div>
       </section>
 
-      {/* The goal */}
+      {/* The math */}
       <section className="py-16 px-5 border-t border-[#e8e0d4]">
         <div className="max-w-3xl mx-auto">
           <p className="text-xs font-bold text-[#D4A843] uppercase tracking-[0.3em] mb-8">
-            The goal
+            The math
           </p>
 
           <div className="bg-white border border-[#e8e0d4] p-8 md:p-10">
-            <h3
-              className="text-2xl text-[#0d0d0d] mb-6"
-              style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
-            >
-              {SPONSOR_GOAL} monthly sponsors
-            </h3>
-
-            <div className="space-y-4 text-[#555] leading-relaxed">
-              <p>
-                Every monthly sponsor you bring in is matched to a real child at the YDO
-                campus. Their sponsorship covers that child&apos;s education, daily meals, and
-                medical care through the on-site clinic. It&apos;s not a donation into a
-                general fund. It&apos;s a name.
-              </p>
-              <p>
-                Get {SPONSOR_GOAL} people from your network sponsoring monthly, keep them
-                active for at least three months, and your trip is fully covered. Flights,
-                housing, meals, transport. {TRIP_LENGTH} at the campus in Northern Uganda,
-                meeting the children your team is keeping in school.
-              </p>
-              <p>
-                The trip isn&apos;t the point. The point is {SPONSOR_GOAL} kids with sponsors
-                who showed up because you told them about BAN. The trip is what happens after.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Who this is for */}
-      <section className="py-16 px-5 border-t border-[#e8e0d4]">
-        <div className="max-w-3xl mx-auto">
-          <p className="text-xs font-bold text-[#D4A843] uppercase tracking-[0.3em] mb-8">
-            Who this is for
-          </p>
-
-          <div className="space-y-4 text-[#555] leading-relaxed">
-            <p>
-              People who are tired of hearing about causes and want to actually know a child
-              by name. Campus ministry groups looking for something that lasts longer than a
-              week-long trip. Greek life philanthropy chairs who want their chapter behind
-              something real. Social work and global studies students who want to see the
-              field, not read about it. Church groups who want their faith to show up in
-              a specific place for specific people.
-            </p>
-            <p>
-              You don&apos;t have to be in college. If you have people in your life who would
-              care about this if you brought it to them, this is for you.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* What you get */}
-      <section className="py-16 px-5 border-t border-[#e8e0d4]">
-        <div className="max-w-3xl mx-auto">
-          <p className="text-xs font-bold text-[#D4A843] uppercase tracking-[0.3em] mb-8">
-            What you get
-          </p>
-
-          <div className="grid md:grid-cols-2 gap-6">
-            {[
-              {
-                title: 'Your own number',
-                desc: 'A child at the YDO campus assigned to you, plus a connection to every child your team sponsors. The trip is about all of them.',
-              },
-              {
-                title: 'Personal referral link',
-                desc: 'Every sale through your link is automatically tracked. No spreadsheets, no manual counting.',
-              },
-              {
-                title: 'Rep dashboard',
-                desc: 'Real-time view of your progress toward the trip. See where your school ranks against other schools on the leaderboard.',
-              },
-              {
-                title: 'Content kit',
-                desc: 'Instagram stories, share graphics, suggested captions. Everything you need to tell people about BAN without writing copy from scratch.',
-              },
-              {
-                title: 'Direct line to Kevin',
-                desc: 'You\'re not a number in a system. Kevin knows who you are and is available when you need him.',
-              },
-              {
-                title: 'The trip',
-                desc: `${TRIP_LENGTH} at the YDO campus in Northern Uganda. Flights, housing, meals, and transport are fully covered when you hit ${SPONSOR_GOAL} sponsors.`,
-              },
-            ].map((item) => (
-              <div key={item.title} className="bg-white border border-[#e8e0d4] p-6">
-                <h4
-                  className="text-base text-[#0d0d0d] mb-2"
+            <div className="space-y-6">
+              <div className="flex justify-between items-baseline border-b border-[#f0ece4] pb-4">
+                <span className="text-[#555]">Trip cost</span>
+                <span
+                  className="text-xl text-[#0d0d0d]"
                   style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
                 >
-                  {item.title}
-                </h4>
-                <p className="text-sm text-[#555] leading-relaxed">{item.desc}</p>
+                  ${TRIP_COST.toLocaleString()}
+                </span>
+              </div>
+              <div className="flex justify-between items-baseline border-b border-[#f0ece4] pb-4">
+                <span className="text-[#555]">Non-refundable deposit at acceptance</span>
+                <span
+                  className="text-xl text-[#0d0d0d]"
+                  style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
+                >
+                  ${DEPOSIT.toLocaleString()}
+                </span>
+              </div>
+              <div className="flex justify-between items-baseline border-b border-[#f0ece4] pb-4">
+                <span className="text-[#555]">Scholarship credit per sponsor (after month 3)</span>
+                <span
+                  className="text-xl text-[#0d0d0d]"
+                  style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
+                >
+                  ${CREDIT_PER_SPONSOR}
+                </span>
+              </div>
+              <div className="flex justify-between items-baseline border-b border-[#f0ece4] pb-4">
+                <span className="text-[#555]">Sponsors needed to max out your credit</span>
+                <span
+                  className="text-xl text-[#0d0d0d]"
+                  style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
+                >
+                  {SPONSOR_GOAL}
+                </span>
+              </div>
+              <div className="flex justify-between items-baseline pt-2">
+                <span className="text-[#0d0d0d] font-semibold">Minimum out-of-pocket if you hit {SPONSOR_GOAL}</span>
+                <span
+                  className="text-2xl text-[#D4A843]"
+                  style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 700 }}
+                >
+                  ${MIN_OUT_OF_POCKET.toLocaleString()}
+                </span>
+              </div>
+            </div>
+
+            <p className="text-sm text-[#777] mt-8 leading-relaxed">
+              The ${DEPOSIT} deposit is due when you&apos;re accepted. Scholarship credits
+              accumulate as your referred sponsors hit their 3-month mark. Balance is due
+              30 days before the trip. If your credits don&apos;t cover the full balance,
+              you pay the difference.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* What the 6 months look like */}
+      <section className="py-16 px-5 border-t border-[#e8e0d4]">
+        <div className="max-w-3xl mx-auto">
+          <p className="text-xs font-bold text-[#D4A843] uppercase tracking-[0.3em] mb-8">
+            The {RAMP_MONTHS} months before the trip
+          </p>
+
+          <p className="text-[#555] leading-relaxed mb-8">
+            You&apos;re not doing this alone. Kevin runs a monthly call with the cohort
+            to keep everyone connected and prepared.
+          </p>
+
+          <div className="space-y-4">
+            {[
+              {
+                month: 'Month 1',
+                title: 'Orientation',
+                desc: 'Who Simon\'s team is, what the campus looks like, what the 10 days will be. You\'ll leave this call knowing exactly what you\'re working toward.',
+              },
+              {
+                month: 'Month 2',
+                title: 'How to have the conversation',
+                desc: 'How to invite people to sponsor without being weird about it. What to say, what not to say, what actually works.',
+              },
+              {
+                month: 'Month 3',
+                title: 'Travel prep',
+                desc: 'Visa, vaccines, packing, safety, cultural norms. Everything you need to know before you board a plane.',
+              },
+              {
+                month: 'Month 4',
+                title: 'The campus and the community',
+                desc: 'Deeper dive into what you\'ll see on the ground. The school, the clinic, the vocational center, the families. Context that will make the trip hit different.',
+              },
+              {
+                month: 'Month 5',
+                title: 'Meeting your child',
+                desc: 'What to do when you\'re standing in front of the kid whose name you\'ve been carrying for months. Most people cry. Some people freeze. We\'ll talk about it so you\'re ready.',
+              },
+              {
+                month: 'Month 6',
+                title: 'What you carry home',
+                desc: 'The trip isn\'t the end. It\'s the start. What we\'re asking you to do with the story when you get back.',
+              },
+            ].map((item) => (
+              <div key={item.month} className="flex gap-4 bg-white border border-[#e8e0d4] p-5">
+                <div className="shrink-0">
+                  <span className="text-xs font-bold text-[#D4A843] uppercase tracking-wider">
+                    {item.month}
+                  </span>
+                </div>
+                <div>
+                  <h4
+                    className="text-base text-[#0d0d0d] mb-1"
+                    style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
+                  >
+                    {item.title}
+                  </h4>
+                  <p className="text-sm text-[#555] leading-relaxed">{item.desc}</p>
+                </div>
               </div>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* What you carry home */}
+      <section className="py-16 px-5 border-t border-[#e8e0d4]">
+        <div className="max-w-3xl mx-auto">
+          <p className="text-xs font-bold text-[#D4A843] uppercase tracking-[0.3em] mb-8">
+            After the trip
+          </p>
+
+          <div className="space-y-4 text-[#555] leading-relaxed mb-8">
+            <p>
+              The trip is the forge, not the finish line. When you get home, you carry the
+              story. Founding Cohort members commit to three things in the year after returning:
+            </p>
+          </div>
+
+          <div className="space-y-4">
+            <div className="bg-white border border-[#e8e0d4] p-6">
+              <h4
+                className="text-base text-[#0d0d0d] mb-2"
+                style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
+              >
+                Host a gathering
+              </h4>
+              <p className="text-sm text-[#555] leading-relaxed">
+                Within 90 days of returning, invite people over. Tell the story. Show
+                the photos. Invite them to sponsor. No stage, no production. Your
+                living room and the truth.
+              </p>
+            </div>
+
+            <div className="bg-white border border-[#e8e0d4] p-6">
+              <h4
+                className="text-base text-[#0d0d0d] mb-2"
+                style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
+              >
+                Tell the story publicly
+              </h4>
+              <p className="text-sm text-[#555] leading-relaxed">
+                A blog post, an Instagram carousel, a newsletter to your people. Within
+                30 days. One honest piece about what you saw and why it matters. In your
+                own words, to your own audience.
+              </p>
+            </div>
+
+            <div className="bg-white border border-[#e8e0d4] p-6">
+              <h4
+                className="text-base text-[#0d0d0d] mb-2"
+                style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
+              >
+                Stay on as a cohort alum
+              </h4>
+              <p className="text-sm text-[#555] leading-relaxed">
+                For at least 12 months after the trip, you&apos;re part of the alumni
+                network. That means you&apos;re available when we need a voice, you
+                mentor the next cohort, and you get early access to future trips and
+                new shirt numbers before anyone else.
+              </p>
+            </div>
           </div>
         </div>
       </section>
@@ -309,11 +418,14 @@ export default function RepPageContent() {
             className="text-3xl text-[#0d0d0d] mb-3"
             style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
           >
-            Be a rep
+            Join the Founding Cohort
           </h2>
-          <p className="text-[#555] mb-10 leading-relaxed">
-            Kevin reads every application. If it&apos;s a fit, he&apos;ll reach out directly
-            to get you set up.
+          <p className="text-[#555] mb-3 leading-relaxed">
+            {COHORT_SIZE} spots. Kevin reads every application and will reach out directly
+            if it&apos;s a fit.
+          </p>
+          <p className="text-sm text-[#777] mb-10">
+            Applications close when the cohort is full.
           </p>
 
           {submitted ? (
@@ -327,7 +439,7 @@ export default function RepPageContent() {
               <p className="text-[#555]">
                 Kevin will be in touch. In the meantime, check out{' '}
                 <a href="/shirts" className="text-[#D4A843] underline">the shirts</a> and
-                start thinking about who you&apos;d share them with.
+                start thinking about who you&apos;d invite to sponsor.
               </p>
             </div>
           ) : (
@@ -356,7 +468,7 @@ export default function RepPageContent() {
                     value={formData.email}
                     onChange={e => setFormData(p => ({ ...p, email: e.target.value }))}
                     className="w-full border border-[#e8e0d4] bg-white px-4 py-3 text-[#0d0d0d] text-sm focus:outline-none focus:border-[#D4A843] transition-colors"
-                    placeholder="you@school.edu"
+                    placeholder="you@email.com"
                   />
                 </div>
               </div>
@@ -373,13 +485,13 @@ export default function RepPageContent() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-[#0d0d0d] mb-2">School</label>
+                  <label className="block text-sm font-semibold text-[#0d0d0d] mb-2">School or church</label>
                   <input
                     type="text"
                     value={formData.school}
                     onChange={e => setFormData(p => ({ ...p, school: e.target.value }))}
                     className="w-full border border-[#e8e0d4] bg-white px-4 py-3 text-[#0d0d0d] text-sm focus:outline-none focus:border-[#D4A843] transition-colors"
-                    placeholder="University, college, or N/A"
+                    placeholder="University, church, or N/A"
                   />
                 </div>
               </div>
@@ -393,13 +505,13 @@ export default function RepPageContent() {
                   value={formData.organization}
                   onChange={e => setFormData(p => ({ ...p, organization: e.target.value }))}
                   className="w-full border border-[#e8e0d4] bg-white px-4 py-3 text-[#0d0d0d] text-sm focus:outline-none focus:border-[#D4A843] transition-colors"
-                  placeholder="Campus ministry, Greek org, church group, etc."
+                  placeholder="Campus ministry, Greek org, small group, etc."
                 />
               </div>
 
               <div>
                 <label className="block text-sm font-semibold text-[#0d0d0d] mb-2">
-                  Why do you want to be a rep? <span className="text-[#D4A843]">*</span>
+                  Why do you want to go? <span className="text-[#D4A843]">*</span>
                 </label>
                 <textarea
                   required
@@ -408,7 +520,22 @@ export default function RepPageContent() {
                   value={formData.why}
                   onChange={e => setFormData(p => ({ ...p, why: e.target.value }))}
                   className="w-full border border-[#e8e0d4] bg-white px-4 py-3 text-[#0d0d0d] text-sm focus:outline-none focus:border-[#D4A843] transition-colors resize-none"
-                  placeholder="Tell Kevin why this resonates with you. No wrong answers."
+                  placeholder="What draws you to this? No wrong answers."
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-[#0d0d0d] mb-2">
+                  Who are the first 5 people you&apos;d invite to sponsor? <span className="text-[#D4A843]">*</span>
+                </label>
+                <textarea
+                  required
+                  minLength={10}
+                  rows={3}
+                  value={formData.first_five}
+                  onChange={e => setFormData(p => ({ ...p, first_five: e.target.value }))}
+                  className="w-full border border-[#e8e0d4] bg-white px-4 py-3 text-[#0d0d0d] text-sm focus:outline-none focus:border-[#D4A843] transition-colors resize-none"
+                  placeholder="First names are fine. We're not contacting them — we want to know you've already thought about this."
                 />
               </div>
 
@@ -421,7 +548,7 @@ export default function RepPageContent() {
                   value={formData.how_heard}
                   onChange={e => setFormData(p => ({ ...p, how_heard: e.target.value }))}
                   className="w-full border border-[#e8e0d4] bg-white px-4 py-3 text-[#0d0d0d] text-sm focus:outline-none focus:border-[#D4A843] transition-colors"
-                  placeholder="Instagram, a friend, campus event, etc."
+                  placeholder="Instagram, a friend, church, etc."
                 />
               </div>
 
@@ -438,18 +565,18 @@ export default function RepPageContent() {
                     : 'bg-[#D4A843] text-[#0d0d0d] hover:bg-[#c49a3a] cursor-pointer'
                 }`}
               >
-                {submitting ? 'Submitting...' : 'Submit Application'}
+                {submitting ? 'Submitting...' : 'Apply for the Founding Cohort'}
               </button>
             </form>
           )}
         </div>
       </section>
 
-      {/* Already a rep? Login link */}
+      {/* Already accepted? Login link */}
       <section className="py-12 px-5 border-t border-[#e8e0d4]">
         <div className="max-w-2xl mx-auto text-center">
           <p className="text-sm text-[#777]">
-            Already a rep?{' '}
+            Already in the cohort?{' '}
             <a href="/rep/dashboard" className="text-[#D4A843] underline">
               Log in to your dashboard
             </a>

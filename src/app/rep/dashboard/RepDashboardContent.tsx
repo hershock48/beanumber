@@ -4,36 +4,43 @@ import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { BANNavigation } from '@/components/BANNavigation';
 
-type RepData = {
+const TRIP_COST = 3000;
+const DEPOSIT = 500;
+const CREDIT_PER_SPONSOR = 100;
+
+type MemberData = {
   name: string;
   email: string;
   refCode: string;
   school: string;
   shirtsSold: number;
   sponsorCount: number;
+  qualifiedSponsorCount: number;
   childNumber: number | null;
   childName: string | null;
 };
 
 type ProgressData = {
   sponsorCount: number;
+  qualifiedSponsorCount: number;
   sponsorGoal: number;
   percentComplete: number;
   shirtsSold: number;
+  scholarshipEarned: number;
+  balanceRemaining: number;
 };
 
-type SchoolLeaderboardEntry = {
-  school: string;
-  repCount: number;
+type CohortLeaderboardEntry = {
+  name: string;
   sponsorCount: number;
-  shirtsSold: number;
+  isMe: boolean;
 };
 
 type DashboardData = {
-  rep: RepData;
+  rep: MemberData;
   progress: ProgressData;
   referralLink: string;
-  schoolLeaderboard: SchoolLeaderboardEntry[];
+  cohortLeaderboard: CohortLeaderboardEntry[];
 };
 
 export default function RepDashboardContent() {
@@ -105,7 +112,7 @@ export default function RepDashboardContent() {
         <BANNavigation currentPath="/rep/dashboard" />
         <div className="max-w-md mx-auto px-5 py-24">
           <p className="text-xs font-bold text-[#D4A843] uppercase tracking-[0.3em] mb-4">
-            Rep Dashboard
+            Cohort Dashboard
           </p>
           <h1
             className="text-3xl text-[#0d0d0d] mb-3"
@@ -123,7 +130,7 @@ export default function RepDashboardContent() {
               required
               value={email}
               onChange={e => setEmail(e.target.value)}
-              placeholder="you@school.edu"
+              placeholder="you@email.com"
               className="w-full border border-[#e8e0d4] bg-white px-4 py-3 text-[#0d0d0d] text-sm focus:outline-none focus:border-[#D4A843] transition-colors"
             />
 
@@ -145,7 +152,7 @@ export default function RepDashboardContent() {
           </form>
 
           <p className="text-center text-sm text-[#777] mt-8">
-            Not a rep yet?{' '}
+            Not in the cohort yet?{' '}
             <a href="/rep" className="text-[#D4A843] underline">Apply here</a>
           </p>
         </div>
@@ -188,7 +195,10 @@ export default function RepDashboardContent() {
 
   // Dashboard state
   if (!data) return null;
-  const { rep, progress, referralLink, schoolLeaderboard } = data;
+  const { rep, progress, referralLink, cohortLeaderboard } = data;
+
+  const scholarshipEarned = progress.qualifiedSponsorCount * CREDIT_PER_SPONSOR;
+  const balanceRemaining = Math.max(0, TRIP_COST - DEPOSIT - scholarshipEarned);
 
   return (
     <div className="min-h-screen bg-[#FFF8F0]">
@@ -198,7 +208,7 @@ export default function RepDashboardContent() {
         {/* Header */}
         <div className="mb-12">
           <p className="text-xs font-bold text-[#D4A843] uppercase tracking-[0.3em] mb-3">
-            Rep Dashboard
+            Founding Cohort
           </p>
           <h1
             className="text-3xl md:text-4xl text-[#0d0d0d]"
@@ -221,7 +231,7 @@ export default function RepDashboardContent() {
               className="text-xl text-[#0d0d0d]"
               style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
             >
-              #{rep.childNumber}{rep.childName ? ` — ${rep.childName}` : ''}
+              #{rep.childNumber}{rep.childName ? ` \u2014 ${rep.childName}` : ''}
             </p>
             <a
               href={`/children/${rep.childNumber}`}
@@ -232,16 +242,16 @@ export default function RepDashboardContent() {
           </div>
         )}
 
-        {/* Progress toward goal */}
+        {/* Sponsors + scholarship progress */}
         <div className="bg-white border border-[#e8e0d4] p-6 md:p-8 mb-8">
           <div className="flex items-end justify-between mb-4">
             <div>
               <p className="text-xs font-bold text-[#D4A843] uppercase tracking-[0.2em] mb-1">
-                Progress
+                Sponsors
               </p>
               <p className="text-3xl font-bold text-[#0d0d0d]">
                 {progress.sponsorCount}
-                <span className="text-lg text-[#999] font-normal"> / {progress.sponsorGoal} sponsors</span>
+                <span className="text-lg text-[#999] font-normal"> / {progress.sponsorGoal} goal</span>
               </p>
             </div>
             <p className="text-sm text-[#777]">
@@ -259,16 +269,47 @@ export default function RepDashboardContent() {
 
           <div className="flex justify-between mt-4 text-sm">
             <div>
-              <span className="text-[#0d0d0d] font-semibold">{progress.shirtsSold}</span>
-              <span className="text-[#777]"> shirts sold</span>
+              <span className="text-[#0d0d0d] font-semibold">{progress.sponsorCount}</span>
+              <span className="text-[#777]"> total referred</span>
             </div>
             <div>
-              <span className="text-[#0d0d0d] font-semibold">{progress.sponsorCount}</span>
-              <span className="text-[#777]"> monthly sponsors</span>
+              <span className="text-[#0d0d0d] font-semibold">{progress.qualifiedSponsorCount}</span>
+              <span className="text-[#777]"> qualified (3+ months)</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Trip balance */}
+        <div className="bg-white border border-[#e8e0d4] p-6 md:p-8 mb-8">
+          <p className="text-xs font-bold text-[#D4A843] uppercase tracking-[0.2em] mb-4">
+            Trip balance
+          </p>
+
+          <div className="space-y-3 text-sm">
+            <div className="flex justify-between">
+              <span className="text-[#777]">Trip cost</span>
+              <span className="text-[#0d0d0d]">${TRIP_COST.toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-[#777]">Deposit paid</span>
+              <span className="text-[#0d0d0d]">-${DEPOSIT.toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-[#777]">Scholarship earned ({progress.qualifiedSponsorCount} &times; ${CREDIT_PER_SPONSOR})</span>
+              <span className="text-[#0d0d0d]">-${scholarshipEarned.toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between pt-3 border-t border-[#f0ece4]">
+              <span className="text-[#0d0d0d] font-semibold">Balance remaining</span>
+              <span
+                className={`text-xl ${balanceRemaining === 0 ? 'text-[#D4A843]' : 'text-[#0d0d0d]'}`}
+                style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 700 }}
+              >
+                ${balanceRemaining.toLocaleString()}
+              </span>
             </div>
           </div>
 
-          {progress.percentComplete >= 100 && (
+          {balanceRemaining === 0 && (
             <div className="mt-6 bg-[#D4A843]/10 border border-[#D4A843] p-4">
               <p
                 className="text-[#0d0d0d] font-semibold"
@@ -301,50 +342,42 @@ export default function RepDashboardContent() {
             </button>
           </div>
           <p className="text-xs text-[#999] mt-2">
-            Share this link. Every shirt sold through it counts toward your goal.
+            Share this link. Every sponsor who signs up through it and stays active for 3 months
+            earns you ${CREDIT_PER_SPONSOR} toward the trip.
           </p>
         </div>
 
-        {/* School Leaderboard */}
-        {schoolLeaderboard.length > 0 && (
+        {/* Cohort Leaderboard */}
+        {cohortLeaderboard && cohortLeaderboard.length > 0 && (
           <div className="bg-white border border-[#e8e0d4] p-6 md:p-8">
             <p className="text-xs font-bold text-[#D4A843] uppercase tracking-[0.2em] mb-4">
-              School Leaderboard
+              Cohort Leaderboard
             </p>
 
-            <div className="space-y-3">
-              {schoolLeaderboard.map((entry, i) => {
-                const isMySchool = rep.school && entry.school === rep.school;
-                return (
-                  <div
-                    key={i}
-                    className={`flex items-center gap-4 p-3 ${
-                      isMySchool ? 'bg-[#D4A843]/5 border border-[#D4A843]/30' : ''
-                    }`}
-                  >
-                    <span className="w-8 text-center text-sm font-bold text-[#999]">
-                      {i + 1}
-                    </span>
-                    <div className="flex-1 min-w-0">
-                      <p className={`text-sm font-semibold ${isMySchool ? 'text-[#D4A843]' : 'text-[#0d0d0d]'}`}>
-                        {entry.school}
-                        {isMySchool && <span className="text-[#999] font-normal ml-1">(your school)</span>}
-                      </p>
-                      <p className="text-xs text-[#999]">
-                        {entry.repCount} {entry.repCount === 1 ? 'rep' : 'reps'}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm font-semibold text-[#0d0d0d]">
-                        {entry.sponsorCount} <span className="text-[#999] font-normal">sponsors</span>
-                      </p>
-                      <p className="text-xs text-[#999]">
-                        {entry.shirtsSold} shirts
-                      </p>
-                    </div>
+            <div className="space-y-2">
+              {cohortLeaderboard.map((entry, i) => (
+                <div
+                  key={i}
+                  className={`flex items-center gap-4 p-3 ${
+                    entry.isMe ? 'bg-[#D4A843]/5 border border-[#D4A843]/30' : ''
+                  }`}
+                >
+                  <span className="w-8 text-center text-sm font-bold text-[#999]">
+                    {i + 1}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-sm font-semibold ${entry.isMe ? 'text-[#D4A843]' : 'text-[#0d0d0d]'}`}>
+                      {entry.name}
+                      {entry.isMe && <span className="text-[#999] font-normal ml-1">(you)</span>}
+                    </p>
                   </div>
-                );
-              })}
+                  <div className="text-right">
+                    <p className="text-sm font-semibold text-[#0d0d0d]">
+                      {entry.sponsorCount} <span className="text-[#999] font-normal">sponsors</span>
+                    </p>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         )}
