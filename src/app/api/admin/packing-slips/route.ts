@@ -90,6 +90,7 @@ export async function GET(request: NextRequest) {
     const params = new URLSearchParams();
     if (formula) params.set('filterByFormula', formula);
     params.set('pageSize', '100');
+    params.set('returnFieldsByFieldId', 'true');
     if (offset) params.set('offset', offset);
 
     const url = `https://api.airtable.com/v0/${env.AIRTABLE_BASE_ID}/${FULFILLMENT_TABLE_ID}?${params}`;
