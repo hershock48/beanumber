@@ -118,6 +118,20 @@ export async function GET(request: NextRequest) {
     return aNum - bNum;
   });
 
+  // Group records by shipping address so multiple shirts to the same
+  // person produce ONE shipping label, not one per shirt.
+  const grouped = new Map<string, AirtableRecord[]>();
+  for (const rec of allRecords) {
+    const key = [
+      fieldVal(rec, F.shipName),
+      fieldVal(rec, F.shipStreet1),
+      fieldVal(rec, F.shipZip),
+    ].join('|').toLowerCase();
+    const group = grouped.get(key) || [];
+    group.push(rec);
+    grouped.set(key, group);
+  }
+
   // Build CSV — Pirate Ship import columns
   const headers = [
     'Order Number',
@@ -139,30 +153,34 @@ export async function GET(request: NextRequest) {
 
   const rows: string[] = [headers.map(escapeCSV).join(',')];
 
-  for (const rec of allRecords) {
-    const orderNum = fieldVal(rec, F.orderNum);
-    const design = fieldVal(rec, F.design);
-    const color = fieldVal(rec, F.shirtColor);
-    const size = fieldVal(rec, F.size);
-    const itemName = `${design} / ${color} / ${size}`;
-    const sku = `BAN-${orderNum}`;
+  for (const [, recs] of grouped) {
+    const first = recs[0];
+    const orderNums = recs.map(r => fieldVal(r, F.orderNum));
+    const items = recs.map(r => {
+      const design = fieldVal(r, F.design);
+      const color = fieldVal(r, F.shirtColor);
+      const size = fieldVal(r, F.size);
+      return `${design} / ${color} / ${size}`;
+    });
+    const skus = orderNums.map(n => `BAN-${n}`);
+    const totalWeight = recs.length * SHIRT_WEIGHT_OZ;
 
     const row = [
-      orderNum,
-      fieldVal(rec, F.shipName),
+      orderNums.join('+'),
+      fieldVal(first, F.shipName),
       '',  // Company — not collected
-      fieldVal(rec, F.shipStreet1),
-      fieldVal(rec, F.shipStreet2),
-      fieldVal(rec, F.shipCity),
-      fieldVal(rec, F.shipState),
-      fieldVal(rec, F.shipZip),
+      fieldVal(first, F.shipStreet1),
+      fieldVal(first, F.shipStreet2),
+      fieldVal(first, F.shipCity),
+      fieldVal(first, F.shipState),
+      fieldVal(first, F.shipZip),
       'US',
       '',  // Phone — not on fulfillment table
-      fieldVal(rec, F.email),
-      itemName,
-      sku,
-      '1',
-      String(SHIRT_WEIGHT_OZ),
+      fieldVal(first, F.email),
+      items.join(' + '),
+      skus.join('+'),
+      String(recs.length),
+      String(totalWeight),
     ].map(escapeCSV).join(',');
 
     rows.push(row);
