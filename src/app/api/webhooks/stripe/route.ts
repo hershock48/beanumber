@@ -1051,13 +1051,13 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
     // Prefer shipping address (collected at checkout for shirt/cart orders)
     // over billing address (customer_details.address), which often only has
     // a postal code when the buyer's card is on file with minimal info.
-    const shippingAddr = (session as any).shipping_details?.address
+    const address = (session as any).shipping_details?.address
       || session.customer_details?.address
       || null;
 
     // Format address as single string
-    const addressString = shippingAddr
-      ? `${shippingAddr.line1 || ''}${shippingAddr.line2 ? ', ' + shippingAddr.line2 : ''}, ${shippingAddr.city || ''}, ${shippingAddr.state || ''} ${shippingAddr.postal_code || ''}, ${shippingAddr.country || ''}`
+    const addressString = address
+      ? `${address.line1 || ''}${address.line2 ? ', ' + address.line2 : ''}, ${address.city || ''}, ${address.state || ''} ${address.postal_code || ''}, ${address.country || ''}`
       : undefined;
 
     const stripeCustomerId = session.customer as string || null;
