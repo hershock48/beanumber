@@ -112,6 +112,7 @@ const AIRTABLE_DONATIONS_TABLE = process.env.AIRTABLE_DONATIONS_TABLE || 'Donati
 const AIRTABLE_COMMUNICATIONS_TABLE = process.env.AIRTABLE_COMMUNICATIONS_TABLE || 'Communications';
 const AIRTABLE_SPONSORSHIPS_TABLE = process.env.AIRTABLE_SPONSORSHIPS_TABLE || 'Sponsorships';
 const AIRTABLE_CHILDREN_TABLE = process.env.AIRTABLE_CHILDREN_TABLE || 'Children';
+const AIRTABLE_FULFILLMENT_TABLE_ID = 'tblkSZBRrMiHhT3MP';
 
 function getAirtableHeaders() {
   return {
@@ -152,6 +153,94 @@ function classifyReferral(raw: string): { choice: string | null; rawNote: string
     return { choice: 'Sponsor referral', rawNote: text };
   }
   return { choice: 'Other', rawNote: text };
+}
+
+// ---------------------------------------------------------------------------
+// Fulfillment record auto-creation
+// ---------------------------------------------------------------------------
+// Determines vinyl color based on shirt color. Dark shirts get white vinyl,
+// light shirts get black vinyl.
+function vinylColorForShirt(shirtColor: string): string {
+  const lower = shirtColor.toLowerCase();
+  if (lower === 'black' || lower === 'grey' || lower === 'gray') return 'White';
+  return 'Black'; // White, Pink, Yellow, etc.
+}
+
+// Creates one Fulfillment record per shirt in Airtable. Non-fatal — if this
+// fails the order still succeeds. Called from all three shirt flows.
+async function createFulfillmentRecord(opts: {
+  shirtNumber: number;
+  design: string;        // e.g. "The Flagship" — must match singleSelect
+  shirtColor: string;    // e.g. "Black" — must match singleSelect
+  shirtSize: string;     // e.g. "L" — must match singleSelect
+  buyerName: string;
+  buyerEmail: string;
+  address: {
+    line1?: string;
+    line2?: string;
+    city?: string;
+    state?: string;
+    postal_code?: string;
+  } | null;
+  childName: string;     // display name for Child Name field
+  orderDate: string;     // ISO date string
+  notes?: string;
+}): Promise<void> {
+  if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) {
+    console.error('[WH] Fulfillment: missing Airtable creds, skipping');
+    return;
+  }
+
+  const vinylFront = vinylColorForShirt(opts.shirtColor);
+  const vinylBack = vinylColorForShirt(opts.shirtColor);
+
+  const fields: Record<string, unknown> = {
+    'fldsUZIXLFesyzg8u': opts.shirtNumber,       // Order #
+    'fldsWHbE3yq7Xoyn4': opts.design,            // Design
+    'fldaVW0nkpBjz0Gm7': opts.shirtColor,        // Shirt Color
+    'fldicYGUVXRbCP4ze': opts.shirtSize,          // Size
+    'fldwFBqD55i4G5yBf': vinylFront,              // Vinyl Front
+    'fldp3RObd3abl3O7w': vinylBack,               // Vinyl Back
+    'fldbGofwASSXDYj9R': opts.buyerName,          // Buyer
+    'fldUakXkAhW2hYLxL': opts.buyerEmail,         // Email
+    'fldkACkyAtFQCOPFL': opts.childName,          // Child Name
+    'fldnXiHlwBtEWP3io': opts.orderDate,          // Order Date
+    'fldbBZtOLYVVDS28X': 'Pending',               // Production
+    'fldJ6ehpDkpindHtO': 'Pending',               // Shipping
+  };
+
+  // Address fields (only set if we have an address object)
+  if (opts.address) {
+    fields['fldOhzT4xrR1jaJYC'] = opts.buyerName;                    // Ship Name
+    fields['fldaNij76IbSJwf8l'] = opts.address.line1 || '';           // Ship Street1
+    fields['fldIptRN8o5c1JYZV'] = opts.address.line2 || '';           // Ship Street2
+    fields['fldklictYmJe4rW5C'] = opts.address.city || '';            // Ship City
+    fields['fldqXjndiZ1dOoIZj'] = opts.address.state || '';           // Ship State
+    fields['fld4TPxLBb9jaAa14'] = opts.address.postal_code || '';     // Ship ZIP
+  }
+
+  if (opts.notes) {
+    fields['fldoX0697ASTKcDvD'] = opts.notes;                        // Notes
+  }
+
+  await airtableAPICall(() =>
+    fetch(
+      `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_FULFILLMENT_TABLE_ID}`,
+      {
+        method: 'POST',
+        headers: getAirtableHeaders(),
+        body: JSON.stringify({ fields }),
+      }
+    ).then(async (res) => {
+      if (!res.ok) {
+        const body = await res.text();
+        throw new Error(`Fulfillment create failed (${res.status}): ${body}`);
+      }
+      return res.json();
+    })
+  );
+
+  console.log(`[WH] Fulfillment record created: #${opts.shirtNumber} ${opts.design} / ${opts.shirtColor} / ${opts.shirtSize}`);
 }
 
 // Find or create donor with deduplication
@@ -1382,6 +1471,27 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
         }
       }
 
+      // Create Fulfillment records — one per shirt in the cart.
+      // Non-fatal: order succeeds even if this fails.
+      for (const a of assignments) {
+        if (!a.child) continue;
+        try {
+          await createFulfillmentRecord({
+            shirtNumber: a.child.shirtNumber,
+            design: a.shirtName,
+            shirtColor: a.shirtColor,
+            shirtSize: a.shirtSize,
+            buyerName: name,
+            buyerEmail: email,
+            address: address || null,
+            childName: a.child.displayName,
+            orderDate: donationDate,
+          });
+        } catch (err: any) {
+          console.error('[WH] Cart fulfillment record failed for #' + a.child.shirtNumber + ':', String(err?.message || err).slice(0, 200));
+        }
+      }
+
       console.log('[WH] Cart order complete:', {
         sessionId: session.id,
         items: cartItems.length,
@@ -1770,6 +1880,25 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
         }
       }
 
+      // Create Fulfillment record — non-fatal.
+      if (assignedChild) {
+        try {
+          await createFulfillmentRecord({
+            shirtNumber: assignedChild.shirtNumber,
+            design: shirtName,
+            shirtColor,
+            shirtSize,
+            buyerName: name,
+            buyerEmail: email,
+            address: address || null,
+            childName: assignedChild.displayName,
+            orderDate: donationDate,
+          });
+        } catch (err: any) {
+          console.error('[WH] Fulfillment record failed (shirt+monthly):', String(err?.message || err).slice(0, 200));
+        }
+      }
+
       console.log('[Webhook] Successfully processed shirt + monthly:', {
         sessionId: session.id,
         donorId,
@@ -1962,6 +2091,25 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
         } catch (err: any) {
           // Non-fatal — the purchase still succeeded even if drip enrollment fails
           console.error('[WH] Drip enrollment failed:', String(err?.message || err).slice(0, 200));
+        }
+      }
+
+      // Create Fulfillment record — non-fatal.
+      if (assignedChild) {
+        try {
+          await createFulfillmentRecord({
+            shirtNumber: assignedChild.shirtNumber,
+            design: shirtName,
+            shirtColor,
+            shirtSize,
+            buyerName: name,
+            buyerEmail: email,
+            address: address || null,
+            childName: assignedChild.displayName,
+            orderDate: donationDate,
+          });
+        } catch (err: any) {
+          console.error('[WH] Fulfillment record failed (shirt-only):', String(err?.message || err).slice(0, 200));
         }
       }
 
