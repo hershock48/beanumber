@@ -64,7 +64,14 @@ function escapeCSV(val: string): string {
 }
 
 export async function GET(request: NextRequest) {
-  requireAdminAuth(request);
+  // Support both header auth (X-Admin-Token) and query param (?token=)
+  const queryToken = request.nextUrl.searchParams.get('token');
+  const adminToken = process.env.ADMIN_API_TOKEN;
+  if (queryToken && adminToken && queryToken === adminToken) {
+    // Authenticated via query param — skip header check
+  } else {
+    requireAdminAuth(request);
+  }
 
   const env = getEnv();
   const status = request.nextUrl.searchParams.get('status') || 'ready';
@@ -86,6 +93,7 @@ export async function GET(request: NextRequest) {
     const params = new URLSearchParams();
     if (formula) params.set('filterByFormula', formula);
     params.set('pageSize', '100');
+    params.set('returnFieldsByFieldId', 'true');
     if (offset) params.set('offset', offset);
 
     const url = `https://api.airtable.com/v0/${env.AIRTABLE_BASE_ID}/${FULFILLMENT_TABLE_ID}?${params}`;
