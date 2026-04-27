@@ -80,7 +80,15 @@ export function CartDrawer() {
         {/* Items */}
         <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
           {items.length === 0 && (
-            <p className="text-[#999] text-center py-12">Your cart is empty.</p>
+            <div className="text-center py-12 space-y-4">
+              <p className="text-[#999]">Your cart is empty.</p>
+              <button
+                onClick={() => setIsOpen(false)}
+                className="text-sm font-semibold text-[#D4A843] hover:text-[#c49a3a] transition-colors cursor-pointer"
+              >
+                Browse shirts &rarr;
+              </button>
+            </div>
           )}
 
           {items.map(item => (
@@ -193,6 +201,18 @@ export function CartDrawer() {
                 </svg>
               )}
             </button>
+
+            <button
+              onClick={() => setIsOpen(false)}
+              className="w-full py-3 text-sm font-semibold text-[#0d0d0d] border border-[#e8e0d4] hover:border-[#D4A843] transition-colors cursor-pointer flex items-center justify-center gap-2"
+            >
+              <svg viewBox="0 0 20 20" fill="none" className="w-4 h-4">
+                <path d="M12 4l-6 6 6 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              Keep shopping
+            </button>
+
+            <p className="text-center text-xs text-[#999] tracking-wide">Free shipping on every order</p>
 
             <button
               onClick={clearCart}
