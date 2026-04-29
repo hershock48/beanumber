@@ -74,6 +74,12 @@ export async function POST(request: NextRequest) {
       };
     });
 
+    // Shipping: $5 flat rate, free on 3+ shirts.
+    // Uses shipping_options so Stripe renders it as a proper shipping line.
+    const shippingOptions = items.length >= 3
+      ? [{ shipping_rate_data: { type: 'fixed_amount' as const, fixed_amount: { amount: 0, currency: 'usd' }, display_name: 'Free shipping' } }]
+      : [{ shipping_rate_data: { type: 'fixed_amount' as const, fixed_amount: { amount: 500, currency: 'usd' }, display_name: 'Standard shipping (USPS)' } }];
+
     // Encode per-item details into metadata so the webhook can process
     // each shirt individually (assign children, create subscriptions).
     // Stripe metadata values are strings, max 500 chars each, max 50 keys.
@@ -105,6 +111,7 @@ export async function POST(request: NextRequest) {
     const sessionParams: Record<string, any> = {
       payment_method_types: ['card'],
       line_items: lineItems,
+      shipping_options: shippingOptions,
       mode: 'payment',
       success_url: `${origin}/shirts/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/shirts`,

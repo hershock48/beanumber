@@ -22,6 +22,8 @@ type CartContextType = {
   setIsOpen: (open: boolean) => void;
   totalOneTime: number;
   totalMonthly: number;
+  shippingCost: number;
+  totalWithShipping: number;
   itemCount: number;
   refCode: string | null;
   setRefCode: (code: string | null) => void;
@@ -65,10 +67,12 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const totalOneTime = items.reduce((sum, i) => sum + i.price, 0);
   const totalMonthly = items.filter(i => i.continueMonthly).reduce((sum, i) => sum + i.price, 0);
   const itemCount = items.length;
+  const shippingCost = itemCount >= 3 ? 0 : itemCount > 0 ? 5 : 0;
+  const totalWithShipping = totalOneTime + shippingCost;
 
   return (
     <CartContext.Provider
-      value={{ items, addItem, removeItem, toggleMonthly, clearCart, isOpen, setIsOpen, totalOneTime, totalMonthly, itemCount, refCode, setRefCode }}
+      value={{ items, addItem, removeItem, toggleMonthly, clearCart, isOpen, setIsOpen, totalOneTime, totalMonthly, shippingCost, totalWithShipping, itemCount, refCode, setRefCode }}
     >
       {children}
     </CartContext.Provider>

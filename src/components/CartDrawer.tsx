@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useCart } from './CartContext';
 
 export function CartDrawer() {
-  const { items, removeItem, toggleMonthly, clearCart, isOpen, setIsOpen, totalOneTime, totalMonthly, itemCount, refCode } = useCart();
+  const { items, removeItem, toggleMonthly, clearCart, isOpen, setIsOpen, totalOneTime, totalMonthly, shippingCost, totalWithShipping, itemCount, refCode } = useCart();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -155,8 +155,23 @@ export function CartDrawer() {
             {/* Summary */}
             <div className="space-y-1">
               <div className="flex justify-between text-sm">
-                <span className="text-[#777]">{itemCount} shirt{itemCount !== 1 ? 's' : ''} today</span>
+                <span className="text-[#777]">{itemCount} shirt{itemCount !== 1 ? 's' : ''}</span>
                 <span className="font-semibold text-[#0d0d0d]">${totalOneTime}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-[#777]">Shipping</span>
+                <span className={`font-semibold ${shippingCost === 0 ? 'text-green-600' : 'text-[#0d0d0d]'}`}>
+                  {shippingCost === 0 ? 'FREE' : `$${shippingCost}`}
+                </span>
+              </div>
+              {shippingCost > 0 && (
+                <p className="text-xs text-[#D4A843]">
+                  Add {3 - itemCount} more shirt{3 - itemCount !== 1 ? 's' : ''} for free shipping
+                </p>
+              )}
+              <div className="flex justify-between text-sm pt-1 border-t border-[#e8e0d4]">
+                <span className="font-semibold text-[#0d0d0d]">Today</span>
+                <span className="font-semibold text-[#0d0d0d]">${totalWithShipping}</span>
               </div>
               {monthlyCount > 0 && (
                 <div className="flex justify-between text-sm">
@@ -187,7 +202,7 @@ export function CartDrawer() {
                   : 'bg-[#D4A843] text-[#0d0d0d] hover:bg-[#c49a3a] cursor-pointer'
               }`}
             >
-              <span>Checkout &middot; ${totalOneTime}</span>
+              <span>Checkout &middot; ${totalWithShipping}</span>
               {loading && (
                 <svg
                   aria-hidden="true"
@@ -212,7 +227,7 @@ export function CartDrawer() {
               Keep shopping
             </button>
 
-            <p className="text-center text-xs text-[#999] tracking-wide">Free shipping on every order</p>
+            <p className="text-center text-xs text-[#999] tracking-wide">Free shipping on 3+ shirts</p>
 
             <button
               onClick={clearCart}
