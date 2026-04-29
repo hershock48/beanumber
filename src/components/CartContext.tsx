@@ -67,7 +67,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const totalOneTime = items.reduce((sum, i) => sum + i.price, 0);
   const totalMonthly = items.filter(i => i.continueMonthly).reduce((sum, i) => sum + i.price, 0);
   const itemCount = items.length;
-  const shippingCost = itemCount >= 3 ? 0 : itemCount > 0 ? 5 : 0;
+  const hasMonthly = items.some(i => i.continueMonthly);
+  const shippingCost = itemCount === 0 ? 0 : (itemCount >= 3 || hasMonthly) ? 0 : 5;
   const totalWithShipping = totalOneTime + shippingCost;
 
   return (

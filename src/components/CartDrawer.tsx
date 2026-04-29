@@ -166,7 +166,7 @@ export function CartDrawer() {
               </div>
               {shippingCost > 0 && (
                 <p className="text-xs text-[#D4A843]">
-                  Add {3 - itemCount} more shirt{3 - itemCount !== 1 ? 's' : ''} for free shipping
+                  Sponsor a child or add {3 - itemCount} more shirt{3 - itemCount !== 1 ? 's' : ''} for free shipping
                 </p>
               )}
               <div className="flex justify-between text-sm pt-1 border-t border-[#e8e0d4]">
@@ -227,7 +227,7 @@ export function CartDrawer() {
               Keep shopping
             </button>
 
-            <p className="text-center text-xs text-[#999] tracking-wide">Free shipping on 3+ shirts</p>
+            <p className="text-center text-xs text-[#999] tracking-wide">Free shipping on 3+ shirts or with any sponsorship</p>
 
             <button
               onClick={clearCart}

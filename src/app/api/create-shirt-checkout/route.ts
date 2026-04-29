@@ -143,7 +143,7 @@ export async function POST(request: NextRequest) {
           quantity: 1,
         },
       ],
-      shipping_options: [{ shipping_rate_data: { type: 'fixed_amount' as const, fixed_amount: { amount: 500, currency: 'usd' }, display_name: 'Standard shipping (USPS)' } }],
+      shipping_options: [{ shipping_rate_data: { type: 'fixed_amount' as const, fixed_amount: { amount: 0, currency: 'usd' }, display_name: 'Free shipping' } }],
       mode: 'subscription',
       success_url: `${origin}/shirts/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/shirts#${shirtId}`,
