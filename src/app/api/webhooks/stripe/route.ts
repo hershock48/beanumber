@@ -1404,10 +1404,8 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
       if (assignedChildren.length > 0 && donorId) {
         try {
           const pipeline = monthlyItems.length > 0 ? 'shirt_sponsor' : 'shirt_nurture';
-          const dripDelay = 10; // Wait for shirt to arrive before first email
-          const dripStartDate = new Date();
-          dripStartDate.setUTCDate(dripStartDate.getUTCDate() + dripDelay);
-          const dripNextSend = dripStartDate.toISOString().split('T')[0];
+          // DripNextSend intentionally NOT set here — drip starts when shirt
+          // is marked as shipped, not at purchase time.
 
           // Comma-separated for multi-shirt orders, single value for single
           const newChildNames = assignedChildren
@@ -1457,7 +1455,7 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
                   fields: {
                     DripPipeline: pipeline,
                     DripStage: 0,
-                    DripNextSend: dripNextSend,
+                    // DripNextSend left blank — set when shirt ships
                     DripChildName: allChildNames,
                     DripShirtNumber: allShirtNumbers,
                   },
@@ -1828,10 +1826,7 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
       // For repeat buyers: append child info to existing drip fields.
       if (assignedChild && donorId) {
         try {
-          const dripStartDate = new Date();
-          dripStartDate.setUTCDate(dripStartDate.getUTCDate() + 10);
-          const dripNextSend = dripStartDate.toISOString().split('T')[0];
-
+          // DripNextSend intentionally NOT set — drip starts when shirt ships.
           const newChildName = assignedChild.displayName?.split(' ')[0] || '';
           const newShirtNumber = String(assignedChild.shirtNumber);
 
@@ -1866,7 +1861,7 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
                   fields: {
                     DripPipeline: 'shirt_sponsor',
                     DripStage: 0,
-                    DripNextSend: dripNextSend,
+                    // DripNextSend left blank — set when shirt ships
                     DripChildName: mergedChildName,
                     DripShirtNumber: mergedShirtNumber,
                   },
@@ -2041,10 +2036,7 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
       // For repeat buyers: append child info to existing drip fields.
       if (assignedChild) {
         try {
-          const dripStartDate = new Date();
-          dripStartDate.setUTCDate(dripStartDate.getUTCDate() + 10);
-          const dripNextSend = dripStartDate.toISOString().split('T')[0];
-
+          // DripNextSend intentionally NOT set — drip starts when shirt ships.
           const newChildName = assignedChild.displayName?.split(' ')[0] || '';
           const newShirtNumber = String(assignedChild.shirtNumber);
 
@@ -2079,7 +2071,7 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
                   fields: {
                     DripPipeline: 'shirt_nurture',
                     DripStage: 0,
-                    DripNextSend: dripNextSend,
+                    // DripNextSend left blank — set when shirt ships
                     DripChildName: mergedChildName,
                     DripShirtNumber: mergedShirtNumber,
                   },
@@ -2465,11 +2457,12 @@ export async function POST(request: NextRequest) {
                 const lookupData = await lookupRes.json();
                 const donorRecord = lookupData.records?.[0];
                 if (donorRecord) {
-                  // If the donor is already in shirt_sponsor, leave them there.
-                  // That pipeline already covers both shirt + sponsor onboarding.
+                  // If the donor is in a shirt pipeline, leave them there.
+                  // Shirt drips are tied to physical delivery — overwriting them
+                  // with a subscription drip causes premature "did your shirt arrive?" emails.
                   const currentPipeline = donorRecord.fields?.DripPipeline || '';
-                  if (currentPipeline === 'shirt_sponsor') {
-                    console.log('[WH] Donor already in shirt_sponsor drip, skipping enrollment');
+                  if (currentPipeline === 'shirt_sponsor' || currentPipeline === 'shirt_nurture') {
+                    console.log(`[WH] Donor already in ${currentPipeline} drip, skipping subscription enrollment`);
                   } else {
                   // Determine which pipeline: sponsorship subscriptions have
                   // order_type='sponsorship' in metadata. Monthly donations from
