@@ -12,7 +12,7 @@ import { CartDrawer, CartButton } from '@/components/CartDrawer';
 
 // Each shirt design is available in the same palette. Ordered neutrals first
 // (most common) then accent tones for visual rhythm on the selector.
-const COLORS = ['Black', 'White', 'Grey', 'Pink', 'Yellow'] as const;
+const COLORS = ['Black', 'Grey', 'Pink', 'Yellow'] as const;
 type ColorName = (typeof COLORS)[number];
 
 type ShirtTheme = {
@@ -34,8 +34,6 @@ type ShirtTheme = {
 // Kevin can print whatever vinyl he prefers — these values are representative.
 const THEMES: Record<ColorName, ShirtTheme> = {
   Black:  { shirt: '#111111', swatch: '#111111', vinyl: '#ffffff', muted: 'rgba(255,255,255,0.3)', cardBg: '#ffffff', cardBorder: '#e8e0d4' },
-  // A warmer cream for white shirts so the silhouette reads against the card.
-  White:  { shirt: '#f5f1e8', swatch: '#ffffff', vinyl: '#141414', muted: 'rgba(0,0,0,0.35)', cardBg: '#e8dfce', cardBorder: '#d6cbb4' },
   Grey:   { shirt: '#8a8a8a', swatch: '#9a9a9a', vinyl: '#ffffff', muted: 'rgba(255,255,255,0.3)', cardBg: '#ffffff', cardBorder: '#e8e0d4' },
   Pink:   { shirt: '#f4b8c4', swatch: '#f4b8c4', vinyl: '#2a1520', muted: 'rgba(0,0,0,0.35)', cardBg: '#ffffff', cardBorder: '#e8e0d4' },
   Yellow: { shirt: '#f3d35b', swatch: '#f3d35b', vinyl: '#141414', muted: 'rgba(0,0,0,0.35)', cardBg: '#ffffff', cardBorder: '#e8e0d4' },
@@ -188,7 +186,8 @@ function FlagshipFront({ theme, mode = 'tee', className = '' }: DesignProps) {
   );
 }
 
-/** Large white # logo with BEANUMBER lettering — Flagship back. */
+/** Large # logo with BEANUMBER lettering — Flagship back. Same vinyl
+ *  color as the front so Kevin only cuts one sheet per shirt. */
 function FlagshipBack({ theme, mode = 'tee', className = '' }: DesignProps) {
   // Back print is typically ~10–12" wide on a ~20" body, so ~55% of body
   // ≈ 28% of the container.
@@ -201,7 +200,7 @@ function FlagshipBack({ theme, mode = 'tee', className = '' }: DesignProps) {
         className="absolute left-1/2"
         style={{ top, width, transform: 'translateX(-50%)' }}
       >
-        <Logo variant="primary" className="w-full" style={{ color: '#ffffff' }} />
+        <Logo variant="primary" className="w-full" style={{ color: theme.vinyl }} />
       </div>
     </DesignContainer>
   );
@@ -390,17 +389,6 @@ const SHIRTS_SOURCE: Shirt[] = [
     specs: 'S – 2XL · Unisex · Heavyweight cotton',
   },
   {
-    id: 'thank-you',
-    name: 'Thank you.',
-    tagline: 'Says enough on its own',
-    price: 25,
-    description: 'Thank you for the good times. Thank you for the bad ones too. Suffering without gratitude is just suffering. Suffering with it becomes something else. It shifts your perspective, brings purpose to the pain, and roots you in trust. God\'s love doesn\'t skip the hard parts. This shirt is a decision to say it out loud. It\'s probably the quietest shirt in the collection. It starts the most conversations.',
-    Front: SharedFront,
-    Back: ThankYouBack,
-    badge: 'Gratitude',
-    specs: 'S – 2XL · Unisex · Heavyweight cotton',
-  },
-  {
     id: 'do-not-fear',
     name: 'Do Not Fear.',
     tagline: 'A reminder you can wear',
@@ -431,17 +419,6 @@ const SHIRTS_SOURCE: Shirt[] = [
     Front: SharedFront,
     Back: EverythingHallelujahBack,
     badge: 'Praise',
-    specs: 'S – 2XL · Unisex · Heavyweight cotton',
-  },
-  {
-    id: 'nigeria',
-    name: 'Nigeria.',
-    tagline: 'For the ones who can\'t wear it there',
-    price: 25,
-    description: 'The killing of Christians in Nigeria is one of the most underreported stories in the world right now. Tens of thousands dead, mostly in the Middle Belt, and it barely makes Western news. They\'re our brothers. This shirt puts the name where people have to see it. That\'s the start.',
-    Front: SharedFront,
-    Back: NigeriaBack,
-    badge: 'Solidarity',
     specs: 'S – 2XL · Unisex · Heavyweight cotton',
   },
 ];
@@ -593,7 +570,7 @@ function ShirtCard({ shirt, reversed, initialColor }: { shirt: Shirt; reversed: 
                 {shirt.badge}
               </span>
             )}
-            <span className="text-xs text-[#aaa] uppercase tracking-wider">Available in 5 colors</span>
+            <span className="text-xs text-[#aaa] uppercase tracking-wider">Available in 4 colors</span>
           </div>
           <h2
             className="text-3xl text-[#0d0d0d] mb-1"
@@ -658,7 +635,7 @@ function ShirtCard({ shirt, reversed, initialColor }: { shirt: Shirt; reversed: 
                   {shirt.badge}
                 </span>
               )}
-              <span className="text-xs text-[#aaa] uppercase tracking-wider">Available in 5 colors</span>
+              <span className="text-xs text-[#aaa] uppercase tracking-wider">Available in 4 colors</span>
             </div>
             <h2
               className="text-3xl md:text-4xl text-[#0d0d0d] mb-1"
@@ -862,7 +839,7 @@ export default function ShirtsPageContent() {
             Every shirt has a number.
           </h1>
           <p className="text-lg text-[#777] max-w-xl mx-auto leading-relaxed">
-            Heavyweight blanks in five colors. HTV vinyl. Handmade to order.
+            Heavyweight blanks in four colors. HTV vinyl. Handmade to order.
             Each design carries a different part of the story.
           </p>
         </div>

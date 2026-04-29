@@ -19,11 +19,9 @@ async function getStripe() {
 // design record.
 const SHIRTS: Record<string, { name: string }> = {
   flagship: { name: 'The Flagship' },
-  'thank-you': { name: 'Thank you.' },
   'do-not-fear': { name: 'Do Not Fear.' },
   peacemaker: { name: 'Peacemaker.' },
   'everything-hallelujah': { name: 'Everything Hallelujah.' },
-  nigeria: { name: 'Nigeria.' },
 };
 
 const VALID_SIZES = ['S', 'M', 'L', 'XL', '2XL'];
@@ -35,9 +33,9 @@ export async function POST(request: NextRequest) {
     const stripe = await getStripe();
 
     const shirtSchema = z.object({
-      shirtId: z.enum(['flagship', 'thank-you', 'do-not-fear', 'peacemaker', 'everything-hallelujah', 'nigeria']),
+      shirtId: z.enum(['flagship', 'do-not-fear', 'peacemaker', 'everything-hallelujah']),
       size: z.enum(['S', 'M', 'L', 'XL', '2XL']),
-      color: z.enum(['Black', 'White', 'Grey', 'Pink', 'Yellow']),
+      color: z.enum(['Black', 'Grey', 'Pink', 'Yellow']),
       email: z.string().email().optional().or(z.literal('')),
       name: z.string().max(255).optional().default(''),
       continueMonthly: z.boolean().optional().default(false),
