@@ -1132,6 +1132,44 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
     // API calls to retrieve the PaymentIntent or Customer objects. Skipping
     // those two calls saves ~1s and keeps us inside the serverless timeout.
     const paymentIntentId = (session.payment_intent as string) || session.id;
+
+    // ── IDEMPOTENCY GUARD ──────────────────────────────────────────────
+    // Stripe retries webhook delivery when it doesn't get a 2xx in time.
+    // Every side effect downstream (child assignment, fulfillment record,
+    // drip enrollment, email send) is NOT individually idempotent, so we
+    // must bail out here if this session has already been fully processed.
+    // We check the Donations table because upsertDonation is the LAST
+    // write in every flow — if a Succeeded donation exists, every
+    // preceding step already ran.
+    // ────────────────────────────────────────────────────────────────────
+    if (AIRTABLE_API_KEY && AIRTABLE_BASE_ID) {
+      const idempotencyFormula = `{Stripe Payment Intent ID} = "${paymentIntentId}"`;
+      try {
+        const idempotencyRes = await airtableAPICall(() =>
+          fetch(
+            `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_DONATIONS_TABLE}?filterByFormula=${encodeURIComponent(idempotencyFormula)}&maxRecords=1`,
+            { headers: getAirtableHeaders() }
+          )
+        );
+        if (idempotencyRes.ok) {
+          const idempotencyData = await idempotencyRes.json();
+          const existing = idempotencyData.records?.[0];
+          if (existing) {
+            const existingStatus = existing.fields?.Status || existing.fields?.['Status'] || '';
+            console.log(
+              `[WH] IDEMPOTENCY: donation already exists for PI ${paymentIntentId}, ` +
+              `status=${existingStatus}, record=${existing.id}. Skipping all side effects.`
+            );
+            return;
+          }
+        }
+      } catch (err) {
+        // If the idempotency check itself fails, log and continue —
+        // better to risk a duplicate than to silently drop a real order.
+        console.error('[WH] IDEMPOTENCY check failed, proceeding anyway:', err);
+      }
+    }
+
     const email = session.customer_email || session.customer_details?.email || '';
     const name = session.customer_details?.name || session.metadata?.donor_name || 'Anonymous';
     const organization = session.custom_fields?.find(f => f.key === 'organization')?.text?.value || '';
