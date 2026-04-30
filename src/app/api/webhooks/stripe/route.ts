@@ -206,7 +206,7 @@ async function createFulfillmentRecord(opts: {
     'fldkACkyAtFQCOPFL': opts.childName,          // Child Name
     'fldnXiHlwBtEWP3io': opts.orderDate,          // Order Date
     'fldbBZtOLYVVDS28X': 'Pending',               // Production
-    'fldJ6ehpDkpindHtO': 'Pending',               // Shipping
+    'fldJ6ehpDkpindHtO': 'Not Shipped',            // Shipping
   };
 
   // Address fields (only set if we have an address object)
@@ -1135,12 +1135,11 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
 
     // ── IDEMPOTENCY GUARD ──────────────────────────────────────────────
     // Stripe retries webhook delivery when it doesn't get a 2xx in time.
-    // Every side effect downstream (child assignment, fulfillment record,
-    // drip enrollment, email send) is NOT individually idempotent, so we
-    // must bail out here if this session has already been fully processed.
-    // We check the Donations table because upsertDonation is the LAST
-    // write in every flow — if a Succeeded donation exists, every
-    // preceding step already ran.
+    // We check the Donations table: if a donation already exists for this
+    // payment intent, all critical side effects (child assignment,
+    // fulfillment record creation) have already run — they execute BEFORE
+    // the donation upsert in every flow.  Emails / drip / notifications
+    // are non-fatal and safe to skip on retry.
     // ────────────────────────────────────────────────────────────────────
     if (AIRTABLE_API_KEY && AIRTABLE_BASE_ID) {
       const idempotencyFormula = `{Stripe Payment Intent ID} = "${paymentIntentId}"`;
@@ -1264,6 +1263,29 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
           continueMonthly: item.m === 1,
           child,
         });
+      }
+
+      // Create Fulfillment records FIRST — before the donation upsert.
+      // The idempotency guard checks for an existing donation and bails if
+      // found.  If fulfillment runs AFTER the donation write, a Stripe retry
+      // that lands between those two steps will skip fulfillment forever.
+      for (const a of assignments) {
+        if (!a.child) continue;
+        try {
+          await createFulfillmentRecord({
+            shirtNumber: a.child.shirtNumber,
+            design: a.shirtName,
+            shirtColor: a.shirtColor,
+            shirtSize: a.shirtSize,
+            buyerName: name,
+            buyerEmail: email,
+            address: address || null,
+            childName: a.child.displayName,
+            orderDate: donationDate,
+          });
+        } catch (err: any) {
+          console.error('[WH] Cart fulfillment record failed for #' + a.child.shirtNumber + ':', String(err?.message || err).slice(0, 200));
+        }
       }
 
       // Create one donation record for the full cart amount
@@ -1507,27 +1529,6 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
         }
       }
 
-      // Create Fulfillment records — one per shirt in the cart.
-      // Non-fatal: order succeeds even if this fails.
-      for (const a of assignments) {
-        if (!a.child) continue;
-        try {
-          await createFulfillmentRecord({
-            shirtNumber: a.child.shirtNumber,
-            design: a.shirtName,
-            shirtColor: a.shirtColor,
-            shirtSize: a.shirtSize,
-            buyerName: name,
-            buyerEmail: email,
-            address: address || null,
-            childName: a.child.displayName,
-            orderDate: donationDate,
-          });
-        } catch (err: any) {
-          console.error('[WH] Cart fulfillment record failed for #' + a.child.shirtNumber + ':', String(err?.message || err).slice(0, 200));
-        }
-      }
-
       console.log('[WH] Cart order complete:', {
         sessionId: session.id,
         items: cartItems.length,
@@ -1739,6 +1740,27 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
         }
       }
 
+      // Create Fulfillment record BEFORE the donation upsert.
+      // The idempotency guard checks for an existing donation — if fulfillment
+      // runs after the donation, a Stripe retry can skip it permanently.
+      if (assignedChild) {
+        try {
+          await createFulfillmentRecord({
+            shirtNumber: assignedChild.shirtNumber,
+            design: shirtName,
+            shirtColor,
+            shirtSize,
+            buyerName: name,
+            buyerEmail: email,
+            address: address || null,
+            childName: assignedChild.displayName,
+            orderDate: donationDate,
+          });
+        } catch (err: any) {
+          console.error('[WH] Fulfillment record failed (shirt+monthly):', String(err?.message || err).slice(0, 200));
+        }
+      }
+
       // Step 4: Record first month as a Donation. We tag it 'Shirt + Monthly'
       // so retention / revenue-source reports can split it out from pure
       // shirt orders and pure sponsorship signups.
@@ -1913,25 +1935,6 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
         }
       }
 
-      // Create Fulfillment record — non-fatal.
-      if (assignedChild) {
-        try {
-          await createFulfillmentRecord({
-            shirtNumber: assignedChild.shirtNumber,
-            design: shirtName,
-            shirtColor,
-            shirtSize,
-            buyerName: name,
-            buyerEmail: email,
-            address: address || null,
-            childName: assignedChild.displayName,
-            orderDate: donationDate,
-          });
-        } catch (err: any) {
-          console.error('[WH] Fulfillment record failed (shirt+monthly):', String(err?.message || err).slice(0, 200));
-        }
-      }
-
       console.log('[Webhook] Successfully processed shirt + monthly:', {
         sessionId: session.id,
         donorId,
@@ -1970,6 +1973,27 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
         assignedChild = childResult;
       } catch (error) {
         throw error;
+      }
+
+      // Create Fulfillment record BEFORE the donation upsert.
+      // The idempotency guard checks for an existing donation — if fulfillment
+      // runs after the donation, a Stripe retry can skip it permanently.
+      if (assignedChild) {
+        try {
+          await createFulfillmentRecord({
+            shirtNumber: assignedChild.shirtNumber,
+            design: shirtName,
+            shirtColor,
+            shirtSize,
+            buyerName: name,
+            buyerEmail: email,
+            address: address || null,
+            childName: assignedChild.displayName,
+            orderDate: donationDate,
+          });
+        } catch (err: any) {
+          console.error('[WH] Fulfillment record failed (shirt-only):', String(err?.message || err).slice(0, 200));
+        }
       }
 
       // Step 3a: Create donation record tagged as shirt order, linked to the
@@ -2121,25 +2145,6 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
         } catch (err: any) {
           // Non-fatal — the purchase still succeeded even if drip enrollment fails
           console.error('[WH] Drip enrollment failed:', String(err?.message || err).slice(0, 200));
-        }
-      }
-
-      // Create Fulfillment record — non-fatal.
-      if (assignedChild) {
-        try {
-          await createFulfillmentRecord({
-            shirtNumber: assignedChild.shirtNumber,
-            design: shirtName,
-            shirtColor,
-            shirtSize,
-            buyerName: name,
-            buyerEmail: email,
-            address: address || null,
-            childName: assignedChild.displayName,
-            orderDate: donationDate,
-          });
-        } catch (err: any) {
-          console.error('[WH] Fulfillment record failed (shirt-only):', String(err?.message || err).slice(0, 200));
         }
       }
 
