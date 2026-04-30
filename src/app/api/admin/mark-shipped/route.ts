@@ -3,7 +3,7 @@
  *
  * POST /api/admin/mark-shipped?token=ADMIN_API_TOKEN
  *
- * Finds all Fulfillment records where Production=Done AND Shipping=Not Shipped,
+ * Finds all Fulfillment records where Shipping=Not Shipped,
  * marks them as Shipped, then sets DripNextSend on each unique donor so the
  * drip nurture sequence begins 3 days after shipment (not purchase).
  *
@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
   };
 
   // 1. Fetch all Fulfillment records that are ready to ship
-  const formula = `AND({Production}="Done",{Shipping}="Not Shipped")`;
+  const formula = `{Shipping}="Not Shipped"`;
   const allRecords: AirtableRecord[] = [];
   let offset: string | undefined;
 
@@ -81,7 +81,7 @@ export async function POST(request: NextRequest) {
 
   if (allRecords.length === 0) {
     return NextResponse.json({
-      message: 'No records to ship. Everything with Production=Done is already marked as shipped.',
+      message: 'No records to ship. Everything is already marked as shipped.',
       shipped: 0,
       dripsStarted: 0,
     });
@@ -225,7 +225,7 @@ export async function GET(request: NextRequest) {
   }
 
   // Show a confirmation page instead of firing immediately on GET
-  const formula = `AND({Production}="Done",{Shipping}="Not Shipped")`;
+  const formula = `{Shipping}="Not Shipped"`;
   const params = new URLSearchParams();
   params.set('filterByFormula', formula);
   params.set('pageSize', '100');
@@ -296,7 +296,7 @@ export async function GET(request: NextRequest) {
   <div class="card">
     <h1>Mark Shipped</h1>
     ${records.length === 0
-      ? '<p class="empty">No orders ready to ship. Everything with Production=Done is already marked.</p>'
+      ? '<p class="empty">No orders ready to ship. Everything is already marked as shipped.</p>'
       : `
     <div class="count">${records.length}</div>
     <p>order${records.length === 1 ? '' : 's'} ready to mark as shipped</p>

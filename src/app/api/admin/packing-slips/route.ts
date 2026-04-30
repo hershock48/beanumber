@@ -72,11 +72,14 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const status = request.nextUrl.searchParams.get('status') || 'pending';
+  const status = request.nextUrl.searchParams.get('status') || 'not-shipped';
 
   // Build Airtable formula filter
   let formula = '';
-  if (status === 'ready') {
+  if (status === 'not-shipped') {
+    // Default: everything that hasn't shipped yet — Kevin's production queue
+    formula = `{Shipping}="Not Shipped"`;
+  } else if (status === 'ready') {
     formula = `AND({Production}="Done",{Shipping}="Not Shipped")`;
   } else if (status === 'pending') {
     formula = `{Production}="Pending"`;
