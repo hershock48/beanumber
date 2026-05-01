@@ -148,6 +148,9 @@ export default function AdminSponsorsPage() {
             <Link href="/admin/sponsors" className="text-gray-900 font-semibold">
               Sponsors
             </Link>
+            <Link href="/admin/fulfillment" className="text-gray-600 hover:text-gray-900">
+              Fulfillment
+            </Link>
           </div>
         </div>
       </nav>

@@ -360,6 +360,9 @@ export default function AdminNewsletterPage() {
             <Link href="/admin/newsletter" className="text-gray-900 font-semibold">
               Newsletter
             </Link>
+            <Link href="/admin/fulfillment" className="text-gray-600 hover:text-gray-900">
+              Fulfillment
+            </Link>
           </div>
         </div>
       </nav>

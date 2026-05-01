@@ -280,6 +280,7 @@ function AdminNav({ showLogout, onLogout }: { showLogout?: boolean; onLogout?: (
         <div className="flex items-center gap-4 text-sm">
           <Link href="/admin/dashboard" className="text-gray-600 hover:text-gray-900">Updates</Link>
           <Link href="/admin/retention" className="text-gray-900 font-medium">Retention</Link>
+          <Link href="/admin/fulfillment" className="text-gray-600 hover:text-gray-900">Fulfillment</Link>
           {showLogout && (
             <button onClick={onLogout} className="text-gray-600 hover:text-gray-900">Logout</button>
           )}
