@@ -129,7 +129,11 @@ export async function POST(request: NextRequest) {
 
     // When any item has monthly sponsorship, save the payment method
     // so we can create subscriptions after the initial payment.
+    // CRITICAL: customer_creation must be 'always' so Stripe creates a
+    // customer record. Without this, session.customer is null on the
+    // webhook side and subscription creation silently fails.
     if (hasMonthly) {
+      sessionParams.customer_creation = 'always';
       sessionParams.payment_intent_data = {
         setup_future_usage: 'off_session',
         metadata,

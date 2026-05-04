@@ -112,6 +112,7 @@ const AIRTABLE_DONATIONS_TABLE = process.env.AIRTABLE_DONATIONS_TABLE || 'Donati
 const AIRTABLE_COMMUNICATIONS_TABLE = process.env.AIRTABLE_COMMUNICATIONS_TABLE || 'Communications';
 const AIRTABLE_SPONSORSHIPS_TABLE = process.env.AIRTABLE_SPONSORSHIPS_TABLE || 'Sponsorships';
 const AIRTABLE_CHILDREN_TABLE = process.env.AIRTABLE_CHILDREN_TABLE || 'Children';
+const AIRTABLE_SUBSCRIPTIONS_TABLE = 'Subscriptions';
 const AIRTABLE_FULFILLMENT_TABLE_ID = 'tblkSZBRrMiHhT3MP';
 
 function getAirtableHeaders() {
@@ -1324,6 +1325,33 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
       // For items with monthly opt-in, create deferred subscriptions
       // using the customer's saved payment method.
       const monthlyItems = assignments.filter(a => a.continueMonthly && a.child);
+      if (monthlyItems.length > 0 && !stripeCustomerId) {
+        // CRITICAL: If we get here, the cart checkout didn't create a Stripe
+        // customer (missing customer_creation:'always'). Log loudly and flag
+        // the donation so Kevin can see the failure immediately.
+        console.error('[WH] CRITICAL: Cart has ' + monthlyItems.length + ' monthly items but NO Stripe customer ID. Subscriptions CANNOT be created. Session: ' + session.id + ', email: ' + email);
+        // Update the donation note to flag the failure
+        if (donationId && AIRTABLE_API_KEY && AIRTABLE_BASE_ID) {
+          try {
+            const donRec = await airtableAPICall(() =>
+              fetch(`https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_DONATIONS_TABLE}/${donationId}?fields%5B%5D=Donation%20Note`, { headers: getAirtableHeaders() })
+            );
+            if (donRec.ok) {
+              const donData = await donRec.json();
+              const existingNote = donData.fields?.['Donation Note'] || '';
+              await airtableAPICall(() =>
+                fetch(`https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_DONATIONS_TABLE}/${donationId}`, {
+                  method: 'PATCH',
+                  headers: getAirtableHeaders(),
+                  body: JSON.stringify({ fields: { 'Donation Note': existingNote + '\n⚠️ FAILED: Monthly subscription not created — no Stripe customer ID. Needs manual backfill.' } }),
+                })
+              );
+            }
+          } catch (flagErr) {
+            console.error('[WH] Could not flag donation note:', flagErr);
+          }
+        }
+      }
       if (monthlyItems.length > 0 && stripeCustomerId) {
         const stripe = await getStripe();
 
@@ -1811,8 +1839,29 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
           });
           sponsorCode = result.sponsorCode;
           sponsorshipRecordId = result.recordId;
-        } catch (err) {
-          console.error('[Webhook] Failed to create sponsorship record (shirt+monthly):', err);
+        } catch (err: any) {
+          console.error('[Webhook] CRITICAL: Failed to create sponsorship record (shirt+monthly):', String(err?.message || err).slice(0, 500));
+          // Flag the donation note so Kevin can see the failure
+          if (donationId && AIRTABLE_API_KEY && AIRTABLE_BASE_ID) {
+            try {
+              const donRec = await airtableAPICall(() =>
+                fetch(`https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_DONATIONS_TABLE}/${donationId}?fields%5B%5D=Donation%20Note`, { headers: getAirtableHeaders() })
+              );
+              if (donRec.ok) {
+                const donData = await donRec.json();
+                const existingNote = donData.fields?.['Donation Note'] || '';
+                await airtableAPICall(() =>
+                  fetch(`https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_DONATIONS_TABLE}/${donationId}`, {
+                    method: 'PATCH',
+                    headers: getAirtableHeaders(),
+                    body: JSON.stringify({ fields: { 'Donation Note': existingNote + `\n⚠️ FAILED: Sponsorship record not created. Error: ${String(err?.message || err).slice(0, 200)}` } }),
+                  })
+                );
+              }
+            } catch (flagErr) {
+              console.error('[WH] Could not flag donation note:', flagErr);
+            }
+          }
         }
       }
 
@@ -2540,6 +2589,97 @@ export async function POST(request: NextRequest) {
             }
           } catch (err: any) {
             console.error('[WH] sponsor_onboard drip enrollment failed (non-fatal):', String(err?.message || err).slice(0, 200));
+          }
+        }
+
+        // Write/update the Subscriptions table so Airtable mirrors Stripe state.
+        // This was missing entirely before — the table was always empty.
+        if (AIRTABLE_API_KEY && AIRTABLE_BASE_ID) {
+          try {
+            const subId = subscription.id;
+            const subStatus = subscription.status; // active, past_due, canceled, etc.
+            const custId = typeof subscription.customer === 'string'
+              ? subscription.customer
+              : subscription.customer?.id || '';
+
+            // Check if a record already exists for this subscription
+            const existFormula = `{Subscription ID} = "${subId}"`;
+            const existRes = await airtableAPICall(() =>
+              fetch(
+                `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_SUBSCRIPTIONS_TABLE}?filterByFormula=${encodeURIComponent(existFormula)}&maxRecords=1`,
+                { headers: getAirtableHeaders() }
+              )
+            );
+
+            // Find the linked donor record for the Donor field
+            let donorRecordId: string | null = null;
+            if (custId) {
+              const donorFormula = `{Stripe Customer ID} = "${custId}"`;
+              const donorRes = await airtableAPICall(() =>
+                fetch(
+                  `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_DONORS_TABLE}?filterByFormula=${encodeURIComponent(donorFormula)}&maxRecords=1`,
+                  { headers: getAirtableHeaders() }
+                )
+              );
+              if (donorRes.ok) {
+                const donorData = await donorRes.json();
+                donorRecordId = donorData.records?.[0]?.id || null;
+              }
+            }
+
+            const amount = subscription.items?.data?.[0]?.price?.unit_amount
+              ? subscription.items.data[0].price.unit_amount / 100
+              : 25;
+            const periodEnd = subscription.current_period_end
+              ? new Date(subscription.current_period_end * 1000).toISOString().split('T')[0]
+              : undefined;
+            const startDate = subscription.start_date
+              ? new Date(subscription.start_date * 1000).toISOString().split('T')[0]
+              : new Date().toISOString().split('T')[0];
+
+            const subFields: Record<string, unknown> = {
+              'Subscription ID': subId,
+              Status: subStatus,
+              Amount: amount,
+              Frequency: 'Monthly',
+            };
+            if (periodEnd) subFields['Current Period End'] = periodEnd;
+            if (donorRecordId) subFields.Donor = [donorRecordId];
+
+            if (existRes.ok) {
+              const existData = await existRes.json();
+              if (existData.records?.length > 0) {
+                // Update existing record
+                const recId = existData.records[0].id;
+                await airtableAPICall(() =>
+                  fetch(
+                    `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_SUBSCRIPTIONS_TABLE}/${recId}`,
+                    {
+                      method: 'PATCH',
+                      headers: getAirtableHeaders(),
+                      body: JSON.stringify({ fields: subFields }),
+                    }
+                  )
+                );
+                console.log('[WH] Updated Subscriptions record:', recId, subId, subStatus);
+              } else {
+                // Create new record
+                subFields['Start Date'] = startDate;
+                await airtableAPICall(() =>
+                  fetch(
+                    `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_SUBSCRIPTIONS_TABLE}`,
+                    {
+                      method: 'POST',
+                      headers: getAirtableHeaders(),
+                      body: JSON.stringify({ fields: subFields }),
+                    }
+                  )
+                );
+                console.log('[WH] Created Subscriptions record for:', subId, subStatus);
+              }
+            }
+          } catch (err: any) {
+            console.error('[WH] Subscriptions table write failed (non-fatal):', String(err?.message || err).slice(0, 200));
           }
         }
         break;
