@@ -2627,14 +2627,16 @@ export async function POST(request: NextRequest) {
               }
             }
 
-            const amount = subscription.items?.data?.[0]?.price?.unit_amount
-              ? subscription.items.data[0].price.unit_amount / 100
+            // Cast to any for fields that vary across Stripe API versions
+            const subAny = subscription as any;
+            const amount = subAny.items?.data?.[0]?.price?.unit_amount
+              ? subAny.items.data[0].price.unit_amount / 100
               : 25;
-            const periodEnd = subscription.current_period_end
-              ? new Date(subscription.current_period_end * 1000).toISOString().split('T')[0]
+            const periodEnd = subAny.current_period_end
+              ? new Date(subAny.current_period_end * 1000).toISOString().split('T')[0]
               : undefined;
-            const startDate = subscription.start_date
-              ? new Date(subscription.start_date * 1000).toISOString().split('T')[0]
+            const startDate = subAny.start_date
+              ? new Date(subAny.start_date * 1000).toISOString().split('T')[0]
               : new Date().toISOString().split('T')[0];
 
             const subFields: Record<string, unknown> = {
