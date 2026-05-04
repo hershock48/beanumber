@@ -58,11 +58,20 @@ interface BackfillResult {
 }
 
 export async function GET(request: NextRequest) {
-  // Auth check
-  const authHeader = request.headers.get('authorization');
-  const cronSecret = process.env.CRON_SECRET;
-  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  // Auth: accept query param ?token=, X-Admin-Token header, or Bearer token.
+  // Checks against ADMIN_API_TOKEN, ADMIN_PASSWORD, or CRON_SECRET.
+  const token =
+    request.nextUrl.searchParams.get('token') ||
+    request.headers.get('X-Admin-Token') ||
+    request.headers.get('authorization')?.replace('Bearer ', '') ||
+    null;
+  const validTokens = [
+    process.env.ADMIN_API_TOKEN,
+    process.env.ADMIN_PASSWORD,
+    process.env.CRON_SECRET,
+  ].filter(Boolean);
+  if (validTokens.length > 0 && (!token || !validTokens.includes(token))) {
+    return NextResponse.json({ error: 'Unauthorized. Pass ?token=YOUR_ADMIN_TOKEN in the URL.' }, { status: 401 });
   }
 
   if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) {

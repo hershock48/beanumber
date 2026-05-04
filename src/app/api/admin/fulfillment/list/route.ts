@@ -63,8 +63,9 @@ export async function GET(request: NextRequest) {
 
   // Auth
   const adminToken = process.env.ADMIN_API_TOKEN;
+  const adminPassword = process.env.ADMIN_PASSWORD;
   const token = request.headers.get('X-Admin-Token') || request.nextUrl.searchParams.get('token');
-  if (!adminToken || token !== adminToken) {
+  if ((!adminToken && !adminPassword) || (token !== adminToken && token !== adminPassword)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

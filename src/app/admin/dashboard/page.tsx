@@ -190,7 +190,7 @@ export default function AdminDashboard() {
         <div className="max-w-md mx-auto px-6 py-16">
           <div className="bg-white rounded-lg shadow-lg p-8">
             <h1 className="text-2xl font-bold text-gray-900 mb-2">Admin Dashboard</h1>
-            <p className="text-gray-600 mb-6">Enter your admin token to continue</p>
+            <p className="text-gray-600 mb-6">Enter your password to continue</p>
 
             {error && (
               <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md mb-4 text-sm">
@@ -201,7 +201,7 @@ export default function AdminDashboard() {
             <div className="space-y-4">
               <div>
                 <label htmlFor="adminToken" className="block text-sm font-medium text-gray-700 mb-2">
-                  Admin Token
+                  Password
                 </label>
                 <input
                   type="password"
@@ -209,7 +209,7 @@ export default function AdminDashboard() {
                   value={adminToken}
                   onChange={(e) => setAdminToken(e.target.value)}
                   className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-                  placeholder="Enter admin token"
+                  placeholder="Enter password"
                   onKeyDown={(e) => e.key === 'Enter' && handleAuthenticate()}
                 />
               </div>

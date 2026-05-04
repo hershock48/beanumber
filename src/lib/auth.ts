@@ -137,7 +137,11 @@ export function verifyAdminToken(request: NextRequest): boolean {
     return false;
   }
 
-  const isValid = requestToken === adminToken;
+  // Accept either the API token or the human-friendly admin password.
+  // ADMIN_PASSWORD is a simpler credential for dashboard login;
+  // ADMIN_API_TOKEN stays for programmatic use and token signing.
+  const adminPassword = process.env.ADMIN_PASSWORD;
+  const isValid = requestToken === adminToken || (!!adminPassword && requestToken === adminPassword);
 
   logger.auth('admin_auth_attempt', isValid);
 

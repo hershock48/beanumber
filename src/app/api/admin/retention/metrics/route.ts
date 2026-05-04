@@ -22,11 +22,12 @@ const AIRTABLE_DONATIONS_TABLE = process.env.AIRTABLE_DONATIONS_TABLE || 'Donati
 
 function verifyAdminToken(request: NextRequest): boolean {
   const adminToken = process.env.ADMIN_API_TOKEN;
-  if (!adminToken) return false;
+  const adminPassword = process.env.ADMIN_PASSWORD;
+  if (!adminToken && !adminPassword) return false;
   const requestToken =
     request.headers.get('X-Admin-Token') ||
     request.headers.get('Authorization')?.replace(/^Bearer\s+/i, '');
-  return requestToken === adminToken;
+  return requestToken === adminToken || (!!adminPassword && requestToken === adminPassword);
 }
 
 // ---------------------------------------------------------------------------

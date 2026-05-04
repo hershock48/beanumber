@@ -44,8 +44,9 @@ export async function POST(request: NextRequest) {
 
   // Auth
   const adminToken = process.env.ADMIN_API_TOKEN;
+  const adminPassword = process.env.ADMIN_PASSWORD;
   const token = request.headers.get('X-Admin-Token');
-  if (!adminToken || token !== adminToken) {
+  if ((!adminToken && !adminPassword) || (token !== adminToken && token !== adminPassword)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

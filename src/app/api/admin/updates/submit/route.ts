@@ -17,16 +17,17 @@ export async function POST(request: NextRequest) {
                       adminPassword ||
                       null;
     const expectedToken = process.env.ADMIN_API_TOKEN;
-    
-    if (!expectedToken) {
-      console.error('[Admin Submit] ADMIN_API_TOKEN not configured');
+    const expectedPassword = process.env.ADMIN_PASSWORD;
+
+    if (!expectedToken && !expectedPassword) {
+      console.error('[Admin Submit] ADMIN_API_TOKEN and ADMIN_PASSWORD not configured');
       return NextResponse.json(
         { error: 'Server configuration error' },
         { status: 500 }
       );
     }
-    
-    if (!adminToken || adminToken !== expectedToken) {
+
+    if (!adminToken || (adminToken !== expectedToken && adminToken !== expectedPassword)) {
       console.warn('[Admin Submit] Unauthorized access attempt');
       return NextResponse.json(
         { error: 'Unauthorized - Invalid admin password' },

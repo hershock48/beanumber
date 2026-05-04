@@ -68,7 +68,8 @@ export async function GET(request: NextRequest) {
   // Auth via query param so Kevin can open this in a browser
   const token = request.nextUrl.searchParams.get('token');
   const adminToken = process.env.ADMIN_API_TOKEN;
-  if (!adminToken || token !== adminToken) {
+  const adminPassword = process.env.ADMIN_PASSWORD;
+  if ((!adminToken && !adminPassword) || (token !== adminToken && token !== adminPassword)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

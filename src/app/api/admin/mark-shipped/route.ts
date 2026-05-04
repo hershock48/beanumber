@@ -45,7 +45,8 @@ export async function POST(request: NextRequest) {
   // Auth via query param (browser-friendly)
   const token = request.nextUrl.searchParams.get('token');
   const adminToken = process.env.ADMIN_API_TOKEN;
-  if (!adminToken || token !== adminToken) {
+  const adminPassword = process.env.ADMIN_PASSWORD;
+  if ((!adminToken && !adminPassword) || (token !== adminToken && token !== adminPassword)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -220,7 +221,8 @@ export async function GET(request: NextRequest) {
 
   const token = request.nextUrl.searchParams.get('token');
   const adminToken = process.env.ADMIN_API_TOKEN;
-  if (!adminToken || token !== adminToken) {
+  const adminPassword = process.env.ADMIN_PASSWORD;
+  if ((!adminToken && !adminPassword) || (token !== adminToken && token !== adminPassword)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

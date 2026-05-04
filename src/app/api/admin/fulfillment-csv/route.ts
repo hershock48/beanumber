@@ -67,7 +67,8 @@ export async function GET(request: NextRequest) {
   // Support both header auth (X-Admin-Token) and query param (?token=)
   const queryToken = request.nextUrl.searchParams.get('token');
   const adminToken = process.env.ADMIN_API_TOKEN;
-  if (queryToken && adminToken && queryToken === adminToken) {
+  const adminPassword = process.env.ADMIN_PASSWORD;
+  if (queryToken && ((adminToken && queryToken === adminToken) || (adminPassword && queryToken === adminPassword))) {
     // Authenticated via query param — skip header check
   } else {
     requireAdminAuth(request);
