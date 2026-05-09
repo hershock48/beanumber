@@ -525,14 +525,20 @@ export default async function ChildProfilePage({ params }: ChildPageProps) {
               </div>
             )}
 
-            {/* Placeholder when no structured intake fields are populated.
-                IMPORTANT: we do NOT fall back to child.fun_fact (the legacy
-                Notes field). That field contains AI-template boilerplate
-                ("bright and hopeful", "peasant farmers", "humble background",
-                "life full of potential and hope") that violates voice.md top
-                to bottom. Better to show an honest, dignified "story coming"
-                line than to ship savior-narrative copy under our brand. */}
-            {!hasStructured && (
+            {/* When no structured intake fields exist, fall back to the
+                Notes field (mapped as fun_fact) if it has content. This covers
+                children like #37 whose bios were written before the structured
+                intake form existed. Only show the "story coming" placeholder
+                when Notes is also empty. */}
+            {!hasStructured && child.fun_fact && (
+              <div className="bg-white border border-[#e8e0d4] p-5 mb-8">
+                <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-2">
+                  About {firstName}
+                </p>
+                <p className="text-[#444] leading-relaxed">{child.fun_fact}</p>
+              </div>
+            )}
+            {!hasStructured && !child.fun_fact && (
               <div className="bg-white border border-[#e8e0d4] p-5 mb-8">
                 <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-2">
                   {firstName}&rsquo;s story
