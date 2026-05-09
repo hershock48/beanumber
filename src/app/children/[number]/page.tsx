@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { BANNavigation } from '@/components/BANNavigation';
 import { BANFooter } from '@/components/BANFooter';
 import { RevealBeacon } from './RevealBeacon';
+import { SponsorButton } from './SponsorButton';
 
 // Never statically optimize or cache this page. Sponsorship status and child
 // data changes over time, and a stale empty cache entry would manifest as a
@@ -101,8 +102,10 @@ async function getChildByShirtNumber(shirtNumber: number) {
       return null;
     }
 
-    const child = childRes.records[0].fields;
+    const childRecord = childRes.records[0];
+    const child = childRecord.fields;
     const childId = child.ChildID;
+    const recordId = childRecord.id;
 
     // Reserved-for-auction numbers short-circuit here. The Child record exists
     // to hold the number, but we don't want to expose placeholder details
@@ -151,6 +154,7 @@ async function getChildByShirtNumber(shirtNumber: number) {
 
     return {
       reserved: false as const,
+      record_id: recordId,
       child_id: childId || `CHILD-${shirtNumber}`,
       display_name: child.DisplayName || `${child.FirstName || 'Child'} ${child.LastInitial || ''}`.trim(),
       first_name: child.FirstName,
@@ -563,12 +567,12 @@ export default async function ChildProfilePage({ params }: ChildPageProps) {
               <p className="text-[#777] text-sm mb-6 leading-relaxed">
                 Education, meals, and mentorship every month. Plus a monthly newsletter from the campus, photos of your child through the year, a handwritten letter from them, and a year-end report card. No commitment. Adjust or cancel anytime.
               </p>
-              <Link
-                href={'/sponsorship?child=' + child.child_id + '&name=' + encodeURIComponent(displayName)}
-                className="block w-full text-center bg-[#D4A843] text-[#0d0d0d] font-bold uppercase tracking-wider py-4 px-6 hover:bg-[#c49a3a] transition-colors"
-              >
-                Become a sponsor
-              </Link>
+              <SponsorButton
+                childRecordId={child.record_id}
+                childId={child.child_id}
+                childDisplayName={displayName}
+                firstName={firstName}
+              />
             </div>
 
             {/* What your $25 does — concrete, named, specific. Replaces the
