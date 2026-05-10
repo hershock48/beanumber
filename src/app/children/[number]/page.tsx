@@ -620,13 +620,106 @@ export default async function ChildProfilePage({ params }: ChildPageProps) {
           </div>
         </div>
 
-        {/* ── Rep your number — PARKED until real products exist.
-            Placeholder merch cards with no checkout behind them dilute
-            the sponsorship ask. Bring this back when hoodies/hats ship.
-        <div className="mt-10 md:mt-20">
-          ...
-        </div>
+        {/* ── Sponsor-gated merch collection ────────────────────
+            Three states:
+            1. Active sponsor  → unlocked catalog, "I want this" → email Kevin
+            2. Shirt buyer     → locked teaser, blurred cards, sponsor CTA
+            3. Cold visitor    → nothing (focus stays on sponsorship CTA)
         ── */}
+        {child.sponsorship_status === 'Active' ? (
+          <div className="mt-10 md:mt-16">
+            <div className="text-center mb-6 md:mb-8">
+              <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-3">
+                Your #{number} collection
+              </p>
+              <h2
+                className="text-2xl md:text-3xl text-[#0d0d0d] mb-2"
+                style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
+              >
+                You&rsquo;re a sponsor. These are yours.
+              </h2>
+              <p className="text-[#777] text-sm max-w-md mx-auto">
+                Every piece is handmade with your number on it. Request what you want and we&rsquo;ll make it.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
+              {[
+                { name: 'Hoodie', slug: 'hoodie', detail: `#${number} on the back`, price: '$45' },
+                { name: 'Hat', slug: 'hat', detail: `#${number} front and center`, price: '$30' },
+                { name: 'Sticker Pack', slug: 'stickers', detail: 'Laptop, water bottle, wherever', price: '$10' },
+                { name: 'Another Shirt', slug: 'shirt', detail: 'Different design, same number', price: '$25' },
+              ].map((item) => (
+                <a
+                  key={item.slug}
+                  href={`mailto:Kevin@beanumber.org?subject=${encodeURIComponent(`I want a #${number} ${item.name}`)}&body=${encodeURIComponent(`Hey Kevin,\n\nI'd love a ${item.name.toLowerCase()} with #${number} on it.\n\nThanks!`)}`}
+                  className="group block bg-white border border-[#e8e0d4] p-3 md:p-4 hover:border-[#D4A843] transition-colors"
+                >
+                  <div className="aspect-[4/3] bg-[#f5f0e8] flex items-center justify-center mb-3">
+                    <p className="text-3xl md:text-4xl font-bold text-[#D4A843] opacity-30">
+                      #{number}
+                    </p>
+                  </div>
+                  <p
+                    className="text-sm font-semibold text-[#0d0d0d] mb-0.5"
+                    style={{ fontFamily: 'var(--font-lora), serif' }}
+                  >
+                    {item.name}
+                  </p>
+                  <p className="text-xs text-[#999] mb-3">{item.detail}</p>
+                  <p className="text-xs font-bold text-[#D4A843] uppercase tracking-wider group-hover:text-[#c49a3a] transition-colors">
+                    I want this &rarr;
+                  </p>
+                </a>
+              ))}
+            </div>
+          </div>
+        ) : child.shirt_assigned ? (
+          <div className="mt-10 md:mt-16">
+            <div className="relative">
+              {/* Blurred product cards — visible but unreachable */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 opacity-30 blur-[3px] pointer-events-none select-none" aria-hidden>
+                {['Hoodie', 'Hat', 'Sticker Pack', 'Another Shirt'].map((name) => (
+                  <div key={name} className="bg-white border border-[#e8e0d4] p-3 md:p-4">
+                    <div className="aspect-[4/3] bg-[#f5f0e8] flex items-center justify-center mb-3">
+                      <p className="text-3xl md:text-4xl font-bold text-[#0d0d0d] opacity-20">
+                        #{number}
+                      </p>
+                    </div>
+                    <p className="text-sm font-semibold text-[#0d0d0d]" style={{ fontFamily: 'var(--font-lora), serif' }}>
+                      {name}
+                    </p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Lock overlay */}
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="bg-white/95 backdrop-blur-sm border border-[#e8e0d4] p-6 md:p-8 text-center max-w-sm mx-4 shadow-lg">
+                  <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-3">
+                    Your #{number} collection
+                  </p>
+                  <p
+                    className="text-lg md:text-xl text-[#0d0d0d] mb-3"
+                    style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
+                  >
+                    Sponsor {firstName} to unlock.
+                  </p>
+                  <p className="text-[#777] text-sm mb-5 leading-relaxed">
+                    Sponsors get exclusive #{number} gear &mdash; hoodies, hats, stickers &mdash; all handmade with your number.
+                  </p>
+                  <SponsorButton
+                    childRecordId={child.record_id}
+                    childId={child.child_id}
+                    childDisplayName={displayName}
+                    firstName={firstName}
+                    shirtAssigned={child.shirt_assigned}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : null}
 
         </RevealOverlay>
       </main>
