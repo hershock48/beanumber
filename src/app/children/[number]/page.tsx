@@ -509,7 +509,7 @@ export default async function ChildProfilePage({ params }: ChildPageProps) {
                 {child.loves && (
                   <div>
                     <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-1">
-                      What {firstName} loves
+                      About {firstName}
                     </p>
                     <p className="text-[#444] leading-relaxed">{child.loves}</p>
                   </div>

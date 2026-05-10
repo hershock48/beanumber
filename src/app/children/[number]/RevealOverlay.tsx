@@ -138,16 +138,10 @@ export function RevealOverlay({ shirtNumber, childName, children }: RevealOverla
                 className="text-3xl md:text-5xl text-[#0d0d0d] mb-2"
                 style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
               >
-                This number
-              </p>
-              <p
-                className="text-3xl md:text-5xl text-[#0d0d0d] mb-1"
-                style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
-              >
-                has a name.
+                This Number has a name&hellip;
               </p>
               <p className="text-[#999] text-sm mb-8">
-                Thanks to you.
+                Thanks to YOU!
               </p>
               <p
                 className="text-5xl md:text-7xl text-[#D4A843] mb-10"
