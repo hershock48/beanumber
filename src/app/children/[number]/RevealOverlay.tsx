@@ -135,13 +135,10 @@ export function RevealOverlay({ shirtNumber, childName, children }: RevealOverla
           <div className="text-center px-8 pointer-events-auto">
             <div className="bg-white/90 backdrop-blur-sm border border-[#e8e0d4] py-10 px-8 md:py-14 md:px-16 shadow-xl max-w-lg mx-auto">
               <p
-                className="text-3xl md:text-5xl text-[#0d0d0d] mb-2"
+                className="text-3xl md:text-5xl text-[#0d0d0d] mb-8"
                 style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
               >
-                This Number has a name&hellip;
-              </p>
-              <p className="text-[#999] text-sm mb-8">
-                Thanks to YOU!
+                Every number is a name.
               </p>
               <p
                 className="text-5xl md:text-7xl text-[#D4A843] mb-10"
@@ -153,7 +150,7 @@ export function RevealOverlay({ shirtNumber, childName, children }: RevealOverla
                 onClick={handleReveal}
                 className="w-full bg-[#D4A843] text-[#0d0d0d] font-bold uppercase tracking-wider py-4 px-10 hover:bg-[#c49a3a] transition-colors text-lg"
               >
-                Reveal
+                Meet them
               </button>
             </div>
           </div>
