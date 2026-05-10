@@ -561,74 +561,50 @@ export default async function ChildProfilePage({ params }: ChildPageProps) {
               </div>
             )}
 
-            {/* What the campus provides — woven naturally as a warm
-                statement rather than a labeled "$25 does X" block.
-                Emotional bridge between the bio and the CTA. */}
-            <div className="mb-6">
-              <p className="text-[#555] leading-relaxed">
-                Through the YDO campus, {firstName} has a uniform, school books,
-                morning porridge and a hot meal every day, access to the on-site
-                medical center, and a place where teachers and other kids know{' '}
+            {/* ── Sponsorship CTA ──────────────────────────────────
+                Single decision container: what the money does, what the
+                sponsor gets back, and the button. No separate "provision"
+                paragraph — everything the visitor needs is here. */}
+            <div className="bg-white border-2 border-[#D4A843]/30 p-7">
+              {child.shirt_assigned ? (
+                <p
+                  className="text-xl text-[#0d0d0d] mb-4"
+                  style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
+                >
+                  You gave {firstName} a month of school when you bought your shirt. Keep going.
+                </p>
+              ) : (
+                <p
+                  className="text-xl text-[#0d0d0d] mb-4"
+                  style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
+                >
+                  Sponsor {firstName}
+                </p>
+              )}
+
+              <p className="text-[#555] leading-relaxed mb-4">
+                Your $25/month covers {firstName}&rsquo;s school fees, books,
+                a uniform, morning porridge and a hot meal every day, access to
+                the on-site medical center, and a place where teachers know{' '}
                 {firstName}&rsquo;s name.
               </p>
-              <p className="text-[#777] leading-relaxed mt-3">
-                On behalf of our entire team &mdash; thank you.
-              </p>
-            </div>
 
-            {/* Sponsorship CTA — two modes. When a shirt buyer has been
-                matched to this number (ShirtAssignedAt is set), the ask is
-                warm retention: "you already gave them a month, keep going."
-                For cold visitors (no shirt assignment), it's standard
-                acquisition framing. */}
-            <div className="bg-white border border-[#e8e0d4] p-7">
-              {child.shirt_assigned ? (
-                <>
-                  <p
-                    className="text-xl text-[#0d0d0d] mb-3"
-                    style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
-                  >
-                    You gave {firstName} a month of school when you bought your shirt.
-                  </p>
-                  <p className="text-[#777] text-sm mb-2 leading-relaxed">
-                    Keep going and you stay in {firstName}&rsquo;s life all year.
-                    A monthly newsletter from the campus, photos of your child,
-                    a handwritten letter from {firstName}, and a year-end report card.
-                  </p>
-                  <div className="flex items-baseline gap-1 mb-4">
-                    <span
-                      className="text-4xl text-[#D4A843]"
-                      style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 700 }}
-                    >
-                      $25
-                    </span>
-                    <span className="text-[#aaa]">/month &middot; cancel anytime</span>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <p
-                    className="text-xl text-[#0d0d0d] mb-1"
-                    style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
-                  >
-                    Sponsor {displayName}
-                  </p>
-                  <div className="flex items-baseline gap-1 mb-2">
-                    <span
-                      className="text-4xl text-[#D4A843]"
-                      style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 700 }}
-                    >
-                      $25
-                    </span>
-                    <span className="text-[#aaa]">/month</span>
-                  </div>
-                  <p className="text-[#777] text-sm mb-4 leading-relaxed">
-                    A monthly newsletter from the campus, photos of your child
-                    through the year, a handwritten letter from {firstName}, and
-                    a year-end report card. Cancel anytime.
-                  </p>
-                </>
-              )}
+              <p className="text-[#555] leading-relaxed mb-5">
+                You&rsquo;ll get a monthly newsletter from the campus, photos
+                of {firstName} through the year, a handwritten letter
+                from {firstName}, and a year-end report card.
+              </p>
+
+              <div className="flex items-baseline gap-1 mb-4">
+                <span
+                  className="text-4xl text-[#D4A843]"
+                  style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 700 }}
+                >
+                  $25
+                </span>
+                <span className="text-[#aaa]">/month &middot; cancel anytime</span>
+              </div>
+
               <SponsorButton
                 childRecordId={child.record_id}
                 childId={child.child_id}
@@ -636,113 +612,21 @@ export default async function ChildProfilePage({ params }: ChildPageProps) {
                 firstName={firstName}
                 shirtAssigned={child.shirt_assigned}
               />
+
+              <p className="text-center text-xs text-[#bbb] mt-4">
+                On behalf of our entire team &mdash; thank you.
+              </p>
             </div>
           </div>
         </div>
 
-        {/* ── Rep your number — custom merch section ──────────────── */}
+        {/* ── Rep your number — PARKED until real products exist.
+            Placeholder merch cards with no checkout behind them dilute
+            the sponsorship ask. Bring this back when hoodies/hats ship.
         <div className="mt-10 md:mt-20">
-          <div className="text-center mb-6 md:mb-10">
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-3">
-              Rep your number
-            </p>
-            <h2
-              className="text-3xl md:text-4xl text-[#0d0d0d] mb-3"
-              style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
-            >
-              You&rsquo;re #{number}. Own it.
-            </h2>
-            <p className="text-[#777] max-w-xl mx-auto leading-relaxed">
-              Every item has your number on it. Every time someone asks
-              about it, that&rsquo;s another kid who gets a shot.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
-            {/* Hoodie */}
-            <a
-              href={`/shirts?number=${number}&item=hoodie`}
-              className="group block bg-white border border-[#e8e0d4] p-3 md:p-4 hover:border-[#D4A843] transition-colors"
-            >
-              <div className="aspect-[4/3] md:aspect-square bg-[#f5f0e8] flex items-center justify-center mb-3">
-                <p className="text-2xl md:text-4xl font-bold text-[#0d0d0d] opacity-20">
-                  #{number}
-                </p>
-              </div>
-              <p
-                className="text-sm font-semibold text-[#0d0d0d] mb-1"
-                style={{ fontFamily: 'var(--font-lora), serif' }}
-              >
-                Hoodie
-              </p>
-              <p className="text-xs text-[#999]">#{number} on the back</p>
-            </a>
-
-            {/* Hat */}
-            <a
-              href={`/shirts?number=${number}&item=hat`}
-              className="group block bg-white border border-[#e8e0d4] p-3 md:p-4 hover:border-[#D4A843] transition-colors"
-            >
-              <div className="aspect-[4/3] md:aspect-square bg-[#f5f0e8] flex items-center justify-center mb-3">
-                <p className="text-2xl md:text-4xl font-bold text-[#0d0d0d] opacity-20">
-                  #{number}
-                </p>
-              </div>
-              <p
-                className="text-sm font-semibold text-[#0d0d0d] mb-1"
-                style={{ fontFamily: 'var(--font-lora), serif' }}
-              >
-                Hat
-              </p>
-              <p className="text-xs text-[#999]">#{number} front and center</p>
-            </a>
-
-            {/* Sticker pack */}
-            <a
-              href={`/shirts?number=${number}&item=stickers`}
-              className="group block bg-white border border-[#e8e0d4] p-3 md:p-4 hover:border-[#D4A843] transition-colors"
-            >
-              <div className="aspect-[4/3] md:aspect-square bg-[#f5f0e8] flex items-center justify-center mb-3">
-                <p className="text-2xl md:text-4xl font-bold text-[#0d0d0d] opacity-20">
-                  #{number}
-                </p>
-              </div>
-              <p
-                className="text-sm font-semibold text-[#0d0d0d] mb-1"
-                style={{ fontFamily: 'var(--font-lora), serif' }}
-              >
-                Sticker Pack
-              </p>
-              <p className="text-xs text-[#999]">Laptop, water bottle, wherever</p>
-            </a>
-
-            {/* Another shirt */}
-            <a
-              href={`/shirts?number=${number}`}
-              className="group block bg-white border border-[#e8e0d4] p-3 md:p-4 hover:border-[#D4A843] transition-colors"
-            >
-              <div className="aspect-[4/3] md:aspect-square bg-[#f5f0e8] flex items-center justify-center mb-3">
-                <p className="text-2xl md:text-4xl font-bold text-[#0d0d0d] opacity-20">
-                  #{number}
-                </p>
-              </div>
-              <p
-                className="text-sm font-semibold text-[#0d0d0d] mb-1"
-                style={{ fontFamily: 'var(--font-lora), serif' }}
-              >
-                Another Shirt
-              </p>
-              <p className="text-xs text-[#999]">Different design, same number</p>
-            </a>
-          </div>
-
-          <p className="text-center text-xs text-[#bbb] mt-6">
-            Coming soon — all items handmade with your number.{' '}
-            <a href="mailto:Kevin@beanumber.org" className="text-[#D4A843] hover:underline">
-              Want early access? Email Kevin.
-            </a>
-          </p>
+          ...
         </div>
+        ── */}
 
         </RevealOverlay>
       </main>
