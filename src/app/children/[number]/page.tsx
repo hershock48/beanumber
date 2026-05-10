@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { BANNavigation } from '@/components/BANNavigation';
 import { BANFooter } from '@/components/BANFooter';
 import { RevealBeacon } from './RevealBeacon';
+import { RevealOverlay } from './RevealOverlay';
 import { SponsorButton } from './SponsorButton';
 
 // Never statically optimize or cache this page. Sponsorship status and child
@@ -29,6 +30,7 @@ interface AirtableChildRecord {
     Status?: string;
     DateOfBirth?: string;
     ReservedForAuction?: boolean;
+    ShirtAssignedAt?: string;
     // ── Structured profile fields populated via the YDO intake form.
     // Rendered conditionally on the profile page — empty = hidden block.
     HomeVillage?: string;
@@ -164,6 +166,10 @@ async function getChildByShirtNumber(shirtNumber: number) {
       photo_url: photo,
       location: sponsorship?.ChildLocation || 'Gulu, Northern Uganda',
       sponsorship_status: sponsorship?.Status,
+      // True when a shirt buyer has been matched to this number. Used on the
+      // profile page to reframe the CTA from cold acquisition ("Sponsor
+      // [name]") to warm retention ("You already gave [name] a month").
+      shirt_assigned: Boolean(child.ShirtAssignedAt),
       // Structured intake fields — any may be empty; the page renders each
       // block conditionally so a half-filled profile still looks intentional.
       home_village: child.HomeVillage,
@@ -421,9 +427,10 @@ export default async function ChildProfilePage({ params }: ChildPageProps) {
           <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
           </svg>
-          Back to all children
+          Back to home
         </Link>
 
+        <RevealOverlay shirtNumber={Number(number)}>
         <div className="grid md:grid-cols-2 gap-10 md:gap-14 items-start">
           {/* Photo */}
           <div className="aspect-[4/5] bg-[#f5f0e8] border border-[#e8e0d4] overflow-hidden relative">
@@ -553,38 +560,9 @@ export default async function ChildProfilePage({ params }: ChildPageProps) {
               </div>
             )}
 
-            {/* Sponsorship card */}
-            <div className="bg-white border border-[#e8e0d4] p-7">
-              <p
-                className="text-xl text-[#0d0d0d] mb-1"
-                style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
-              >
-                Sponsor {displayName}
-              </p>
-              <div className="flex items-baseline gap-1 mb-2">
-                <span
-                  className="text-4xl text-[#D4A843]"
-                  style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 700 }}
-                >
-                  $25
-                </span>
-                <span className="text-[#aaa]">/month</span>
-              </div>
-              <p className="text-[#777] text-sm mb-6 leading-relaxed">
-                Education, meals, and mentorship every month. Plus a monthly newsletter from the campus, photos of your child through the year, a handwritten letter from them, and a year-end report card. No commitment. Adjust or cancel anytime.
-              </p>
-              <SponsorButton
-                childRecordId={child.record_id}
-                childId={child.child_id}
-                childDisplayName={displayName}
-                firstName={firstName}
-              />
-            </div>
-
-            {/* What your $25 does — concrete, named, specific. Replaces the
-                generic emoji grid. Uses the child's first name so the line
-                reads like it's about a person, not a program. */}
-            <div className="mt-8">
+            {/* What your $25 does — ABOVE the CTA. Justify the purchase
+                before the ask, not after. */}
+            <div className="mb-6">
               <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-3">
                 What your $25 does for {firstName}
               </p>
@@ -595,8 +573,71 @@ export default async function ChildProfilePage({ params }: ChildPageProps) {
                 and other kids know their name.
               </p>
             </div>
+
+            {/* Sponsorship CTA — two modes. When a shirt buyer has been
+                matched to this number (ShirtAssignedAt is set), the ask is
+                warm retention: "you already gave them a month, keep going."
+                For cold visitors (no shirt assignment), it's standard
+                acquisition framing. */}
+            <div className="bg-white border border-[#e8e0d4] p-7">
+              {child.shirt_assigned ? (
+                <>
+                  <p
+                    className="text-xl text-[#0d0d0d] mb-3"
+                    style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
+                  >
+                    You gave {firstName} a month of school when you bought your shirt.
+                  </p>
+                  <p className="text-[#777] text-sm mb-2 leading-relaxed">
+                    Keep going and you stay in {firstName}&rsquo;s life all year.
+                    A monthly newsletter from the campus, photos of your child,
+                    a handwritten letter from {firstName}, and a year-end report card.
+                  </p>
+                  <div className="flex items-baseline gap-1 mb-4">
+                    <span
+                      className="text-4xl text-[#D4A843]"
+                      style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 700 }}
+                    >
+                      $25
+                    </span>
+                    <span className="text-[#aaa]">/month &middot; cancel anytime</span>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <p
+                    className="text-xl text-[#0d0d0d] mb-1"
+                    style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
+                  >
+                    Sponsor {displayName}
+                  </p>
+                  <div className="flex items-baseline gap-1 mb-2">
+                    <span
+                      className="text-4xl text-[#D4A843]"
+                      style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 700 }}
+                    >
+                      $25
+                    </span>
+                    <span className="text-[#aaa]">/month</span>
+                  </div>
+                  <p className="text-[#777] text-sm mb-4 leading-relaxed">
+                    A monthly newsletter from the campus, photos of your child
+                    through the year, a handwritten letter from {firstName}, and
+                    a year-end report card. Cancel anytime.
+                  </p>
+                </>
+              )}
+              <SponsorButton
+                childRecordId={child.record_id}
+                childId={child.child_id}
+                childDisplayName={displayName}
+                firstName={firstName}
+                shirtAssigned={child.shirt_assigned}
+              />
+            </div>
           </div>
         </div>
+        </RevealOverlay>
       </main>
 
       <BANFooter />

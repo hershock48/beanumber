@@ -7,6 +7,9 @@ interface SponsorButtonProps {
   childId: string;
   childDisplayName: string;
   firstName: string;
+  /** True when a shirt buyer has been matched to this number. Changes
+   *  the button label from cold acquisition to warm retention framing. */
+  shirtAssigned?: boolean;
 }
 
 export function SponsorButton({
@@ -14,6 +17,7 @@ export function SponsorButton({
   childId,
   childDisplayName,
   firstName,
+  shirtAssigned,
 }: SponsorButtonProps) {
   const [loading, setLoading] = useState(false);
 
@@ -51,7 +55,11 @@ export function SponsorButton({
       disabled={loading}
       className="block w-full text-center bg-[#D4A843] text-[#0d0d0d] font-bold uppercase tracking-wider py-4 px-6 hover:bg-[#c49a3a] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
     >
-      {loading ? 'Loading checkout...' : `Sponsor ${firstName} · $25/mo`}
+      {loading
+        ? 'Loading checkout...'
+        : shirtAssigned
+          ? `Stay in ${firstName}'s story · $25/mo`
+          : `Sponsor ${firstName} · $25/mo`}
     </button>
   );
 }
