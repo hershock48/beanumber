@@ -166,7 +166,7 @@ export function RevealOverlay({ shirtNumber, childName, children }: RevealOverla
 
       {/* ── Stage 0: "Meet your child" card ── */}
       {stage === 0 && (
-        <div className="absolute inset-0 flex items-center justify-center z-10">
+        <div className="absolute inset-0 flex items-start md:items-center justify-center z-10 pt-16 md:pt-0">
           <div className="text-center px-6 max-w-md">
             <div className="bg-white/95 backdrop-blur-sm border border-[#e8e0d4] p-8 md:p-12 shadow-lg">
               <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-4">
@@ -198,7 +198,7 @@ export function RevealOverlay({ shirtNumber, childName, children }: RevealOverla
 
       {/* ── Stage 1: Name title card ── */}
       {stage === 1 && (
-        <div className="absolute inset-0 flex items-center justify-center z-10">
+        <div className="absolute inset-0 flex items-start md:items-center justify-center z-10 pt-24 md:pt-0">
           <div
             className="text-center px-6"
             style={{
@@ -231,7 +231,7 @@ export function RevealOverlay({ shirtNumber, childName, children }: RevealOverla
       {/* ── Stage 2: photo unblurring + confetti (overlay fades out) ── */}
       {stage === 2 && (
         <div
-          className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none"
+          className="absolute inset-0 flex items-start md:items-center justify-center z-10 pointer-events-none pt-24 md:pt-0"
           style={{
             animation: 'revealFadeOut 1200ms ease-in forwards',
           }}

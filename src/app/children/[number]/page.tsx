@@ -418,7 +418,7 @@ export default async function ChildProfilePage({ params }: ChildPageProps) {
 
       <BANNavigation currentPath={'/children/' + number} />
 
-      <main className="max-w-5xl mx-auto px-5 py-10 md:py-16">
+      <main className="max-w-5xl mx-auto px-5 py-6 md:py-16">
         {/* Breadcrumb */}
         <Link
           href="/"
@@ -431,9 +431,10 @@ export default async function ChildProfilePage({ params }: ChildPageProps) {
         </Link>
 
         <RevealOverlay shirtNumber={Number(number)} childName={displayName}>
-        <div className="grid md:grid-cols-2 gap-10 md:gap-14 items-start">
-          {/* Photo */}
-          <div className="aspect-[4/5] bg-[#f5f0e8] border border-[#e8e0d4] overflow-hidden relative">
+        <div className="grid md:grid-cols-2 gap-5 md:gap-14 items-start">
+          {/* Photo — shorter on mobile to keep the CTA reachable without
+              a marathon scroll. Desktop keeps the taller portrait crop. */}
+          <div className="aspect-[4/4] md:aspect-[4/5] bg-[#f5f0e8] border border-[#e8e0d4] overflow-hidden relative">
             {photoUrl.startsWith('http') ? (
               <img
                 src={photoUrl}
@@ -455,7 +456,7 @@ export default async function ChildProfilePage({ params }: ChildPageProps) {
           </div>
 
           {/* Details */}
-          <div className="flex flex-col justify-center py-4">
+          <div className="flex flex-col justify-center py-0 md:py-4">
             <h1
               className="text-4xl md:text-5xl text-[#0d0d0d] mb-3"
               style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
@@ -639,8 +640,8 @@ export default async function ChildProfilePage({ params }: ChildPageProps) {
         </div>
 
         {/* ── Rep your number — custom merch section ──────────────── */}
-        <div className="mt-16 md:mt-20">
-          <div className="text-center mb-10">
+        <div className="mt-10 md:mt-20">
+          <div className="text-center mb-6 md:mb-10">
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-3">
               Rep your number
             </p>
@@ -660,14 +661,12 @@ export default async function ChildProfilePage({ params }: ChildPageProps) {
             {/* Hoodie */}
             <a
               href={`/shirts?number=${number}&item=hoodie`}
-              className="group block bg-white border border-[#e8e0d4] p-4 hover:border-[#D4A843] transition-colors"
+              className="group block bg-white border border-[#e8e0d4] p-3 md:p-4 hover:border-[#D4A843] transition-colors"
             >
-              <div className="aspect-square bg-[#f5f0e8] flex items-center justify-center mb-3">
-                <div className="text-center">
-                  <p className="text-3xl md:text-4xl font-bold text-[#0d0d0d] opacity-20">
-                    #{number}
-                  </p>
-                </div>
+              <div className="aspect-[4/3] md:aspect-square bg-[#f5f0e8] flex items-center justify-center mb-3">
+                <p className="text-2xl md:text-4xl font-bold text-[#0d0d0d] opacity-20">
+                  #{number}
+                </p>
               </div>
               <p
                 className="text-sm font-semibold text-[#0d0d0d] mb-1"
@@ -681,14 +680,12 @@ export default async function ChildProfilePage({ params }: ChildPageProps) {
             {/* Hat */}
             <a
               href={`/shirts?number=${number}&item=hat`}
-              className="group block bg-white border border-[#e8e0d4] p-4 hover:border-[#D4A843] transition-colors"
+              className="group block bg-white border border-[#e8e0d4] p-3 md:p-4 hover:border-[#D4A843] transition-colors"
             >
-              <div className="aspect-square bg-[#f5f0e8] flex items-center justify-center mb-3">
-                <div className="text-center">
-                  <p className="text-3xl md:text-4xl font-bold text-[#0d0d0d] opacity-20">
-                    #{number}
-                  </p>
-                </div>
+              <div className="aspect-[4/3] md:aspect-square bg-[#f5f0e8] flex items-center justify-center mb-3">
+                <p className="text-2xl md:text-4xl font-bold text-[#0d0d0d] opacity-20">
+                  #{number}
+                </p>
               </div>
               <p
                 className="text-sm font-semibold text-[#0d0d0d] mb-1"
@@ -702,14 +699,12 @@ export default async function ChildProfilePage({ params }: ChildPageProps) {
             {/* Sticker pack */}
             <a
               href={`/shirts?number=${number}&item=stickers`}
-              className="group block bg-white border border-[#e8e0d4] p-4 hover:border-[#D4A843] transition-colors"
+              className="group block bg-white border border-[#e8e0d4] p-3 md:p-4 hover:border-[#D4A843] transition-colors"
             >
-              <div className="aspect-square bg-[#f5f0e8] flex items-center justify-center mb-3">
-                <div className="text-center">
-                  <p className="text-3xl md:text-4xl font-bold text-[#0d0d0d] opacity-20">
-                    #{number}
-                  </p>
-                </div>
+              <div className="aspect-[4/3] md:aspect-square bg-[#f5f0e8] flex items-center justify-center mb-3">
+                <p className="text-2xl md:text-4xl font-bold text-[#0d0d0d] opacity-20">
+                  #{number}
+                </p>
               </div>
               <p
                 className="text-sm font-semibold text-[#0d0d0d] mb-1"
@@ -723,14 +718,12 @@ export default async function ChildProfilePage({ params }: ChildPageProps) {
             {/* Another shirt */}
             <a
               href={`/shirts?number=${number}`}
-              className="group block bg-white border border-[#e8e0d4] p-4 hover:border-[#D4A843] transition-colors"
+              className="group block bg-white border border-[#e8e0d4] p-3 md:p-4 hover:border-[#D4A843] transition-colors"
             >
-              <div className="aspect-square bg-[#f5f0e8] flex items-center justify-center mb-3">
-                <div className="text-center">
-                  <p className="text-3xl md:text-4xl font-bold text-[#0d0d0d] opacity-20">
-                    #{number}
-                  </p>
-                </div>
+              <div className="aspect-[4/3] md:aspect-square bg-[#f5f0e8] flex items-center justify-center mb-3">
+                <p className="text-2xl md:text-4xl font-bold text-[#0d0d0d] opacity-20">
+                  #{number}
+                </p>
               </div>
               <p
                 className="text-sm font-semibold text-[#0d0d0d] mb-1"
