@@ -561,17 +561,18 @@ export default async function ChildProfilePage({ params }: ChildPageProps) {
               </div>
             )}
 
-            {/* What your $25 does — ABOVE the CTA. Justify the purchase
-                before the ask, not after. */}
+            {/* What the campus provides — woven naturally as a warm
+                statement rather than a labeled "$25 does X" block.
+                Emotional bridge between the bio and the CTA. */}
             <div className="mb-6">
-              <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-3">
-                What your $25 does for {firstName}
-              </p>
               <p className="text-[#555] leading-relaxed">
-                Keeps {firstName} in school at the YDO campus in Omoro District —
-                school fees, books, a uniform, morning porridge and a midday meal,
-                access to the on-site medical center, and a place where teachers
-                and other kids know their name.
+                Through the YDO campus, {firstName} has a uniform, school books,
+                morning porridge and a hot meal every day, access to the on-site
+                medical center, and a place where teachers and other kids know{' '}
+                {firstName}&rsquo;s name.
+              </p>
+              <p className="text-[#777] leading-relaxed mt-3">
+                On behalf of our entire team &mdash; thank you.
               </p>
             </div>
 
