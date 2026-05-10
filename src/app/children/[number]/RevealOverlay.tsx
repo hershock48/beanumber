@@ -8,8 +8,6 @@ interface RevealOverlayProps {
   children: React.ReactNode;
 }
 
-// ── Confetti ────────────────────────────────────────────────────
-// Gold and white particles. No library. Self-cleaning canvas.
 function fireConfetti() {
   const canvas = document.createElement('canvas');
   canvas.style.cssText =
@@ -76,11 +74,11 @@ function fireConfetti() {
   requestAnimationFrame(animate);
 }
 
-// ── Reveal stages ──────────────────────────────────────────────
-// 0 → pre-reveal: blurred content, number + "Meet them" floating over it
-// 1 → name: child's name appears large over the blur
-// 2 → face: confetti fires, photo unblurs, name fades
-// 3 → done: full profile (same as return visits)
+// ── Stages ─────────────────────────────────────────────────────
+// 0 → pre-reveal: blurred content, "This number has a name" overlay
+// 1 → name reveal: child's name appears large
+// 2 → face reveal: confetti + unblur
+// 3 → done (same as return visits)
 
 type Stage = 0 | 1 | 2 | 3;
 
@@ -112,10 +110,6 @@ export function RevealOverlay({ shirtNumber, childName, children }: RevealOverla
   if (!checked) return <div className="min-h-[60vh]" />;
   if (alreadyRevealed || stage === 3) return <>{children}</>;
 
-  // Text shadow so floating text stays legible over the blur on any
-  // photo color. Subtle enough to not look like a drop-shadow effect.
-  const textShadow = '0 2px 20px rgba(255,248,240,0.9), 0 0 40px rgba(255,248,240,0.7)';
-
   return (
     <div className="relative">
       {/* Blurred content — unblurs during stage 2 */}
@@ -123,7 +117,7 @@ export function RevealOverlay({ shirtNumber, childName, children }: RevealOverla
         className="transition-all ease-out"
         style={{
           filter: stage >= 2 ? 'blur(0px)' : 'blur(20px)',
-          opacity: stage >= 2 ? 1 : 0.35,
+          opacity: stage >= 2 ? 1 : 0.3,
           transform: stage >= 2 ? 'scale(1)' : 'scale(0.97)',
           transitionDuration: stage >= 2 ? '1400ms' : '0ms',
           pointerEvents: stage >= 2 ? 'auto' : 'none',
@@ -133,58 +127,72 @@ export function RevealOverlay({ shirtNumber, childName, children }: RevealOverla
         {children}
       </div>
 
-      {/* ── Stage 0: Number + "Meet them" ──
-          No card. No box. Just the number and a button floating over
-          the blur. The blur is the visual. The number is the context.
-          The button is the action. Nothing else. */}
+      {/* ── Stage 0: "This number has a name" ──
+          Fixed to viewport so it's always visible above the fold,
+          regardless of how tall the blurred content container is. */}
       {stage === 0 && (
-        <div className="absolute inset-0 flex items-start justify-center z-10 pt-20 md:pt-0 md:items-center">
-          <div className="text-center px-8">
-            <p
-              className="text-xs font-bold uppercase tracking-[0.25em] text-[#D4A843] mb-5"
-              style={{ textShadow }}
-            >
-              Your number
-            </p>
-            <p
-              className="text-6xl md:text-8xl text-[#0d0d0d] mb-10"
-              style={{
-                fontFamily: 'var(--font-lora), serif',
-                fontWeight: 700,
-                textShadow,
-              }}
-            >
-              {shirtNumber}
-            </p>
-            <button
-              onClick={handleReveal}
-              className="bg-[#D4A843] text-[#0d0d0d] font-bold uppercase tracking-wider py-4 px-14 hover:bg-[#c49a3a] transition-colors text-lg"
-            >
-              Meet them
-            </button>
+        <div className="fixed inset-0 flex items-center justify-center z-10 pointer-events-none">
+          <div className="text-center px-8 pointer-events-auto">
+            <div className="bg-white/90 backdrop-blur-sm border border-[#e8e0d4] py-10 px-8 md:py-14 md:px-16 shadow-xl max-w-lg mx-auto">
+              <p
+                className="text-3xl md:text-5xl text-[#0d0d0d] mb-2"
+                style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
+              >
+                This number
+              </p>
+              <p
+                className="text-3xl md:text-5xl text-[#0d0d0d] mb-1"
+                style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
+              >
+                has a name.
+              </p>
+              <p className="text-[#999] text-sm mb-8">
+                Thanks to you.
+              </p>
+              <p
+                className="text-5xl md:text-7xl text-[#D4A843] mb-10"
+                style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 700 }}
+              >
+                #{shirtNumber}
+              </p>
+              <button
+                onClick={handleReveal}
+                className="w-full bg-[#D4A843] text-[#0d0d0d] font-bold uppercase tracking-wider py-4 px-10 hover:bg-[#c49a3a] transition-colors text-lg"
+              >
+                Reveal
+              </button>
+            </div>
           </div>
         </div>
       )}
 
-      {/* ── Stage 1: The name ──
-          Just the name. Big. Centered. They clicked "Meet them" — the
-          answer is a name. No label needed. The context is established. */}
+      {/* ── Stage 1: The name ── */}
       {stage === 1 && (
-        <div className="absolute inset-0 flex items-start justify-center z-10 pt-24 md:pt-0 md:items-center">
+        <div className="fixed inset-0 flex items-center justify-center z-10 pointer-events-none">
           <div
             className="text-center px-6"
             style={{ animation: 'revealNameIn 700ms ease-out forwards' }}
           >
             <p
-              className="text-4xl md:text-7xl text-[#0d0d0d]"
+              className="text-5xl md:text-8xl text-[#0d0d0d] mb-3"
               style={{
                 fontFamily: 'var(--font-lora), serif',
                 fontWeight: 600,
-                textShadow,
-                lineHeight: 1.15,
+                lineHeight: 1.1,
+                textShadow: '0 2px 30px rgba(255,248,240,1), 0 0 60px rgba(255,248,240,0.8)',
               }}
             >
               {childName}
+            </p>
+            <p
+              className="text-xl md:text-2xl text-[#D4A843]"
+              style={{
+                fontFamily: 'var(--font-lora), serif',
+                fontWeight: 500,
+                textShadow: '0 2px 20px rgba(255,248,240,1)',
+              }}
+            >
+              #{shirtNumber}
             </p>
           </div>
           <style>{`
@@ -199,20 +207,30 @@ export function RevealOverlay({ shirtNumber, childName, children }: RevealOverla
       {/* ── Stage 2: Face reveal — name lingers while photo unblurs ── */}
       {stage === 2 && (
         <div
-          className="absolute inset-0 flex items-start justify-center z-10 pointer-events-none pt-24 md:pt-0 md:items-center"
+          className="fixed inset-0 flex items-center justify-center z-10 pointer-events-none"
           style={{ animation: 'revealFadeOut 1400ms ease-in forwards' }}
         >
           <div className="text-center px-6">
             <p
-              className="text-4xl md:text-7xl text-[#0d0d0d]"
+              className="text-5xl md:text-8xl text-[#0d0d0d] mb-3"
               style={{
                 fontFamily: 'var(--font-lora), serif',
                 fontWeight: 600,
-                textShadow,
-                lineHeight: 1.15,
+                lineHeight: 1.1,
+                textShadow: '0 2px 30px rgba(255,248,240,1), 0 0 60px rgba(255,248,240,0.8)',
               }}
             >
               {childName}
+            </p>
+            <p
+              className="text-xl md:text-2xl text-[#D4A843]"
+              style={{
+                fontFamily: 'var(--font-lora), serif',
+                fontWeight: 500,
+                textShadow: '0 2px 20px rgba(255,248,240,1)',
+              }}
+            >
+              #{shirtNumber}
             </p>
           </div>
           <style>{`
