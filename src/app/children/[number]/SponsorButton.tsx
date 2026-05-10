@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 interface SponsorButtonProps {
   childRecordId: string;
@@ -20,6 +20,17 @@ export function SponsorButton({
   shirtAssigned,
 }: SponsorButtonProps) {
   const [loading, setLoading] = useState(false);
+
+  // When the user clicks the button, we redirect to Stripe. If they hit
+  // the browser back button, the page is restored from bfcache with
+  // loading still set to true. Reset it on pageshow so the button works.
+  useEffect(() => {
+    const reset = (e: PageTransitionEvent) => {
+      if (e.persisted) setLoading(false);
+    };
+    window.addEventListener('pageshow', reset);
+    return () => window.removeEventListener('pageshow', reset);
+  }, []);
 
   async function handleClick() {
     setLoading(true);
