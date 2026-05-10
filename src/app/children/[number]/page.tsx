@@ -430,7 +430,7 @@ export default async function ChildProfilePage({ params }: ChildPageProps) {
           Back to home
         </Link>
 
-        <RevealOverlay shirtNumber={Number(number)}>
+        <RevealOverlay shirtNumber={Number(number)} childName={displayName}>
         <div className="grid md:grid-cols-2 gap-10 md:gap-14 items-start">
           {/* Photo */}
           <div className="aspect-[4/5] bg-[#f5f0e8] border border-[#e8e0d4] overflow-hidden relative">
@@ -637,6 +637,119 @@ export default async function ChildProfilePage({ params }: ChildPageProps) {
             </div>
           </div>
         </div>
+
+        {/* ── Rep your number — custom merch section ──────────────── */}
+        <div className="mt-16 md:mt-20">
+          <div className="text-center mb-10">
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-3">
+              Rep your number
+            </p>
+            <h2
+              className="text-3xl md:text-4xl text-[#0d0d0d] mb-3"
+              style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
+            >
+              You&rsquo;re #{number}. Own it.
+            </h2>
+            <p className="text-[#777] max-w-xl mx-auto leading-relaxed">
+              Every item has your number on it. Every time someone asks
+              about it, that&rsquo;s another kid who gets a shot.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
+            {/* Hoodie */}
+            <a
+              href={`/shirts?number=${number}&item=hoodie`}
+              className="group block bg-white border border-[#e8e0d4] p-4 hover:border-[#D4A843] transition-colors"
+            >
+              <div className="aspect-square bg-[#f5f0e8] flex items-center justify-center mb-3">
+                <div className="text-center">
+                  <p className="text-3xl md:text-4xl font-bold text-[#0d0d0d] opacity-20">
+                    #{number}
+                  </p>
+                </div>
+              </div>
+              <p
+                className="text-sm font-semibold text-[#0d0d0d] mb-1"
+                style={{ fontFamily: 'var(--font-lora), serif' }}
+              >
+                Hoodie
+              </p>
+              <p className="text-xs text-[#999]">#{number} on the back</p>
+            </a>
+
+            {/* Hat */}
+            <a
+              href={`/shirts?number=${number}&item=hat`}
+              className="group block bg-white border border-[#e8e0d4] p-4 hover:border-[#D4A843] transition-colors"
+            >
+              <div className="aspect-square bg-[#f5f0e8] flex items-center justify-center mb-3">
+                <div className="text-center">
+                  <p className="text-3xl md:text-4xl font-bold text-[#0d0d0d] opacity-20">
+                    #{number}
+                  </p>
+                </div>
+              </div>
+              <p
+                className="text-sm font-semibold text-[#0d0d0d] mb-1"
+                style={{ fontFamily: 'var(--font-lora), serif' }}
+              >
+                Hat
+              </p>
+              <p className="text-xs text-[#999]">#{number} front and center</p>
+            </a>
+
+            {/* Sticker pack */}
+            <a
+              href={`/shirts?number=${number}&item=stickers`}
+              className="group block bg-white border border-[#e8e0d4] p-4 hover:border-[#D4A843] transition-colors"
+            >
+              <div className="aspect-square bg-[#f5f0e8] flex items-center justify-center mb-3">
+                <div className="text-center">
+                  <p className="text-3xl md:text-4xl font-bold text-[#0d0d0d] opacity-20">
+                    #{number}
+                  </p>
+                </div>
+              </div>
+              <p
+                className="text-sm font-semibold text-[#0d0d0d] mb-1"
+                style={{ fontFamily: 'var(--font-lora), serif' }}
+              >
+                Sticker Pack
+              </p>
+              <p className="text-xs text-[#999]">Laptop, water bottle, wherever</p>
+            </a>
+
+            {/* Another shirt */}
+            <a
+              href={`/shirts?number=${number}`}
+              className="group block bg-white border border-[#e8e0d4] p-4 hover:border-[#D4A843] transition-colors"
+            >
+              <div className="aspect-square bg-[#f5f0e8] flex items-center justify-center mb-3">
+                <div className="text-center">
+                  <p className="text-3xl md:text-4xl font-bold text-[#0d0d0d] opacity-20">
+                    #{number}
+                  </p>
+                </div>
+              </div>
+              <p
+                className="text-sm font-semibold text-[#0d0d0d] mb-1"
+                style={{ fontFamily: 'var(--font-lora), serif' }}
+              >
+                Another Shirt
+              </p>
+              <p className="text-xs text-[#999]">Different design, same number</p>
+            </a>
+          </div>
+
+          <p className="text-center text-xs text-[#bbb] mt-6">
+            Coming soon — all items handmade with your number.{' '}
+            <a href="mailto:Kevin@beanumber.org" className="text-[#D4A843] hover:underline">
+              Want early access? Email Kevin.
+            </a>
+          </p>
+        </div>
+
         </RevealOverlay>
       </main>
 

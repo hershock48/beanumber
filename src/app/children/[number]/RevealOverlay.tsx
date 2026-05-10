@@ -4,6 +4,9 @@ import { useState, useEffect, useCallback } from 'react';
 
 interface RevealOverlayProps {
   shirtNumber: number;
+  /** Child's display name — shown as the title card in beat one of the
+   *  reveal before the photo unblurs in beat two. */
+  childName: string;
   children: React.ReactNode;
 }
 
@@ -35,15 +38,15 @@ function fireConfetti() {
   const cx = canvas.width / 2;
   const cy = canvas.height * 0.4;
 
-  for (let i = 0; i < 120; i++) {
+  for (let i = 0; i < 150; i++) {
     const angle = Math.random() * Math.PI * 2;
-    const speed = 4 + Math.random() * 8;
+    const speed = 4 + Math.random() * 9;
     particles.push({
       x: cx,
       y: cy,
       vx: Math.cos(angle) * speed * (0.6 + Math.random()),
-      vy: Math.sin(angle) * speed * (0.6 + Math.random()) - 3,
-      size: 4 + Math.random() * 6,
+      vy: Math.sin(angle) * speed * (0.6 + Math.random()) - 4,
+      size: 4 + Math.random() * 7,
       color: colors[Math.floor(Math.random() * colors.length)],
       rotation: Math.random() * 360,
       rotationSpeed: (Math.random() - 0.5) * 12,
@@ -53,7 +56,7 @@ function fireConfetti() {
   }
 
   let frame = 0;
-  const maxFrames = 120;
+  const maxFrames = 140;
 
   function animate() {
     frame++;
@@ -65,7 +68,7 @@ function fireConfetti() {
     for (const p of particles) {
       p.x += p.vx;
       p.y += p.vy;
-      p.vy += 0.18; // gravity
+      p.vy += 0.16; // gravity
       p.vx *= 0.99; // air resistance
       p.rotation += p.rotationSpeed;
       p.opacity = Math.max(0, 1 - frame / maxFrames);
@@ -89,66 +92,80 @@ function fireConfetti() {
   requestAnimationFrame(animate);
 }
 
-export function RevealOverlay({ shirtNumber, children }: RevealOverlayProps) {
+// ── Reveal stages ──────────────────────────────────────────────
+// Stage 0: pre-reveal — blurred content, overlay card with "Meet your child"
+// Stage 1: name title card — child's name appears large, background still blurred
+// Stage 2: photo unblur + confetti — the face reveal
+// Stage 3: done — full profile visible (same as return-visit state)
+
+type RevealStage = 0 | 1 | 2 | 3;
+
+export function RevealOverlay({ shirtNumber, childName, children }: RevealOverlayProps) {
   const storageKey = `ban-revealed-${shirtNumber}`;
-  const [revealed, setRevealed] = useState<boolean | null>(null);
-  const [animating, setAnimating] = useState(false);
+  const [checked, setChecked] = useState(false);
+  const [alreadyRevealed, setAlreadyRevealed] = useState(false);
+  const [stage, setStage] = useState<RevealStage>(0);
 
   useEffect(() => {
-    // Check localStorage to see if they've already revealed this child.
-    // Default to revealed=true so SSR/no-JS users see content immediately.
     try {
       const already = localStorage.getItem(storageKey);
-      setRevealed(already === 'yes');
+      setAlreadyRevealed(already === 'yes');
     } catch {
-      setRevealed(true);
+      setAlreadyRevealed(true);
     }
+    setChecked(true);
   }, [storageKey]);
 
   const handleReveal = useCallback(() => {
-    setAnimating(true);
-    fireConfetti();
-    try {
-      localStorage.setItem(storageKey, 'yes');
-    } catch {
-      // Private browsing or full storage — just proceed.
-    }
-    // Let the unblur animation play, then fully reveal.
+    // Beat 1: show the name title card
+    setStage(1);
+
+    // Beat 2: after a pause, fire confetti and unblur the photo
     setTimeout(() => {
-      setRevealed(true);
-      setAnimating(false);
-    }, 900);
+      setStage(2);
+      fireConfetti();
+      try {
+        localStorage.setItem(storageKey, 'yes');
+      } catch {
+        // Private browsing — just proceed.
+      }
+    }, 1600);
+
+    // Beat 3: fully revealed
+    setTimeout(() => {
+      setStage(3);
+    }, 2800);
   }, [storageKey]);
 
-  // While checking localStorage (first render), show nothing to avoid flash.
-  if (revealed === null) {
+  // While checking localStorage, show a placeholder to avoid flash.
+  if (!checked) {
     return <div className="min-h-[60vh]" />;
   }
 
-  // Already revealed — render children normally.
-  if (revealed) {
+  // Return visit — render content immediately.
+  if (alreadyRevealed || stage === 3) {
     return <>{children}</>;
   }
 
-  // First visit — show the reveal experience.
   return (
     <div className="relative">
-      {/* Blurred/hidden content underneath */}
+      {/* Blurred content underneath — unblurs during stage 2 */}
       <div
-        className="transition-all duration-700 ease-out"
+        className="transition-all ease-out"
         style={{
-          filter: animating ? 'blur(0px)' : 'blur(16px)',
-          opacity: animating ? 1 : 0.5,
-          transform: animating ? 'scale(1)' : 'scale(0.98)',
-          pointerEvents: animating ? 'auto' : 'none',
+          filter: stage >= 2 ? 'blur(0px)' : 'blur(18px)',
+          opacity: stage >= 2 ? 1 : 0.4,
+          transform: stage >= 2 ? 'scale(1)' : 'scale(0.97)',
+          transitionDuration: stage >= 2 ? '1200ms' : '0ms',
+          pointerEvents: stage >= 2 ? 'auto' : 'none',
         }}
-        aria-hidden={!animating}
+        aria-hidden={stage < 2}
       >
         {children}
       </div>
 
-      {/* Overlay with reveal button — sits on top of blurred content */}
-      {!animating && (
+      {/* ── Stage 0: "Meet your child" card ── */}
+      {stage === 0 && (
         <div className="absolute inset-0 flex items-center justify-center z-10">
           <div className="text-center px-6 max-w-md">
             <div className="bg-white/95 backdrop-blur-sm border border-[#e8e0d4] p-8 md:p-12 shadow-lg">
@@ -166,7 +183,7 @@ export function RevealOverlay({ shirtNumber, children }: RevealOverlayProps) {
               </p>
               <p className="text-[#777] mb-8 leading-relaxed">
                 A real child at the YDO campus in Northern Uganda
-                has been waiting for you.
+                is on the other side of this button.
               </p>
               <button
                 onClick={handleReveal}
@@ -176,6 +193,71 @@ export function RevealOverlay({ shirtNumber, children }: RevealOverlayProps) {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* ── Stage 1: Name title card ── */}
+      {stage === 1 && (
+        <div className="absolute inset-0 flex items-center justify-center z-10">
+          <div
+            className="text-center px-6"
+            style={{
+              animation: 'revealNameIn 600ms ease-out forwards',
+            }}
+          >
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-4">
+              Meet
+            </p>
+            <p
+              className="text-5xl md:text-7xl text-[#0d0d0d] mb-4"
+              style={{
+                fontFamily: 'var(--font-lora), serif',
+                fontWeight: 600,
+              }}
+            >
+              {childName}
+            </p>
+            <p className="text-lg text-[#999]">#{shirtNumber}</p>
+          </div>
+          <style>{`
+            @keyframes revealNameIn {
+              0% { opacity: 0; transform: scale(0.9) translateY(20px); }
+              100% { opacity: 1; transform: scale(1) translateY(0); }
+            }
+          `}</style>
+        </div>
+      )}
+
+      {/* ── Stage 2: photo unblurring + confetti (overlay fades out) ── */}
+      {stage === 2 && (
+        <div
+          className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none"
+          style={{
+            animation: 'revealFadeOut 1200ms ease-in forwards',
+          }}
+        >
+          <div className="text-center px-6">
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-4">
+              Meet
+            </p>
+            <p
+              className="text-5xl md:text-7xl text-[#0d0d0d] mb-4"
+              style={{
+                fontFamily: 'var(--font-lora), serif',
+                fontWeight: 600,
+              }}
+            >
+              {childName}
+            </p>
+            <p className="text-lg text-[#999]">#{shirtNumber}</p>
+          </div>
+          <style>{`
+            @keyframes revealFadeOut {
+              0% { opacity: 1; }
+              60% { opacity: 1; }
+              100% { opacity: 0; }
+            }
+          `}</style>
         </div>
       )}
     </div>
