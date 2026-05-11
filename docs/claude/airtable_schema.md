@@ -6,156 +6,287 @@ Base: `Donor Management` (ID `app73ZPGbM0BQTOZW`).
 
 > **Rule one:** singleSelect fields reject unknown values (422 INVALID_MULTIPLE_CHOICE_OPTIONS). You cannot add options via the REST API — Airtable's metadata API is blocked by the sandbox proxy. Either use an existing option, normalize to one in code, or ask Kevin to add the option in the Airtable UI.
 
+> **Last verified against live schema:** 2026-05-11 via `list_tables_for_base`. If this doc drifts, trust the MCP tool output, then update this file.
+
 ## Tables
 
-### Donors
+### Donors (`tblhuLpJgYLB0pTjx`)
 
 The people who pay us. One record per unique email address.
 
 Key fields:
-- `Name` (single line text) — display name. Can be blank for anonymous.
-- `Email` (email) — unique, lowercase, canonical identifier.
-- `Stripe Customer ID` (single line text) — `cus_...`.
-- `First Donation Date`, `Last Donation Date` (date).
-- `Lifetime Total` (currency, rollup of Donations).
-- `Status` (singleSelect: Active, Lapsed, Refunded, Test).
-- `Tags` (multipleSelect).
-- `Unsubscribed` (checkbox) — checked = respect unsub on all non-transactional email.
-- Reverse links: `Donations`, `Sponsorships`, `Communications`.
+- `Donor Name` (singleLineText) — display name. Can be blank for anonymous.
+- `Organization Name` (singleLineText) — company/org if applicable.
+- `Email Address` (singleLineText) — unique, lowercase, canonical identifier.
+- `Phone Number` (singleLineText).
+- `Mailing Address` (singleLineText).
+- `Stripe Customer ID` (singleLineText) — `cus_...`.
+- `Total Lifetime Giving` (currency) — computed by `updateDonorSummary()` in the webhook and the backfill endpoint.
+- `First Donation Date` (date) — computed by `updateDonorSummary()`.
+- `Most Recent Donation` (date) — computed by `updateDonorSummary()`.
+- `Donor Status` (singleSelect) — computed by `updateDonorSummary()`. Values: check Airtable for current options.
+- `Recurring Supporter` (checkbox) — computed by `updateDonorSummary()`.
+- `Communication Opt-In` (checkbox) — has the donor consented to marketing emails beyond transactional receipts?
+- `How They Heard` (singleSelect) — attribution source.
+- `Notes` (multilineText) — internal relationship notes.
 
-Drip nurture fields (added April 16 for post-purchase conversion pipelines):
-- `DripPipeline` (singleSelect: shirt_nurture, sponsor_onboard, donor_convert, shirt_sponsor, monthly_donor) — which sequence, if any. 5 pipelines, 17 total emails.
-- `DripStage` (number) — 0 = first email pending, increments after each send, cleared when sequence completes. Max stages vary by pipeline (3–4).
-- `DripNextSend` (date, ISO) — next scheduled send. Cron at `/api/cron/drip` checks daily.
-- `DripChildName` (single line text) — child's first name for email personalization. May be comma-separated for multi-shirt/repeat orders (e.g. "Ayubu,Amito,Okello").
-- `DripShirtNumber` (single line text) — shirt number(s) for building `/children/N` links. May be comma-separated for multi-shirt/repeat orders (e.g. "24,25,26"). Changed from number to text on Apr 26 2026.
+Reverse links (auto-managed by Airtable):
+- `Donations` (multipleRecordLinks → Donations).
+- `Sponsorships` (multipleRecordLinks → Sponsorships).
+- `Subscriptions` (multipleRecordLinks → Subscriptions).
 
-Upsert key: `Email` (lowercased). If no match by email, try `Stripe Customer ID` as a secondary key before creating a new record.
+Drip nurture fields (post-purchase conversion pipelines, 5 pipelines / 17 emails):
+- `DripPipeline` (singleSelect: shirt_nurture, sponsor_onboard, donor_convert, shirt_sponsor, monthly_donor).
+- `DripStage` (number) — 0 = first email pending, increments after each send, cleared when sequence completes.
+- `DripNextSend` (date) — next scheduled send. Cron at `/api/cron/drip` checks daily.
+- `DripChildName` (singleLineText) — child's first name for email personalization. May be comma-separated for multi-shirt/repeat orders.
+- `DripShirtNumber` (singleLineText) — shirt number(s) for building `/children/N` links. May be comma-separated.
 
-### Donations
+Upsert key: `Email Address` (lowercased). If no match by email, try `Stripe Customer ID` as a secondary key before creating a new record.
+
+**Pending deletion (tagged `[DELETE]` in Airtable, Kevin needs to delete in UI):** Profile Photo, Engagement Score, Preferred Contact Method, Communications (reverse link), Number of Donations (rollup), Exports (link to dead table).
+
+### Donations (`tblw0ss8qpGL7l25s`)
 
 One record per money event (one-time donation, monthly recurring charge, shirt purchase, refund).
 
 Key fields:
-- `Amount` (currency).
-- `Date` (datetime).
-- `Donor` (linked record → Donors).
-- `Stripe Payment Intent ID` / `Stripe Session ID` / `Stripe Invoice ID` (single line text).
+- `Stripe Payment Intent ID` (singleLineText) — primary field.
+- `Donation Date` (date).
+- `Payment Status` (singleSelect).
+- `Donation Amount` (currency).
+- `Stripe Checkout Session ID` (singleLineText).
+- `Currency` (singleLineText).
+- `Recurring Donation` (checkbox).
+- `Donor` (multipleRecordLinks → Donors).
+- `Donation Note` (multilineText).
+- `Donor Email at Donation` (singleLineText).
+- `Stripe Customer ID` (singleLineText).
 - `Donation Source` (singleSelect) — **see trap below**.
-- `Donation Note` (long text).
-- `Status` (singleSelect: Succeeded, Refunded, Pending, Failed).
-- `Receipt Sent` (checkbox).
-- `Receipt URL` (URL, set by SendGrid template callback).
-- `Sponsorship` (linked record → Sponsorships, set for subscription-generated donations).
+- `Child` (multipleRecordLinks → Children) — if this gift is tagged to a specific child.
+- `Communications` (multipleRecordLinks → Communications).
+
+Lookup/rollup fields (auto-computed by Airtable):
+- `Donor Name (Lookup)` (multipleLookupValues).
+- `Donor Status (Lookup)` (multipleLookupValues).
+- `Donation Year` (formula).
+- `Donor Lifetime Giving (Rollup)` (rollup).
+- `Thank You Email Sent? (Rollup)` (rollup).
 
 **Fields that DO NOT exist on this table (webhook used to try to write these — don't):**
+- `Subscription ID`, `Organization Name`, `Address Line 1`, `City`, `State`, `Postal Code`, `Country`.
+If the webhook collects a billing address from Stripe, put it on **Donors**, not Donations. Or shove it into `Donation Note`.
 
-- `Subscription ID`
-- `Organization Name`
-- `Address Line 1`
-- `City`
-- `State`
-- `Postal Code`
-- `Country`
+**Pending deletion:** Receipt Photo, Donation Note Summary (AI), Donation Impact Tag (AI), Exports.
 
-If the webhook collects a billing address from Stripe and you want to persist it, put it on **Donors**, not Donations. Or put a one-line string into `Donation Note`.
+### Sponsorships (`tbluUPB0FrtxZZi8S`)
 
-### Sponsorships
-
-One record per active sponsor-to-child pairing. Lifecycle: created on subscription start, updated on each invoice, can be canceled or swapped.
+One record per active sponsor-to-child pairing. Lifecycle: created on subscription start (or manually for missed sponsors), updated on each invoice, can be canceled or swapped.
 
 Key fields:
-- `Donor` (linked record → Donors).
-- `Child` (linked record → Children).
-- `ShirtNumber` (number) — **preferred join key** per the deferred `ChildID → ShirtNumber` migration note.
-- `ChildID` (single line text) — **legacy join key**, still referenced by ~20 files. Migration deferred.
-- `Stripe Subscription ID` (single line text) — `sub_...`.
-- `Status` (singleSelect: Active, Paused, Canceled, Past Due).
-- `Started` (date), `Canceled` (date, nullable).
-- `ChildRevealedAt` (datetime, nullable) — **the reveal gate.** Until this is set, the sponsor portal shows the lockbox view.
-- `Monthly Amount` (currency, default 25).
-- `Total Paid` (currency, rollup).
+- `SponsorCode` (singleLineText) — primary field. Format: `BAN-YYYY-NNN`.
+- `SponsorEmail` (email).
+- `SponsorName` (singleLineText).
+- `ChildID` (singleLineText) — **legacy join key**, still referenced by ~20 files. Migration deferred.
+- `ChildDisplayName` (singleLineText).
+- `ChildPhoto` (multipleAttachments).
+- `ChildAge` (singleLineText).
+- `ChildLocation` (singleLineText).
+- `Children` (multipleRecordLinks → Children).
+- `Donor` (multipleRecordLinks → Donors).
+- `Child Updates` (multipleRecordLinks → Child Updates).
+- `Status` (singleSelect).
+- `AuthStatus` (singleSelect).
+- `VisibleToSponsor` (checkbox).
+- `SponsorshipStartDate` (date).
+- `MonthlyAmount` (currency, default 25).
+- `StripeSubscriptionID` (singleLineText) — `sub_...`.
+- `ChildRevealedAt` (dateTime, nullable) — **the reveal gate.** Until this is set, the sponsor portal shows the lockbox view.
 
-### Children
+Request/publish lifecycle fields:
+- `RequestedBySponsor` (checkbox).
+- `RequestedAt` (dateTime).
+- `LastRequestAt` (dateTime).
+- `NextRequestEligibleAt` (dateTime).
+- `PublishedAt` (dateTime).
+
+### Children (`tbl4po2E8c72MUpan`)
 
 The kids. One record per child at the YDO campus.
 
 Key fields:
-- `Name` (single line text) — full name.
-- `FirstName` (single line text).
+- `ChildID` (singleLineText) — primary field.
 - `ShirtNumber` (number) — unique. **This is the public identifier**, used in URLs at `/children/[number]`.
-- `Photo` (attachment, single) — required for homepage carousel appearance.
-- `Birthday` (date).
-- `Class` (single line text, e.g. "Primary 3").
-- `Notes` (long text) — legacy freeform bio. Fallback on profile page when structured fields are empty.
-- `HomeVillage` (single line text) — new April 15 intake field.
-- `FamilyContext` (long text) — new.
-- `Loves` (long text) — new.
-- `ChildQuote` (long text) — new. Renders as Lora italic pull-quote.
-- `TeacherName` (single line text) — new.
-- `TeacherQuote` (long text) — new.
+- `DisplayName` (singleLineText).
+- `FirstName` (singleLineText).
+- `LastInitial` (singleLineText).
+- `DateOfBirth` (date).
+- `Gender` (singleSelect).
+- `ProfilePhoto` (multipleAttachments) — required for homepage carousel appearance.
+- `Status` (singleSelect).
+- `EnrollmentDate` (date).
+- `GradeClass` (singleLineText).
+- `SchoolLocation` (singleSelect).
+- `Notes` (multilineText) — legacy freeform bio. Fallback on profile page when structured fields are empty.
+
+Structured intake fields (April 15 redesign):
+- `HomeVillage` (singleLineText).
+- `FamilyContext` (singleLineText).
+- `Loves` (singleLineText).
+- `ChildQuote` (multilineText) — renders as Lora italic pull-quote.
+- `TeacherName` (singleLineText).
+- `TeacherQuote` (multilineText).
+
+Shirt assignment fields:
+- `ShirtAssignedAt` (dateTime) — BLANK means shirt number is available.
+- `ShirtBuyerEmail` (email) — denormalized from linked Donation.
+- `ShirtBuyerName` (singleLineText) — denormalized from linked Donation.
+- `ReservedForAuction` (checkbox) — if checked, skip auto-assignment.
+
+Update scheduling fields:
+- `ExpectedFieldPeriod` (singleSelect).
+- `ExpectedAcademicTerm` (singleSelect).
+- `LastFieldUpdateDate` (date).
+- `LastAcademicUpdateDate` (date).
+
+Reverse links:
+- `Associated Sponsorships` (multipleRecordLinks → Sponsorships).
+- `Child Updates` (multipleRecordLinks → Child Updates).
+- `Donations` (multipleRecordLinks → Donations).
+- `Child ID` (singleLineText) — duplicate of ChildID? Verify in UI.
 
 Half-filled intake is fine; the page renders each block conditionally.
 
-### Child Updates
+### Child Updates (`tblrmtVBVzL7zCQDE`)
 
 Content the YDO team publishes for sponsors. Delivered via sponsor portal + email.
 
 Key fields:
-- `Child` (linked record → Children).
-- `Date` (date).
-- `Title` (single line text).
-- `Body` (long text, markdown).
-- `Photos` (attachments, multiple).
-- `Status` (singleSelect: Draft, Scheduled, Sent).
-- `Scheduled For` (datetime, nullable).
-- `Visible To` (singleSelect: All Sponsors, Sponsor of This Child, Admin Only).
+- `UpdateID` (singleLineText) — primary field.
+- `SponsorCode` (singleLineText).
+- `UpdateType` (singleSelect).
+- `Title` (singleLineText).
+- `Content` (multilineText).
+- `Child` (multipleRecordLinks → Children).
+- `UpdateDate` (date).
+- `Type` (singleSelect).
+- `Status` (singleSelect).
+- `Summary` (multilineText).
+- `UpdateDetails` (multilineText).
+- `Photos` (multipleAttachments).
+- `VisibleToSponsor` (checkbox).
+- `RequestedBySponsor` (checkbox).
+- `RequestedAt` (dateTime).
+- `PublishedAt` (dateTime).
+- `Author` (singleLineText).
+- `LastModified` (date).
+- `Linked Sponsor Request` (multipleRecordLinks → Sponsorships).
+- `Scheduled Posts` (multipleRecordLinks → Scheduled Posts).
 
-### Communications
+Academic/wellbeing assessment fields:
+- `PhysicalWellbeing`, `EmotionalWellbeing`, `SchoolEngagement` (singleSelect).
+- `PhysicalNotes`, `EmotionalNotes`, `EngagementNotes` (multilineText).
+- `SponsorNarrative` (multilineText).
+- `PositiveHighlight`, `Challenge` (singleLineText).
+- `AttendancePercent`, `EnglishGrade`, `MathGrade`, `ScienceGrade`, `SocialStudiesGrade` (number).
+- `TeacherComment` (multilineText).
+
+Google Drive file IDs (for pulling photos/docs from Drive):
+- `DriveFolderID`, `Photo1FileID`, `Photo2FileID`, `Photo3FileID`, `HandwrittenNoteFileID`, `ReportCardFileID` (singleLineText).
+
+Review workflow:
+- `SubmittedAt` (dateTime), `SubmittedBy` (email).
+- `ReviewedBy` (email), `ReviewedAt` (dateTime).
+- `RejectionReason`, `CorrectionNotes` (multilineText).
+- `SourceType`, `Period`, `AcademicTerm` (singleSelect).
+- `ChildID` (singleLineText).
+
+### Communications (`tblw7ZmsfcphmfsWT`)
 
 Log of outbound transactional/newsletter sends. Used for audit + unsubscribe enforcement.
 
 Key fields:
-- `Donor` (linked → Donors) or `Sponsorship` (linked → Sponsorships).
-- `Type` (singleSelect: Thank You, Monthly Update, Receipt, Magic Link, Admin Notification, Newsletter).
-- `Sent At` (datetime).
-- `Subject` (single line text).
-- `SendGrid Message ID` (single line text).
-- `Status` (singleSelect: Sent, Delivered, Bounced, Opened, Clicked, Unsubscribed).
+- `Subject` (singleLineText) — primary field.
+- `Send Date` (date).
+- `Status` (singleSelect).
+- `Recipient Email` (singleLineText).
+- `Email Type` (singleSelect).
+- `Related Donation` (multipleRecordLinks → Donations).
+- `Related Donor` (multipleRecordLinks → Donors).
 
-### Subscriptions
+**Pending deletion (11 fields tagged `[DELETE]`):** Email Body, Attachments, Stripe Event ID, Related Donation Amount, Related Donation Date, Related Donor Name, Related Donor Email, Days Since Sent, Is Thank You Sent?, Email Body Summary, Sentiment of Email.
+
+### Subscriptions (`tbl3WANtB8pg7XZpw`)
 
 Shadow table for Stripe subscription state. Synced by webhook events. Don't edit by hand.
 
 Key fields:
-- `Stripe Subscription ID` (primary).
-- `Sponsorship` (linked → Sponsorships).
-- `Status` (mirrors Stripe: active, past_due, canceled, incomplete, trialing).
-- `Current Period End` (datetime).
-- `Cancel At Period End` (checkbox).
+- `Subscription ID` (singleLineText) — primary field. `sub_...`.
+- `Donor` (multipleRecordLinks → Donors).
+- `Status` (singleSelect — mirrors Stripe: active, past_due, canceled, etc.).
+- `Start Date` (date).
+- `Current Period End` (date).
+- `Amount` (currency).
+- `Frequency` (singleSelect).
 
-### Scheduled Posts
+### Scheduled Posts (`tbltCdrr6ehpP8wX8`)
 
 Social media / newsletter content queue. Dequeued by the cron at `/api/cron/publish-scheduled`.
 
 Key fields:
-- `Platform` (singleSelect: Instagram, Facebook, Newsletter).
-- `Content` (long text).
-- `Media` (attachments).
-- `Scheduled For` (datetime).
-- `Status` (singleSelect: Draft, Scheduled, Published, Failed).
+- `ScheduledPostID` (autoNumber) — primary field.
+- `Platform` (singleSelect).
+- `ContentType` (singleSelect).
+- `Caption` (multilineText).
+- `Hashtags` (singleLineText).
+- `ScheduledAt` (dateTime).
+- `Status` (singleSelect).
+- `PublishedAt` (dateTime).
+- `MediaDriveId` (singleLineText), `MediaUrl` (url).
+- `InstagramPostId`, `FacebookPostId` (singleLineText).
+- `Error` (multilineText).
+- `CreatedBy` (email), `CreatedAt` (dateTime).
+- `Related Child Update` (multipleRecordLinks → Child Updates).
+- `Review Needed` (checkbox).
+- `Notes` (multilineText).
 
-### Newsletters
+### Newsletters (`tblqP1zrRsh4mblHq`)
 
-Assembled newsletter issues. Produced by `/api/cron/newsletter`.
+Monthly campus newsletters sent to all active sponsors. Kevin drafts here, sends on demand or via cron.
 
 Key fields:
-- `Issue Number` (number).
-- `Date` (date).
-- `Subject` (single line text).
-- `Body HTML` (long text).
-- `Recipients` (number, at send time).
-- `SendGrid Campaign ID` (single line text).
+- `Title` (singleLineText) — primary field. Internal label.
+- `Subject` (singleLineText) — email subject line as sponsors see it.
+- `BodyHTML` (multilineText) — full HTML. Supports `{{sponsorFirstName}}` merge tag.
+- `HeroPhoto` (multipleAttachments).
+- `Status` (singleSelect).
+- `SendDate` (dateTime) — if Status=Scheduled and SendDate ≤ now, cron picks it up.
+- `PublishedAt` (dateTime) — actual send timestamp, written by code.
+- `RecipientCount`, `SentCount`, `FailedCount` (number).
+- `SendNotes` (multilineText).
+- `Author` (singleLineText).
+
+### Fulfillment (`tblkSZBRrMiHhT3MP`)
+
+Production queue and shipping tracker. One row per shirt. Group by Design → Shirt Color for batch production.
+
+Key fields:
+- `Order #` (number) — primary field. The shirt number stamped inside the collar.
+- `Design` (singleSelect).
+- `Shirt Color` (singleSelect).
+- `Size` (singleSelect).
+- `Vinyl Front`, `Vinyl Back` (singleSelect) — auto-set based on shirt color.
+- `Buyer` (singleLineText), `Email` (email).
+- `Ship Name`, `Ship Street1`, `Ship Street2`, `Ship City`, `Ship State`, `Ship ZIP` (singleLineText).
+- `Production` (singleSelect), `Shipping` (singleSelect).
+- `Tracking` (singleLineText).
+- `Child Name` (singleLineText).
+- `Order Date` (date).
+- `Notes` (multilineText).
+
+### Exports (`tbljNFr1c4an7SrEr`) — DELETE THIS TABLE
+
+Entirely unused. Zero records, zero code references. Kevin: delete the whole table from the tab bar.
 
 ## Traps already hit (don't hit them again)
 
@@ -177,19 +308,19 @@ const sourceLabelForNote = VALID_SOURCES.has(rawSource) ? null : rawSource;
 
 ### Trap 2: The webhook tried to write address fields to Donations
 
-Fields like `Address Line 1`, `City`, `State`, `Postal Code`, `Country` do not exist on the Donations table. They never did. Writing them returned 422 UNKNOWN_FIELD_NAME, the handler threw, the outer catch returned 500, Stripe retried, Stripe gave up. Fixed in commit `2307241` — those writes are removed. If you want to persist address info, put it on the Donors record (check that table's schema first) or shove it into `Donation Note` as a single string.
+Fields like `Address Line 1`, `City`, `State`, `Postal Code`, `Country` do not exist on the Donations table. They never did. Writing them returned 422 UNKNOWN_FIELD_NAME. Fixed in commit `2307241` — those writes are removed. If you want to persist address info, put it on the Donors record or shove it into `Donation Note` as a single string.
 
-### Trap 3: `Subscription ID` vs `Stripe Subscription ID`
+### Trap 3: Field names in code vs Airtable
 
-The field on Sponsorships is `Stripe Subscription ID`, not `Subscription ID`. Don't guess the field name from memory; copy it.
+Field names in the codebase don't always match the actual Airtable field names. Examples: the doc used to say `Name` but the field is `Donor Name`; used to say `Email` but the field is `Email Address`; Sponsorships uses `StripeSubscriptionID` not `Stripe Subscription ID`. **Always verify with `get_table_schema` before writing.** Copy field names exactly.
 
 ### Trap 4: ChildID vs ShirtNumber
 
 `ChildID` is the legacy join key between Sponsorships and Children, still referenced in ~20 files. The Ugandan team only uses shirt numbers. We chose not to do the migration mid-stream. When writing new code, prefer `ShirtNumber` for new joins, but don't break the old path — add, don't replace.
 
-### Trap 5: Airtable API can't modify schema
+### Trap 5: Airtable API can't delete fields or tables
 
-You cannot add singleSelect options, create fields, or rename fields via the REST API from this environment. The Airtable metadata API is blocked by the sandbox proxy (403, `X-Proxy-Error: blocked-by-allowlist`). Schema changes happen in the Airtable UI, manually. Flag needed changes to Kevin; don't spin your wheels trying to do it programmatically.
+You cannot delete fields, delete tables, add singleSelect options, or change field types via the REST API from this environment. The Airtable metadata API is blocked by the sandbox proxy (403, `X-Proxy-Error: blocked-by-allowlist`). You CAN rename fields and update descriptions via `update_field`. Schema changes that require deletion happen in the Airtable UI manually.
 
 ### Trap 6: Attachments need URLs, not bytes
 

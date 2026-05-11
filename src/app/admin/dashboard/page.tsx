@@ -68,27 +68,43 @@ export default function AdminDashboard() {
     }
   };
 
+  const loadUpdates = async (token: string) => {
+    try {
+      const response = await fetch('/api/admin/updates/list', {
+        headers: { 'X-Admin-Token': token },
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setUpdates(data.data.updates);
+      } else {
+        const data = await response.json().catch(() => ({}));
+        setError(`Couldn't load pending updates: ${data.message || response.statusText}. Dashboard still works — check Airtable API key in Vercel env vars.`);
+      }
+    } catch (err) {
+      setError('Couldn\'t reach the updates API. Dashboard still works.');
+    }
+  };
+
   const handleAuthenticate = async () => {
     setError('');
     setIsLoading(true);
 
     try {
-      const response = await fetch('/api/admin/updates/list', {
-        headers: {
-          'X-Admin-Token': adminToken,
-        },
+      // Step 1: verify password (no Airtable dependency)
+      const authResponse = await fetch('/api/admin/auth', {
+        method: 'POST',
+        headers: { 'X-Admin-Token': adminToken },
       });
 
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.message || 'Authentication failed');
+      if (!authResponse.ok) {
+        throw new Error('Wrong password');
       }
 
-      const data = await response.json();
-      setUpdates(data.data.updates);
+      // Step 2: auth passed — let them in
       setIsAuthenticated(true);
 
-      // Also load overdue data
+      // Step 3: load data in the background (failures don't block access)
+      loadUpdates(adminToken);
       loadOverdueData(adminToken);
     } catch (err: any) {
       setError(err.message || 'Failed to authenticate');
