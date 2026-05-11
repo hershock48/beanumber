@@ -124,9 +124,10 @@ export async function clearSession(): Promise<void> {
  */
 export function verifyAdminToken(request: NextRequest): boolean {
   const adminToken = process.env.ADMIN_API_TOKEN;
+  const adminPassword = process.env.ADMIN_PASSWORD;
 
-  if (!adminToken) {
-    logger.warn('Admin authentication not configured');
+  if (!adminToken && !adminPassword) {
+    logger.warn('Admin authentication not configured (neither ADMIN_API_TOKEN nor ADMIN_PASSWORD is set)');
     return false;
   }
 
@@ -140,8 +141,9 @@ export function verifyAdminToken(request: NextRequest): boolean {
   // Accept either the API token or the human-friendly admin password.
   // ADMIN_PASSWORD is a simpler credential for dashboard login;
   // ADMIN_API_TOKEN stays for programmatic use and token signing.
-  const adminPassword = process.env.ADMIN_PASSWORD;
-  const isValid = requestToken === adminToken || (!!adminPassword && requestToken === adminPassword);
+  const isValid =
+    (!!adminToken && requestToken === adminToken) ||
+    (!!adminPassword && requestToken === adminPassword);
 
   logger.auth('admin_auth_attempt', isValid);
 
