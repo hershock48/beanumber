@@ -1,10 +1,12 @@
 import { notFound } from 'next/navigation';
+import { cookies } from 'next/headers';
 import Link from 'next/link';
 import { BANNavigation } from '@/components/BANNavigation';
 import { BANFooter } from '@/components/BANFooter';
 import { RevealBeacon } from './RevealBeacon';
 import { RevealOverlay } from './RevealOverlay';
 import { SponsorButton } from './SponsorButton';
+import { SESSION } from '@/lib/constants';
 
 // Never statically optimize or cache this page. Sponsorship status and child
 // data changes over time, and a stale empty cache entry would manifest as a
@@ -51,7 +53,22 @@ interface AirtableSponsorshipRecord {
     ChildLocation?: string;
     ChildPhoto?: Array<{ url: string; filename: string }>;
     Status?: string;
+    SponsorCode?: string;
   };
+}
+
+/** Read the sponsor_session cookie and return the sponsorCode if valid. */
+async function getViewerSponsorCode(): Promise<string | null> {
+  try {
+    const cookieStore = await cookies();
+    const raw = cookieStore.get(SESSION.COOKIE_NAME);
+    if (!raw) return null;
+    const session = JSON.parse(raw.value);
+    if (new Date(session.expires) < new Date()) return null;
+    return session.sponsorCode || null;
+  } catch {
+    return null;
+  }
 }
 
 async function airtableRequest<T>(endpoint: string): Promise<T> {
@@ -154,6 +171,18 @@ async function getChildByShirtNumber(shirtNumber: number) {
 
     const photo = child.ProfilePhoto?.[0]?.url || sponsorship?.ChildPhoto?.[0]?.url;
 
+    // Check if the current viewer is the sponsor for THIS child.
+    // The sponsor portal sets an httpOnly cookie with the sponsorCode.
+    // If it matches the sponsorship record for this child, the viewer
+    // is the actual sponsor — not just any visitor.
+    const viewerCode = await getViewerSponsorCode();
+    const viewerIsSponsor = Boolean(
+      viewerCode &&
+      sponsorship?.SponsorCode &&
+      sponsorship.Status === 'Active' &&
+      viewerCode === sponsorship.SponsorCode
+    );
+
     return {
       reserved: false as const,
       record_id: recordId,
@@ -170,6 +199,11 @@ async function getChildByShirtNumber(shirtNumber: number) {
       // profile page to reframe the CTA from cold acquisition ("Sponsor
       // [name]") to warm retention ("You already gave [name] a month").
       shirt_assigned: Boolean(child.ShirtAssignedAt),
+      // True when the current viewer is the verified sponsor of this child.
+      // Determined by matching the sponsor_session cookie against the
+      // sponsorship record's SponsorCode.
+      viewer_is_sponsor: viewerIsSponsor,
+      sponsor_code: viewerIsSponsor ? sponsorship!.SponsorCode : undefined,
       // Structured intake fields — any may be empty; the page renders each
       // block conditionally so a half-filled profile still looks intentional.
       home_village: child.HomeVillage,
@@ -561,62 +595,87 @@ export default async function ChildProfilePage({ params }: ChildPageProps) {
               </div>
             )}
 
-            {/* ── Sponsorship CTA ──────────────────────────────────
-                Single decision container: what the money does, what the
-                sponsor gets back, and the button. No separate "provision"
-                paragraph — everything the visitor needs is here. */}
-            <div className="bg-white border-2 border-[#D4A843]/30 p-7">
-              {child.shirt_assigned ? (
+            {/* ── CTA — three states based on viewer identity ──── */}
+            {child.viewer_is_sponsor ? (
+              /* ── Verified sponsor: acknowledge, link to portal ── */
+              <div className="bg-white border-2 border-[#D4A843]/30 p-7 text-center">
                 <p
-                  className="text-xl text-[#0d0d0d] mb-4"
+                  className="text-xl text-[#0d0d0d] mb-3"
                   style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
                 >
-                  You gave {firstName} a month of school when you bought your shirt. Keep going.
+                  You&rsquo;re {firstName}&rsquo;s sponsor.
                 </p>
-              ) : (
-                <p
-                  className="text-xl text-[#0d0d0d] mb-4"
-                  style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
-                >
-                  Sponsor {firstName}
+                <p className="text-[#555] leading-relaxed mb-5">
+                  Through your $25/month, {firstName} has school fees, books,
+                  a uniform, morning porridge and a hot meal every day, access to
+                  the on-site medical center, and a classroom where teachers know{' '}
+                  {firstName}&rsquo;s name.
                 </p>
-              )}
-
-              <p className="text-[#555] leading-relaxed mb-4">
-                Your $25/month covers {firstName}&rsquo;s school fees, books,
-                a uniform, morning porridge and a hot meal every day, access to
-                the on-site medical center, and a place where teachers know{' '}
-                {firstName}&rsquo;s name.
-              </p>
-
-              <p className="text-[#555] leading-relaxed mb-5">
-                You&rsquo;ll get a monthly newsletter from the campus, photos
-                of {firstName} through the year, a handwritten letter
-                from {firstName}, and a year-end report card.
-              </p>
-
-              <div className="flex items-baseline gap-1 mb-4">
-                <span
-                  className="text-4xl text-[#D4A843]"
-                  style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 700 }}
+                <Link
+                  href={`/sponsor/${child.sponsor_code}`}
+                  className="inline-block bg-[#D4A843] text-[#0d0d0d] font-bold uppercase tracking-wider py-4 px-10 hover:bg-[#c49a3a] transition-colors"
                 >
-                  $25
-                </span>
-                <span className="text-[#aaa]">/month &middot; cancel anytime</span>
+                  Go to your portal
+                </Link>
+                <p className="text-center text-xs text-[#bbb] mt-4">
+                  On behalf of our entire team &mdash; thank you.
+                </p>
               </div>
+            ) : (
+              /* ── Not the sponsor: acquisition or retention CTA ── */
+              <div className="bg-white border-2 border-[#D4A843]/30 p-7">
+                {child.shirt_assigned ? (
+                  <p
+                    className="text-xl text-[#0d0d0d] mb-4"
+                    style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
+                  >
+                    You gave {firstName} a month of school when you bought your shirt. Keep going.
+                  </p>
+                ) : (
+                  <p
+                    className="text-xl text-[#0d0d0d] mb-4"
+                    style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
+                  >
+                    Sponsor {firstName}
+                  </p>
+                )}
 
-              <SponsorButton
-                childRecordId={child.record_id}
-                childId={child.child_id}
-                childDisplayName={displayName}
-                firstName={firstName}
-                shirtAssigned={child.shirt_assigned}
-              />
+                <p className="text-[#555] leading-relaxed mb-4">
+                  Your $25/month covers {firstName}&rsquo;s school fees, books,
+                  a uniform, morning porridge and a hot meal every day, access to
+                  the on-site medical center, and a place where teachers know{' '}
+                  {firstName}&rsquo;s name.
+                </p>
 
-              <p className="text-center text-xs text-[#bbb] mt-4">
-                On behalf of our entire team &mdash; thank you.
-              </p>
-            </div>
+                <p className="text-[#555] leading-relaxed mb-5">
+                  You&rsquo;ll get a monthly newsletter from the campus, photos
+                  of {firstName} through the year, a handwritten letter
+                  from {firstName}, and a year-end report card.
+                </p>
+
+                <div className="flex items-baseline gap-1 mb-4">
+                  <span
+                    className="text-4xl text-[#D4A843]"
+                    style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 700 }}
+                  >
+                    $25
+                  </span>
+                  <span className="text-[#aaa]">/month &middot; cancel anytime</span>
+                </div>
+
+                <SponsorButton
+                  childRecordId={child.record_id}
+                  childId={child.child_id}
+                  childDisplayName={displayName}
+                  firstName={firstName}
+                  shirtAssigned={child.shirt_assigned}
+                />
+
+                <p className="text-center text-xs text-[#bbb] mt-4">
+                  On behalf of our entire team &mdash; thank you.
+                </p>
+              </div>
+            )}
           </div>
         </div>
 
@@ -626,7 +685,7 @@ export default async function ChildProfilePage({ params }: ChildPageProps) {
             2. Shirt buyer     → locked teaser, blurred cards, sponsor CTA
             3. Cold visitor    → nothing (focus stays on sponsorship CTA)
         ── */}
-        {child.sponsorship_status === 'Active' ? (
+        {child.viewer_is_sponsor ? (
           <div className="mt-10 md:mt-16">
             <div className="text-center mb-6 md:mb-8">
               <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-3">
