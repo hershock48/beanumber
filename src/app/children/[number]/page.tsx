@@ -1,3 +1,4 @@
+import { cache } from 'react';
 import { notFound } from 'next/navigation';
 import { cookies } from 'next/headers';
 import Link from 'next/link';
@@ -104,7 +105,10 @@ async function airtableRequest<T>(endpoint: string): Promise<T> {
   return response.json();
 }
 
-async function getChildByShirtNumber(shirtNumber: number) {
+// React cache() deduplicates calls within a single server request.
+// Both generateMetadata() and the page component call this function,
+// so without cache() the page would hit Airtable 4× instead of 2×.
+const getChildByShirtNumber = cache(async function getChildByShirtNumber(shirtNumber: number) {
   const childrenTable = process.env.AIRTABLE_CHILDREN_TABLE || 'Children';
 
   try {
@@ -144,21 +148,31 @@ async function getChildByShirtNumber(shirtNumber: number) {
       };
     }
 
+    // Fire the sponsorship lookup and cookie read in parallel.
+    // The sponsorship call depends on childId but NOT on the cookie,
+    // and the cookie read is pure I/O — no reason to serialize them.
     let sponsorship: AirtableSponsorshipRecord['fields'] | null = null;
-    if (childId) {
-      const sponsorshipTable = process.env.AIRTABLE_SPONSORSHIPS_TABLE || 'Sponsorships';
-      const sFormula = encodeURIComponent(`{ChildID}="${childId}"`);
-      try {
-        const sRes = await airtableRequest<{ records: AirtableSponsorshipRecord[] }>(
-          `/${encodeURIComponent(sponsorshipTable)}?filterByFormula=${sFormula}&maxRecords=1`
-        );
-        if (sRes.records.length) {
-          sponsorship = sRes.records[0].fields;
-        }
-      } catch {
-        // Sponsorship lookup is optional
-      }
-    }
+    const sponsorshipPromise = childId
+      ? (async () => {
+          const sponsorshipTable = process.env.AIRTABLE_SPONSORSHIPS_TABLE || 'Sponsorships';
+          const sFormula = encodeURIComponent(`{ChildID}="${childId}"`);
+          try {
+            const sRes = await airtableRequest<{ records: AirtableSponsorshipRecord[] }>(
+              `/${encodeURIComponent(sponsorshipTable)}?filterByFormula=${sFormula}&maxRecords=1`
+            );
+            if (sRes.records.length) return sRes.records[0].fields;
+          } catch {
+            // Sponsorship lookup is optional
+          }
+          return null;
+        })()
+      : Promise.resolve(null);
+
+    const [sponsorshipResult, viewerCode] = await Promise.all([
+      sponsorshipPromise,
+      getViewerSponsorCode(),
+    ]);
+    sponsorship = sponsorshipResult;
 
     let age: string | undefined = sponsorship?.ChildAge;
     if (!age && child.DateOfBirth) {
@@ -171,11 +185,6 @@ async function getChildByShirtNumber(shirtNumber: number) {
 
     const photo = child.ProfilePhoto?.[0]?.url || sponsorship?.ChildPhoto?.[0]?.url;
 
-    // Check if the current viewer is the sponsor for THIS child.
-    // The sponsor portal sets an httpOnly cookie with the sponsorCode.
-    // If it matches the sponsorship record for this child, the viewer
-    // is the actual sponsor — not just any visitor.
-    const viewerCode = await getViewerSponsorCode();
     const viewerIsSponsor = Boolean(
       viewerCode &&
       sponsorship?.SponsorCode &&
@@ -220,7 +229,7 @@ async function getChildByShirtNumber(shirtNumber: number) {
     });
     return null;
   }
-}
+});
 
 export async function generateMetadata({ params }: ChildPageProps) {
   const { number } = await params;
