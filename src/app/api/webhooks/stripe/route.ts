@@ -374,6 +374,120 @@ async function findOrCreateDonor(
   return data.id;
 }
 
+// After creating a donation, recalculate the donor's summary fields.
+// Keeps Total Lifetime Giving, First/Most Recent Donation, Donor Status,
+// and Recurring Supporter current without manual intervention.
+async function updateDonorSummary(donorId: string): Promise<void> {
+  if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) return;
+  try {
+    // Fetch all donations linked to this donor
+    const formula = `FIND("${donorId}", ARRAYJOIN(RECORD_ID({Donor})))`;
+    // Simpler: just fetch the donor's linked donation IDs, then get those records.
+    // Actually, easier: get the donor record with its linked Donations, then
+    // fetch those donation records for amounts and dates.
+    const donorRes = await airtableAPICall(() =>
+      fetch(
+        `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_DONORS_TABLE}/${donorId}?fields%5B%5D=Donations&fields%5B%5D=Subscriptions`,
+        { headers: getAirtableHeaders() }
+      )
+    );
+    if (!donorRes.ok) return;
+    const donorData = await donorRes.json();
+    const donationIds: string[] = (donorData.fields?.Donations || []).map(
+      (d: any) => (typeof d === 'string' ? d : d.id)
+    );
+
+    if (donationIds.length === 0) return;
+
+    // Fetch each donation's amount and date (batch-friendly: up to 100 per URL)
+    let totalGiving = 0;
+    let firstDate: string | null = null;
+    let lastDate: string | null = null;
+
+    // Airtable: fetch by record IDs using filterByFormula with OR(RECORD_ID()=...)
+    // Simpler for small sets: just fetch each. Most donors have 1-3 donations.
+    for (const donId of donationIds) {
+      const dRes = await airtableAPICall(() =>
+        fetch(
+          `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_DONATIONS_TABLE}/${donId}?fields%5B%5D=Donation%20Amount&fields%5B%5D=Donation%20Date&fields%5B%5D=Payment%20Status`,
+          { headers: getAirtableHeaders() }
+        )
+      );
+      if (!dRes.ok) continue;
+      const dData = await dRes.json();
+      const status = dData.fields?.['Payment Status'];
+      const statusName = typeof status === 'object' ? status?.name : status;
+      if (statusName === 'Succeeded' || !statusName) {
+        totalGiving += dData.fields?.['Donation Amount'] || 0;
+      }
+      const date = dData.fields?.['Donation Date'];
+      if (date) {
+        if (!firstDate || date < firstDate) firstDate = date;
+        if (!lastDate || date > lastDate) lastDate = date;
+      }
+    }
+
+    // Check subscription status
+    const subIds: string[] = (donorData.fields?.Subscriptions || []).map(
+      (s: any) => (typeof s === 'string' ? s : s.id)
+    );
+    let hasActiveSub = false;
+    for (const subId of subIds) {
+      const sRes = await airtableAPICall(() =>
+        fetch(
+          `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/Subscriptions/${subId}?fields%5B%5D=Status`,
+          { headers: getAirtableHeaders() }
+        )
+      );
+      if (!sRes.ok) continue;
+      const sData = await sRes.json();
+      const st = sData.fields?.Status;
+      const stName = typeof st === 'object' ? st?.name : st;
+      if (stName === 'active' || stName === 'Active') {
+        hasActiveSub = true;
+        break;
+      }
+    }
+
+    // Determine donor status
+    let donorStatus = 'New';
+    if (donationIds.length > 0) {
+      if (hasActiveSub) {
+        donorStatus = 'Active';
+      } else if (lastDate) {
+        const daysSince = Math.floor(
+          (Date.now() - new Date(lastDate).getTime()) / (1000 * 60 * 60 * 24)
+        );
+        donorStatus = daysSince <= 180 ? 'Active' : 'Lapsed';
+      }
+    }
+
+    // Write summary fields
+    const fields: Record<string, any> = {
+      'Total Lifetime Giving': totalGiving,
+      'Donor Status': donorStatus,
+      'Recurring Supporter': hasActiveSub,
+    };
+    if (firstDate) fields['First Donation Date'] = firstDate;
+    if (lastDate) fields['Most Recent Donation'] = lastDate;
+
+    await airtableAPICall(() =>
+      fetch(
+        `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_DONORS_TABLE}/${donorId}`,
+        {
+          method: 'PATCH',
+          headers: getAirtableHeaders(),
+          body: JSON.stringify({ fields }),
+        }
+      )
+    );
+    console.log('[WH] Donor summary updated:', donorId, `$${totalGiving}`, donorStatus);
+  } catch (err) {
+    // Non-fatal — log and continue
+    console.error('[WH] Failed to update donor summary:', donorId, err);
+  }
+}
+
 // Create or update donation record (idempotent)
 async function upsertDonation(
   paymentIntentId: string,
@@ -481,6 +595,13 @@ async function upsertDonation(
 
   const data = await response.json();
   console.log('[WH] donation created:', data.id);
+
+  // Fire-and-forget: recalculate the donor's summary fields
+  // (lifetime giving, first/last date, status, recurring flag)
+  if (donationData.donorId) {
+    updateDonorSummary(donationData.donorId).catch(() => {});
+  }
+
   return data.id;
 }
 
