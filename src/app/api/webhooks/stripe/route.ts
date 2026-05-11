@@ -1351,6 +1351,17 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
             console.error('[WH] Could not flag donation note:', flagErr);
           }
         }
+        // Alert Kevin immediately so this never goes unnoticed again
+        const childNames = monthlyItems.map(i => i.child?.displayName || 'unknown').join(', ');
+        await sendEmail({
+          to: { email: 'kevin@beanumber.org', name: 'Kevin' },
+          subject: '🚨 Monthly subscription failed — needs manual fix',
+          html: `<p>A cart checkout just completed with ${monthlyItems.length} monthly opt-in(s), but Stripe didn't create a customer record so the subscription(s) could not be set up.</p>
+<p><strong>Buyer:</strong> ${name || 'unknown'} (${email})<br/>
+<strong>Children:</strong> ${childNames}<br/>
+<strong>Session:</strong> ${session.id}</p>
+<p>The shirt order went through fine — the buyer paid. But their monthly sponsorship is NOT active. Run the backfill endpoint or create the subscription manually in Stripe.</p>`,
+        }).catch(e => console.error('[WH] Failed to send subscription-failure alert:', e));
       }
       if (monthlyItems.length > 0 && stripeCustomerId) {
         const stripe = await getStripe();
@@ -1425,8 +1436,20 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
             } catch (err) {
               console.error('[WH] Failed to create sponsorship for cart item ' + item.itemIndex + ':', err);
             }
-          } catch (err) {
+          } catch (err: any) {
             console.error('[WH] Failed to create subscription for cart item ' + item.itemIndex + ':', err);
+            // Alert Kevin — the buyer paid but their monthly sponsorship didn't activate
+            const failedChildName = item.child?.displayName || 'unknown';
+            await sendEmail({
+              to: { email: 'kevin@beanumber.org', name: 'Kevin' },
+              subject: '🚨 Monthly subscription failed for ' + failedChildName,
+              html: `<p>A cart checkout completed and the shirt order went through, but creating the monthly subscription failed.</p>
+<p><strong>Buyer:</strong> ${name || 'unknown'} (${email})<br/>
+<strong>Child:</strong> ${failedChildName} (#${item.child?.childId || '?'})<br/>
+<strong>Error:</strong> ${err?.message || String(err)}<br/>
+<strong>Session:</strong> ${session.id}</p>
+<p>The buyer's $25/mo is NOT active. Create the subscription manually in Stripe or run the backfill endpoint.</p>`,
+            }).catch(e => console.error('[WH] Failed to send subscription-failure alert:', e));
           }
         }
       }
