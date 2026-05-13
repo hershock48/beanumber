@@ -539,7 +539,21 @@ async function upsertDonation(
   // Normalize Donation Source to a valid singleSelect option.
   // Airtable only accepts: Website, Manual Entry, Event, Other.
   // Real labels like "Shirt Order" or "Sponsorship" go into Donation Note.
-  const VALID_SOURCES = new Set(['Website', 'Manual Entry', 'Event', 'Other', 'Portal Repeat']);
+  // Mirrors the Donation Source singleSelect options in Airtable. If you
+  // add a new option in the UI, add it here too. If code passes a label
+  // that isn't in this set OR in Airtable, the normalizer below falls
+  // back to 'Website' and prefixes the raw label onto Donation Note as
+  // a safety net.
+  const VALID_SOURCES = new Set([
+    'Website',
+    'Manual Entry',
+    'Event',
+    'Other',
+    'Portal Repeat',
+    'Sponsorship',
+    'Shirt Order',
+    'Shirt + Monthly',
+  ]);
   const rawSource = donationData.donationSource || 'Website';
   const sourceForAirtable = VALID_SOURCES.has(rawSource) ? rawSource : 'Website';
   const sourceLabelForNote = VALID_SOURCES.has(rawSource) ? null : rawSource;

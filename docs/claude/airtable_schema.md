@@ -290,11 +290,11 @@ Entirely unused. Zero records, zero code references. Kevin: delete the whole tab
 
 ## Traps already hit (don't hit them again)
 
-### Trap 1: Donation Source rejects unknown singleSelect values
+### Trap 1: Donation Source rejects unknown singleSelect values (resolved May 13 for current code paths)
 
-Current valid options: `Website`, `Manual Entry`, `Event`, `Other`, `Portal Repeat` (added May 13 for the Shop Your Number flow).
+Current valid options: `Website`, `Manual Entry`, `Event`, `Other`, `Portal Repeat`, `Sponsorship`, `Shirt Order`, `Shirt + Monthly`. All values the current code actually passes are now valid Airtable options, so the normalizer never falls back in normal operation.
 
-The code in `src/lib/tools/donation/upsertDonation.ts` wants to pass `Sponsorship`, `Shirt Order`, `Shirt + Monthly` to describe the flow, but those still aren't options. The normalizer introduced in commit `2307241` does this:
+The normalizer introduced in commit `2307241` stays in place as a safety net for any future label the code might pass before Kevin adds it in the Airtable UI (e.g., a future "Founder's Series" or "Gift" source). It does this:
 
 ```ts
 const VALID_SOURCES = new Set(['Website', 'Manual Entry', 'Event', 'Other']);
@@ -304,7 +304,7 @@ const sourceLabelForNote = VALID_SOURCES.has(rawSource) ? null : rawSource;
 // Prefix the real label onto Donation Note as [Sponsorship], [Shirt], etc.
 ```
 
-**Real fix:** Kevin adds `Sponsorship`, `Shirt Order`, `Shirt + Monthly` as options to the Donation Source singleSelect in Airtable's UI. `Portal Repeat` is already done (May 13). When the other three are added, expand `VALID_SOURCES` in `webhooks/stripe/route.ts` and remove the normalizer fallback entirely. Until then, those three labels live in the Note prefix and the records stay clean.
+**Status (May 13):** Done for current code paths. All four extra labels are valid Airtable options and the webhook's `VALID_SOURCES` set mirrors them. The normalizer stays as a safety net for any future label the code might pass (e.g., "Founder's Series", "Gift Shirt", "Gift Sponsorship") before the corresponding Airtable option is added.
 
 ### Trap 2: The webhook tried to write address fields to Donations
 
