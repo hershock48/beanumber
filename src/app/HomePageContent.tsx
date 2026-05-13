@@ -135,8 +135,10 @@ export function HomePageContent() {
             This number has a name.
           </h1>
           <div className="mb-10" />
-          <p className="text-lg md:text-xl text-[#FFF8F0]/70 mb-12 max-w-lg mx-auto leading-relaxed">
-            Every shirt has a number. Every number is a child. Find yours.
+          <p className="text-lg md:text-xl text-[#FFF8F0]/70 mb-12 max-w-lg mx-auto leading-snug">
+            Every shirt has a number.<br />
+            Every number is a child.<br />
+            Find yours.
           </p>
 
           <form onSubmit={handleSearch} className="flex max-w-md mx-auto shadow-2xl rounded-sm overflow-hidden">
