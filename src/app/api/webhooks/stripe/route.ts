@@ -159,8 +159,11 @@ function classifyReferral(raw: string): { choice: string | null; rawNote: string
 // ---------------------------------------------------------------------------
 // Fulfillment record auto-creation
 // ---------------------------------------------------------------------------
-// Determines vinyl color based on shirt color. Dark shirts get white vinyl,
-// light shirts get black vinyl.
+// Determines print ink color based on shirt color. Dark shirts get white
+// ink, light shirts get black ink. The function name and the Airtable
+// field names ("Vinyl Front" / "Vinyl Back") are legacy from the HTV
+// production era; production is now screen-printed but the semantics —
+// what color sits on the shirt — are identical.
 function vinylColorForShirt(shirtColor: string): string {
   const lower = shirtColor.toLowerCase();
   if (lower === 'black' || lower === 'grey' || lower === 'gray') return 'White';
@@ -926,7 +929,7 @@ async function sendShirtConfirmationEmail(orderData: {
 
               <p style="margin-top: 0;">Hey ${firstName},</p>
 
-              <p>Your shirt is in the works &mdash; I&rsquo;m cutting the vinyl and pressing it now, and it&rsquo;ll ship within 5&ndash;7 business days.</p>
+              <p>Your shirt is in the works &mdash; I&rsquo;m screen-printing it by hand right now, and it&rsquo;ll ship within 5&ndash;7 business days.</p>
 
               <p style="color: #999; font-size: 14px; margin-bottom: 4px;">Your order:</p>
               <p style="font-size: 15px; color: #555; margin-top: 0;">

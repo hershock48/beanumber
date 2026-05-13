@@ -361,7 +361,7 @@ export default async function ChildProfilePage({ params }: ChildPageProps) {
               Get one. Meet your child.
             </h2>
             <p className="text-[#666] leading-relaxed max-w-lg mx-auto mb-8">
-              Six designs. Five colors. Heavyweight cotton, HTV vinyl, handmade to order.
+              Four designs. Four colors. Heavyweight cotton, screen-printed, handmade to order.
               Every shirt starts a matched child&rsquo;s year at the campus &mdash; school, meals, medical care.
             </p>
             <Link

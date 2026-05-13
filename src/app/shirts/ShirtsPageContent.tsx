@@ -20,7 +20,7 @@ type ShirtTheme = {
   shirt: string;
   /** Swatch shown in the color picker (may differ slightly for visibility). */
   swatch: string;
-  /** HTV vinyl color for the printed artwork — auto-contrasted for legibility. */
+  /** Print ink color for the artwork — auto-contrasted for legibility. */
   vinyl: string;
   /** Muted foreground used for the small "beanumber.org" text on the back. */
   muted: string;
@@ -30,8 +30,10 @@ type ShirtTheme = {
   cardBorder: string;
 };
 
-// HTV is chosen per shirt color to stay legible on the mockup. In production
-// Kevin can print whatever vinyl he prefers — these values are representative.
+// Ink color is chosen per shirt color to stay legible on the mockup.
+// In production Kevin picks the actual ink — these values are
+// representative. Field is named `vinyl` for back-compat (HTV-era name);
+// renaming the property is a separate refactor.
 const THEMES: Record<ColorName, ShirtTheme> = {
   Black:  { shirt: '#111111', swatch: '#111111', vinyl: '#ffffff', muted: 'rgba(255,255,255,0.3)', cardBg: '#ffffff', cardBorder: '#e8e0d4' },
   Grey:   { shirt: '#8a8a8a', swatch: '#9a9a9a', vinyl: '#ffffff', muted: 'rgba(255,255,255,0.3)', cardBg: '#ffffff', cardBorder: '#e8e0d4' },
@@ -123,10 +125,11 @@ function DesignContainer({
 /* ── Shirt design components ────────────────────────────────── */
 
 /**
- * Universal front used on every shirt. Small # mark + "beanumber.org" in
- * small caps centered ~3 inches below the neckline. In tee mode the mark
- * sits lower on the mockup (below the SVG neckline); in flat mode it sits
- * higher (closer to the top of the box).
+ * Legacy front design (# mark + "beanumber.org"). Retained for reference;
+ * currently every shirt uses FlagshipFront (cross + "beanumber.org") to
+ * keep the front mark consistent across the collection now that
+ * production is screen-printed. Kept in code so the # variant can be
+ * brought back without rewriting from scratch.
  */
 function SharedFront({ theme, mode = 'tee', className = '' }: DesignProps) {
   const top = mode === 'tee' ? '28%' : '17%';
@@ -186,8 +189,8 @@ function FlagshipFront({ theme, mode = 'tee', className = '' }: DesignProps) {
   );
 }
 
-/** Large # logo with BEANUMBER lettering — Flagship back. Same vinyl
- *  color as the front so Kevin only cuts one sheet per shirt. */
+/** Large # logo with BEANUMBER lettering — Flagship back. Same ink
+ *  color as the front so one screen per shirt color does both prints. */
 function FlagshipBack({ theme, mode = 'tee', className = '' }: DesignProps) {
   // Back print is typically ~10–12" wide on a ~20" body, so ~55% of body
   // ≈ 28% of the container.
@@ -394,7 +397,7 @@ const SHIRTS_SOURCE: Shirt[] = [
     tagline: 'A reminder you can wear',
     price: 25,
     description: '"Do not fear" appears over 100 times in the Bible. More than any other repeated command. Not because it\'s easy, but because God knows we need to hear it constantly. Whatever you\'re afraid of is not bigger than the God who said it. Move forward. Trust in love.',
-    Front: SharedFront,
+    Front: FlagshipFront,
     Back: DoNotFearBack,
     badge: 'Courage',
     specs: 'S – 2XL · Unisex · Heavyweight cotton',
@@ -405,7 +408,7 @@ const SHIRTS_SOURCE: Shirt[] = [
     tagline: 'Blessed are those who show up',
     price: 25,
     description: '"Blessed are the peacemakers. But woe to those who manipulate religion and the very name of God for their own military, economic and political gain." That\'s Pope Leo XIV, speaking in Cameroon on his first trip as pope. When the world pushed back, he didn\'t flinch. He said "I have no fear." This shirt is for the person who heard that and meant it.',
-    Front: SharedFront,
+    Front: FlagshipFront,
     Back: PeacemakerBack,
     badge: 'Conviction',
     specs: 'S – 2XL · Unisex · Heavyweight cotton',
@@ -416,7 +419,7 @@ const SHIRTS_SOURCE: Shirt[] = [
     tagline: 'The whole thing, all of it',
     price: 25,
     description: 'Through the good and the bad. Everything hallelujah. Not just praise when things are easy. Praise when they\'re not. Praise when it doesn\'t make sense yet. When the news is bad, when the money is short, when someone you love is suffering and you can\'t fix it. Hallelujah anyway. That\'s the whole point.',
-    Front: SharedFront,
+    Front: FlagshipFront,
     Back: EverythingHallelujahBack,
     badge: 'Praise',
     specs: 'S – 2XL · Unisex · Heavyweight cotton',
@@ -837,7 +840,7 @@ export default function ShirtsPageContent() {
             Every shirt has a number.
           </h1>
           <p className="text-lg text-[#777] max-w-xl mx-auto leading-relaxed">
-            Heavyweight blanks in four colors. HTV vinyl. Handmade to order.
+            Heavyweight blanks in four colors. Screen-printed, handmade to order.
             Each design carries a different part of the story.
           </p>
         </div>

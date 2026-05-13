@@ -320,7 +320,7 @@ export default function FulfillmentDashboard() {
                           <div>
                             <p className="text-sm font-semibold text-gray-900">{order.design}</p>
                             <p className="text-xs text-gray-500">
-                              {order.shirtColor} · {order.size} · Vinyl: {order.vinylFront}/{order.vinylBack}
+                              {order.shirtColor} · {order.size} · Ink: {order.vinylFront}/{order.vinylBack}
                             </p>
                           </div>
 

@@ -180,10 +180,10 @@ function shirtNurtureEmail(
         html: wrapEmail(`
           <p style="margin-top: 0;">Hey ${firstName},</p>
           ${multi
-            ? `<p>You ordered ${numbers.length} shirts, and I wanted to check if they made it. I make each one by hand (heat press, vinyl, the whole thing), so they were all made specifically for you.</p>
+            ? `<p>You ordered ${numbers.length} shirts, and I wanted to check if they made it. I make each one by hand (screen press, ink, the whole thing), so they were all made specifically for you.</p>
                <p>Each shirt has a different number inside the collar, and each number belongs to a different child at our campus in Northern Uganda. You have ${numbers.length} kids waiting to meet you. Go to <a href="${SITE_URL}" style="color: #D4A843; font-weight: bold;">beanumber.org</a>, enter each number one at a time, and meet them all.</p>
                <p>Your numbers are: <strong>${numbers.map(n => '#' + n).join(', ')}</strong></p>`
-            : `<p>I wanted to check in and see if your shirt made it. I make each one by hand (heat press, vinyl, the whole thing), so it was made specifically for you.</p>
+            : `<p>I wanted to check in and see if your shirt made it. I make each one by hand (screen press, ink, the whole thing), so it was made specifically for you.</p>
                <p>When you get it, look inside the collar. There&rsquo;s a number printed there, and that number belongs to a real child at our campus in Northern Uganda. Go to <a href="${SITE_URL}" style="color: #D4A843; font-weight: bold;">beanumber.org</a>, enter the number, and meet them.</p>`
           }
           <p style="text-align: center; margin: 24px 0;">
@@ -432,9 +432,9 @@ function shirtSponsorEmail(
         html: wrapEmail(`
           <p style="margin-top: 0;">Hey ${firstName},</p>
           ${multi
-            ? `<p>Your ${numbers.length} shirts are being made right now. I heat-press every one by hand, and yours will ship within the next few days.</p>
+            ? `<p>Your ${numbers.length} shirts are being made right now. I screen-print every one by hand, and yours will ship within the next few days.</p>
                <p>When they arrive, check the tag inside each collar. Every shirt has a different number, and every number belongs to a different child at our campus in Northern Uganda. You&rsquo;ll come back to the site, enter each number, and meet them all by name.</p>`
-            : `<p>Your shirt is being made right now. I heat-press every one by hand, and yours will ship within the next few days.</p>
+            : `<p>Your shirt is being made right now. I screen-print every one by hand, and yours will ship within the next few days.</p>
                <p>When it arrives, check the tag inside the collar. There&rsquo;s a number on it, and that number belongs to a real child at our campus in Northern Uganda. You&rsquo;ll come back to the site, enter the number, and meet them by name.</p>`
           }
           <p>You also signed up for monthly sponsorship, which means your $25 a month is already at work. It supports school fees, two meals a day, and medical care at the campus, and that started the day you signed up. You&rsquo;re a sponsor right now, even before the ${multi ? 'shirts arrive' : 'shirt arrives'}.</p>
