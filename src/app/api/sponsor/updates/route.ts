@@ -61,7 +61,7 @@ export async function GET(request: NextRequest) {
       { headers: headers() }
     );
 
-    let childInfo = null;
+    let childInfo: any = null;
     let childID: string | null = null;
     let childRevealed = false;
     let revealedAt: string | null = null;
@@ -71,7 +71,8 @@ export async function GET(request: NextRequest) {
       totalPaid: number;
       monthlyAmount: number;
       monthsActive: number;
-    } = { startDate: null, totalPaid: 0, monthlyAmount: 25, monthsActive: 0 };
+      status: string | null;
+    } = { startDate: null, totalPaid: 0, monthlyAmount: 25, monthsActive: 0, status: null };
 
     if (sponsorshipRes.ok) {
       const sponsorshipData = await sponsorshipRes.json();
@@ -101,7 +102,8 @@ export async function GET(request: NextRequest) {
           if (monthsActive === 0 && now >= start) monthsActive = 1;
         }
 
-        sponsorship = { startDate, totalPaid, monthlyAmount, monthsActive };
+        const status = (f['Status'] as string | undefined) || null;
+        sponsorship = { startDate, totalPaid, monthlyAmount, monthsActive, status };
 
         // Build child info only when revealed
         if (childRevealed) {
@@ -142,6 +144,11 @@ export async function GET(request: NextRequest) {
                   childInfo.teacherName = childFields['TeacherName'] || undefined;
                   childInfo.teacherQuote = childFields['TeacherQuote'] || undefined;
                   childInfo.notes = childFields['Notes'] || undefined;
+                  // Shop Your Number (memo §5) needs the shirt number on the
+                  // sponsor's matched child so the portal can carry it
+                  // forward to repeat orders.
+                  const shirtNum = childFields['ShirtNumber'];
+                  childInfo.shirtNumber = typeof shirtNum === 'number' ? shirtNum : null;
                 }
               }
             } catch (err) {

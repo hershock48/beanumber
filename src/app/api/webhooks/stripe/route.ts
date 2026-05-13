@@ -1328,6 +1328,9 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
     const isShirtPlusMonthly = session.metadata?.order_type === 'shirt_plus_monthly';
     const isSponsorship = session.metadata?.order_type === 'sponsorship';
     const isCart = session.metadata?.order_type === 'cart';
+    // Memo §5: "Shop Your Number" — active sponsor reordering with their
+    // existing shirt number, no new child assignment, no new sponsorship.
+    const isPortalRepeat = session.metadata?.order_type === 'portal_repeat';
 
     const donorArgs = {
       name,
@@ -2342,6 +2345,133 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
       }
 
       return { donorId, donationId, assignedChild };
+
+    } else if (isPortalRepeat) {
+      // --- SHOP YOUR NUMBER FLOW (memo §5) ---
+      //
+      // An active sponsor is reordering a shirt that ships stamped with
+      // their EXISTING shirt number, not a newly-assigned one. The
+      // sponsor-to-child relationship is already established; this is
+      // just an additional physical product purchase.
+      //
+      // We skip: child assignment, new sponsorship creation, drip
+      // enrollment, the lockbox/reveal flow.
+      //
+      // We do: update donor lifetime giving, create a Donation record
+      // tagged 'Portal Repeat', create a Fulfillment row stamped with
+      // the existing shirt number, send a brief reorder confirmation,
+      // ping admin.
+      const shirtName = session.metadata?.shirt_name || 'Unknown';
+      const shirtColor = session.metadata?.shirt_color || 'Unknown';
+      const shirtSize = session.metadata?.shirt_size || 'Unknown';
+      const existingShirtNumber = parseInt(session.metadata?.existing_shirt_number || '0', 10);
+      const childDisplayName = session.metadata?.child_display_name || '';
+      const sponsorCode = session.metadata?.sponsor_code || '';
+
+      console.log(
+        `[WH] S2: portal-repeat flow, shirt=${shirtName}, #${existingShirtNumber}, sponsor=${sponsorCode}`
+      );
+
+      const donorId = await donorPromise;
+      console.log('[WH] S3: donor resolved, id=' + donorId);
+
+      // Fulfillment row BEFORE the donation upsert, same ordering reason
+      // as the standard shirt flow (idempotency guard might short-circuit
+      // a retry otherwise).
+      if (existingShirtNumber > 0) {
+        try {
+          await createFulfillmentRecord({
+            shirtNumber: existingShirtNumber,
+            design: shirtName,
+            shirtColor,
+            shirtSize,
+            buyerName: name,
+            buyerEmail: email,
+            address: address || null,
+            childName: childDisplayName,
+            orderDate: donationDate,
+            notes: `Portal reorder — sponsor ${sponsorCode} reordering with their existing #${existingShirtNumber}. Press with that number on the inside collar (do NOT assign a new number).`,
+          });
+        } catch (err: any) {
+          console.error('[WH] Fulfillment record failed (portal-repeat):', String(err?.message || err).slice(0, 200));
+        }
+      }
+
+      console.log('[WH] S4: upsert donation (portal-repeat)');
+      const donationId = await upsertDonation(paymentIntentId, {
+        sessionId: session.id,
+        customerId: stripeCustomerId,
+        donorId,
+        amount,
+        currency,
+        donationDate,
+        isRecurring: false,
+        subscriptionId: null,
+        status,
+        email,
+        name,
+        organization: organization || undefined,
+        address,
+        donationSource: 'Portal Repeat',
+        notes: `Portal reorder: ${shirtName} / ${shirtColor} / ${shirtSize} / Re-using #${existingShirtNumber} (${childDisplayName})${session.metadata?.ref_code ? ` [Ref: ${session.metadata.ref_code}]` : ''}`,
+      });
+
+      let emailStatus = 'Sent';
+      try {
+        await sendShirtConfirmationEmail({
+          email,
+          name,
+          shirtName,
+          shirtColor,
+          shirtSize,
+          amount,
+        });
+      } catch (error: any) {
+        console.error('[Webhook] Failed to send portal-repeat confirmation email:', error);
+        emailStatus = 'Failed';
+      }
+
+      try {
+        await createCommunicationRecord(donationId, donorId, {
+          email,
+          subject: 'Your reorder is being made.',
+          body: `Portal reorder: ${shirtName} (${shirtColor}, ${shirtSize}) / $${amount.toFixed(2)} / Re-using #${existingShirtNumber} (${childDisplayName})`,
+          status: emailStatus,
+        });
+      } catch (error) {
+        console.error('[Webhook] Failed to create communication record (portal-repeat):', error);
+      }
+
+      console.log('[Webhook] Successfully processed portal-repeat order:', {
+        sessionId: session.id,
+        donorId,
+        donationId,
+        shirt: `${shirtName} / ${shirtColor} / ${shirtSize}`,
+        existingNumber: existingShirtNumber,
+        sponsorCode,
+      });
+
+      try {
+        await sendAdminOrderNotification({
+          kind: 'Shirt',
+          customerName: name,
+          customerEmail: email,
+          amount,
+          isRecurring: false,
+          shirtName,
+          shirtColor,
+          shirtSize,
+          childDisplayName,
+          shirtNumber: existingShirtNumber,
+          stripeSessionId: session.id,
+        });
+      } catch (err: any) {
+        console.error('[WH] admin notify failed (portal-repeat):', String(err?.message || err).slice(0, 200));
+      }
+
+      // Deliberately skip drip enrollment — they're already a sponsor.
+
+      return { donorId, donationId, isPortalRepeat: true, existingShirtNumber };
 
     } else {
       // --- STANDARD DONATION FLOW ---

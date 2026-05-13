@@ -29,6 +29,7 @@ interface Sponsorship {
   totalPaid: number;
   monthlyAmount: number;
   monthsActive: number;
+  status: string | null;
 }
 
 interface ChildInfo {
@@ -46,7 +47,22 @@ interface ChildInfo {
   teacherName?: string;
   teacherQuote?: string;
   notes?: string;
+  shirtNumber?: number | null;
 }
+
+// Memo §5: Shop Your Number — the 4 designs surfaced inside the
+// sponsor portal for repeat purchases. Kept lightweight here (no
+// mockup imports) since the sponsor already knows what the shirts
+// look like. If hats/hoodies launch later they join this list.
+const PORTAL_DESIGNS: { id: string; name: string; tagline: string; badge: string; price: number }[] = [
+  { id: 'flagship', name: 'The Flagship', tagline: 'The one that started it all', badge: 'Original', price: 25 },
+  { id: 'do-not-fear', name: 'Do Not Fear.', tagline: 'A reminder you can wear', badge: 'Courage', price: 25 },
+  { id: 'peacemaker', name: 'Peacemaker.', tagline: 'Blessed are those who show up', badge: 'Conviction', price: 25 },
+  { id: 'everything-hallelujah', name: 'Everything Hallelujah.', tagline: 'The whole thing, all of it', badge: 'Praise', price: 25 },
+];
+const PORTAL_COLORS = ['Black', 'Grey', 'Pink', 'Yellow'] as const;
+type PortalColor = typeof PORTAL_COLORS[number];
+const PORTAL_SIZES = ['S', 'M', 'L', 'XL', '2XL'] as const;
 
 // A single timeline entry — the component merges updates, messages, and
 // computed milestones into this shape and sorts chronologically.
@@ -256,6 +272,216 @@ function ImpactStat({ end, prefix, sublabel, detail }: {
 }
 
 // ---------------------------------------------------------------------------
+// Shop Your Number — memo §5
+// ---------------------------------------------------------------------------
+//
+// Surfaces a compact reorder UI in the sponsor portal for active
+// sponsors. Each repeat purchase carries the sponsor's existing shirt
+// number, not a freshly-assigned one. Gated by sponsorship status:
+// 'Active' only. Lapsed sponsors keep their number and matched child
+// (memo §7) but lose this surface.
+
+function ShopYourNumberSection({
+  sponsorCode,
+  shirtNumber,
+  childFirstName,
+}: {
+  sponsorCode: string;
+  shirtNumber: number;
+  childFirstName: string;
+}) {
+  const [activeShirtId, setActiveShirtId] = useState<string | null>(null);
+  const [color, setColor] = useState<PortalColor | null>(null);
+  const [size, setSize] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  function openPicker(shirtId: string) {
+    setActiveShirtId(shirtId);
+    setColor(null);
+    setSize(null);
+    setError(null);
+  }
+  function closePicker() {
+    setActiveShirtId(null);
+    setColor(null);
+    setSize(null);
+    setError(null);
+  }
+
+  async function handleOrder() {
+    if (!activeShirtId) return;
+    if (!color) { setError('Pick a color.'); return; }
+    if (!size) { setError('Pick a size.'); return; }
+    setSubmitting(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/sponsor/portal-purchase', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sponsorCode,
+          shirtId: activeShirtId,
+          color,
+          size,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || 'Could not start checkout.');
+        setSubmitting(false);
+        return;
+      }
+      if (data.url) {
+        window.location.href = data.url;
+        return;
+      }
+      setError('No checkout URL returned.');
+      setSubmitting(false);
+    } catch (err: any) {
+      setError(err?.message || 'Network error.');
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="bg-white border border-[#e8e0d4] p-6 md:p-8 mb-6">
+      <div className="flex items-baseline justify-between gap-4 mb-2 flex-wrap">
+        <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843]">
+          Shop your number
+        </p>
+        <p className="text-xs text-[#999] font-mono">#{shirtNumber}</p>
+      </div>
+      <h3
+        className="text-2xl text-[#0d0d0d] mb-2"
+        style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
+      >
+        Reorder with your number.
+      </h3>
+      <p className="text-sm text-[#666] leading-relaxed mb-5 max-w-prose">
+        Every shirt you order from here ships stamped with #{shirtNumber} on the inside collar &mdash;
+        the same number as your original, matched to {childFirstName}. Free shipping.
+      </p>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {PORTAL_DESIGNS.map((shirt) => {
+          const isActive = activeShirtId === shirt.id;
+          return (
+            <div
+              key={shirt.id}
+              className={`border transition-colors ${
+                isActive ? 'border-[#D4A843] bg-[#FFF8F0]' : 'border-[#e8e0d4] bg-white'
+              }`}
+            >
+              <div className="p-4 flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-[#D4A843] mb-1">
+                    {shirt.badge}
+                  </p>
+                  <p
+                    className="text-base text-[#0d0d0d] leading-tight"
+                    style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
+                  >
+                    {shirt.name}
+                  </p>
+                  <p className="text-xs text-[#888] italic mt-0.5">{shirt.tagline}</p>
+                </div>
+                <div className="flex-shrink-0 text-right">
+                  <p
+                    className="text-lg text-[#D4A843]"
+                    style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 700 }}
+                  >
+                    ${shirt.price}
+                  </p>
+                </div>
+              </div>
+
+              {!isActive ? (
+                <button
+                  type="button"
+                  onClick={() => openPicker(shirt.id)}
+                  className="w-full px-4 py-3 text-sm font-bold uppercase tracking-wider text-[#0d0d0d] border-t border-[#e8e0d4] hover:bg-[#FFF8F0] transition-colors cursor-pointer"
+                >
+                  Order with #{shirtNumber}
+                </button>
+              ) : (
+                <div className="px-4 py-4 border-t border-[#D4A843]/40 space-y-3">
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-[#999] mb-1.5">Color</p>
+                    <div className="flex gap-2 flex-wrap">
+                      {PORTAL_COLORS.map((c) => (
+                        <button
+                          key={c}
+                          type="button"
+                          onClick={() => { setColor(c); setError(null); }}
+                          className={`px-3 py-1.5 text-xs font-semibold border transition-colors cursor-pointer ${
+                            color === c
+                              ? 'bg-[#0d0d0d] text-white border-[#0d0d0d]'
+                              : 'bg-white text-[#555] border-[#e8e0d4] hover:border-[#999]'
+                          }`}
+                        >
+                          {c}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-[#999] mb-1.5">Size</p>
+                    <div className="flex gap-1.5">
+                      {PORTAL_SIZES.map((s) => (
+                        <button
+                          key={s}
+                          type="button"
+                          onClick={() => { setSize(s); setError(null); }}
+                          className={`w-10 h-9 text-xs font-semibold border transition-colors cursor-pointer ${
+                            size === s
+                              ? 'bg-[#0d0d0d] text-white border-[#0d0d0d]'
+                              : 'bg-white text-[#555] border-[#e8e0d4] hover:border-[#999]'
+                          }`}
+                        >
+                          {s}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  {error && <p className="text-xs text-red-600">{error}</p>}
+                  <div className="flex gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={handleOrder}
+                      disabled={submitting}
+                      className={`flex-1 px-4 py-2.5 text-sm font-bold uppercase tracking-wider transition-colors cursor-pointer ${
+                        submitting
+                          ? 'bg-[#cccccc] text-[#666] cursor-not-allowed'
+                          : 'bg-[#D4A843] text-[#0d0d0d] hover:bg-[#c49a3a]'
+                      }`}
+                    >
+                      {submitting ? 'Starting checkout…' : `Confirm with #${shirtNumber}`}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={closePicker}
+                      disabled={submitting}
+                      className="px-4 py-2.5 text-sm font-semibold text-[#555] border border-[#e8e0d4] hover:bg-[#f5f0e8] transition-colors cursor-pointer disabled:cursor-not-allowed"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      <p className="text-xs text-[#aaa] mt-4 leading-relaxed">
+        Your monthly sponsorship is unchanged &mdash; this is a separate one-time order, supports the campus the same way.
+      </p>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
@@ -264,7 +490,7 @@ export function SponsorDashboard({ sponsorCode, email }: SponsorDashboardProps) 
   const [sponsorMessages, setSponsorMessages] = useState<SponsorMessage[]>([]);
   const [childInfo, setChildInfo] = useState<ChildInfo | null>(null);
   const [childRevealed, setChildRevealed] = useState<boolean>(false);
-  const [sponsorship, setSponsorship] = useState<Sponsorship>({ startDate: null, totalPaid: 0, monthlyAmount: 25, monthsActive: 0 });
+  const [sponsorship, setSponsorship] = useState<Sponsorship>({ startDate: null, totalPaid: 0, monthlyAmount: 25, monthsActive: 0, status: null });
   const [isLoading, setIsLoading] = useState(true);
   const [nextRequestEligibleAt, setNextRequestEligibleAt] = useState<string | null>(null);
   const [canRequestUpdate, setCanRequestUpdate] = useState(false);
@@ -312,7 +538,7 @@ export function SponsorDashboard({ sponsorCode, email }: SponsorDashboardProps) 
         setSponsorMessages(data.sponsorMessages || []);
         setChildInfo(data.childInfo || null);
         setChildRevealed(!!data.childRevealed);
-        setSponsorship(data.sponsorship || { startDate: null, totalPaid: 0, monthlyAmount: 25, monthsActive: 0 });
+        setSponsorship(data.sponsorship || { startDate: null, totalPaid: 0, monthlyAmount: 25, monthsActive: 0, status: null });
         setNextRequestEligibleAt(data.nextRequestEligibleAt);
 
         if (data.nextRequestEligibleAt) {
@@ -846,6 +1072,21 @@ export function SponsorDashboard({ sponsorCode, email }: SponsorDashboardProps) 
             );
           })()}
         </div>
+      )}
+
+      {/* ============================================================
+          SHOP YOUR NUMBER — memo §5
+          Active sponsors only. Reorders ship stamped with the existing
+          number, not a freshly-assigned one.
+          ============================================================ */}
+      {sponsorship.status === 'Active'
+        && childRevealed
+        && typeof childInfo?.shirtNumber === 'number' && (
+        <ShopYourNumberSection
+          sponsorCode={sponsorCode}
+          shirtNumber={childInfo.shirtNumber}
+          childFirstName={firstName}
+        />
       )}
 
       {/* ============================================================
