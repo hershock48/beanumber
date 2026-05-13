@@ -856,6 +856,12 @@ async function sendShirtConfirmationEmail(orderData: {
   alreadySponsoring?: boolean;
   // Sponsor code to include when alreadySponsoring is true.
   sponsorCode?: string;
+  // Memo §5 portal repeat: existing sponsor reordering with their known
+  // number. Suppresses the reveal-instructions block; adds context that
+  // their monthly is unchanged.
+  isPortalRepeat?: boolean;
+  shirtNumber?: number;
+  childDisplayName?: string;
 }): Promise<void> {
   if (!orderData.email) {
     console.log('[Webhook] No customer email, skipping shirt confirmation email');
@@ -866,10 +872,15 @@ async function sendShirtConfirmationEmail(orderData: {
   const firstName = orderData.name.split(' ')[0];
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.beanumber.org';
 
-  // The reveal block is now always generic. The buyer enters their number
-  // at beanumber.org when the shirt physically arrives.
-  const revealBlock = `
-              <p>When it arrives, look at the inside of the collar. There&rsquo;s a number on it, and that number belongs to a real child in Northern Uganda. Go to <a href="${siteUrl}" style="color: #D4A843; font-weight: bold;">beanumber.org</a>, enter your number, and meet them &mdash; their name, their face, their story. Your $25 today covered the shirt and their first month of school, meals, and medical care.</p>
+  // The reveal block is generic for first-time buyers. Portal repeats
+  // (sponsor reorders) get a different block — they already know who
+  // their child is.
+  const revealBlock = orderData.isPortalRepeat
+    ? `
+              <p>This one ships stamped with <strong>#${orderData.shirtNumber || ''}</strong> on the inside collar &mdash; the same number you already know, matched to ${orderData.childDisplayName || 'your child'}. Free shipping, no new sponsorship started, your monthly is unchanged.</p>
+    `
+    : `
+              <p>When it arrives, look at the inside of the collar. There&rsquo;s a number on it, and that number belongs to a real child in Northern Uganda. Go to <a href="${siteUrl}" style="color: #D4A843; font-weight: bold;">beanumber.org</a>, enter your number, and meet them &mdash; their name, their face, their story. Your $25 today gets you the shirt and starts their year at the campus.</p>
     `;
 
   // Monthly sponsorship confirmation + sponsor code block. Only rendered
@@ -898,9 +909,11 @@ async function sendShirtConfirmationEmail(orderData: {
     `
     : '';
 
-  const subject = orderData.alreadySponsoring
-    ? 'Your shirt is on its way (and your sponsorship is active).'
-    : 'Your shirt is being made right now.';
+  const subject = orderData.isPortalRepeat
+    ? `Your reorder is being made (#${orderData.shirtNumber || ''}).`
+    : orderData.alreadySponsoring
+      ? 'Your shirt is on its way (and your sponsorship is active).'
+      : 'Your shirt is being made right now.';
 
   const html = `
           <!DOCTYPE html>
@@ -2425,6 +2438,9 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
           shirtColor,
           shirtSize,
           amount,
+          isPortalRepeat: true,
+          shirtNumber: existingShirtNumber,
+          childDisplayName,
         });
       } catch (error: any) {
         console.error('[Webhook] Failed to send portal-repeat confirmation email:', error);
@@ -2434,7 +2450,7 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
       try {
         await createCommunicationRecord(donationId, donorId, {
           email,
-          subject: 'Your reorder is being made.',
+          subject: `Your reorder is being made (#${existingShirtNumber}).`,
           body: `Portal reorder: ${shirtName} (${shirtColor}, ${shirtSize}) / $${amount.toFixed(2)} / Re-using #${existingShirtNumber} (${childDisplayName})`,
           status: emailStatus,
         });

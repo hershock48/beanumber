@@ -338,7 +338,7 @@ function sponsorOnboardEmail(
         subject: "Checking in after your first month",
         html: wrapEmail(`
           <p style="margin-top: 0;">Hey ${firstName},</p>
-          <p>You&rsquo;ve been sponsoring for about a month now, so I just wanted to check in and let you know what your $25 covered this month: ${displayChildName ? `${displayChildName} went` : 'your child went'} to school every day, ate breakfast and lunch at the campus every day, and had a nurse available whenever they needed one. Same thing will happen next month because you&rsquo;re still here.</p>
+          <p>You&rsquo;ve been sponsoring for about a month now, so I just wanted to check in and let you know what your $25 supported this month: ${displayChildName ? `${displayChildName} went` : 'your child went'} to school every day, ate breakfast and lunch at the campus every day, and had a nurse available whenever they needed one. Same thing will happen next month because you&rsquo;re still here.</p>
           <p>One thing that really helps us grow: if you know someone who&rsquo;d be into what we do, send them a quick text. It doesn&rsquo;t need to be a whole thing, something like &ldquo;I sponsor a kid in Uganda through this org called Be A Number, you should check it out.&rdquo; That&rsquo;s genuinely how most of our sponsors find us.</p>
           <p>Your <a href="${portalUrl}" style="color: #D4A843; font-weight: bold;">portal</a> has the latest updates whenever you want to check in.</p>
           <p>Kevin</p>

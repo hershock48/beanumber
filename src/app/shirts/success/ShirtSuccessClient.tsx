@@ -176,10 +176,10 @@ function ShippingConfirmation({
             Your monthly sponsorship is active.
           </h3>
           <p className="text-[#666] text-sm leading-relaxed mb-3">
-            Today&rsquo;s $25 covered your shirt and the first month. Another
-            $25 will be charged each month going forward, and it goes straight
-            to school, meals, and medical care for the child your shirt is
-            tied to.
+            Today&rsquo;s $25 got you the shirt and started their year at the campus.
+            Another $25 will be charged each month going forward, and it supports
+            the campus where the child your shirt is tied to goes to school, eats
+            meals, and gets medical care.
           </p>
           <p className="text-[#666] text-sm leading-relaxed mb-3">
             You&rsquo;ll get a <strong>sponsor code</strong> by email shortly

@@ -204,7 +204,7 @@ export async function sendSponsorWelcomeEmail(
   const html = wrapTransactionalEmail(`
     <p style="margin-top: 0;">Hey ${firstName},</p>
 
-    <p>Your sponsorship of ${childName} is active. That means ${childName} has school fees, daily meals, and access to the on-site clinic covered, and you have a direct connection to them through your sponsor portal.</p>
+    <p>Your sponsorship of ${childName} is active. That means ${childName} goes to school at the YDO campus, eats two meals a day, and has the on-site clinic when they need it — and you have a direct connection to them through your sponsor portal.</p>
 
     <div style="background: #f5f0e8; border: 1px solid #e8e0d4; padding: 16px 20px; margin: 24px 0;">
       <p style="margin: 0 0 8px 0; font-size: 13px; color: #999; text-transform: uppercase; letter-spacing: 0.1em;">Your portal access</p>

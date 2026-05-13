@@ -1056,7 +1056,7 @@ export function SponsorDashboard({ sponsorCode, email }: SponsorDashboardProps) 
                   />
                   <ImpactStat
                     end={meals}
-                    sublabel="meals covered"
+                    sublabel="meals supported"
                     detail="breakfast + lunch, every school day"
                   />
                   <ImpactStat

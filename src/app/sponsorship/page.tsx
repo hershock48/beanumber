@@ -371,7 +371,7 @@ function SponsorshipPageContent() {
               </h2>
               <p className="text-[#777] text-center mb-10 max-w-lg mx-auto">
                 {referringShirtSessionId
-                  ? "Your shirt covered their first month. Keep going. $25/month, cancel anytime."
+                  ? "Your shirt started their year at the campus. Keep going. $25/month, cancel anytime."
                   : `Confirm below to sponsor ${focusedChild.displayName} for $25/month. Cancel anytime.`}
               </p>
             </>
