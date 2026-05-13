@@ -292,9 +292,9 @@ Entirely unused. Zero records, zero code references. Kevin: delete the whole tab
 
 ### Trap 1: Donation Source rejects unknown singleSelect values
 
-Current valid options: `Website`, `Manual Entry`, `Event`, `Other`.
+Current valid options: `Website`, `Manual Entry`, `Event`, `Other`, `Portal Repeat` (added May 13 for the Shop Your Number flow).
 
-The code in `src/lib/tools/donation/upsertDonation.ts` wants to pass `Sponsorship`, `Shirt`, `Shirt + Monthly` to describe the flow, but those aren't options. The normalizer introduced in commit `2307241` does this:
+The code in `src/lib/tools/donation/upsertDonation.ts` wants to pass `Sponsorship`, `Shirt Order`, `Shirt + Monthly` to describe the flow, but those still aren't options. The normalizer introduced in commit `2307241` does this:
 
 ```ts
 const VALID_SOURCES = new Set(['Website', 'Manual Entry', 'Event', 'Other']);
@@ -304,7 +304,7 @@ const sourceLabelForNote = VALID_SOURCES.has(rawSource) ? null : rawSource;
 // Prefix the real label onto Donation Note as [Sponsorship], [Shirt], etc.
 ```
 
-**Real fix:** Kevin adds `Sponsorship`, `Shirt`, `Shirt + Monthly` as options to the Donation Source singleSelect in Airtable's UI. When he does, remove the normalizer. Until then, the label lives in the Note prefix and we keep the record clean.
+**Real fix:** Kevin adds `Sponsorship`, `Shirt Order`, `Shirt + Monthly` as options to the Donation Source singleSelect in Airtable's UI. `Portal Repeat` is already done (May 13). When the other three are added, expand `VALID_SOURCES` in `webhooks/stripe/route.ts` and remove the normalizer fallback entirely. Until then, those three labels live in the Note prefix and the records stay clean.
 
 ### Trap 2: The webhook tried to write address fields to Donations
 

@@ -70,7 +70,7 @@ Last updated: May 13, 2026.
 
 - **ChildID → ShirtNumber migration.** ~20 files reference `ChildID` as a join key between Sponsorships and Children. The Ugandan team only uses shirt numbers, so the field is dead weight. Migration requires coordinated code + data changes; we chose not to take it on mid-stream.
 - **Stripe webhook 400 at 20:02:15 on April 15.** Signature-verification failure, likely a second stale webhook endpoint in Stripe dashboard. Kevin needs to check Stripe Developers → Webhooks for duplicate endpoints and delete the stale one.
-- **Donation Source singleSelect options in Airtable.** Code normalizes to "Website" and prefixes the real label onto the Note. Real fix is to add "Sponsorship", "Shirt", "Shirt + Monthly", and "Portal Repeat" as options in Airtable's UI.
+- **Donation Source singleSelect options in Airtable.** Code normalizes to "Website" and prefixes the real label onto the Note. `Portal Repeat` is added (May 13); the remaining "Sponsorship", "Shirt Order", "Shirt + Monthly" still need adding in the Airtable UI to fully retire the normalizer fallback.
 
 ## Recent meaningful commits (as of 2026-05-13)
 
