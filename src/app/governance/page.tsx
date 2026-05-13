@@ -70,6 +70,20 @@ export default function Governance() {
             </p>
           </section>
 
+          {/* How sponsorship works */}
+          <section className="mb-12">
+            <h2 className="text-2xl font-bold text-gray-900 mb-6">How sponsorship works</h2>
+            <p className="text-gray-700 leading-relaxed mb-4">
+              We operate a pool-funded program with personal matching. Every shirt purchase, monthly sponsorship, gift, and donation flows into the operating budget of the YDO campus in Omoro District, Northern Uganda. That budget pays for the school, the clinic, the meals program, vocational training, the teachers and clinic staff, and the children's care year-round. Each donor is matched to a specific child for relationship and storytelling &mdash; the child whose number you receive becomes your personal connection, the one you get photos of, letters from, and updates about as the year unfolds.
+            </p>
+            <p className="text-gray-700 leading-relaxed mb-4">
+              This is the same model Compassion International and World Vision operate on. Strict 1-to-1 financial allocation isn't operationally honest for a six-acre campus with 30+ staff, a school, a clinic, and a vocational program &mdash; the annual cost of running it far exceeds what any one sponsor's $25 a month could literally pay for. What your gift does is fund a partnership: a community-run campus that keeps your matched child in school, fed, and cared for alongside their classmates, year after year.
+            </p>
+            <p className="text-gray-700 leading-relaxed">
+              Restricted gifts are an exception we honor explicitly. Founder's Series shirts (when designated to a specific capital project), named scholarships, and project-restricted donations to the clinic or vocational program are tracked and reported against the restriction. Everything else is unrestricted general support, which is what gives the campus the flexibility to keep going through weeks when shirt sales are slow or a child needs urgent care.
+            </p>
+          </section>
+
           {/* 2025 Financial Snapshot */}
           <section className="mb-12">
             <h2 className="text-2xl font-bold text-gray-900 mb-6">2025 Financial Snapshot</h2>
