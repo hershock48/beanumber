@@ -136,8 +136,7 @@ export function HomePageContent() {
           </h1>
           <div className="mb-10" />
           <p className="text-lg md:text-xl text-[#FFF8F0]/70 mb-12 max-w-lg mx-auto leading-relaxed">
-            There&rsquo;s a child in Africa waiting to tell you their name.
-            Your shirt number is theirs. Enter it and meet them.
+            Every shirt has a number. Every number is a child. Find yours.
           </p>
 
           <form onSubmit={handleSearch} className="flex max-w-md mx-auto shadow-2xl rounded-sm overflow-hidden">
