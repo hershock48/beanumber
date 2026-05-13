@@ -521,9 +521,6 @@ function ShirtCard({ shirt, reversed, initialColor }: { shirt: Shirt; reversed: 
   const [selectedColor, setSelectedColor] = useState<ColorName | null>(null);
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  // Unchecked by default. Opting in converts this purchase into a monthly
-  // sponsorship from day one — the $25 today IS month one, then $25/month.
-  const [continueMonthly, setContinueMonthly] = useState(false);
   const [justAdded, setJustAdded] = useState(false);
   const { addItem } = useCart();
 
@@ -531,7 +528,10 @@ function ShirtCard({ shirt, reversed, initialColor }: { shirt: Shirt; reversed: 
   const Front = shirt.Front;
   const Back = shirt.Back;
 
-  function handleAddToCart() {
+  // Memo §1: active-choice two-button pattern. Caller passes intent
+  // explicitly so we don't rely on stale React state between click
+  // and dispatch.
+  function handleAddToCart(continueMonthly: boolean) {
     if (!selectedColor) {
       setError('Please select a color.');
       return;
@@ -551,10 +551,9 @@ function ShirtCard({ shirt, reversed, initialColor }: { shirt: Shirt; reversed: 
       price: shirt.price,
     });
 
-    // Flash confirmation, then reset selections for another add
+    // Flash confirmation, then reset for another add
     setJustAdded(true);
     setTimeout(() => setJustAdded(false), 1500);
-    setContinueMonthly(false);
   }
 
   return (
@@ -713,87 +712,86 @@ function ShirtCard({ shirt, reversed, initialColor }: { shirt: Shirt; reversed: 
               <p className="text-sm text-red-600 mb-3">{error}</p>
             )}
 
-            {/* Monthly sponsorship opt-in. Unchecked by default — the
-                shirt always stands on its own. Checking it converts the
-                purchase into a monthly sponsorship from day one ($25 today
-                = month one, then $25/month). Built as a full-width card
-                instead of a text checkbox so it actually gets read. */}
-            <button
-              type="button"
-              onClick={() => setContinueMonthly(v => !v)}
-              aria-pressed={continueMonthly}
-              className={`w-full text-left mb-4 border transition-all cursor-pointer relative p-4 sm:p-5 ${
-                continueMonthly
-                  ? 'border-[#D4A843] bg-[#D4A843]/5 shadow-sm'
-                  : 'border-[#e8e0d4] bg-white hover:border-[#D4A843]/50'
-              }`}
-            >
-              <div className="flex items-start gap-3">
-                {/* Gold checkbox indicator — visual state only; the whole
-                    card is the click target. */}
-                <span
-                  aria-hidden
-                  className={`mt-0.5 flex-shrink-0 w-5 h-5 border flex items-center justify-center transition-colors ${
-                    continueMonthly
-                      ? 'bg-[#D4A843] border-[#D4A843]'
-                      : 'bg-white border-[#c9bfae]'
-                  }`}
+            {/* Memo §1: active-choice pattern. Two side-by-side buttons of
+                deliberately unequal visual weight. Primary path is "Shirt +
+                Stay" (filled, larger). Secondary is shirt-only (outlined,
+                smaller). Replaces the opt-in toggle + single CTA, which
+                implied continuation in its unchecked default state without
+                naming it. The explainer block above the buttons keeps the
+                "what does staying actually mean" context that the old card
+                was carrying — but as visible context, not a toggle. */}
+            <div className="mb-4 p-4 sm:p-5 border border-[#e8e0d4] bg-[#FFF8F0]">
+              <div className="flex items-baseline justify-between gap-3 mb-1">
+                <p
+                  className="text-base text-[#0d0d0d]"
+                  style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
                 >
-                  {continueMonthly && (
-                    <svg viewBox="0 0 20 20" fill="none" className="w-3.5 h-3.5 text-[#0d0d0d]">
+                  Stay in their life.
+                </p>
+                <p className="text-xs font-bold uppercase tracking-wider text-[#D4A843] whitespace-nowrap">
+                  +$25/mo
+                </p>
+              </div>
+              <p className="text-sm text-[#555] leading-snug">
+                The shirt is how you meet them. $25 a month is how you stay &mdash;
+                letters, photos, report cards, report from the ground.
+              </p>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 mb-3">
+              {/* Primary: Shirt + monthly sponsorship from day one. */}
+              <button
+                onClick={() => handleAddToCart(true)}
+                aria-label="Add shirt and start monthly sponsorship"
+                className={`flex-1 sm:flex-[2] px-5 py-4 font-bold uppercase tracking-wider transition-colors inline-flex flex-col items-center justify-center gap-0.5 cursor-pointer ${
+                  justAdded
+                    ? 'bg-[#2a7a2a] text-white'
+                    : 'bg-[#D4A843] text-[#0d0d0d] hover:bg-[#c49a3a]'
+                }`}
+              >
+                {justAdded ? (
+                  <span className="text-sm flex items-center gap-2">
+                    Added!
+                    <svg viewBox="0 0 20 20" fill="none" className="w-4 h-4 text-white">
                       <path d="M5 10l3.5 3.5L15 7" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
-                  )}
-                </span>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-baseline justify-between gap-3 mb-1">
-                    <p
-                      className="text-base text-[#0d0d0d]"
-                      style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
-                    >
-                      Stay in their life.
-                    </p>
-                    <p className="text-xs font-bold uppercase tracking-wider text-[#D4A843] whitespace-nowrap">
-                      +$25/mo
-                    </p>
-                  </div>
-                  <p className="text-sm text-[#555] leading-snug mb-2">
-                    The shirt is how you meet them. $25 a month is how you stay &mdash;
-                    letters, photos, report cards, report from the ground.
-                  </p>
-                  <p className="text-xs text-[#999] leading-snug">
-                    $25 today gets you the shirt and starts their year at the campus. Billed $25/month after that to finish it. Cancel anytime from your sponsor portal.
-                  </p>
-                </div>
-              </div>
-            </button>
+                  </span>
+                ) : (
+                  <>
+                    <span className="text-sm">Shirt + Stay</span>
+                    <span className="text-[11px] font-semibold normal-case tracking-normal opacity-80">$25 today, then $25/mo</span>
+                  </>
+                )}
+              </button>
 
-            <button
-              onClick={handleAddToCart}
-              className={`w-full sm:w-auto px-10 py-4 font-bold uppercase tracking-wider text-sm transition-colors inline-flex items-center justify-center gap-3 cursor-pointer ${
-                justAdded
-                  ? 'bg-[#2a7a2a] text-white'
-                  : 'bg-[#D4A843] text-[#0d0d0d] hover:bg-[#c49a3a]'
-              }`}
-            >
-              <span>
-                {justAdded
-                  ? 'Added!'
-                  : continueMonthly
-                    ? 'Add Shirt + Sponsor · $25'
-                    : 'Add to Cart · $25'}
-              </span>
-              {justAdded && (
-                <svg viewBox="0 0 20 20" fill="none" className="w-4 h-4 text-white">
-                  <path d="M5 10l3.5 3.5L15 7" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              )}
-            </button>
+              {/* Secondary: shirt only, one-time. */}
+              <button
+                onClick={() => handleAddToCart(false)}
+                aria-label="Add shirt only, one-time purchase"
+                className={`flex-1 px-5 py-4 font-bold uppercase tracking-wider transition-colors inline-flex flex-col items-center justify-center gap-0.5 cursor-pointer border ${
+                  justAdded
+                    ? 'bg-[#2a7a2a] text-white border-[#2a7a2a]'
+                    : 'bg-white text-[#0d0d0d] border-[#0d0d0d] hover:bg-[#FFF8F0]'
+                }`}
+              >
+                {justAdded ? (
+                  <span className="text-sm flex items-center gap-2">
+                    Added!
+                    <svg viewBox="0 0 20 20" fill="none" className="w-4 h-4 text-white">
+                      <path d="M5 10l3.5 3.5L15 7" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </span>
+                ) : (
+                  <>
+                    <span className="text-sm">Shirt only</span>
+                    <span className="text-[11px] font-semibold normal-case tracking-normal opacity-70">$25 once</span>
+                  </>
+                )}
+              </button>
+            </div>
 
-            <p className="text-xs text-[#bbb] mt-3">
-              {continueMonthly
-                ? '$25 today. $25/month after. Cancel anytime.'
-                : '$25 supports their campus this month. One-time, unless you add monthly above.'}
+            <p className="text-xs text-[#bbb]">
+              Cancel anytime from your sponsor portal. Continuing is your choice.
             </p>
           </div>
         </div>
