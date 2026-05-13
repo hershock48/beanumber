@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
               product_data: {
                 name: `${shirt.name} / ${color} / ${size}`,
                 description:
-                  'Be A Number heavyweight tee. Your shirt number connects you to a real child. $25 covers the shirt and their first month of sponsorship.',
+                  'Be A Number heavyweight tee. Your shirt number connects you to a real child. $25 gets you the shirt and starts their year at the campus.',
               },
               unit_amount: SHIRT_PRICE * 100,
             },
@@ -133,7 +133,7 @@ export async function POST(request: NextRequest) {
             product_data: {
               name: `${shirt.name} / ${color} / ${size} + Monthly Sponsorship`,
               description:
-                "Your shirt plus ongoing $25/month sponsorship. Today's $25 covers month one and ships your shirt. Cancel anytime.",
+                "Your shirt plus ongoing $25/month sponsorship. Today's $25 starts their year at the campus and ships your shirt. Cancel anytime.",
             },
             unit_amount: SHIRT_PRICE * 100,
             recurring: { interval: 'month' },

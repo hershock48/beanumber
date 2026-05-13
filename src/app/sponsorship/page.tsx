@@ -239,8 +239,8 @@ function SponsorshipPageContent() {
           </h1>
           <p className="text-lg text-[#777] max-w-2xl mx-auto leading-relaxed">
             {focusedChild && referringShirtSessionId
-              ? `Your shirt covered ${focusedChild.displayName.split(' ')[0]}\u2019s first month of school, meals, and medical care. Keep going for $25/month. Cancel anytime.`
-              : '$25 a month covers school, daily meals, medical care, and a personal mentor for a child at the YDO campus in Northern Uganda. You\u2019ll know their name, see their face, and follow their year.'}
+              ? `Your shirt started ${focusedChild.displayName.split(' ')[0]}\u2019s year at the campus. $25/month finishes it. Cancel anytime.`
+              : '$25 a month supports school, daily meals, medical care, and a personal mentor at the YDO campus in Northern Uganda. You\u2019ll know your matched child by name, see their face, and follow their year.'}
           </p>
         </div>
       </section>
@@ -316,7 +316,7 @@ function SponsorshipPageContent() {
                   {
                     icon: <IconUser className="w-5 h-5 text-[#D4A843]" />,
                     title: 'Matched to a specific child',
-                    desc: 'You\u2019ll know their name, see their photo, and follow their story. Multiple sponsors can back the same child. That\u2019s how we fully fund them.',
+                    desc: 'You\u2019ll know their name, see their photo, and follow their story. Multiple sponsors can be matched to the same child. That\u2019s how the campus stays funded.',
                   },
                   {
                     icon: <IconNewspaper className="w-5 h-5 text-[#D4A843]" />,
@@ -384,7 +384,7 @@ function SponsorshipPageContent() {
                 Skip the shirt, pick a child.
               </h2>
               <p className="text-[#777] text-center mb-10 max-w-lg mx-auto">
-                $25/month pays for their school, daily meals, medical care through the on-site clinic, and a mentor who knows their name. You get letters, photos, and a year-end report card.
+                $25/month supports school, daily meals, medical care through the on-site clinic, and a mentor who knows your matched child by name. You get letters, photos, and a year-end report card.
               </p>
             </>
           )}
@@ -648,7 +648,7 @@ function SponsorshipPageContent() {
               },
               {
                 step: 'II',
-                title: '$25/month covers everything',
+                title: '$25/month supports the campus',
                 desc: 'School fees, daily meals, medical care, and mentorship at the YDO campus in Omoro District. Secure checkout via Stripe.',
               },
               {
@@ -692,15 +692,15 @@ function SponsorshipPageContent() {
             {[
               {
                 q: 'Where does my $25 actually go?',
-                a: 'Your $25 pools with other sponsors to fund education, daily meals, medical care through the on-site clinic, and mentorship for the children at the YDO campus. But it also supports the infrastructure around them: the 60 women in vocational training, the 700+ patients served through medical outreach, the construction apprenticeships. You\u2019re not funding one line item. You\u2019re funding the ecosystem that keeps a child safe.',
+                a: 'Your $25 pools with other sponsors to support education, daily meals, medical care through the on-site clinic, and mentorship for the children at the YDO campus. It also supports the infrastructure around them: the 60 women in vocational training, the 700+ patients served through medical outreach, the construction apprenticeships. You\u2019re not paying line items on one child\u2019s bill. You\u2019re supporting the ecosystem that keeps them in school.',
               },
               {
                 q: 'What happens if multiple people sponsor the same child?',
-                a: 'That\u2019s the model. It costs more than $25/month to fully fund a child\u2019s education, meals, and medical care. We set the price at $25 because it\u2019s accessible, and we stack multiple sponsors per child until they\u2019re fully funded. Every child at the campus is enrolled and cared for regardless of how many individual sponsors they have. Your $25 isn\u2019t the difference between a child going to school or not. It\u2019s part of the team that makes it possible.',
+                a: 'That\u2019s the model. It costs more than $25/month to fully support a child\u2019s education, meals, and medical care at the campus. We set the price at $25 because it\u2019s accessible, and we match multiple sponsors per child until the campus is fully funded. Every child at the campus is enrolled and cared for regardless of how many sponsors they have on paper. Your $25 isn\u2019t the difference between a child going to school or not. It\u2019s part of the team that makes it possible.',
               },
               {
                 q: 'Do I need to buy a shirt first?',
-                a: 'No. The shirt is one way in. You can also sponsor directly from this page. If you did buy a shirt, it covered your first month and the number on the tag connects you to a specific child. If you didn\u2019t, pick a child above and you\u2019re in the same place.',
+                a: 'No. The shirt is one way in. You can also sponsor directly from this page. If you did buy a shirt, it started your matched child\u2019s year at the campus and the number on the tag connects you to them. If you didn\u2019t, pick a child above and you\u2019re in the same place.',
               },
               {
                 q: 'What makes this different from other child sponsorship programs?',

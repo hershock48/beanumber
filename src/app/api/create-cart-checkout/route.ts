@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
           product_data: {
             name: `${shirt.name} / ${item.color} / ${item.size}${monthlyLabel}`,
             description: item.continueMonthly
-              ? '$25 covers the shirt + month one. Monthly sponsorship ($25/mo) starts in 30 days.'
+              ? '$25 gets you the shirt and starts your matched child’s year at the campus. Monthly sponsorship ($25/mo) starts in 30 days.'
               : 'Be A Number heavyweight tee. Your shirt number connects you to a real child.',
           },
           unit_amount: SHIRT_PRICE * 100,

@@ -43,13 +43,13 @@ export default function SponsorWelcomePage() {
             </p>
           </div>
 
-          {/* What your $25 covers each month */}
+          {/* What your $25 supports each month */}
           <div className="bg-white border border-[#e8e0d4] p-7 md:p-8 mb-8">
             <h3
               className="text-lg text-[#0d0d0d] mb-4"
               style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
             >
-              What your $25 covers each month
+              What your $25 supports each month
             </h3>
             <div className="space-y-3 text-[#555] text-sm leading-relaxed">
               <div className="flex gap-3 items-start">

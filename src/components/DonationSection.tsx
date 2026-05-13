@@ -125,7 +125,7 @@ export function DonationSection({}: DonationSectionProps) {
               className="bg-white/10 hover:bg-white/20 border border-white/20 rounded-md p-3 sm:p-4 text-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
             >
               <div className="text-xl sm:text-2xl font-bold mb-2">$25</div>
-              <div className="text-xs sm:text-sm text-gray-200 leading-snug">Covers school supplies for 5 students for one term</div>
+              <div className="text-xs sm:text-sm text-gray-200 leading-snug">Supports school supplies for 5 students this term</div>
             </button>
             <button 
               onClick={() => handleDonate(50)}
@@ -133,7 +133,7 @@ export function DonationSection({}: DonationSectionProps) {
               className="bg-white/10 hover:bg-white/20 border border-white/20 rounded-md p-3 sm:p-4 text-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
             >
               <div className="text-xl sm:text-2xl font-bold mb-2">$50</div>
-              <div className="text-xs sm:text-sm text-gray-200 leading-snug">Covers malaria treatment for 3 families</div>
+              <div className="text-xs sm:text-sm text-gray-200 leading-snug">Supports malaria treatment for 3 families through the clinic</div>
             </button>
             <button 
               onClick={() => handleDonate(100)}
@@ -141,7 +141,7 @@ export function DonationSection({}: DonationSectionProps) {
               className="bg-white/10 hover:bg-white/20 border border-white/20 rounded-md p-3 sm:p-4 text-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
             >
               <div className="text-xl sm:text-2xl font-bold mb-2">$100</div>
-              <div className="text-xs sm:text-sm text-gray-200 leading-snug">Funds complete vocational training for 1 person</div>
+              <div className="text-xs sm:text-sm text-gray-200 leading-snug">Supports a full vocational training term for one woman</div>
             </button>
             <button 
               onClick={() => handleDonate(250)}
@@ -149,7 +149,7 @@ export function DonationSection({}: DonationSectionProps) {
               className="bg-white/10 hover:bg-white/20 border border-white/20 rounded-md p-3 sm:p-4 text-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
             >
               <div className="text-xl sm:text-2xl font-bold mb-2">$250</div>
-              <div className="text-xs sm:text-sm text-gray-200 leading-snug">Covers one month's salary for a local teacher</div>
+              <div className="text-xs sm:text-sm text-gray-200 leading-snug">Supports a month of salary for a local teacher on campus</div>
             </button>
           </div>
           

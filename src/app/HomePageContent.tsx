@@ -196,9 +196,9 @@ export function HomePageContent() {
             They have names and stories.
           </h2>
           <p className="text-[#777] max-w-lg mx-auto leading-relaxed text-lg">
-            Every number on every shirt belongs to a child like the ones below. Your shirt covers their first month
-            of school. Stay with them for $25/month and you&rsquo;ll get a monthly newsletter from the campus, photos
-            of your child through the year, and a handwritten letter from them once a year.
+            Every number on every shirt belongs to a child like the ones below. Your shirt starts their year
+            at the campus. Stay with them for $25/month to finish it &mdash; a monthly newsletter from the campus,
+            photos of your matched child through the year, and a handwritten letter from them once a year.
           </p>
         </div>
 
@@ -321,7 +321,7 @@ export function HomePageContent() {
               </div>
               <h3 className="text-lg font-semibold text-[#0d0d0d] mb-3">Get a Shirt</h3>
               <p className="text-[#777] text-sm leading-relaxed">
-                Every shirt has a number, and every number belongs to a child. $25 gets you the shirt and covers their first month of school. Your number is assigned when you order.
+                Every shirt has a number, and every number belongs to a child. $25 gets you the shirt and starts their year at the campus. Your number is assigned when you order.
               </p>
             </div>
 

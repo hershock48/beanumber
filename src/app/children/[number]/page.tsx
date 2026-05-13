@@ -342,10 +342,10 @@ export default async function ChildProfilePage({ params }: ChildPageProps) {
               When you enter it here, you meet them &mdash; their name, their face, their story.
             </p>
             <p className="text-[#666] leading-relaxed">
-              Your $25 covers the shirt and sponsors that child for your first month of school,
-              meals, and medical care. Continue at $25/month and you stay connected to their
-              story all year &mdash; a monthly campus newsletter, photos, a handwritten letter
-              from your child, and a year-end report card.
+              Your $25 gets you the shirt and starts their year at the campus &mdash; school,
+              meals, medical care. Continue at $25/month to finish their year and stay connected:
+              a monthly campus newsletter, photos, a handwritten letter from your matched child,
+              and a year-end report card.
             </p>
           </div>
 
@@ -362,7 +362,7 @@ export default async function ChildProfilePage({ params }: ChildPageProps) {
             </h2>
             <p className="text-[#666] leading-relaxed max-w-lg mx-auto mb-8">
               Six designs. Five colors. Heavyweight cotton, HTV vinyl, handmade to order.
-              Every shirt funds a real child&rsquo;s education, meals, and medical care for a month.
+              Every shirt starts a matched child&rsquo;s year at the campus &mdash; school, meals, medical care.
             </p>
             <Link
               href="/shirts"
@@ -650,9 +650,9 @@ export default async function ChildProfilePage({ params }: ChildPageProps) {
                 )}
 
                 <p className="text-[#555] leading-relaxed mb-4">
-                  Your $25/month covers {firstName}&rsquo;s school fees, books,
-                  a uniform, morning porridge and a hot meal every day, access to
-                  the on-site medical center, and a place where teachers know{' '}
+                  Your $25/month supports the campus where {firstName} goes to school,
+                  eats morning porridge and a hot meal every day, gets care at the
+                  on-site medical center, and learns from teachers who know{' '}
                   {firstName}&rsquo;s name.
                 </p>
 

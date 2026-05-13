@@ -835,12 +835,12 @@ export function SponsorDashboard({ sponsorCode, email }: SponsorDashboardProps) 
                   />
                   <ImpactStat
                     end={schoolDays}
-                    sublabel="school days covered"
+                    sublabel="school days supported"
                     detail="fees, medical care, mentorship"
                   />
                 </div>
                 <p className="text-xs text-[#aaa] mt-5">
-                  ${sponsorship.monthlyAmount}/mo covers breakfast and lunch at the campus, school fees, basic medical care, and mentorship through the YDO team.
+                  ${sponsorship.monthlyAmount}/mo supports breakfast and lunch at the campus, school fees, basic medical care, and mentorship through the YDO team.
                 </p>
               </>
             );

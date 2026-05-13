@@ -233,14 +233,14 @@ function shirtNurtureEmail(
                <div style="background: #FFF8F0; border: 1px solid #e8e0d4; padding: 16px 20px; margin: 16px 0;">
                  ${multiChildBlock(numbers, names)}
                </div>
-               <p>Right now, $25 a month covers school fees, two meals a day, and medical care for a child at the campus. If you sponsor any of these kids, you get a direct connection to them: letters, photos, report cards, and a place to write to them whenever you want.</p>
+               <p>Right now, $25 a month supports school fees, two meals a day, and medical care at the campus. If you sponsor any of these kids, you get a direct connection to them: letters, photos, report cards, and a place to write to them whenever you want.</p>
                <p style="text-align: center; margin: 24px 0;">
                  <a href="${sponsorUrl}" style="display: inline-block; background: #D4A843; color: #0d0d0d; font-weight: bold; text-decoration: none; padding: 14px 32px; font-size: 15px; letter-spacing: 0.05em;">SPONSOR A CHILD FOR $25/MO</a>
                </p>`
             : `${firstName_
                 ? `<p>The child connected to your shirt is ${firstName_}. If you haven&rsquo;t met them yet, <a href="${childUrl}" style="color: #D4A843; font-weight: bold;">here&rsquo;s their page</a>.</p>
-                   <p>Right now, $25 a month covers school fees, two meals a day, and medical care for the children at the campus. That&rsquo;s what sponsorship funds, and it starts the day you sign up.</p>`
-                : `<p>Right now, $25 a month covers school fees, two meals a day, and medical care for the children at the campus. That&rsquo;s what sponsorship funds, and it starts the day you sign up.</p>`
+                   <p>Right now, $25 a month supports school fees, two meals a day, and medical care at the campus. That&rsquo;s what sponsorship supports, and it starts the day you sign up.</p>`
+                : `<p>Right now, $25 a month supports school fees, two meals a day, and medical care at the campus. That&rsquo;s what sponsorship supports, and it starts the day you sign up.</p>`
               }
               <p>If you sponsor ${firstName_ || 'a child'}, you get a direct connection to them. Letters, photos, report cards, and a place to write to them whenever you want.</p>
               <p style="text-align: center; margin: 24px 0;">
@@ -259,7 +259,7 @@ function shirtNurtureEmail(
         html: wrapEmail(`
           <p style="margin-top: 0;">Hey ${firstName},</p>
           <p>This is the last email I&rsquo;ll send you about this, and I&rsquo;ll keep it short.</p>
-          <p>The shirts are how most people find us, and sponsorship is how we keep the campus running. $25 a month covers school fees, two meals a day, and medical care for a child at the campus, and the sponsor gets letters, photos, and a real relationship with a specific kid by name.</p>
+          <p>The shirts are how most people find us, and sponsorship is how we keep the campus running. $25 a month supports school fees, two meals a day, and medical care at the campus, and the sponsor gets letters, photos, and a real relationship with a specific kid by name.</p>
           ${multi
             ? `<p>You have ${numbers.length} children connected to your shirts. Any one of them can be sponsored at <a href="${SITE_URL}" style="color: #D4A843; font-weight: bold;">beanumber.org</a>. And if not now, the door is always open.</p>`
             : `<p>If you want in, you can <a href="${sponsorUrl}" style="color: #D4A843; font-weight: bold;">sponsor ${firstName_ || 'a child'} here</a>. And if not, wear that shirt with pride. You can always come back later, or grab another design and get matched to a different child.</p>`
@@ -300,8 +300,8 @@ function sponsorOnboardEmail(
           <p style="margin-top: 0;">Hey ${firstName},</p>
           <p>Your sponsorship is active, and I wanted to make sure you have everything you need to get started.</p>
           ${displayChildName
-            ? `<p>Your $25 a month covers school fees, two meals a day, and medical care for ${displayChildName} at the YDO campus in Northern Uganda. <a href="${childUrl}" style="color: #D4A843; font-weight: bold;">Here&rsquo;s their page.</a> For a lot of the kids on campus, those meals are the only ones they get all day, so this is making a real difference starting right now.</p>`
-            : `<p>Your $25 a month covers school fees, two meals a day, and medical care for a specific child at the YDO campus in Northern Uganda. For a lot of the kids on campus, those meals are the only ones they get all day, so this is making a real difference starting right now.</p>`
+            ? `<p>Your $25 a month supports school fees, two meals a day, and medical care at the YDO campus where ${displayChildName} goes to school. <a href="${childUrl}" style="color: #D4A843; font-weight: bold;">Here&rsquo;s their page.</a> For a lot of the kids on campus, those meals are the only ones they get all day, so this matters starting right now.</p>`
+            : `<p>Your $25 a month supports school fees, two meals a day, and medical care at the YDO campus where your matched child goes to school. For a lot of the kids on campus, those meals are the only ones they get all day, so this matters starting right now.</p>`
           }
           <p>I built a sponsor portal where you can see updates, photos, and letters as they come in from the campus. To log in, you&rsquo;ll need your email and your sponsor code:</p>
           ${sponsorCode
@@ -367,7 +367,7 @@ function donorConvertEmail(
         html: wrapEmail(`
           <p style="margin-top: 0;">Hey ${firstName},</p>
           <p>I wanted to follow up and let you know where your donation actually went, because I think that matters.</p>
-          <p>It went to the YDO campus in Northern Uganda. One campus, one team on the ground. We use it to cover school fees, meals, and medical care for specific kids by name. We&rsquo;re small on purpose, which means I can tell you exactly where your money ends up.</p>
+          <p>It went to the YDO campus in Northern Uganda. One campus, one team on the ground. The budget supports school fees, meals, and medical care for the children there &mdash; you can know any of them by name. We&rsquo;re small on purpose, which means I can tell you exactly where your money ends up.</p>
           <p>Thank you for trusting us with it.</p>
           <p>Kevin</p>
         `),
@@ -380,7 +380,7 @@ function donorConvertEmail(
         html: wrapEmail(`
           <p style="margin-top: 0;">Hey ${firstName},</p>
           <p>I wanted to tell you a little more about how we work, since you already took a chance on us once.</p>
-          <p>Every child at our campus has a number, and that number connects them to one specific sponsor. The sponsor pays $25 a month, which covers school, two meals a day, and medical care. In return, the sponsor gets letters, photos, and report cards from the campus. The child knows their sponsor&rsquo;s name. It&rsquo;s a real relationship between two real people, and that&rsquo;s kind of the whole point of what we built.</p>
+          <p>Every child at our campus has a number, and that number is the bridge to a sponsor. The sponsor pays $25 a month, which supports school, two meals a day, and medical care at the campus. In return, the sponsor gets letters, photos, and report cards from their matched child. The child knows their sponsor&rsquo;s name. It&rsquo;s a real relationship between two real people, and that&rsquo;s kind of the whole point of what we built.</p>
           <p>If you want to see the kids, you can <a href="${sponsorUrl}" style="color: #D4A843; font-weight: bold;">meet them here</a>. Or if you want to grab a shirt and get randomly matched to a child by number, <a href="${SITE_URL}/shirts" style="color: #D4A843; font-weight: bold;">check out the shirts here</a>.</p>
           <p style="text-align: center; margin: 24px 0;">
             <a href="${sponsorUrl}" style="display: inline-block; background: #D4A843; color: #0d0d0d; font-weight: bold; text-decoration: none; padding: 14px 32px; font-size: 15px; letter-spacing: 0.05em;">MEET THE KIDS</a>
@@ -396,7 +396,7 @@ function donorConvertEmail(
         html: wrapEmail(`
           <p style="margin-top: 0;">Hey ${firstName},</p>
           <p>This is the last email I&rsquo;ll send you about this.</p>
-          <p>What you gave went to real kids. It paid for meals and kept them in school. If you ever want to go deeper, whether that&rsquo;s sponsoring a child for $25 a month or picking up a shirt that connects you to one by number, <a href="${SITE_URL}" style="color: #D4A843; font-weight: bold;">we&rsquo;re always here</a>.</p>
+          <p>What you gave went to real kids. It supported meals and kept them in school. If you ever want to go deeper, whether that&rsquo;s sponsoring a child for $25 a month or picking up a shirt that matches you to one by number, <a href="${SITE_URL}" style="color: #D4A843; font-weight: bold;">we&rsquo;re always here</a>.</p>
           <p>Thank you again.</p>
           <p>Kevin</p>
         `),
@@ -437,7 +437,7 @@ function shirtSponsorEmail(
             : `<p>Your shirt is being made right now. I heat-press every one by hand, and yours will ship within the next few days.</p>
                <p>When it arrives, check the tag inside the collar. There&rsquo;s a number on it, and that number belongs to a real child at our campus in Northern Uganda. You&rsquo;ll come back to the site, enter the number, and meet them by name.</p>`
           }
-          <p>You also signed up for monthly sponsorship, which means your $25 a month is already at work. It covers school fees, two meals a day, and medical care for the children at the campus, and that started the day you signed up. You&rsquo;re a sponsor right now, even before the ${multi ? 'shirts arrive' : 'shirt arrives'}.</p>
+          <p>You also signed up for monthly sponsorship, which means your $25 a month is already at work. It supports school fees, two meals a day, and medical care at the campus, and that started the day you signed up. You&rsquo;re a sponsor right now, even before the ${multi ? 'shirts arrive' : 'shirt arrives'}.</p>
           <p>Once you&rsquo;ve gotten your ${multi ? 'shirts' : 'shirt'} and had that moment where you meet ${multi ? 'the kids' : 'your child'}, I&rsquo;ll follow up with your sponsor portal access so you can see updates, photos, and write to them directly. I want you to have the ${multi ? 'shirts' : 'shirt'} in hand first.</p>
           <p>Kevin</p>
         `),
@@ -544,7 +544,7 @@ function monthlyDonorEmail(
         html: wrapEmail(`
           <p style="margin-top: 0;">Hey ${firstName},</p>
           <p>I wanted to reach out and let you know where your monthly donation goes.</p>
-          <p>It goes to the YDO campus in Northern Uganda. One campus, one team on the ground. We built a school for 380 kids, a medical clinic that has treated more than 700 patients, and vocational programs where 60 women are learning trades. Your gift each month helps cover meals for kids who might not eat otherwise, school fees that keep them in class, and a medical clinic that serves the whole community.</p>
+          <p>It goes to the YDO campus in Northern Uganda. One campus, one team on the ground. We built a school for 380 kids, a medical clinic that has treated more than 700 patients, and vocational programs where 60 women are learning trades. Your gift each month supports meals for kids who might not eat otherwise, school fees that keep them in class, and a medical clinic that serves the whole community.</p>
           <p>I&rsquo;ll keep you in the loop on what&rsquo;s happening at the campus.</p>
           <p>Kevin</p>
         `),

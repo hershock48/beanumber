@@ -15,7 +15,7 @@ const faqJsonLd = {
       name: 'What actually happens when I buy a shirt?',
       acceptedAnswer: {
         '@type': 'Answer',
-        text: 'Your order number becomes your shirt number, and that number belongs to a real child enrolled in our program in Northern Uganda. When your shirt arrives, you\'ll come back to the site, enter your number, and meet them. Your $25 covers the shirt and their first month of school, meals, and medical care.',
+        text: 'Your order number becomes your shirt number, and that number belongs to a real child enrolled in our program in Northern Uganda. When your shirt arrives, you\'ll come back to the site, enter your number, and meet them. $25 starts their year at the YDO campus — school, meals, medical care. $25/month finishes it.',
       },
     },
     {
@@ -23,7 +23,7 @@ const faqJsonLd = {
       name: 'Where does the $25 actually go?',
       acceptedAnswer: {
         '@type': 'Answer',
-        text: 'Your child\'s sponsorship funds education, daily meals, medical care through the on-site clinic, and mentorship. It also supports the community infrastructure around them: vocational training, medical outreach, construction apprenticeships.',
+        text: 'Your $25/month supports the YDO campus where your matched child goes to school, eats two meals a day, and gets medical care through the on-site clinic. The campus runs on the combined support of every sponsor — that\'s also what keeps the 60 women in vocational training, the medical outreach that has served 700+ patients, and the construction apprenticeships going. You\'re not paying line items on one child\'s bill. You\'re supporting the ecosystem that keeps them in school.',
       },
     },
     {

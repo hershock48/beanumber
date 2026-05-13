@@ -6,11 +6,11 @@ import { DonationSection } from '@/components/DonationSection';
 export const metadata: Metadata = {
   title: 'Donate | Be A Number',
   description:
-    'Your gift funds schools, clinics, vocational training, and trauma recovery in Northern Uganda.',
+    'Your gift supports schools, clinics, vocational training, and trauma recovery in Northern Uganda.',
   openGraph: {
     title: 'Donate | Be A Number',
     description:
-      'Your gift funds schools, clinics, vocational training, and trauma recovery in Northern Uganda.',
+      'Your gift supports schools, clinics, vocational training, and trauma recovery in Northern Uganda.',
   },
 };
 

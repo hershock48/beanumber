@@ -150,8 +150,8 @@ function ShippingConfirmation({
 
         <p className="text-[#777] leading-relaxed max-w-md mx-auto">
           {alreadySponsoring
-            ? 'Your purchase and your sponsorship go directly to school, meals, and medical care at the YDO campus. You just changed a life.'
-            : 'Every shirt funds school, meals, and medical care for a child at the YDO campus in Northern Uganda. You just changed a life.'}
+            ? 'Your purchase and your sponsorship both support school, meals, and medical care at the YDO campus. You just started something real.'
+            : 'Every shirt supports school, meals, and medical care at the YDO campus in Northern Uganda. You just started something real.'}
         </p>
 
         {shirt && (
@@ -263,9 +263,9 @@ const SHARE_MESSAGES: Record<string, string> = {
   shirt:
     'I just bought a shirt from beanumber.org — every shirt is tied to a real kid in Northern Uganda. When it arrives, the number on the tag is my kid. Check it out.',
   shirt_sponsor:
-    'I just bought a shirt and started sponsoring a child through beanumber.org — $25/month covers school, meals, and medical care for a kid in Northern Uganda. Worth a look.',
+    'I just bought a shirt and started sponsoring a child through beanumber.org — $25/month supports school, meals, and medical care at a campus in Northern Uganda. Worth a look.',
   sponsor:
-    'I just started sponsoring a child through beanumber.org — $25/month covers school, meals, and medical care at a campus in Northern Uganda. Worth a look.',
+    'I just started sponsoring a child through beanumber.org — $25/month supports school, meals, and medical care at a campus in Northern Uganda. Worth a look.',
 };
 
 function TellSomeone({ flow }: { flow: 'shirt' | 'shirt_sponsor' | 'sponsor' }) {

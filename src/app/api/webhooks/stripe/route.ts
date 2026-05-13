@@ -1083,7 +1083,7 @@ async function sendSponsorWelcomeEmail(data: {
             <body style="font-family: Georgia, 'Times New Roman', serif; line-height: 1.7; color: #333; max-width: 560px; margin: 0 auto; padding: 30px 20px;">
               <p style="margin-top: 0;">Hey ${firstName},</p>
 
-              <p>You're officially sponsoring <strong>${data.childDisplayName}</strong>. Your $${data.amount.toFixed(2)}/month covers their school fees, meals, medical care, and mentorship in Northern Uganda.</p>
+              <p>You're officially sponsoring <strong>${data.childDisplayName}</strong>. Your $${data.amount.toFixed(2)}/month supports the YDO campus where they go to school, eat two meals a day, and get medical care.</p>
 
               <p style="color: #999; font-size: 14px; margin-bottom: 4px;">Your sponsor code:</p>
               <p style="font-size: 20px; color: #0d0d0d; margin-top: 0; font-weight: bold; letter-spacing: 0.1em;">${data.sponsorCode}</p>

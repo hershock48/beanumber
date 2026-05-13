@@ -382,7 +382,7 @@ const SHIRTS_SOURCE: Shirt[] = [
     name: 'The Flagship',
     tagline: 'The one that started it all',
     price: 25,
-    description: 'This is the shirt that started Be A Number. Before there were any designs there was one idea: put a number on a shirt, connect that number to a real child, and see what happens. What happened was people showed up. Your $25 gets you the shirt and sponsors a child for your first month. The number you receive is assigned by order and belongs to a real kid in Northern Uganda. This is the original.',
+    description: 'This is the shirt that started Be A Number. Before there were any designs there was one idea: put a number on a shirt, connect that number to a real child, and see what happens. What happened was people showed up. Your $25 gets you the shirt and starts a child\'s year at the YDO campus. The number you receive is assigned by order and belongs to a real kid in Northern Uganda. This is the original.',
     Front: FlagshipFront,
     Back: FlagshipBack,
     badge: 'Original',
@@ -762,7 +762,7 @@ function ShirtCard({ shirt, reversed, initialColor }: { shirt: Shirt; reversed: 
                     letters, photos, report cards, report from the ground.
                   </p>
                   <p className="text-xs text-[#999] leading-snug">
-                    Your $25 today covers the shirt and month one. Billed $25/month after that. Cancel anytime from your sponsor portal.
+                    $25 today gets you the shirt and starts their year at the campus. Billed $25/month after that to finish it. Cancel anytime from your sponsor portal.
                   </p>
                 </div>
               </div>
@@ -793,7 +793,7 @@ function ShirtCard({ shirt, reversed, initialColor }: { shirt: Shirt; reversed: 
             <p className="text-xs text-[#bbb] mt-3">
               {continueMonthly
                 ? '$25 today. $25/month after. Cancel anytime.'
-                : 'Your $25 covers the shirt and their first month.'}
+                : '$25 supports their campus this month. One-time, unless you add monthly above.'}
             </p>
           </div>
         </div>
@@ -866,9 +866,9 @@ export default function ShirtsPageContent() {
             </h2>
             <p className="text-[#777] leading-relaxed max-w-lg mx-auto">
               Every shirt carries a unique number connected to a real child in Northern Uganda.
-              Your $25 covers the shirt and sponsors that child for your first month.
-              When it arrives, come here, enter your number, and meet them.
-              Continue for $25/month to stay connected to their story.
+              $25 starts their year at the YDO campus &mdash; school, meals, medical care.
+              When the shirt arrives, come here, enter your number, and meet them.
+              $25/month finishes their year and keeps you in their story.
             </p>
           </div>
         </div>
@@ -888,11 +888,11 @@ export default function ShirtsPageContent() {
             {[
               {
                 q: 'What actually happens when I buy a shirt?',
-                a: 'Your order number becomes your shirt number, and that number belongs to a real child enrolled in our program in Northern Uganda. When your shirt arrives, you\'ll come back to the site, enter your number, and meet them: their name, their face, their story. Your $25 covers the shirt and their first month of school, meals, and medical care. If you continue at $25/month, you stay connected to that child all year \u2014 a monthly campus newsletter, photos of your child through the year, a handwritten letter from them, and a year-end report card.',
+                a: 'Your order number becomes your shirt number, and that number belongs to a real child enrolled in our program in Northern Uganda. When your shirt arrives, you\'ll come back to the site, enter your number, and meet them: their name, their face, their story. $25 starts their year at the YDO campus \u2014 school, meals, medical care. $25/month finishes it and keeps you in their story all year: a monthly campus newsletter, photos of your matched child through the year, a handwritten letter from them, and a year-end report card.',
               },
               {
                 q: 'Where does the $25 actually go?',
-                a: 'Your child\'s sponsorship funds education, daily meals, medical care through the on-site clinic, and mentorship. But it also supports the community infrastructure around them: the 60 women in vocational training, the 700+ patients served through medical outreach, the construction apprenticeships. It\'s not just one child; it\'s the ecosystem that keeps them safe.',
+                a: 'Your $25/month supports the YDO campus where your matched child goes to school, eats two meals a day, and gets medical care through the on-site clinic. The campus runs on the combined support of every sponsor — that\'s what also keeps the 60 women in vocational training, the medical outreach that has served 700+ patients, and the construction apprenticeships going. You\'re not paying line items on one child\'s bill. You\'re supporting the ecosystem that keeps them in school.',
               },
               {
                 q: 'Can I pick my number?',

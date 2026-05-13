@@ -149,10 +149,10 @@ export default function TermsPage() {
                 Shirt purchases and shipping
               </h2>
               <p className="text-[#555] leading-relaxed text-lg mb-3">
-                Every numbered shirt you buy is tied to a child at the campus
-                in Omoro District. The price of the shirt covers manufacturing,
-                shipping, and a contribution to that child&rsquo;s tuition and
-                campus programs.
+                Every numbered shirt you buy is matched to a child at the campus
+                in Omoro District. The price of the shirt covers manufacturing
+                and shipping, and the balance supports the campus where your
+                matched child attends school, eats meals, and receives medical care.
               </p>
               <p className="text-[#555] leading-relaxed text-lg mb-3">
                 We&rsquo;re a small team. Orders are typically shipped within 2 to
@@ -166,8 +166,8 @@ export default function TermsPage() {
                 <a href="mailto:kevin@beanumber.org" className="text-[#D4A843] underline">
                   kevin@beanumber.org
                 </a>{' '}
-                within 30 days and we&rsquo;ll make it right. Because each order
-                directly funds a child&rsquo;s tuition, we generally don&rsquo;t accept
+                within 30 days and we&rsquo;ll make it right. Because each order&rsquo;s
+                proceeds are deployed to the campus immediately, we generally don&rsquo;t accept
                 returns for buyer&rsquo;s remorse, but we&rsquo;ll work with you on
                 anything reasonable.
               </p>

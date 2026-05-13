@@ -3,7 +3,7 @@
 import { useState } from 'react';
 
 const SHARE_MESSAGE =
-  'I just started sponsoring a child through beanumber.org — $25/month covers school, meals, and medical care at a campus in Northern Uganda. Worth a look.';
+  'I just started sponsoring a child through beanumber.org — $25/month supports school, meals, and medical care at a campus in Northern Uganda. Worth a look.';
 
 export function ShareButton() {
   const [copied, setCopied] = useState(false);
