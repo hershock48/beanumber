@@ -75,9 +75,18 @@ export async function POST(request: NextRequest) {
     };
 
     // --- One-time shirt purchase (default) ---------------------------------
+    //
+    // Even though this is a one-time payment, we ALWAYS create a Stripe
+    // Customer and save the payment method off-session. This is the
+    // Stripe object-model continuity that memo §2 depends on: when the
+    // shirt arrives and the buyer comes to /[number] to meet their child,
+    // the "Will you stay with [child]?" CTA can offer one-tap recurring
+    // confirm via Stripe Link / Apple Pay / Google Pay against the saved
+    // card. Without customer_creation:'always' + setup_future_usage:
+    // 'off_session', the one-tap UI breaks and forces re-entry.
     if (!optIn) {
       const session = await stripe.checkout.sessions.create({
-        payment_method_types: ['card'],
+        payment_method_types: ['card', 'link'],
         line_items: [
           {
             price_data: {
@@ -94,6 +103,11 @@ export async function POST(request: NextRequest) {
         ],
         shipping_options: [{ shipping_rate_data: { type: 'fixed_amount' as const, fixed_amount: { amount: 500, currency: 'usd' }, display_name: 'Standard shipping (USPS)' } }],
         mode: 'payment',
+        customer_creation: 'always',
+        payment_intent_data: {
+          setup_future_usage: 'off_session',
+          metadata: sharedMetadata,
+        },
         success_url: `${origin}/shirts/success?session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${origin}/shirts#${shirtId}`,
         customer_email: email || undefined,
@@ -125,7 +139,7 @@ export async function POST(request: NextRequest) {
     // assignNextShirtChild() so the subscription is linked to the specific
     // child who got this shirt number.
     const session = await stripe.checkout.sessions.create({
-      payment_method_types: ['card'],
+      payment_method_types: ['card', 'link'],
       line_items: [
         {
           price_data: {

@@ -50,14 +50,14 @@ export async function POST(request: NextRequest) {
     const origin = request.headers.get('origin') || 'https://www.beanumber.org';
 
     const sessionConfig: Stripe.Checkout.SessionCreateParams = {
-      payment_method_types: ['card'],
+      payment_method_types: ['card', 'link'],
       line_items: [
         {
           price_data: {
             currency: 'usd',
             product_data: {
               name: `Sponsor ${childDisplayName || 'a child'} / Be A Number`,
-              description: `Monthly sponsorship of ${childDisplayName || 'a child in Northern Uganda'}. Education, meals, medical care, and mentorship. Cancel anytime.`,
+              description: `Monthly sponsorship of ${childDisplayName || 'a child in Northern Uganda'}. Supports school, meals, medical care, and mentorship at the YDO campus. Cancel anytime.`,
             },
             unit_amount: SPONSORSHIP_AMOUNT * 100,
             recurring: { interval: 'month' },

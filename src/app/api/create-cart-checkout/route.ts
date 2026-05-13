@@ -105,13 +105,26 @@ export async function POST(request: NextRequest) {
     };
 
     // Create a single payment-mode checkout session for ALL items.
-    // If any items have monthly opt-in, we save the payment method
-    // so the webhook can create subscriptions after payment.
+    //
+    // We ALWAYS create a Stripe Customer and save the payment method
+    // off-session, even on shirt-only carts. This is the Stripe
+    // object-model continuity that memo §2 depends on: when shirts
+    // arrive and the buyer comes to /[number] to meet their child,
+    // the "Will you stay with [child]?" CTA can offer one-tap recurring
+    // confirm via Stripe Link / Apple Pay / Google Pay against the
+    // saved card. Previously this was conditional on monthly opt-in;
+    // making it unconditional ensures every shirt buyer has a payment
+    // method on file for the post-purchase conversion moment.
     const sessionParams: Record<string, any> = {
-      payment_method_types: ['card'],
+      payment_method_types: ['card', 'link'],
       line_items: lineItems,
       shipping_options: shippingOptions,
       mode: 'payment',
+      customer_creation: 'always',
+      payment_intent_data: {
+        setup_future_usage: 'off_session',
+        metadata,
+      },
       success_url: `${origin}/shirts/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/shirts`,
       customer_email: email || undefined,
@@ -126,19 +139,6 @@ export async function POST(request: NextRequest) {
       ],
       metadata,
     };
-
-    // When any item has monthly sponsorship, save the payment method
-    // so we can create subscriptions after the initial payment.
-    // CRITICAL: customer_creation must be 'always' so Stripe creates a
-    // customer record. Without this, session.customer is null on the
-    // webhook side and subscription creation silently fails.
-    if (hasMonthly) {
-      sessionParams.customer_creation = 'always';
-      sessionParams.payment_intent_data = {
-        setup_future_usage: 'off_session',
-        metadata,
-      };
-    }
 
     const session = await stripe.checkout.sessions.create(sessionParams);
 

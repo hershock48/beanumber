@@ -61,9 +61,15 @@ export async function POST(request: NextRequest) {
     const mode = isMonthly ? 'subscription' : 'payment';
     const donationType = isMonthly ? 'monthly' : 'one-time';
 
-    // Create Stripe Checkout Session
+    // Create Stripe Checkout Session.
+    //
+    // For one-time donations we create a Stripe Customer and save the
+    // payment method off-session anyway, so this donor can be offered
+    // one-tap conversion later (gift-to-gifter loop in memo §6, or
+    // simple "thanks for donating, want to sponsor?" follow-up).
+    // Subscription mode handles Customer creation automatically.
     const sessionConfig: Stripe.Checkout.SessionCreateParams = {
-      payment_method_types: ['card'],
+      payment_method_types: ['card', 'link'],
       line_items: [
         {
           price_data: {
@@ -124,6 +130,17 @@ export async function POST(request: NextRequest) {
         metadata: {
           donation_type: 'monthly',
           amount: amount.toString(),
+        },
+      };
+    } else {
+      // One-time payment: create Customer + save payment method off-session
+      // so this donor can be offered one-tap recurring conversion later.
+      sessionConfig.customer_creation = 'always';
+      sessionConfig.payment_intent_data = {
+        setup_future_usage: 'off_session',
+        metadata: {
+          donor_name: name || 'Anonymous',
+          donation_type: 'one-time',
         },
       };
     }
