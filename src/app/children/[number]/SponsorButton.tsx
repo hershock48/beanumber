@@ -67,10 +67,8 @@ export function SponsorButton({
       className="block w-full text-center bg-[#D4A843] text-[#0d0d0d] font-bold uppercase tracking-wider py-4 px-6 hover:bg-[#c49a3a] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
     >
       {loading
-        ? 'Loading checkout...'
-        : shirtAssigned
-          ? `Stay in ${firstName}'s story · $25/mo`
-          : `Sponsor ${firstName} · $25/mo`}
+        ? 'Loading checkout…'
+        : `Yes, stay with ${firstName} · $25/mo`}
     </button>
   );
 }

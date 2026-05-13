@@ -7,6 +7,7 @@ import { BANFooter } from '@/components/BANFooter';
 import { RevealBeacon } from './RevealBeacon';
 import { RevealOverlay } from './RevealOverlay';
 import { SponsorButton } from './SponsorButton';
+import { NewsletterSignup } from './NewsletterSignup';
 import { SESSION } from '@/lib/constants';
 
 // Never statically optimize or cache this page. Sponsorship status and child
@@ -631,21 +632,27 @@ export default async function ChildProfilePage({ params }: ChildPageProps) {
                 </p>
               </div>
             ) : (
-              /* ── Not the sponsor: acquisition or retention CTA ── */
+              /* ── Not the sponsor: single-decision CTA (memo §2).
+                  Primary ask: "Will you stay with [child]?" with $25/mo.
+                  Secondary ask: monthly newsletter signup (free, captures
+                  email for nurture). The shirt-buyer variant warms the
+                  headline since they've already given the first month;
+                  cold visitors get a slightly more cold-acquisition framing.
+              ── */
               <div className="bg-white border-2 border-[#D4A843]/30 p-7">
                 {child.shirt_assigned ? (
                   <p
-                    className="text-xl text-[#0d0d0d] mb-4"
+                    className="text-2xl text-[#0d0d0d] mb-4"
                     style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
                   >
-                    You gave {firstName} a month of school when you bought your shirt. Keep going.
+                    Will you stay with {firstName}?
                   </p>
                 ) : (
                   <p
-                    className="text-xl text-[#0d0d0d] mb-4"
+                    className="text-2xl text-[#0d0d0d] mb-4"
                     style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
                   >
-                    Sponsor {firstName}
+                    Stay with {firstName}.
                   </p>
                 )}
 
@@ -680,9 +687,18 @@ export default async function ChildProfilePage({ params }: ChildPageProps) {
                   shirtAssigned={child.shirt_assigned}
                 />
 
-                <p className="text-center text-xs text-[#bbb] mt-4">
-                  On behalf of our entire team &mdash; thank you.
+                <p className="text-center text-xs text-[#bbb] mt-3 mb-6">
+                  Continuing is your choice. No pressure if not now.
                 </p>
+
+                {/* Memo §2 secondary CTA — newsletter-only, no payment. */}
+                <div className="border-t border-[#e8e0d4] pt-5">
+                  <NewsletterSignup
+                    shirtNumber={Number(number)}
+                    firstName={firstName}
+                    childDisplayName={displayName}
+                  />
+                </div>
               </div>
             )}
           </div>
