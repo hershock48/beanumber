@@ -1,6 +1,6 @@
 # Project state
 
-Last updated: April 18, 2026.
+Last updated: May 12, 2026.
 
 **Source of truth is `git log` and the live site.** If this file is stale, trust the code, update the file.
 
@@ -51,6 +51,13 @@ Last updated: April 18, 2026.
   Kevin needs to add these wherever beanumber.org's DNS is managed.
 - **Legacy email templates in `src/lib/email.ts` need voice.md rewrite.** Several template functions (`sendSponsorWelcomeEmail`, `sendDonationReceiptEmail`, `sendRecurringDonationThankYouEmail`, `sendUpdateNotificationEmail`, `sendUpdateRequestConfirmationEmail`) use banned phrases ("Dear", "generous", "empowerment", "making a difference", "sustainable community systems") and the wrong visual style (Helvetica, dark headers instead of Georgia/cream). The webhook thank-you email was rewritten; these haven't been yet.
 - **Delete drip-preview endpoint** after Kevin finishes reviewing the 17 preview emails.
+
+## What's planned (not started)
+
+- **Founder's Series shirt.** Limited run of 25 premium, hand-pressed shirts at $150–$250, positioned as the major-donor entry point. The natural step up for a donor who already owns a $25 flagship and wants something more meaningful. Lives in operational planning; not yet built, no SKU, no design files in the repo. Sits in the giving-architecture upgrade ladder (one-time shirt → monthly sponsor → second-child sponsor → Founder's Series → cohort trip → restricted gifts).
+- **Annual sponsorship tier.** $300/year ("commit to the school year"), positioned alongside the existing $25/month on `/sponsorship` and `/donate` (NOT on `/shirts`). Reduces churn on the most committed segment, captures year-end tax-strategic giving. Requires a second Stripe price object and minor schema work on the Sponsorships table.
+- **"Shop your number" sponsor portal feature.** Once a sponsor is matched to their number, every additional purchase carries the same number. Gated by active sponsorship status. SKU-to-impact narrative ("Hat → supports meals for [child]'s classroom"). Highest-LTV mechanic in the web funnel strategy memo (May 2026).
+- **Gift sponsorships.** Two flavors: gift-shirt (physical) and gift-sponsorship (digital card, scheduled delivery date). Recipient meets their child via a `/[number]?gift=true` framing. Tax receipt to the gifter; if the recipient continues at $25/mo it's their own record going forward.
 
 ## What's deferred (Kevin and I agreed, don't restart without asking)
 
