@@ -10,6 +10,15 @@ interface SponsorButtonProps {
   /** True when a shirt buyer has been matched to this number. Changes
    *  the button label from cold acquisition to warm retention framing. */
   shirtAssigned?: boolean;
+  /** Memo §2 one-tap: the buyer's Stripe Customer ID (cus_...) when the
+   *  page resolved a ban_buyer_session cookie tying THIS browser to a
+   *  Donation that was matched to THIS child. When set, the sponsor
+   *  checkout attaches the existing Customer and uses the saved payment
+   *  method instead of forcing fresh card entry. */
+  existingCustomerId?: string;
+  /** Buyer email from the same Donation. Pre-fills the Stripe Checkout
+   *  email field when the Customer attachment isn't available. */
+  buyerEmail?: string;
 }
 
 export function SponsorButton({
@@ -18,6 +27,8 @@ export function SponsorButton({
   childDisplayName,
   firstName,
   shirtAssigned,
+  existingCustomerId,
+  buyerEmail,
 }: SponsorButtonProps) {
   const [loading, setLoading] = useState(false);
 
@@ -42,6 +53,8 @@ export function SponsorButton({
           childRecordId,
           childId,
           childDisplayName,
+          existingCustomerId,
+          buyerEmail,
         }),
       });
       const data = await response.json();

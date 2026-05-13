@@ -41,6 +41,19 @@ export function ShirtSuccessClient() {
       return;
     }
 
+    // Memo §2 one-tap prerequisite: drop a long-lived cookie tying this
+    // browser to the shirt purchase session. Days/weeks later when the
+    // buyer comes back to /children/[number] to meet their child, the
+    // page reads this cookie, looks up the Donation, and threads the
+    // buyer's Stripe Customer ID into the sponsor checkout — so the
+    // "Yes, stay with [name]" button uses the saved payment method
+    // instead of forcing a fresh card entry. Cookie holds only the
+    // Stripe Checkout Session ID (recoverable, not a credential).
+    if (typeof document !== 'undefined' && sessionId.startsWith('cs_')) {
+      document.cookie =
+        `ban_buyer_session=${sessionId}; max-age=7776000; path=/; samesite=lax`;
+    }
+
     let cancelled = false;
 
     async function load() {

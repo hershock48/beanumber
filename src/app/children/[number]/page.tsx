@@ -73,6 +73,54 @@ async function getViewerSponsorCode(): Promise<string | null> {
   }
 }
 
+/** Read the ban_buyer_session cookie set on /shirts/success. Returns the
+ *  Stripe Checkout Session ID (cs_...) if present and well-formed,
+ *  otherwise null. Memo §2 one-tap prerequisite. */
+async function getBuyerSessionId(): Promise<string | null> {
+  try {
+    const cookieStore = await cookies();
+    const raw = cookieStore.get('ban_buyer_session');
+    if (!raw) return null;
+    const v = raw.value.trim();
+    if (!v.startsWith('cs_')) return null;
+    return v;
+  } catch {
+    return null;
+  }
+}
+
+/** Given a buyer-session cookie value and the current child's record ID,
+ *  resolve the buyer's Stripe Customer ID and email — but only if the
+ *  cookie's Donation was matched to THIS child. The child check is the
+ *  security gate: without it, anyone who happened to have an old cookie
+ *  for shirt #42 could autofill checkout for whichever /[number] they
+ *  visit. The check ensures we only one-tap-prefill the buyer on their
+ *  own matched child's page. */
+async function lookupBuyerSessionMatch(
+  sessionId: string,
+  childRecordId: string
+): Promise<{ customerId: string | null; email: string | null } | null> {
+  if (!sessionId.startsWith('cs_')) return null;
+  const donationsTable = process.env.AIRTABLE_DONATIONS_TABLE || 'Donations';
+  try {
+    const formula = encodeURIComponent(`{Stripe Checkout Session ID} = "${sessionId}"`);
+    const res = await airtableRequest<{ records: Array<{ id: string; fields: Record<string, any> }> }>(
+      `/${encodeURIComponent(donationsTable)}?filterByFormula=${formula}&maxRecords=1`
+    );
+    if (!res.records.length) return null;
+    const donation = res.records[0];
+    const linkedChildren: string[] = donation.fields?.Child || [];
+    if (!linkedChildren.includes(childRecordId)) return null;
+    return {
+      customerId: (donation.fields?.['Stripe Customer ID'] as string | undefined) || null,
+      email: (donation.fields?.['Donor Email at Donation'] as string | undefined) || null,
+    };
+  } catch (err) {
+    console.warn('[children/page] Buyer session lookup failed', err);
+    return null;
+  }
+}
+
 async function airtableRequest<T>(endpoint: string): Promise<T> {
   const apiKey = process.env.AIRTABLE_API_KEY;
   const baseId = process.env.AIRTABLE_BASE_ID;
@@ -454,6 +502,19 @@ export default async function ChildProfilePage({ params }: ChildPageProps) {
     child.teacher_quote
   );
 
+  // Memo §2 one-tap: if the visitor's browser has the ban_buyer_session
+  // cookie set on /shirts/success AND that cookie's Donation was matched
+  // to THIS child, surface the buyer's Stripe Customer ID + email to the
+  // SponsorButton so the sponsor checkout uses the saved card instead of
+  // a fresh entry. The child-match check is the security gate.
+  let buyerHint: { customerId: string | null; email: string | null } | null = null;
+  if (!child.viewer_is_sponsor && child.record_id) {
+    const buyerSessionId = await getBuyerSessionId();
+    if (buyerSessionId) {
+      buyerHint = await lookupBuyerSessionMatch(buyerSessionId, child.record_id);
+    }
+  }
+
   return (
     <div className="min-h-screen bg-[#FFF8F0]">
       {/* Silently flip the sponsor's ChildRevealedAt if they're logged in
@@ -685,6 +746,8 @@ export default async function ChildProfilePage({ params }: ChildPageProps) {
                   childDisplayName={displayName}
                   firstName={firstName}
                   shirtAssigned={child.shirt_assigned}
+                  existingCustomerId={buyerHint?.customerId || undefined}
+                  buyerEmail={buyerHint?.email || undefined}
                 />
 
                 <p className="text-center text-xs text-[#bbb] mt-3 mb-6">
@@ -798,6 +861,8 @@ export default async function ChildProfilePage({ params }: ChildPageProps) {
                     childDisplayName={displayName}
                     firstName={firstName}
                     shirtAssigned={child.shirt_assigned}
+                    existingCustomerId={buyerHint?.customerId || undefined}
+                    buyerEmail={buyerHint?.email || undefined}
                   />
                 </div>
               </div>

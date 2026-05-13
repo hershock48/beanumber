@@ -27,6 +27,13 @@ export async function POST(request: NextRequest) {
       email: z.string().email().optional().or(z.literal('')),
       name: z.string().max(255).optional().default(''),
       referringShirtSessionId: z.string().optional().default(''),
+      // Memo §2 one-tap: when /children/[number] resolves the visitor as
+      // a known shirt buyer (via the ban_buyer_session cookie tied to a
+      // Donation matched to this same child), the page passes the existing
+      // Stripe Customer ID and buyer email so we attach the saved
+      // payment method to the new subscription session.
+      existingCustomerId: z.string().optional(),
+      buyerEmail: z.string().email().optional().or(z.literal('')),
     });
 
     const parsed = sponsorSchema.safeParse(await request.json());
@@ -36,7 +43,7 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-    const { childRecordId, childId, childDisplayName, email, name, referringShirtSessionId } = parsed.data;
+    const { childRecordId, childId, childDisplayName, email, name, referringShirtSessionId, existingCustomerId, buyerEmail } = parsed.data;
 
     // Attribution breadcrumb. When a sponsor arrives via the shirt success
     // page, we thread the original shirt checkout session id here so the
@@ -49,6 +56,11 @@ export async function POST(request: NextRequest) {
 
     const origin = request.headers.get('origin') || 'https://www.beanumber.org';
 
+    // Memo §2 one-tap: prefer attaching the existing Stripe Customer
+    // (saved payment method + Link session) over a fresh customer_email
+    // entry. Stripe rejects sessions that set BOTH `customer` and
+    // `customer_email`, so the two are mutually exclusive.
+    const hasExistingCustomer = Boolean(existingCustomerId && existingCustomerId.startsWith('cus_'));
     const sessionConfig: Stripe.Checkout.SessionCreateParams = {
       payment_method_types: ['card', 'link'],
       line_items: [
@@ -68,7 +80,9 @@ export async function POST(request: NextRequest) {
       mode: 'subscription',
       success_url: `${origin}/sponsor/welcome?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/sponsorship`,
-      customer_email: email || undefined,
+      ...(hasExistingCustomer
+        ? { customer: existingCustomerId as string }
+        : { customer_email: email || buyerEmail || undefined }),
       billing_address_collection: 'required',
       custom_fields: [
         {
