@@ -987,6 +987,223 @@ async function sendShirtConfirmationEmail(orderData: {
   console.log('[Webhook] Shirt confirmation email sent to:', orderData.email, 'via', result.data?.provider);
 }
 
+// ---------------------------------------------------------------------------
+// Gift sponsorship emails (memo §11)
+// ---------------------------------------------------------------------------
+
+/**
+ * Email to the RECIPIENT of a gift sponsorship. They learn for the first
+ * time that someone gifted them a child to know. The matched child's
+ * number + a link to /children/[number]?gift=true&from=[gifter] does the
+ * reveal work.
+ */
+async function sendGiftCardEmail(data: {
+  recipientEmail: string;
+  recipientName: string;
+  gifterName: string; // may be ''
+  giftMessage: string; // may be ''
+  shirtNumber: number;
+  childDisplayName: string; // for internal-only context; NOT shown in email
+}): Promise<void> {
+  const fromEmail = process.env.SENDGRID_FROM_EMAIL || 'Kevin@beanumber.org';
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.beanumber.org';
+  const recipientFirst = data.recipientName.trim().split(/\s+/)[0] || 'friend';
+  const fromLineRaw = data.gifterName.trim() || 'Someone who knows you';
+  const fromLine = escapeHtml(fromLineRaw);
+  const meetUrl =
+    `${siteUrl}/children/${data.shirtNumber}?gift=true&from=` +
+    encodeURIComponent(data.gifterName.trim() || '');
+
+  // The reveal page handles the actual name-and-photo reveal. The email
+  // intentionally does NOT name or show the child — that's preserved for
+  // the click-through moment. Subject line uses unescaped string since
+  // it's not HTML.
+  const subject = `${fromLineRaw} sponsored a child in your honor.`;
+
+  const messageBlock = data.giftMessage
+    ? `
+            <div style="background: #FFF8F0; border-left: 3px solid #D4A843; padding: 14px 18px; margin: 24px 0;">
+              <p style="margin: 0 0 6px 0; font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.15em; color: #D4A843;">
+                A note from ${escapeHtml(data.gifterName.trim() || 'them')}
+              </p>
+              <p style="margin: 0; color: #444; font-style: italic; line-height: 1.6;">
+                ${escapeHtml(data.giftMessage)}
+              </p>
+            </div>`
+    : '';
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      </head>
+      <body style="font-family: Georgia, 'Times New Roman', serif; line-height: 1.7; color: #333; max-width: 560px; margin: 0 auto; padding: 30px 20px; background: #ffffff;">
+
+        <p style="text-align: center; font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.25em; color: #D4A843; margin: 0 0 16px 0;">
+          A gift for you
+        </p>
+
+        <h1 style="text-align: center; font-size: 28px; font-weight: 600; color: #0d0d0d; margin: 0 0 8px 0; line-height: 1.25;">
+          ${fromLine}<br>sponsored a child<br>in your honor.
+        </h1>
+
+        <p style="text-align: center; color: #777; margin: 0 0 28px 0; font-size: 15px;">
+          A real kid at the YDO campus in Northern Uganda.<br>
+          Hey ${escapeHtml(recipientFirst)} — they&rsquo;re waiting for you to meet them.
+        </p>
+
+        ${messageBlock}
+
+        <div style="text-align: center; background: #FFF8F0; border: 1px solid #e8e0d4; padding: 24px 20px; margin: 28px 0;">
+          <p style="margin: 0 0 8px 0; font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.2em; color: #999;">
+            Your number
+          </p>
+          <p style="margin: 0 0 18px 0; font-size: 44px; font-weight: 700; color: #D4A843; letter-spacing: 0.05em; font-family: Georgia, serif;">
+            #${data.shirtNumber}
+          </p>
+          <p style="margin: 0; color: #666; font-size: 14px;">
+            That number belongs to a real child at the campus.
+          </p>
+        </div>
+
+        <p style="text-align: center; margin: 28px 0;">
+          <a href="${meetUrl}" style="display: inline-block; background: #D4A843; color: #0d0d0d; font-weight: bold; text-decoration: none; padding: 14px 32px; font-size: 15px; letter-spacing: 0.05em; text-transform: uppercase;">
+            Meet them
+          </a>
+        </p>
+
+        <p style="color: #555; font-size: 15px; line-height: 1.7;">
+          Their first month at the campus is already covered &mdash; school fees, breakfast and
+          lunch every day, medical care if they need it. The gift was the introduction.
+        </p>
+
+        <p style="color: #555; font-size: 15px; line-height: 1.7;">
+          If you want to stay with them after that, it&rsquo;s $25 a month and you can stop anytime.
+          But there&rsquo;s no obligation. The point of this gift is the introduction; the rest is up to you.
+        </p>
+
+        <hr style="border: none; border-top: 1px solid #e8e0d4; margin: 32px 0;">
+
+        <p style="font-size: 12px; color: #999; line-height: 1.5;">
+          Be A Number, International<br>
+          <a href="https://www.beanumber.org" style="color: #D4A843;">beanumber.org</a> &nbsp;·&nbsp;
+          <a href="mailto:Kevin@beanumber.org" style="color: #D4A843;">Kevin@beanumber.org</a>
+        </p>
+      </body>
+    </html>
+  `;
+
+  const result = await sendEmail({
+    to: { email: data.recipientEmail, name: data.recipientName },
+    from: { email: fromEmail, name: 'Kevin at Be A Number' },
+    subject,
+    html,
+  });
+
+  if (!result.success) {
+    console.error('[Webhook] Gift card email failed:', result.error);
+    return;
+  }
+
+  console.log(
+    '[Webhook] Gift card email sent to:',
+    data.recipientEmail,
+    'for #' + data.shirtNumber,
+    'via',
+    result.data?.provider
+  );
+}
+
+/**
+ * Email to the GIFTER confirming the gift was sent. Receipt-style with
+ * tax language; intentionally does not name or photo the recipient's
+ * matched child (the reveal belongs to the recipient).
+ */
+async function sendGifterConfirmationEmail(data: {
+  gifterEmail: string;
+  gifterName: string;
+  recipientName: string;
+  recipientEmail: string;
+  amount: number;
+}): Promise<void> {
+  const fromEmail = process.env.SENDGRID_FROM_EMAIL || 'Kevin@beanumber.org';
+  const firstName = (data.gifterName || 'friend').trim().split(/\s+/)[0] || 'friend';
+  const subject = `Your gift is on its way to ${data.recipientName}.`;
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      </head>
+      <body style="font-family: Georgia, 'Times New Roman', serif; line-height: 1.7; color: #333; max-width: 560px; margin: 0 auto; padding: 30px 20px; background: #ffffff;">
+
+        <p style="margin-top: 0;">Hey ${escapeHtml(firstName)},</p>
+
+        <p>
+          Your gift sponsorship for <strong>${escapeHtml(data.recipientName)}</strong>
+          (${escapeHtml(data.recipientEmail)}) just went out. They&rsquo;re getting an email right now
+          with their matched child&rsquo;s number and a link to meet them.
+        </p>
+
+        <p>
+          What happens from here is entirely their call. They can decide to stay with the child
+          at $25/month, or they can just hold onto the introduction. Either way, the first
+          month at the campus is already covered because of you.
+        </p>
+
+        <p>
+          On behalf of the team at the YDO campus &mdash; thank you. This is the kind of gift
+          we don&rsquo;t take lightly.
+        </p>
+
+        <hr style="border: none; border-top: 1px solid #e8e0d4; margin: 28px 0;">
+
+        <p style="font-size: 13px; color: #888; line-height: 1.6;">
+          <strong>Receipt:</strong> $${data.amount.toFixed(2)} on ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}.<br>
+          Tax-deductible to the extent allowed by law. Be A Number, International is a 501(c)(3)
+          public charity, EIN 93-1948872. No goods or services were exchanged.
+        </p>
+
+        <hr style="border: none; border-top: 1px solid #e8e0d4; margin: 28px 0;">
+
+        <p style="font-size: 12px; color: #999; line-height: 1.5;">
+          Be A Number, International<br>
+          <a href="https://www.beanumber.org" style="color: #D4A843;">beanumber.org</a> &nbsp;·&nbsp;
+          <a href="mailto:Kevin@beanumber.org" style="color: #D4A843;">Kevin@beanumber.org</a>
+        </p>
+      </body>
+    </html>
+  `;
+
+  const result = await sendEmail({
+    to: { email: data.gifterEmail, name: data.gifterName || data.gifterEmail },
+    from: { email: fromEmail, name: 'Kevin at Be A Number' },
+    subject,
+    html,
+  });
+
+  if (!result.success) {
+    console.error('[Webhook] Gifter confirmation email failed:', result.error);
+    return;
+  }
+
+  console.log('[Webhook] Gifter confirmation email sent to:', data.gifterEmail, 'via', result.data?.provider);
+}
+
+/** Minimal HTML escape for user-supplied gift message + names. */
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 // Generate a unique sponsor code (e.g. BAN-2026-427)
 function generateSponsorCode(): string {
   const year = new Date().getFullYear();
@@ -1361,6 +1578,10 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
     // Memo §5: "Shop Your Number" — active sponsor reordering with their
     // existing shirt number, no new child assignment, no new sponsorship.
     const isPortalRepeat = session.metadata?.order_type === 'portal_repeat';
+    // Memo §11: Gift sponsorship — gifter pays $25 one-time, recipient
+    // gets matched to a child and emailed an intro. Recipient may
+    // convert to a $25/mo sponsor from the reveal page.
+    const isGiftSponsorship = session.metadata?.order_type === 'gift_sponsorship';
 
     const donorArgs = {
       name,
@@ -2505,6 +2726,167 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
       // Deliberately skip drip enrollment — they're already a sponsor.
 
       return { donorId, donationId, isPortalRepeat: true, existingShirtNumber };
+
+    } else if (isGiftSponsorship) {
+      // --- GIFT SPONSORSHIP FLOW (memo §11) ---
+      //
+      // A gifter (the Stripe customer on this session) paid $25 to gift
+      // a sponsorship to someone else. The recipient's identity comes in
+      // via metadata. We:
+      //  - Create the gifter as a Donor and book the $25 donation under them.
+      //  - Assign the next available child to the RECIPIENT's email/name
+      //    (the Child record's ShirtBuyer fields reflect the recipient
+      //    because they're the future relationship owner — the gifter's
+      //    identity stays on the Donation, not the Child).
+      //  - Email the recipient a gift card with the assigned shirt number
+      //    and a link to /children/[number]?gift=true&from=[gifter] so the
+      //    reveal moment is preserved.
+      //  - Email the gifter a confirmation/receipt.
+      //  - No drip enrollment, no new sponsorship subscription. The
+      //    recipient converts (if they choose) by clicking through to
+      //    /[number] and using the SponsorButton from there.
+      const recipientName = (session.metadata?.recipient_name || '').trim();
+      const recipientEmail = (session.metadata?.recipient_email || '').trim().toLowerCase();
+      const gifterName = (session.metadata?.gifter_name || '').trim() || name;
+      const giftMessage = session.metadata?.gift_message || '';
+
+      console.log(
+        `[WH] S2: gift-sponsorship flow, gifter=${email}, recipient=${recipientEmail}`
+      );
+
+      if (!recipientEmail || !recipientName) {
+        // Required fields missing — treat as a regular $25 donation so we
+        // don't lose the money, but flag for manual fix.
+        console.error('[WH] gift_sponsorship missing recipient info, falling back to donation', {
+          sessionId: session.id,
+        });
+      }
+
+      // Parallelize: gifter donor lookup + recipient's child assignment.
+      let assignedChild: Awaited<ReturnType<typeof assignNextShirtChild>> = null;
+      let donorId: string;
+      try {
+        const [donorResult, childResult] = await Promise.all([
+          donorPromise,
+          recipientEmail && recipientName
+            ? assignNextShirtChild(recipientEmail, recipientName).catch(err => {
+                console.error('[Webhook] Gift child assignment error:', err);
+                return null;
+              })
+            : Promise.resolve(null),
+        ]);
+        donorId = donorResult;
+        assignedChild = childResult;
+      } catch (error) {
+        throw error;
+      }
+
+      // Book the gifter's $25 donation. Source 'Gift Sponsorship' is not
+      // (yet) an Airtable option — until Kevin adds it, the normalizer
+      // falls back to 'Website' and prefixes '[Gift Sponsorship]' onto
+      // the Donation Note, per trap 1.
+      const assignmentNote = assignedChild
+        ? ` / Assigned to #${assignedChild.shirtNumber} (${assignedChild.displayName})`
+        : ' / No child assigned (out of stock or assignment failed)';
+      const donationId = await upsertDonation(paymentIntentId, {
+        sessionId: session.id,
+        customerId: stripeCustomerId,
+        donorId,
+        amount,
+        currency,
+        donationDate,
+        isRecurring: false,
+        subscriptionId: null,
+        status,
+        email,
+        name: gifterName,
+        organization: organization || undefined,
+        address,
+        donationSource: 'Gift Sponsorship',
+        notes:
+          `Gift to ${recipientName || 'unknown'} <${recipientEmail || 'unknown'}>` +
+          assignmentNote +
+          (giftMessage ? ` / Message: ${giftMessage.slice(0, 200)}` : ''),
+        childRecordId: assignedChild?.recordId,
+      });
+
+      // Email the recipient — the reveal hook.
+      let recipientEmailStatus = 'Sent';
+      if (recipientEmail && recipientName && assignedChild) {
+        try {
+          await sendGiftCardEmail({
+            recipientEmail,
+            recipientName,
+            gifterName,
+            giftMessage,
+            shirtNumber: assignedChild.shirtNumber,
+            childDisplayName: assignedChild.displayName,
+          });
+        } catch (err: any) {
+          console.error('[Webhook] Gift card email failed:', String(err?.message || err).slice(0, 200));
+          recipientEmailStatus = 'Failed';
+        }
+      } else {
+        recipientEmailStatus = 'Skipped';
+      }
+
+      // Email the gifter — receipt + thanks.
+      let gifterEmailStatus = 'Sent';
+      try {
+        await sendGifterConfirmationEmail({
+          gifterEmail: email,
+          gifterName,
+          recipientName,
+          recipientEmail,
+          amount,
+        });
+      } catch (err: any) {
+        console.error('[Webhook] Gifter confirmation failed:', String(err?.message || err).slice(0, 200));
+        gifterEmailStatus = 'Failed';
+      }
+
+      // Communication record covers both emails as one transaction.
+      try {
+        await createCommunicationRecord(donationId, donorId, {
+          email,
+          subject: `Gift sponsorship → ${recipientEmail || 'unknown'} (#${assignedChild?.shirtNumber || '?'})`,
+          body:
+            `Gift sponsorship: gifter=${email} -> recipient=${recipientName} <${recipientEmail}> ` +
+            `/ $${amount.toFixed(2)} ` +
+            `/ Assigned #${assignedChild?.shirtNumber || 'none'} ${assignedChild?.displayName || ''} ` +
+            `/ Recipient email: ${recipientEmailStatus} / Gifter email: ${gifterEmailStatus}`,
+          status: recipientEmailStatus === 'Sent' ? 'Sent' : 'Failed',
+        });
+      } catch (error) {
+        console.error('[Webhook] Failed to create communication record (gift_sponsorship):', error);
+      }
+
+      console.log('[Webhook] Successfully processed gift sponsorship:', {
+        sessionId: session.id,
+        donorId,
+        donationId,
+        gifter: email,
+        recipient: recipientEmail,
+        assignedShirtNumber: assignedChild?.shirtNumber || null,
+      });
+
+      // Admin ping — Kevin sees a gift go out same as any other order.
+      try {
+        await sendAdminOrderNotification({
+          kind: 'Sponsorship',
+          customerName: gifterName + ' (gift to ' + recipientName + ')',
+          customerEmail: email,
+          amount,
+          isRecurring: false,
+          childDisplayName: assignedChild?.displayName,
+          shirtNumber: assignedChild?.shirtNumber,
+          stripeSessionId: session.id,
+        });
+      } catch (err: any) {
+        console.error('[WH] admin notify failed (gift):', String(err?.message || err).slice(0, 200));
+      }
+
+      return { donorId, donationId, isGiftSponsorship: true, assignedChild };
 
     } else {
       // --- STANDARD DONATION FLOW ---

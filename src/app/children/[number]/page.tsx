@@ -18,6 +18,7 @@ export const revalidate = 0;
 
 interface ChildPageProps {
   params: Promise<{ number: string }>;
+  searchParams?: Promise<{ gift?: string; from?: string }>;
 }
 
 interface AirtableChildRecord {
@@ -318,8 +319,11 @@ export async function generateMetadata({ params }: ChildPageProps) {
   };
 }
 
-export default async function ChildProfilePage({ params }: ChildPageProps) {
+export default async function ChildProfilePage({ params, searchParams }: ChildPageProps) {
   const { number } = await params;
+  const sp = searchParams ? await searchParams : {};
+  const isGiftReveal = sp?.gift === 'true' || sp?.gift === '1';
+  const gifterFromQuery = (sp?.from || '').toString().trim().slice(0, 80);
   const num = parseInt(number, 10);
   // Treat non-numeric input the same as "not found" — show the friendly page,
   // not a hard 404 that makes people think the site is broken.
@@ -534,6 +538,29 @@ export default async function ChildProfilePage({ params }: ChildPageProps) {
           </svg>
           Back to home
         </Link>
+
+        {/* Memo §11: gift recipient frame. Renders when the URL has
+            ?gift=true (sent by the gift card email). Sets the emotional
+            tone before the photo + name + bio. */}
+        {isGiftReveal && (
+          <div className="mb-8 md:mb-10 bg-white border-2 border-[#D4A843]/40 px-6 py-5 md:px-8 md:py-6 text-center">
+            <p className="text-xs font-bold uppercase tracking-[0.3em] text-[#D4A843] mb-2">
+              A gift for you
+            </p>
+            <p
+              className="text-xl md:text-2xl text-[#0d0d0d] leading-snug"
+              style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
+            >
+              {gifterFromQuery
+                ? `${gifterFromQuery} sponsored a child in your honor.`
+                : 'Someone sponsored a child in your honor.'}
+            </p>
+            <p className="text-sm text-[#666] mt-2">
+              Their first month at the campus is already covered.
+              You&rsquo;ll meet them below.
+            </p>
+          </div>
+        )}
 
         <RevealOverlay shirtNumber={Number(number)} childName={displayName}>
         <div className="grid md:grid-cols-2 gap-5 md:gap-14 items-start">
