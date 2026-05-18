@@ -125,19 +125,20 @@ function DesignContainer({
 /* ── Shirt design components ────────────────────────────────── */
 
 /**
- * Globe mark used as a CSS mask so the SVG shape is rendered in the
- * shirt's ink color (white on Onyx, black on the pastels). The SVG
- * itself sits in `/public/shirt-designs/globe.svg` and uses fills
- * we don't actually render — the browser only cares about its
- * alpha channel for masking.
+ * Globe mark — halftone-dotted Africa-centered globe rendered as a CSS
+ * mask so the dot pattern picks up the shirt's ink color (white on Onyx,
+ * black on the pastels). Source is the halftone PNG that matches the
+ * production screen-print look — solid vector silhouettes were too clean
+ * and didn't read as a print. The PNG's alpha channel IS the dot pattern;
+ * mask-image clips backgroundColor to those dots.
  */
 function GlobeMark({ color, className = '' }: { color: string; className?: string }) {
   const maskStyle: React.CSSProperties = {
     backgroundColor: color,
     width: '100%',
     aspectRatio: '1 / 1',
-    WebkitMaskImage: 'url(/shirt-designs/globe.svg)',
-    maskImage: 'url(/shirt-designs/globe.svg)',
+    WebkitMaskImage: 'url(/shirt-designs/globe-halftone.png)',
+    maskImage: 'url(/shirt-designs/globe-halftone.png)',
     WebkitMaskSize: 'contain',
     maskSize: 'contain',
     WebkitMaskRepeat: 'no-repeat',
@@ -311,9 +312,14 @@ function shuffle<T>(src: T[]): T[] {
 const SIZES = ['S', 'M', 'L', 'XL', '2XL'];
 
 /**
- * Single preview slot that shows a shirt silhouette by default and reveals
- * the flat, detailed design on hover (desktop) or tap (mobile). The two
- * views are stacked absolutely so the cross-fade is purely opacity-based.
+ * Single preview slot — design on a tee silhouette, no hover-zoom toggle.
+ *
+ * The earlier toggle cross-faded between a tee view and a "flat" view on
+ * hover/tap. With the halftone print already visible at tee size, the
+ * flat-mode "zoom" was doing more harm than good — the design jumped
+ * position and the silhouette disappeared into a rectangular swatch,
+ * which read as broken rather than informative. Single static view now;
+ * the print detail is already on the shirt.
  */
 function PreviewMockup({
   Design,
@@ -324,53 +330,13 @@ function PreviewMockup({
   theme: ShirtTheme;
   label: 'Front' | 'Back';
 }) {
-  const [tapped, setTapped] = useState(false);
-
   return (
     <div
       className="p-2 sm:p-4 flex flex-col items-center border transition-colors duration-300"
       style={{ backgroundColor: theme.cardBg, borderColor: theme.cardBorder }}
     >
-      <div
-        className="group relative w-full cursor-pointer select-none"
-        role="button"
-        tabIndex={0}
-        aria-label={`${label} view — tap to toggle design detail`}
-        onClick={() => setTapped((t) => !t)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            setTapped((t) => !t);
-          }
-        }}
-        onMouseLeave={() => setTapped(false)}
-      >
-        {/* Tee silhouette — default visible; fades out on hover/tap */}
-        <div
-          className={`transition-opacity duration-300 ${
-            tapped ? 'opacity-0' : 'opacity-100 group-hover:opacity-0'
-          }`}
-        >
-          <Design theme={theme} mode="tee" className="w-full rounded-sm transition-colors duration-300" />
-        </div>
-
-        {/* Flat detail — hidden by default; fades in on hover/tap */}
-        <div
-          className={`absolute inset-0 transition-opacity duration-300 ${
-            tapped ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
-          }`}
-        >
-          <Design theme={theme} mode="flat" className="w-full rounded-sm transition-colors duration-300" />
-        </div>
-
-        {/* Subtle hint chip — visible when NOT hovered/tapped */}
-        <div
-          className={`absolute bottom-2 right-2 text-[9px] font-semibold uppercase tracking-wider px-2 py-1 bg-white/80 backdrop-blur-sm border border-[#e8e0d4] text-[#888] transition-opacity duration-200 ${
-            tapped ? 'opacity-0' : 'opacity-70 group-hover:opacity-0'
-          }`}
-        >
-          Tap for detail
-        </div>
+      <div className="relative w-full select-none">
+        <Design theme={theme} mode="tee" className="w-full rounded-sm transition-colors duration-300" />
       </div>
       <p className="text-xs text-[#999] mt-3 font-bold uppercase tracking-wider">{label}</p>
     </div>
