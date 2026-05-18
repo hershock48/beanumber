@@ -178,9 +178,11 @@ function BackMark({ color, className = '' }: { color: string; className?: string
  * not a chest tag above another print.
  */
 function GlobeFront({ theme, mode = 'tee', className = '' }: DesignProps) {
-  // Sized to match the production print: ~38–42% of chest area, upper-center.
-  const top = mode === 'tee' ? '24%' : '17%';
-  const width = mode === 'tee' ? '32%' : '46%';
+  // Sized to match the production print mockup (220/340 of canvas width,
+  // 74/400 of canvas height in the reference HTML). The globe is the
+  // dominant chest mark, not a small tag above another design.
+  const top = mode === 'tee' ? '19%' : '14%';
+  const width = mode === 'tee' ? '65%' : '75%';
 
   return (
     <DesignContainer theme={theme} mode={mode} side="front" className={className}>
@@ -200,8 +202,12 @@ function GlobeFront({ theme, mode = 'tee', className = '' }: DesignProps) {
  * conventional screen print.
  */
 function NumberBack({ theme, mode = 'tee', className = '' }: DesignProps) {
+  // Sized to match the production back-print mockup (174/340 of canvas
+  // width, 78/400 of canvas height in the reference HTML). The back
+  // composition is wider than tall, so the back mark gets a different
+  // width treatment than the front globe.
   const top = mode === 'tee' ? '20%' : '14%';
-  const width = mode === 'tee' ? '30%' : '46%';
+  const width = mode === 'tee' ? '51%' : '62%';
 
   return (
     <DesignContainer theme={theme} mode={mode} side="back" className={className}>
@@ -635,13 +641,13 @@ export default function ShirtsPageContent() {
         <div className="max-w-4xl mx-auto text-center">
           <p className="text-xs font-bold text-[#D4A843] uppercase tracking-[0.3em] mb-6">The Collection</p>
           <h1
-            className="text-4xl md:text-5xl lg:text-6xl text-[#0d0d0d] mb-6"
+            className="text-4xl md:text-5xl lg:text-6xl text-[#0d0d0d] mb-6 leading-tight"
             style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
           >
-            Every shirt has a number.
+            One shirt.<br />Four colors.
           </h1>
           <p className="text-lg text-[#777] max-w-xl mx-auto leading-relaxed">
-            Heavyweight blanks in four colors. Screen-printed, handmade to order.
+            Heavyweight blanks, screen-printed, handmade to order.
             Each one carries a different child&apos;s number.
           </p>
         </div>
