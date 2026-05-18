@@ -50,18 +50,16 @@ interface ChildInfo {
   shirtNumber?: number | null;
 }
 
-// Memo §5: Shop Your Number — the 4 designs surfaced inside the
-// sponsor portal for repeat purchases. Kept lightweight here (no
-// mockup imports) since the sponsor already knows what the shirts
-// look like. If hats/hoodies launch later they join this list.
-const PORTAL_DESIGNS: { id: string; name: string; tagline: string; badge: string; price: number }[] = [
-  { id: 'flagship', name: 'The Flagship', tagline: 'The one that started it all', badge: 'Original', price: 25 },
-  { id: 'do-not-fear', name: 'Do Not Fear.', tagline: 'A reminder you can wear', badge: 'Courage', price: 25 },
-  { id: 'peacemaker', name: 'Peacemaker.', tagline: 'Blessed are those who show up', badge: 'Conviction', price: 25 },
-  { id: 'everything-hallelujah', name: 'Everything Hallelujah.', tagline: 'The whole thing, all of it', badge: 'Praise', price: 25 },
+// Memo §5: Shop Your Number — the 4 colorways surfaced inside the
+// sponsor portal for repeat purchases. Each colorway is its own
+// product card; the color is fixed per card. If hats/hoodies launch
+// later they join this list.
+const PORTAL_DESIGNS: { id: string; name: string; color: string; price: number }[] = [
+  { id: 'onyx', name: 'Onyx', color: 'Onyx', price: 25 },
+  { id: 'meadow', name: 'Meadow', color: 'Meadow', price: 25 },
+  { id: 'blossom', name: 'Blossom', color: 'Blossom', price: 25 },
+  { id: 'sky', name: 'Sky', color: 'Sky', price: 25 },
 ];
-const PORTAL_COLORS = ['Black', 'Grey', 'Pink', 'Yellow'] as const;
-type PortalColor = typeof PORTAL_COLORS[number];
 const PORTAL_SIZES = ['S', 'M', 'L', 'XL', '2XL'] as const;
 
 // A single timeline entry — the component merges updates, messages, and
@@ -291,28 +289,26 @@ function ShopYourNumberSection({
   childFirstName: string;
 }) {
   const [activeShirtId, setActiveShirtId] = useState<string | null>(null);
-  const [color, setColor] = useState<PortalColor | null>(null);
   const [size, setSize] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   function openPicker(shirtId: string) {
     setActiveShirtId(shirtId);
-    setColor(null);
     setSize(null);
     setError(null);
   }
   function closePicker() {
     setActiveShirtId(null);
-    setColor(null);
     setSize(null);
     setError(null);
   }
 
   async function handleOrder() {
     if (!activeShirtId) return;
-    if (!color) { setError('Pick a color.'); return; }
     if (!size) { setError('Pick a size.'); return; }
+    const design = PORTAL_DESIGNS.find((d) => d.id === activeShirtId);
+    if (!design) { setError('Unknown design.'); return; }
     setSubmitting(true);
     setError(null);
     try {
@@ -322,7 +318,7 @@ function ShopYourNumberSection({
         body: JSON.stringify({
           sponsorCode,
           shirtId: activeShirtId,
-          color,
+          color: design.color,
           size,
         }),
       });
@@ -375,16 +371,12 @@ function ShopYourNumberSection({
             >
               <div className="p-4 flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-[#D4A843] mb-1">
-                    {shirt.badge}
-                  </p>
                   <p
                     className="text-base text-[#0d0d0d] leading-tight"
                     style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
                   >
                     {shirt.name}
                   </p>
-                  <p className="text-xs text-[#888] italic mt-0.5">{shirt.tagline}</p>
                 </div>
                 <div className="flex-shrink-0 text-right">
                   <p
@@ -406,25 +398,6 @@ function ShopYourNumberSection({
                 </button>
               ) : (
                 <div className="px-4 py-4 border-t border-[#D4A843]/40 space-y-3">
-                  <div>
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-[#999] mb-1.5">Color</p>
-                    <div className="flex gap-2 flex-wrap">
-                      {PORTAL_COLORS.map((c) => (
-                        <button
-                          key={c}
-                          type="button"
-                          onClick={() => { setColor(c); setError(null); }}
-                          className={`px-3 py-1.5 text-xs font-semibold border transition-colors cursor-pointer ${
-                            color === c
-                              ? 'bg-[#0d0d0d] text-white border-[#0d0d0d]'
-                              : 'bg-white text-[#555] border-[#e8e0d4] hover:border-[#999]'
-                          }`}
-                        >
-                          {c}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
                   <div>
                     <p className="text-[10px] font-bold uppercase tracking-wider text-[#999] mb-1.5">Size</p>
                     <div className="flex gap-1.5">

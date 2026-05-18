@@ -18,10 +18,10 @@ async function getStripe() {
 // `color` is now chosen by the buyer at checkout rather than baked into the
 // design record.
 const SHIRTS: Record<string, { name: string }> = {
-  flagship: { name: 'The Flagship' },
-  'do-not-fear': { name: 'Do Not Fear.' },
-  peacemaker: { name: 'Peacemaker.' },
-  'everything-hallelujah': { name: 'Everything Hallelujah.' },
+  onyx: { name: 'Onyx' },
+  meadow: { name: 'Meadow' },
+  blossom: { name: 'Blossom' },
+  sky: { name: 'Sky' },
 };
 
 const VALID_SIZES = ['S', 'M', 'L', 'XL', '2XL'];
@@ -33,9 +33,9 @@ export async function POST(request: NextRequest) {
     const stripe = await getStripe();
 
     const shirtSchema = z.object({
-      shirtId: z.enum(['flagship', 'do-not-fear', 'peacemaker', 'everything-hallelujah']),
+      shirtId: z.enum(['onyx', 'meadow', 'blossom', 'sky']),
       size: z.enum(['S', 'M', 'L', 'XL', '2XL']),
-      color: z.enum(['Black', 'Grey', 'Pink', 'Yellow']),
+      color: z.enum(['Onyx', 'Meadow', 'Blossom', 'Sky']),
       email: z.string().email().optional().or(z.literal('')),
       name: z.string().max(255).optional().default(''),
       continueMonthly: z.boolean().optional().default(false),
@@ -92,7 +92,7 @@ export async function POST(request: NextRequest) {
             price_data: {
               currency: 'usd',
               product_data: {
-                name: `${shirt.name} / ${color} / ${size}`,
+                name: `${shirt.name} tee · ${size}`,
                 description:
                   'Be A Number heavyweight tee. Your shirt number connects you to a real child. $25 gets you the shirt and starts their year at the campus.',
               },
@@ -145,7 +145,7 @@ export async function POST(request: NextRequest) {
           price_data: {
             currency: 'usd',
             product_data: {
-              name: `${shirt.name} / ${color} / ${size} + Monthly Sponsorship`,
+              name: `${shirt.name} tee · ${size} + Monthly Sponsorship`,
               description:
                 "Your shirt plus ongoing $25/month sponsorship. Today's $25 starts their year at the campus and ships your shirt. Cancel anytime.",
             },

@@ -164,17 +164,21 @@ function classifyReferral(raw: string): { choice: string | null; rawNote: string
 // field names ("Vinyl Front" / "Vinyl Back") are legacy from the HTV
 // production era; production is now screen-printed but the semantics —
 // what color sits on the shirt — are identical.
+//
+// 2026 lineup: Onyx → white ink. Sky / Meadow / Blossom → black ink.
+// Old colorways (Black, Grey, Pink, Yellow, White) still mapped here so
+// any in-flight historical orders / portal redirects still resolve.
 function vinylColorForShirt(shirtColor: string): string {
   const lower = shirtColor.toLowerCase();
-  if (lower === 'black' || lower === 'grey' || lower === 'gray') return 'White';
-  return 'Black'; // White, Pink, Yellow, etc.
+  if (lower === 'onyx' || lower === 'black' || lower === 'grey' || lower === 'gray') return 'White';
+  return 'Black'; // Sky, Meadow, Blossom, White, Pink, Yellow, etc.
 }
 
 // Creates one Fulfillment record per shirt in Airtable. Non-fatal — if this
 // fails the order still succeeds. Called from all three shirt flows.
 async function createFulfillmentRecord(opts: {
   shirtNumber: number;
-  design: string;        // e.g. "The Flagship" — must match singleSelect
+  design: string;        // 2026 lineup: always "Number Tee" — must match singleSelect
   shirtColor: string;    // e.g. "Black" — must match singleSelect
   shirtSize: string;     // e.g. "L" — must match singleSelect
   buyerName: string;
@@ -1650,7 +1654,7 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
         try {
           await createFulfillmentRecord({
             shirtNumber: a.child.shirtNumber,
-            design: a.shirtName,
+            design: 'Number Tee',  // 2026 lineup: every shirt is the same design (4 colorways)
             shirtColor: a.shirtColor,
             shirtSize: a.shirtSize,
             buyerName: name,
@@ -2173,7 +2177,7 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
         try {
           await createFulfillmentRecord({
             shirtNumber: assignedChild.shirtNumber,
-            design: shirtName,
+            design: 'Number Tee',  // 2026 lineup: every shirt is the same design (4 colorways)
             shirtColor,
             shirtSize,
             buyerName: name,
@@ -2429,7 +2433,7 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
         try {
           await createFulfillmentRecord({
             shirtNumber: assignedChild.shirtNumber,
-            design: shirtName,
+            design: 'Number Tee',  // 2026 lineup: every shirt is the same design (4 colorways)
             shirtColor,
             shirtSize,
             buyerName: name,
@@ -2633,7 +2637,7 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
         try {
           await createFulfillmentRecord({
             shirtNumber: existingShirtNumber,
-            design: shirtName,
+            design: 'Number Tee',  // 2026 lineup: every shirt is the same design (4 colorways)
             shirtColor,
             shirtSize,
             buyerName: name,

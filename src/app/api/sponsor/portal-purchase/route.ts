@@ -24,19 +24,19 @@ const AIRTABLE_CHILDREN_TABLE = process.env.AIRTABLE_CHILDREN_TABLE || 'Children
 const AIRTABLE_DONORS_TABLE = process.env.AIRTABLE_DONORS_TABLE || 'Donors';
 
 const SHIRTS: Record<string, { name: string }> = {
-  flagship: { name: 'The Flagship' },
-  'do-not-fear': { name: 'Do Not Fear.' },
-  peacemaker: { name: 'Peacemaker.' },
-  'everything-hallelujah': { name: 'Everything Hallelujah.' },
+  onyx: { name: 'Onyx' },
+  meadow: { name: 'Meadow' },
+  blossom: { name: 'Blossom' },
+  sky: { name: 'Sky' },
 };
 
 const SHIRT_PRICE = 25;
 
 const purchaseSchema = z.object({
   sponsorCode: z.string().min(1).max(64),
-  shirtId: z.enum(['flagship', 'do-not-fear', 'peacemaker', 'everything-hallelujah']),
+  shirtId: z.enum(['onyx', 'meadow', 'blossom', 'sky']),
   size: z.enum(['S', 'M', 'L', 'XL', '2XL']),
-  color: z.enum(['Black', 'Grey', 'Pink', 'Yellow']),
+  color: z.enum(['Onyx', 'Meadow', 'Blossom', 'Sky']),
 });
 
 const atHeaders = () => ({
@@ -202,7 +202,7 @@ export async function POST(request: NextRequest) {
           price_data: {
             currency: 'usd',
             product_data: {
-              name: `${shirt.name} / ${color} / ${size} — Sponsor reorder #${shirtNumber}`,
+              name: `${shirt.name} tee · ${size} — Sponsor reorder #${shirtNumber}`,
               description: `Repeat order for ${sponsorName || 'an active sponsor'}. Ships with #${shirtNumber} stamped on the inside collar — the same number as the original shirt.`,
             },
             unit_amount: SHIRT_PRICE * 100,

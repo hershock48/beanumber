@@ -12,33 +12,33 @@ import { CartDrawer, CartButton } from '@/components/CartDrawer';
 
 // Each shirt design is available in the same palette. Ordered neutrals first
 // (most common) then accent tones for visual rhythm on the selector.
-const COLORS = ['Black', 'Grey', 'Pink', 'Yellow'] as const;
+// 2026 lineup: four colorways, each its own product. Same design across all.
+const COLORS = ['Onyx', 'Meadow', 'Blossom', 'Sky'] as const;
 type ColorName = (typeof COLORS)[number];
 
 type ShirtTheme = {
   /** Body color of the shirt as rendered in the mockup. */
   shirt: string;
-  /** Swatch shown in the color picker (may differ slightly for visibility). */
+  /** Swatch color (matches body for solid colorways). */
   swatch: string;
-  /** Print ink color for the artwork — auto-contrasted for legibility. */
+  /** Print ink color — auto-contrasted: white on Onyx, black on the pastels. */
   vinyl: string;
-  /** Muted foreground used for the small "beanumber.org" text on the back. */
+  /** Muted foreground for any secondary marks. */
   muted: string;
-  /** Preview-card background — warmer tan for white shirts so they don't vanish. */
+  /** Preview-card background — warm cream so pastels don't blend into white. */
   cardBg: string;
-  /** Subtle border color for the preview card, tuned to the card background. */
+  /** Subtle card border. */
   cardBorder: string;
 };
 
-// Ink color is chosen per shirt color to stay legible on the mockup.
-// In production Kevin picks the actual ink — these values are
-// representative. Field is named `vinyl` for back-compat (HTV-era name);
-// renaming the property is a separate refactor.
+// Per-shirt themes. `vinyl` is named for backwards compatibility with the
+// HTV-era code that wrote ink color to Airtable's Vinyl Front/Back fields;
+// production is now screen-printed but the semantics are identical.
 const THEMES: Record<ColorName, ShirtTheme> = {
-  Black:  { shirt: '#111111', swatch: '#111111', vinyl: '#ffffff', muted: 'rgba(255,255,255,0.3)', cardBg: '#ffffff', cardBorder: '#e8e0d4' },
-  Grey:   { shirt: '#8a8a8a', swatch: '#9a9a9a', vinyl: '#ffffff', muted: 'rgba(255,255,255,0.3)', cardBg: '#ffffff', cardBorder: '#e8e0d4' },
-  Pink:   { shirt: '#f4b8c4', swatch: '#f4b8c4', vinyl: '#2a1520', muted: 'rgba(0,0,0,0.35)', cardBg: '#ffffff', cardBorder: '#e8e0d4' },
-  Yellow: { shirt: '#f3d35b', swatch: '#f3d35b', vinyl: '#141414', muted: 'rgba(0,0,0,0.35)', cardBg: '#ffffff', cardBorder: '#e8e0d4' },
+  Onyx:    { shirt: '#1a1a1a', swatch: '#1a1a1a', vinyl: '#ffffff', muted: 'rgba(255,255,255,0.3)', cardBg: '#fffdf8', cardBorder: '#e8e0d4' },
+  Meadow:  { shirt: '#c8dfc5', swatch: '#c8dfc5', vinyl: '#1a1a1a', muted: 'rgba(0,0,0,0.35)',   cardBg: '#fffdf8', cardBorder: '#e8e0d4' },
+  Blossom: { shirt: '#f3cfd4', swatch: '#f3cfd4', vinyl: '#1a1a1a', muted: 'rgba(0,0,0,0.35)',   cardBg: '#fffdf8', cardBorder: '#e8e0d4' },
+  Sky:     { shirt: '#bdd5e5', swatch: '#bdd5e5', vinyl: '#1a1a1a', muted: 'rgba(0,0,0,0.35)',   cardBg: '#fffdf8', cardBorder: '#e8e0d4' },
 };
 
 // The mission gold stays constant; it's the brand accent and reads on any body.
@@ -125,77 +125,83 @@ function DesignContainer({
 /* ── Shirt design components ────────────────────────────────── */
 
 /**
- * Legacy front design (# mark + "beanumber.org"). Retained for reference;
- * currently every shirt uses FlagshipFront (cross + "beanumber.org") to
- * keep the front mark consistent across the collection now that
- * production is screen-printed. Kept in code so the # variant can be
- * brought back without rewriting from scratch.
+ * Globe mark used as a CSS mask so the SVG shape is rendered in the
+ * shirt's ink color (white on Onyx, black on the pastels). The SVG
+ * itself sits in `/public/shirt-designs/globe.svg` and uses fills
+ * we don't actually render — the browser only cares about its
+ * alpha channel for masking.
  */
-function SharedFront({ theme, mode = 'tee', className = '' }: DesignProps) {
-  const top = mode === 'tee' ? '28%' : '17%';
-  const width = mode === 'tee' ? '10%' : '14%';
+function GlobeMark({ color, className = '' }: { color: string; className?: string }) {
+  const maskStyle: React.CSSProperties = {
+    backgroundColor: color,
+    width: '100%',
+    aspectRatio: '1 / 1',
+    WebkitMaskImage: 'url(/shirt-designs/globe.svg)',
+    maskImage: 'url(/shirt-designs/globe.svg)',
+    WebkitMaskSize: 'contain',
+    maskSize: 'contain',
+    WebkitMaskRepeat: 'no-repeat',
+    maskRepeat: 'no-repeat',
+    WebkitMaskPosition: 'center',
+    maskPosition: 'center',
+  };
+  return <div className={className} style={maskStyle} aria-label="Be A Number globe" />;
+}
+
+/**
+ * Back mark — CHANGE THE WORLD + hashtag logo + ORDER # + sample number.
+ * Sourced from `/public/shirt-designs/back.svg` and recolored via CSS
+ * mask just like the globe. The "0421" in the SVG is a SAMPLE; the real
+ * number is heat-pressed per shirt after the order is placed.
+ */
+function BackMark({ color, className = '' }: { color: string; className?: string }) {
+  const maskStyle: React.CSSProperties = {
+    backgroundColor: color,
+    width: '100%',
+    // The back-design SVG is 792 × 936 → aspect-ratio matches.
+    aspectRatio: '792 / 936',
+    WebkitMaskImage: 'url(/shirt-designs/back.svg)',
+    maskImage: 'url(/shirt-designs/back.svg)',
+    WebkitMaskSize: 'contain',
+    maskSize: 'contain',
+    WebkitMaskRepeat: 'no-repeat',
+    maskRepeat: 'no-repeat',
+    WebkitMaskPosition: 'center',
+    maskPosition: 'center',
+  };
+  return <div className={className} style={maskStyle} aria-label="Be A Number — Change The World" />;
+}
+
+/**
+ * Front design — the heritage Africa-centered globe, centered on the chest.
+ * Bigger than the previous # / cross marks because the globe IS the design,
+ * not a chest tag above another print.
+ */
+function GlobeFront({ theme, mode = 'tee', className = '' }: DesignProps) {
+  // Sized to match the production print: ~38–42% of chest area, upper-center.
+  const top = mode === 'tee' ? '24%' : '17%';
+  const width = mode === 'tee' ? '32%' : '46%';
 
   return (
     <DesignContainer theme={theme} mode={mode} side="front" className={className}>
       <div
-        className="absolute left-1/2 flex flex-col items-center"
+        className="absolute left-1/2"
         style={{ top, width, transform: 'translateX(-50%)' }}
       >
-        <Logo variant="micro" className="w-full" style={{ color: theme.vinyl }} />
-        <span
-          className="font-semibold uppercase"
-          style={{
-            color: theme.vinyl,
-            fontSize: mode === 'tee' ? 'clamp(3px, 1.4cqw, 6px)' : 'clamp(4px, 1.8cqw, 8px)',
-            letterSpacing: '0.18em',
-            marginTop: '8%',
-          }}
-        >
-          beanumber.org
-        </span>
+        <GlobeMark color={theme.vinyl} />
       </div>
     </DesignContainer>
   );
 }
 
 /**
- * Flagship front — small cross mark on the chest at the same size and
- * placement as the # mark on every other shirt, with beanumber.org below.
+ * Back design — CHANGE THE WORLD over the hashtag logo over ORDER # over
+ * the unique number. Sized to sit in the upper-back yoke area like a
+ * conventional screen print.
  */
-function FlagshipFront({ theme, mode = 'tee', className = '' }: DesignProps) {
-  const top = mode === 'tee' ? '28%' : '17%';
-  const width = mode === 'tee' ? '10%' : '14%';
-
-  return (
-    <DesignContainer theme={theme} mode={mode} side="front" className={className}>
-      <div
-        className="absolute left-1/2 flex flex-col items-center"
-        style={{ top, width, transform: 'translateX(-50%)' }}
-      >
-        <Logo variant="cross" className="w-full" style={{ color: theme.vinyl }} />
-        <span
-          className="font-semibold uppercase"
-          style={{
-            color: theme.vinyl,
-            fontSize: mode === 'tee' ? 'clamp(3px, 1.4cqw, 6px)' : 'clamp(4px, 1.8cqw, 8px)',
-            letterSpacing: '0.18em',
-            marginTop: '8%',
-          }}
-        >
-          beanumber.org
-        </span>
-      </div>
-    </DesignContainer>
-  );
-}
-
-/** Large # logo with BEANUMBER lettering — Flagship back. Same ink
- *  color as the front so one screen per shirt color does both prints. */
-function FlagshipBack({ theme, mode = 'tee', className = '' }: DesignProps) {
-  // Back print is typically ~10–12" wide on a ~20" body, so ~55% of body
-  // ≈ 28% of the container.
-  const top = mode === 'tee' ? '30%' : '25%';
-  const width = mode === 'tee' ? '28%' : '50%';
+function NumberBack({ theme, mode = 'tee', className = '' }: DesignProps) {
+  const top = mode === 'tee' ? '20%' : '14%';
+  const width = mode === 'tee' ? '30%' : '46%';
 
   return (
     <DesignContainer theme={theme} mode={mode} side="back" className={className}>
@@ -203,174 +209,23 @@ function FlagshipBack({ theme, mode = 'tee', className = '' }: DesignProps) {
         className="absolute left-1/2"
         style={{ top, width, transform: 'translateX(-50%)' }}
       >
-        <Logo variant="primary" className="w-full" style={{ color: theme.vinyl }} />
+        <BackMark color={theme.vinyl} />
       </div>
     </DesignContainer>
   );
 }
 
-/**
- * Shared layout for the three text-back designs (Thank you / Do Not Fear /
- * Peacemaker). Lora serif, LEFT-aligned inside the back body area, stacked
- * across multiple lines like the Peacemaker production photo.
- */
-function TextBack({
-  theme,
-  mode = 'tee',
-  lines,
-  weight = 700,
-  scale = 1,
-  className = '',
-}: DesignProps & { lines: string[]; weight?: number; scale?: number }) {
-  // In tee mode the text is positioned within the back body region (body
-  // runs ~23% → 77% horizontally, ~18% → 92% vertically). In flat mode the
-  // whole box is usable; we still left-align but with a generous margin.
-  // The *block* is centered horizontally on the shirt back (transform
-  // -50%), but the text inside the block is left-aligned so each line
-  // starts at the same x — matching the Peacemaker production photo.
-  //
-  // `scale` shrinks text for longer words (e.g. "Everything / Hallelujah.")
-  // so they don't overflow the shirt body.
-  const topPos = mode === 'tee' ? '23%' : '14%';
-  const teeSize = 12 * scale;
-  const teeMax = Math.round(64 * scale);
-  const flatSize = 12.5 * scale;
-  const flatMax = Math.round(80 * scale);
-  const fontSize = mode === 'tee'
-    ? `clamp(22px, ${teeSize}cqw, ${teeMax}px)`
-    : `clamp(26px, ${flatSize}cqw, ${flatMax}px)`;
-
-  return (
-    <DesignContainer theme={theme} mode={mode} side="back" className={className}>
-      <div
-        className="absolute text-left"
-        style={{
-          left: '50%',
-          top: topPos,
-          transform: 'translateX(-50%)',
-          fontFamily: 'var(--font-lora), Georgia, serif',
-          fontWeight: weight,
-          color: theme.vinyl,
-          fontSize,
-          lineHeight: 1.45,
-          letterSpacing: '-0.01em',
-        }}
-      >
-        {lines.map((line, i) => (
-          <div key={i}>{line}</div>
-        ))}
-      </div>
-    </DesignContainer>
-  );
-}
-
-function ThankYouBack(props: DesignProps) {
-  return <TextBack {...props} lines={['Thank', 'you.']} weight={600} />;
-}
-
-function DoNotFearBack(props: DesignProps) {
-  return <TextBack {...props} lines={['Do', 'Not', 'Fear.']} />;
-}
-
-function PeacemakerBack(props: DesignProps) {
-  return <TextBack {...props} lines={['Peace', 'maker.']} />;
-}
-
-/**
- * Everything Hallelujah back — small centered text repeated 5 times down the
- * spine of the shirt, each block the same size as the front chest logo.
- */
-function EverythingHallelujahBack({ theme, mode = 'tee', className = '' }: DesignProps) {
-  // Tee mode: small like the front chest logo. Flat/hover mode: scaled up
-  // so the text is actually readable when someone hovers to inspect.
-  // On mobile tee mode, make it wider + fewer reps so the text is legible.
-  // On desktop tee the original proportions work fine.
-  const blockWidth = mode === 'tee' ? '23%' : '36%';
-  const fontSize = mode === 'tee'
-    ? 'clamp(4px, 2.3cqw, 10px)'
-    : 'clamp(6px, 3.4cqw, 16px)';
-  // Spread the 5 repetitions evenly down the back body area
-  const startTop = mode === 'tee' ? 20 : 10;
-  const gap = mode === 'tee' ? 13 : 16;
-
-  return (
-    <DesignContainer theme={theme} mode={mode} side="back" className={className}>
-      {Array.from({ length: 5 }).map((_, i) => (
-        <div
-          key={i}
-          className="absolute text-center uppercase"
-          style={{
-            left: '50%',
-            top: `${startTop + i * gap}%`,
-            transform: 'translateX(-50%)',
-            width: blockWidth,
-            fontFamily: 'var(--font-lora), Georgia, serif',
-            fontWeight: 700,
-            color: theme.vinyl,
-            fontSize,
-            lineHeight: 1.3,
-            letterSpacing: '0.08em',
-          }}
-        >
-          <div>Everything</div>
-          <div>Hallelujah</div>
-        </div>
-      ))}
-    </DesignContainer>
-  );
-}
-
-/**
- * Nigeria back — "NIGERIA" in tracked uppercase Lora centered on the back,
- * with a thin cross centered below the text.
- */
-function NigeriaBack({ theme, mode = 'tee', className = '' }: DesignProps) {
-  const topPos = mode === 'tee' ? '28%' : '20%';
-  const fontSize = mode === 'tee' ? 'clamp(16px, 9cqw, 47px)' : 'clamp(22px, 10.5cqw, 68px)';
-  const crossSize = mode === 'tee' ? 'clamp(20px, 10cqw, 54px)' : 'clamp(28px, 12cqw, 76px)';
-
-  return (
-    <DesignContainer theme={theme} mode={mode} side="back" className={className}>
-      <div
-        className="absolute flex flex-col items-center"
-        style={{
-          left: '50%',
-          top: topPos,
-          transform: 'translateX(-50%)',
-        }}
-      >
-        <div
-          style={{
-            fontFamily: 'var(--font-lora), Georgia, serif',
-            fontWeight: 700,
-            color: theme.vinyl,
-            fontSize,
-            letterSpacing: '0.06em',
-            textAlign: 'center',
-          }}
-        >
-          NIGERIA
-        </div>
-        <svg
-          viewBox="0 0 40 56"
-          style={{ width: crossSize, marginTop: '12%' }}
-          aria-hidden
-        >
-          <rect x="18" y="0" width="4" height="56" fill={theme.vinyl} />
-          <rect x="4" y="18" width="32" height="4" fill={theme.vinyl} />
-        </svg>
-      </div>
-    </DesignContainer>
-  );
-}
 
 
 /* ── Shirt data ─────────────────────────────────────────────── */
 
 type Shirt = {
+  /** URL slug + checkout key. Lowercase colorway name. */
   id: string;
+  /** Display name — the colorway. */
   name: string;
-  tagline: string;
+  /** The fixed colorway for this product. */
+  color: ColorName;
   price: number;
   description: string;
   Front: React.ComponentType<DesignProps>;
@@ -379,50 +234,59 @@ type Shirt = {
   specs: string;
 };
 
+// 2026 lineup: one design, four colorways, each its own product card.
+// Shared description across all four — the shirt is the same; the color
+// is the only thing that varies. Names do the differentiation; copy stays
+// honest about the product being one shirt.
+const SHARED_DESCRIPTION =
+  "A heavyweight cotton tee, screen-printed by hand. Every shirt gets a unique number, pressed on after you order. Each is one of a kind. That number is matched to a specific child at our campus in Northern Uganda. Type it into beanumber.org and you'll meet them.";
+
+const SHARED_SPECS = 'S – 2XL · Unisex · Heavyweight cotton';
+
 const SHIRTS_SOURCE: Shirt[] = [
   {
-    id: 'flagship',
-    name: 'The Flagship',
-    tagline: 'The one that started it all',
+    id: 'onyx',
+    name: 'Onyx',
+    color: 'Onyx',
     price: 25,
-    description: 'This is the shirt that started Be A Number. Before there were any designs there was one idea: put a number on a shirt, connect that number to a real child, and see what happens. What happened was people showed up. Your $25 gets you the shirt and starts a child\'s year at the YDO campus. The number you receive is assigned by order and belongs to a real kid in Northern Uganda. This is the original.',
-    Front: FlagshipFront,
-    Back: FlagshipBack,
-    badge: 'Original',
-    specs: 'S – 2XL · Unisex · Heavyweight cotton',
+    description: SHARED_DESCRIPTION,
+    Front: GlobeFront,
+    Back: NumberBack,
+    badge: null,
+    specs: SHARED_SPECS,
   },
   {
-    id: 'do-not-fear',
-    name: 'Do Not Fear.',
-    tagline: 'A reminder you can wear',
+    id: 'meadow',
+    name: 'Meadow',
+    color: 'Meadow',
     price: 25,
-    description: '"Do not fear" appears over 100 times in the Bible. More than any other repeated command. Not because it\'s easy, but because God knows we need to hear it constantly. Whatever you\'re afraid of is not bigger than the God who said it. Move forward. Trust in love.',
-    Front: FlagshipFront,
-    Back: DoNotFearBack,
-    badge: 'Courage',
-    specs: 'S – 2XL · Unisex · Heavyweight cotton',
+    description: SHARED_DESCRIPTION,
+    Front: GlobeFront,
+    Back: NumberBack,
+    badge: null,
+    specs: SHARED_SPECS,
   },
   {
-    id: 'peacemaker',
-    name: 'Peacemaker.',
-    tagline: 'Blessed are those who show up',
+    id: 'blossom',
+    name: 'Blossom',
+    color: 'Blossom',
     price: 25,
-    description: '"Blessed are the peacemakers. But woe to those who manipulate religion and the very name of God for their own military, economic and political gain." That\'s Pope Leo XIV, speaking in Cameroon on his first trip as pope. When the world pushed back, he didn\'t flinch. He said "I have no fear." This shirt is for the person who heard that and meant it.',
-    Front: FlagshipFront,
-    Back: PeacemakerBack,
-    badge: 'Conviction',
-    specs: 'S – 2XL · Unisex · Heavyweight cotton',
+    description: SHARED_DESCRIPTION,
+    Front: GlobeFront,
+    Back: NumberBack,
+    badge: null,
+    specs: SHARED_SPECS,
   },
   {
-    id: 'everything-hallelujah',
-    name: 'Everything Hallelujah.',
-    tagline: 'The whole thing, all of it',
+    id: 'sky',
+    name: 'Sky',
+    color: 'Sky',
     price: 25,
-    description: 'Through the good and the bad. Everything hallelujah. Not just praise when things are easy. Praise when they\'re not. Praise when it doesn\'t make sense yet. When the news is bad, when the money is short, when someone you love is suffering and you can\'t fix it. Hallelujah anyway. That\'s the whole point.',
-    Front: FlagshipFront,
-    Back: EverythingHallelujahBack,
-    badge: 'Praise',
-    specs: 'S – 2XL · Unisex · Heavyweight cotton',
+    description: SHARED_DESCRIPTION,
+    Front: GlobeFront,
+    Back: NumberBack,
+    badge: null,
+    specs: SHARED_SPECS,
   },
 ];
 
@@ -436,22 +300,9 @@ function shuffle<T>(src: T[]): T[] {
   return arr;
 }
 
-/**
- * Assign a different preview color to each shirt so the page reads as a
- * collection, not six identical black tees. Shuffles the five colors and
- * cycles through them so no two adjacent shirts share a color.
- */
-function assignPreviewColors(count: number): ColorName[] {
-  const shuffled = shuffle([...COLORS]);
-  return Array.from({ length: count }, (_, i) => shuffled[i % shuffled.length]);
-}
-
-/* ── Per-shirt card (owns color + size state) ───────────────── */
+/* ── Per-shirt card ─────────────────────────────────────────── */
 
 const SIZES = ['S', 'M', 'L', 'XL', '2XL'];
-// Default preview color when the user hasn't chosen yet. Black is the safest
-// showcase for light artwork and matches the design mockups' original intent.
-const DEFAULT_PREVIEW_COLOR: ColorName = 'Black';
 
 /**
  * Single preview slot that shows a shirt silhouette by default and reveals
@@ -520,14 +371,14 @@ function PreviewMockup({
   );
 }
 
-function ShirtCard({ shirt, reversed, initialColor }: { shirt: Shirt; reversed: boolean; initialColor: ColorName }) {
-  const [selectedColor, setSelectedColor] = useState<ColorName | null>(null);
+function ShirtCard({ shirt, reversed }: { shirt: Shirt; reversed: boolean }) {
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [justAdded, setJustAdded] = useState(false);
   const { addItem } = useCart();
 
-  const previewTheme = THEMES[selectedColor ?? initialColor];
+  // Each card IS one colorway — no picker. Theme is fixed per shirt.
+  const previewTheme = THEMES[shirt.color];
   const Front = shirt.Front;
   const Back = shirt.Back;
 
@@ -535,10 +386,6 @@ function ShirtCard({ shirt, reversed, initialColor }: { shirt: Shirt; reversed: 
   // explicitly so we don't rely on stale React state between click
   // and dispatch.
   function handleAddToCart(continueMonthly: boolean) {
-    if (!selectedColor) {
-      setError('Please select a color.');
-      return;
-    }
     if (!selectedSize) {
       setError('Please select a size.');
       return;
@@ -548,7 +395,7 @@ function ShirtCard({ shirt, reversed, initialColor }: { shirt: Shirt; reversed: 
     addItem({
       shirtId: shirt.id,
       shirtName: shirt.name,
-      color: selectedColor,
+      color: shirt.color,
       size: selectedSize,
       continueMonthly,
       price: shirt.price,
@@ -566,21 +413,12 @@ function ShirtCard({ shirt, reversed, initialColor }: { shirt: Shirt; reversed: 
             knows what they're looking at before scrolling past the image.
             Hidden on desktop where the side-by-side layout makes it redundant. */}
         <div className="md:hidden w-full">
-          <div className="flex items-center gap-3 mb-2">
-            {shirt.badge && (
-              <span className="text-xs font-bold uppercase tracking-wider px-2.5 py-1 bg-[#D4A843]/10 text-[#D4A843] border border-[#D4A843]/20">
-                {shirt.badge}
-              </span>
-            )}
-            <span className="text-xs text-[#aaa] uppercase tracking-wider">Available in 4 colors</span>
-          </div>
           <h2
-            className="text-3xl text-[#0d0d0d] mb-1"
+            className="text-3xl text-[#0d0d0d] mb-0"
             style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
           >
             {shirt.name}
           </h2>
-          <p className="text-sm text-[#777] italic mb-0">{shirt.tagline}</p>
         </div>
 
         {/* Mockup previews */}
@@ -589,11 +427,6 @@ function ShirtCard({ shirt, reversed, initialColor }: { shirt: Shirt; reversed: 
             <PreviewMockup Design={Front} theme={previewTheme} label="Front" />
             <PreviewMockup Design={Back} theme={previewTheme} label="Back" />
           </div>
-          {!selectedColor && (
-            <p className="text-xs text-[#aaa] text-center mt-3 italic">
-              Showing in {initialColor} — pick a color below to preview.
-            </p>
-          )}
           {/* Inside-collar detail: mini mockup of the actual stamp the buyer
               will find inside the neck. Uses a mono type to mimic the stamped
               look, with a clear "sample" caption so no one expects #0007. */}
@@ -631,21 +464,12 @@ function ShirtCard({ shirt, reversed, initialColor }: { shirt: Shirt; reversed: 
         <div className="flex-1 w-full">
           {/* Desktop title — hidden on mobile where it appears above the mockups */}
           <div className="hidden md:block">
-            <div className="flex items-center gap-3 mb-2">
-              {shirt.badge && (
-                <span className="text-xs font-bold uppercase tracking-wider px-2.5 py-1 bg-[#D4A843]/10 text-[#D4A843] border border-[#D4A843]/20">
-                  {shirt.badge}
-                </span>
-              )}
-              <span className="text-xs text-[#aaa] uppercase tracking-wider">Available in 4 colors</span>
-            </div>
             <h2
               className="text-3xl md:text-4xl text-[#0d0d0d] mb-1"
               style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
             >
               {shirt.name}
             </h2>
-            <p className="text-sm text-[#777] italic mb-4">{shirt.tagline}</p>
           </div>
           <p
             className="text-2xl text-[#D4A843] mb-4"
@@ -665,32 +489,11 @@ function ShirtCard({ shirt, reversed, initialColor }: { shirt: Shirt; reversed: 
               <span className="text-[11px] text-[#888] uppercase tracking-[0.15em] font-semibold">Unisex fit</span>
             </div>
 
-            {/* Color selector */}
-            <div className="flex items-baseline justify-between mb-2">
+            {/* Color is fixed per shirt — no picker. Show the colorway label
+                so the user is clear what they're buying. */}
+            <div className="flex items-baseline justify-between mb-5">
               <p className="text-xs text-[#999] uppercase tracking-wider font-bold">Color</p>
-              {selectedColor && (
-                <p className="text-xs text-[#666]">{selectedColor}</p>
-              )}
-            </div>
-            <div className="flex gap-2.5 mb-5">
-              {COLORS.map((name) => {
-                const theme = THEMES[name];
-                const active = selectedColor === name;
-                return (
-                  <button
-                    key={name}
-                    onClick={() => { setSelectedColor(name); setError(null); }}
-                    aria-label={name}
-                    title={name}
-                    className={`w-9 h-9 rounded-full border transition-all cursor-pointer ${
-                      active
-                        ? 'border-[#0d0d0d] ring-2 ring-offset-2 ring-[#0d0d0d]'
-                        : 'border-[#ddd] hover:border-[#999]'
-                    }`}
-                    style={{ backgroundColor: theme.swatch }}
-                  />
-                );
-              })}
+              <p className="text-xs text-[#666]">{shirt.color}</p>
             </div>
 
             {/* Size selector */}
@@ -817,11 +620,9 @@ function RefCapture() {
 }
 
 export default function ShirtsPageContent() {
-  // Shuffle order and preview colors once on mount so every visitor sees
-  // a different arrangement. Prevents any design from being permanently
-  // buried and makes the page feel like a real collection.
+  // Shuffle order so every visitor sees a different arrangement — keeps any
+  // one colorway from being permanently buried at the bottom of the page.
   const [shirts] = useState(() => shuffle(SHIRTS_SOURCE));
-  const [previewColors] = useState(() => assignPreviewColors(SHIRTS_SOURCE.length));
 
   return (
     <CartProvider>
@@ -841,7 +642,7 @@ export default function ShirtsPageContent() {
           </h1>
           <p className="text-lg text-[#777] max-w-xl mx-auto leading-relaxed">
             Heavyweight blanks in four colors. Screen-printed, handmade to order.
-            Each design carries a different part of the story.
+            Each one carries a different child&apos;s number.
           </p>
         </div>
       </section>
@@ -850,7 +651,7 @@ export default function ShirtsPageContent() {
       <section className="px-5 pb-24">
         <div className="max-w-6xl mx-auto space-y-16 md:space-y-28">
           {shirts.map((shirt, i) => (
-            <ShirtCard key={shirt.id} shirt={shirt} reversed={i % 2 !== 0} initialColor={previewColors[i]} />
+            <ShirtCard key={shirt.id} shirt={shirt} reversed={i % 2 !== 0} />
           ))}
         </div>
       </section>

@@ -14,18 +14,18 @@ async function getStripe() {
 }
 
 const SHIRTS: Record<string, { name: string }> = {
-  flagship: { name: 'The Flagship' },
-  'do-not-fear': { name: 'Do Not Fear.' },
-  peacemaker: { name: 'Peacemaker.' },
-  'everything-hallelujah': { name: 'Everything Hallelujah.' },
+  onyx: { name: 'Onyx' },
+  meadow: { name: 'Meadow' },
+  blossom: { name: 'Blossom' },
+  sky: { name: 'Sky' },
 };
 
 const SHIRT_PRICE = 25;
 
 const cartItemSchema = z.object({
-  shirtId: z.enum(['flagship', 'do-not-fear', 'peacemaker', 'everything-hallelujah']),
+  shirtId: z.enum(['onyx', 'meadow', 'blossom', 'sky']),
   size: z.enum(['S', 'M', 'L', 'XL', '2XL']),
-  color: z.enum(['Black', 'Grey', 'Pink', 'Yellow']),
+  color: z.enum(['Onyx', 'Meadow', 'Blossom', 'Sky']),
   continueMonthly: z.boolean().optional().default(false),
 });
 
@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
         price_data: {
           currency: 'usd',
           product_data: {
-            name: `${shirt.name} / ${item.color} / ${item.size}${monthlyLabel}`,
+            name: `${shirt.name} tee · ${item.size}${monthlyLabel}`,
             description: item.continueMonthly
               ? '$25 gets you the shirt and starts your matched child’s year at the campus. Monthly sponsorship ($25/mo) starts in 30 days.'
               : 'Be A Number heavyweight tee. Your shirt number connects you to a real child.',
