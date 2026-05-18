@@ -898,10 +898,10 @@ async function sendShirtConfirmationEmail(orderData: {
   // their child is.
   const revealBlock = orderData.isPortalRepeat
     ? `
-              <p>This one ships stamped with <strong>#${orderData.shirtNumber || ''}</strong> on the inside collar &mdash; the same number you already know, matched to ${orderData.childDisplayName || 'your child'}. Free shipping, no new sponsorship started, your monthly is unchanged.</p>
+              <p>This one ships with <strong>#${orderData.shirtNumber || ''}</strong> pressed on the back &mdash; the same number you already know, matched to ${orderData.childDisplayName || 'your child'}. Free shipping, no new sponsorship started, your monthly is unchanged.</p>
     `
     : `
-              <p>When it arrives, look at the inside of the collar. There&rsquo;s a number on it, and that number belongs to a real child in Northern Uganda. Go to <a href="${siteUrl}" style="color: #D4A843; font-weight: bold;">beanumber.org</a>, enter your number, and meet them &mdash; their name, their face, their story. Your $25 today gets you the shirt and starts their year at the campus.</p>
+              <p>When it arrives, look at the back of the shirt. There&rsquo;s a number pressed below the main design, and that number belongs to a real child in Northern Uganda. Go to <a href="${siteUrl}" style="color: #D4A843; font-weight: bold;">beanumber.org</a>, enter your number, and meet them &mdash; their name, their face, their story. Your $25 today gets you the shirt and starts their year at the campus.</p>
     `;
 
   // Monthly sponsorship confirmation + sponsor code block. Only rendered
@@ -2645,7 +2645,7 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
             address: address || null,
             childName: childDisplayName,
             orderDate: donationDate,
-            notes: `Portal reorder — sponsor ${sponsorCode} reordering with their existing #${existingShirtNumber}. Press with that number on the inside collar (do NOT assign a new number).`,
+            notes: `Portal reorder — sponsor ${sponsorCode} reordering with their existing #${existingShirtNumber}. Press that number on the back of the shirt below the main design (do NOT assign a new number).`,
           });
         } catch (err: any) {
           console.error('[WH] Fulfillment record failed (portal-repeat):', String(err?.message || err).slice(0, 200));

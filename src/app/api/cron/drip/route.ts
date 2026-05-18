@@ -181,10 +181,10 @@ function shirtNurtureEmail(
           <p style="margin-top: 0;">Hey ${firstName},</p>
           ${multi
             ? `<p>You ordered ${numbers.length} shirts, and I wanted to check if they made it. I make each one by hand (screen press, ink, the whole thing), so they were all made specifically for you.</p>
-               <p>Each shirt has a different number inside the collar, and each number belongs to a different child at our campus in Northern Uganda. You have ${numbers.length} kids waiting to meet you. Go to <a href="${SITE_URL}" style="color: #D4A843; font-weight: bold;">beanumber.org</a>, enter each number one at a time, and meet them all.</p>
+               <p>Each shirt has a different number on the back, and each number belongs to a different child at our campus in Northern Uganda. You have ${numbers.length} kids waiting to meet you. Go to <a href="${SITE_URL}" style="color: #D4A843; font-weight: bold;">beanumber.org</a>, enter each number one at a time, and meet them all.</p>
                <p>Your numbers are: <strong>${numbers.map(n => '#' + n).join(', ')}</strong></p>`
             : `<p>I wanted to check in and see if your shirt made it. I make each one by hand (screen press, ink, the whole thing), so it was made specifically for you.</p>
-               <p>When you get it, look inside the collar. There&rsquo;s a number printed there, and that number belongs to a real child at our campus in Northern Uganda. Go to <a href="${SITE_URL}" style="color: #D4A843; font-weight: bold;">beanumber.org</a>, enter the number, and meet them.</p>`
+               <p>When you get it, look at the back. There&rsquo;s a number pressed below the main design, and that number belongs to a real child at our campus in Northern Uganda. Go to <a href="${SITE_URL}" style="color: #D4A843; font-weight: bold;">beanumber.org</a>, enter the number, and meet them.</p>`
           }
           <p style="text-align: center; margin: 24px 0;">
             <a href="${SITE_URL}" style="display: inline-block; background: #D4A843; color: #0d0d0d; font-weight: bold; text-decoration: none; padding: 14px 32px; font-size: 15px; letter-spacing: 0.05em;">ENTER YOUR ${multi ? 'NUMBERS' : 'NUMBER'}</a>
@@ -207,7 +207,7 @@ function shirtNurtureEmail(
                  ${multiChildBlock(numbers, names)}
                </div>
                <p>Tap any number to meet that child.</p>`
-            : `<p>If you&rsquo;ve had a chance to check the number inside your collar, you already know who your shirt is connected to. If not, no rush at all, but when you&rsquo;re ready:</p>
+            : `<p>If you&rsquo;ve had a chance to check the number on the back of your shirt, you already know who your shirt is connected to. If not, no rush at all, but when you&rsquo;re ready:</p>
                <p style="text-align: center; margin: 24px 0;">
                  <a href="${SITE_URL}" style="display: inline-block; background: #D4A843; color: #0d0d0d; font-weight: bold; text-decoration: none; padding: 14px 32px; font-size: 15px; letter-spacing: 0.05em;">ENTER YOUR NUMBER</a>
                </p>`
@@ -433,9 +433,9 @@ function shirtSponsorEmail(
           <p style="margin-top: 0;">Hey ${firstName},</p>
           ${multi
             ? `<p>Your ${numbers.length} shirts are being made right now. I screen-print every one by hand, and yours will ship within the next few days.</p>
-               <p>When they arrive, check the tag inside each collar. Every shirt has a different number, and every number belongs to a different child at our campus in Northern Uganda. You&rsquo;ll come back to the site, enter each number, and meet them all by name.</p>`
+               <p>When they arrive, check the back of each one. Every shirt has a different number pressed below the main design, and every number belongs to a different child at our campus in Northern Uganda. You&rsquo;ll come back to the site, enter each number, and meet them all by name.</p>`
             : `<p>Your shirt is being made right now. I screen-print every one by hand, and yours will ship within the next few days.</p>
-               <p>When it arrives, check the tag inside the collar. There&rsquo;s a number on it, and that number belongs to a real child at our campus in Northern Uganda. You&rsquo;ll come back to the site, enter the number, and meet them by name.</p>`
+               <p>When it arrives, check the back of the shirt. There&rsquo;s a number pressed below the main design, and that number belongs to a real child at our campus in Northern Uganda. You&rsquo;ll come back to the site, enter the number, and meet them by name.</p>`
           }
           <p>You also signed up for monthly sponsorship, which means your $25 a month is already at work. It supports school fees, two meals a day, and medical care at the campus, and that started the day you signed up. You&rsquo;re a sponsor right now, even before the ${multi ? 'shirts arrive' : 'shirt arrives'}.</p>
           <p>Once you&rsquo;ve gotten your ${multi ? 'shirts' : 'shirt'} and had that moment where you meet ${multi ? 'the kids' : 'your child'}, I&rsquo;ll follow up with your sponsor portal access so you can see updates, photos, and write to them directly. I want you to have the ${multi ? 'shirts' : 'shirt'} in hand first.</p>
@@ -456,7 +456,7 @@ function shirtSponsorEmail(
         html: wrapEmail(`
           <p style="margin-top: 0;">Hey ${firstName},</p>
           ${multi
-            ? `<p>Your shirts should be there by now. Each one has a different number inside the collar, and each number belongs to a different child at the campus.</p>
+            ? `<p>Your shirts should be there by now. Each one has a different number pressed on the back, and each number belongs to a different child at the campus.</p>
                <div style="background: #FFF8F0; border: 1px solid #e8e0d4; padding: 16px 20px; margin: 16px 0;">
                  ${multiChildBlock(numbers, names)}
                </div>
@@ -464,7 +464,7 @@ function shirtSponsorEmail(
             : `<p>Your shirt should be there by now, and if it is, you&rsquo;ve seen the number.</p>
                ${firstName_
                  ? `<p>That number belongs to <strong>${firstName_}</strong>. <a href="${childUrl}" style="color: #D4A843; font-weight: bold;">Here&rsquo;s their page.</a> This is the child your sponsorship is covering, and the one you&rsquo;ll be connected to from here on out.</p>`
-                 : `<p>The number inside the collar belongs to a real child at our campus. Enter it at <a href="${SITE_URL}" style="color: #D4A843; font-weight: bold;">beanumber.org</a> to meet them. That&rsquo;s the child your sponsorship is covering.</p>`
+                 : `<p>The number on the back of the shirt belongs to a real child at our campus. Enter it at <a href="${SITE_URL}" style="color: #D4A843; font-weight: bold;">beanumber.org</a> to meet them. That&rsquo;s the child your sponsorship is supporting.</p>`
                }`
           }
           <p>Here&rsquo;s your sponsor portal. This is where updates, photos, and letters will show up over the coming months:</p>

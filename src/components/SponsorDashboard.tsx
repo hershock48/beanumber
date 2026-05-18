@@ -355,7 +355,7 @@ function ShopYourNumberSection({
         Reorder with your number.
       </h3>
       <p className="text-sm text-[#666] leading-relaxed mb-5 max-w-prose">
-        Every shirt you order from here ships stamped with #{shirtNumber} on the inside collar &mdash;
+        Every shirt you order from here ships with #{shirtNumber} pressed on the back &mdash;
         the same number as your original, matched to {childFirstName}. Free shipping.
       </p>
 

@@ -57,36 +57,56 @@ type DesignProps = {
 /* ── Tee silhouette ─────────────────────────────────────────── */
 
 /**
- * SVG outline of a crew-neck tee. Used as the primary preview so buyers see
- * the design *on a shirt* rather than floating inside a rectangle. The
- * viewBox is 300 × 380 and children are placed in absolute % coords that
- * map onto the body region (roughly x ∈ [24%, 76%], y ∈ [18%, 92%]).
+ * SVG outline of a crew-neck tee. Path geometry lifted from the 2026
+ * production mockup (340×400 canvas) so the silhouette on /shirts
+ * matches what Kevin's been showing partners in the mockup HTML —
+ * realistic shoulders, curved sleeves, proportioned body. Children
+ * are placed in absolute % coords that map onto the body region.
  */
 function TeeOutline({ theme, side }: { theme: ShirtTheme; side: 'front' | 'back' }) {
-  // Deeper neckline on the front; subtle dip on the back.
-  const neckCurve = side === 'front' ? 'Q 150 72 175 28' : 'Q 150 42 175 28';
-  const path = `M 60 28 L 125 28 ${neckCurve} L 240 28 L 272 84 L 258 104 L 232 96 L 232 352 L 68 352 L 68 96 L 42 104 L 28 84 Z`;
+  // Production body path — same shape on both sides; only the neckline
+  // depth differs (front shows a wider crew opening, back is a smaller
+  // dip).
+  const bodyPath = `
+M 135 42
+C 150 34 190 34 205 42
+C 224 47 248 55 268 64
+C 286 72 302 78 312 84
+C 318 88 320 96 316 104
+C 311 116 304 130 295 142
+C 289 150 280 152 272 148
+C 269 165 268 200 268 365
+C 250 372 90 372 72 365
+C 72 200 71 165 68 148
+C 60 152 51 150 45 142
+C 36 130 29 116 24 104
+C 20 96 22 88 28 84
+C 38 78 54 72 72 64
+C 92 55 116 47 135 42 Z`;
+  const neckPath = side === 'front'
+    ? 'M 138 44 C 152 36 188 36 202 44 C 210 50 210 64 200 70 C 184 73 156 73 140 70 C 130 64 130 50 138 44 Z'
+    : 'M 140 46 C 154 40 186 40 200 46 C 208 50 208 58 200 62 C 184 65 156 65 140 62 C 132 58 132 50 140 46 Z';
 
   return (
     <svg
-      viewBox="0 0 300 380"
+      viewBox="0 0 340 400"
       className="absolute inset-0 w-full h-full"
       preserveAspectRatio="xMidYMid meet"
-      style={{ filter: 'drop-shadow(0 2px 3px rgba(0,0,0,0.08))' }}
+      style={{ filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.08))' }}
       aria-hidden
     >
-      <path d={path} fill={theme.shirt} />
-      {/* Subtle seam suggestion along the neckline for definition. */}
-      <path
-        d={
-          side === 'front'
-            ? 'M 127 30 Q 150 66 173 30'
-            : 'M 128 30 Q 150 40 172 30'
-        }
-        fill="none"
-        stroke={theme.muted}
-        strokeWidth={1}
-      />
+      {/* Soft ground shadow under the shirt — sells the floating-on-table feel. */}
+      <ellipse cx="170" cy="380" rx="130" ry="6" fill="rgba(0,0,0,0.06)" />
+      {/* Body */}
+      <path d={bodyPath} fill={theme.shirt} />
+      {/* Neckline opening — translucent darker than body so it reads as
+          the inside of the collar on any colorway. */}
+      <path d={neckPath} fill="rgba(0,0,0,0.18)" />
+      {/* Sleeve cuff suggestion (left + right). */}
+      <path d="M 45 138 C 55 144 65 146 70 144" stroke="rgba(0,0,0,0.25)" strokeWidth={1.2} fill="none" />
+      <path d="M 295 138 C 285 144 275 146 270 144" stroke="rgba(0,0,0,0.25)" strokeWidth={1.2} fill="none" />
+      {/* Outline */}
+      <path d={bodyPath} fill="none" stroke="rgba(0,0,0,0.3)" strokeWidth={1} />
     </svg>
   );
 }
@@ -399,11 +419,9 @@ function ShirtCard({ shirt, reversed }: { shirt: Shirt; reversed: boolean }) {
             <PreviewMockup Design={Front} theme={previewTheme} label="Front" />
             <PreviewMockup Design={Back} theme={previewTheme} label="Back" />
           </div>
-          {/* Inside-collar detail: mini mockup of the actual stamp the buyer
-              will find inside the neck. Uses a mono type to mimic the stamped
-              look, with a clear "sample" caption so no one expects #0007. */}
+          {/* Back-print detail: mini mockup of the order-number stamp that
+              gets heat-pressed on the back below the main design. */}
           <div className="mt-3 sm:mt-5 bg-white border border-dashed border-[#e8e0d4] px-3 sm:px-5 py-3 sm:py-4 flex items-center gap-3 sm:gap-5">
-            {/* Stamp mockup — centered inside a faux collar tape. */}
             <div
               className="flex-none bg-[#faf6ee] border border-[#e8e0d4] px-3 py-2 text-center"
               style={{
@@ -422,11 +440,11 @@ function ShirtCard({ shirt, reversed }: { shirt: Shirt; reversed: boolean }) {
             </div>
             <div className="text-xs text-[#777] leading-snug">
               <p className="font-semibold text-[#555] mb-0.5">
-                Stamped on the inside collar.
+                Pressed on the back, below the main design.
               </p>
               <p className="text-[#999]">
-                Sample shown — your number is assigned at checkout and printed
-                inside the neck, like a numbered edition.
+                Sample shown &mdash; your real number is assigned at checkout
+                and heat-pressed by hand at fulfillment.
               </p>
             </div>
           </div>
@@ -610,11 +628,15 @@ export default function ShirtsPageContent() {
             className="text-4xl md:text-5xl lg:text-6xl text-[#0d0d0d] mb-6 leading-tight"
             style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
           >
-            One shirt.<br />Four colors.
+            Pick a color.<br />
+            Get a number.<br />
+            Meet a child.
           </h1>
           <p className="text-lg text-[#777] max-w-xl mx-auto leading-relaxed">
-            Heavyweight blanks, screen-printed, handmade to order.
-            Each one carries a different child&apos;s number.
+            Heavyweight cotton, screen-printed, handmade to order. Every
+            shirt ships with a unique number pressed on the back &mdash;
+            and that number is matched to a real child at the YDO campus
+            in Northern Uganda.
           </p>
         </div>
       </section>

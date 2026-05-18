@@ -203,7 +203,7 @@ export async function POST(request: NextRequest) {
             currency: 'usd',
             product_data: {
               name: `${shirt.name} tee · ${size} — Sponsor reorder #${shirtNumber}`,
-              description: `Repeat order for ${sponsorName || 'an active sponsor'}. Ships with #${shirtNumber} stamped on the inside collar — the same number as the original shirt.`,
+              description: `Repeat order for ${sponsorName || 'an active sponsor'}. Ships with #${shirtNumber} pressed on the back of the shirt — the same number as the original.`,
             },
             unit_amount: SHIRT_PRICE * 100,
           },

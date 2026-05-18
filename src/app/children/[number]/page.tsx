@@ -390,7 +390,7 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
               How the number works
             </h2>
             <p className="text-[#666] leading-relaxed mb-4">
-              Every Be A Number shirt has a unique number stamped on the inside collar.
+              Every Be A Number shirt has a unique number pressed on the back.
               That number belongs to a real child at our campus in Omoro District, Northern Uganda.
               When you enter it here, you meet them &mdash; their name, their face, their story.
             </p>
