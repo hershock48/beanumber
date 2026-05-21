@@ -8,6 +8,7 @@ import { RevealBeacon } from './RevealBeacon';
 import { RevealOverlay } from './RevealOverlay';
 import { SponsorButton } from './SponsorButton';
 import { NewsletterSignup } from './NewsletterSignup';
+import { ClaimMatchCard } from './ClaimMatchCard';
 import { SESSION } from '@/lib/constants';
 
 // Never statically optimize or cache this page. Sponsorship status and child
@@ -90,17 +91,31 @@ async function getBuyerSessionId(): Promise<string | null> {
   }
 }
 
-/** Given a buyer-session cookie value and the current child's record ID,
- *  resolve the buyer's Stripe Customer ID and email — but only if the
- *  cookie's Donation was matched to THIS child. The child check is the
- *  security gate: without it, anyone who happened to have an old cookie
- *  for shirt #42 could autofill checkout for whichever /[number] they
- *  visit. The check ensures we only one-tap-prefill the buyer on their
- *  own matched child's page. */
-async function lookupBuyerSessionMatch(
-  sessionId: string,
-  childRecordId: string
-): Promise<{ customerId: string | null; email: string | null } | null> {
+/**
+ * Resolve the visitor's buyer context from their `ban_buyer_session`
+ * cookie. Under the May 2026 stockpile model, buyer-side Donations no
+ * longer carry a Child link (the match isn't known at checkout), so
+ * we identify the buyer purely by their Stripe Checkout Session ID
+ * and pass that identity through to two downstream consumers:
+ *
+ *   1. The SponsorButton, which prefills checkout with the buyer's
+ *      saved payment method when they tap "sponsor this kid."
+ *   2. The ClaimMatchCard, which only renders for Shirt + Stay buyers
+ *      who haven't yet claimed any child — turning their first
+ *      /[number] visit into the match event.
+ *
+ * Returns null only when the cookie's Donation can't be resolved at
+ * all (most likely a forged or expired cookie). A real buyer with
+ * any donation source resolves successfully.
+ */
+async function resolveBuyerContext(
+  sessionId: string
+): Promise<{
+  customerId: string | null;
+  email: string | null;
+  donorRecordId: string | null;
+  isShirtMonthly: boolean;
+} | null> {
   if (!sessionId.startsWith('cs_')) return null;
   const donationsTable = process.env.AIRTABLE_DONATIONS_TABLE || 'Donations';
   try {
@@ -110,15 +125,45 @@ async function lookupBuyerSessionMatch(
     );
     if (!res.records.length) return null;
     const donation = res.records[0];
-    const linkedChildren: string[] = donation.fields?.Child || [];
-    if (!linkedChildren.includes(childRecordId)) return null;
+    const fields = donation.fields || {};
+    const donorLink: string[] = fields['Donor'] || [];
+    const source = (fields['Donation Source'] as string | undefined) || '';
+    const isRecurring = Boolean(fields['Recurring Donation']);
     return {
-      customerId: (donation.fields?.['Stripe Customer ID'] as string | undefined) || null,
-      email: (donation.fields?.['Donor Email at Donation'] as string | undefined) || null,
+      customerId: (fields['Stripe Customer ID'] as string | undefined) || null,
+      email: (fields['Donor Email at Donation'] as string | undefined) || null,
+      donorRecordId: donorLink[0] || null,
+      isShirtMonthly: source === 'Shirt + Monthly' && isRecurring,
     };
   } catch (err) {
-    console.warn('[children/page] Buyer session lookup failed', err);
+    console.warn('[children/page] Buyer context lookup failed', err);
     return null;
+  }
+}
+
+/**
+ * Returns true when this donor already has an Active Sponsorship in
+ * Airtable. We use this to suppress the ClaimMatchCard for buyers
+ * who've already claimed (or were manually sponsored by Kevin) — the
+ * card should only fire on the first /[number] visit by a brand-new
+ * Shirt + Stay buyer. Multi-child sponsorship is still supported via
+ * the normal sponsor button.
+ */
+async function donorHasActiveSponsorship(donorRecordId: string): Promise<boolean> {
+  const sponsorshipsTable = process.env.AIRTABLE_SPONSORSHIPS_TABLE || 'Sponsorships';
+  try {
+    const formula = encodeURIComponent(
+      `AND(FIND("${donorRecordId}", ARRAYJOIN({Donor}, ",")), {Status}="Active")`
+    );
+    const res = await airtableRequest<{ records: Array<{ id: string }> }>(
+      `/${encodeURIComponent(sponsorshipsTable)}?filterByFormula=${formula}&maxRecords=1`
+    );
+    return res.records.length > 0;
+  } catch (err) {
+    console.warn('[children/page] Donor sponsorship check failed', err);
+    // Fail closed: if we can't check, don't show the claim card —
+    // better to under-prompt than to let a second-claim race in.
+    return true;
   }
 }
 
@@ -506,18 +551,51 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
     child.teacher_quote
   );
 
-  // Memo §2 one-tap: if the visitor's browser has the ban_buyer_session
-  // cookie set on /shirts/success AND that cookie's Donation was matched
-  // to THIS child, surface the buyer's Stripe Customer ID + email to the
-  // SponsorButton so the sponsor checkout uses the saved card instead of
-  // a fresh entry. The child-match check is the security gate.
-  let buyerHint: { customerId: string | null; email: string | null } | null = null;
+  // Memo §2 one-tap + May 2026 stockpile model:
+  //
+  // Resolve the visitor's buyer identity from the ban_buyer_session
+  // cookie. Two consumers use this:
+  //
+  //   1. SponsorButton — prefills checkout with the buyer's saved
+  //      payment method so tapping "sponsor this kid" is one tap.
+  //   2. ClaimMatchCard — renders for Shirt + Stay buyers who haven't
+  //      yet claimed any child. Their first /[number] visit becomes
+  //      the match event: the page detects the unbound subscription,
+  //      a confirm card asks "is this your kid?", a tap creates the
+  //      Sponsorship + sponsor code and reloads the page in sponsor
+  //      mode.
+  //
+  // Under the stockpile model, Donations no longer have a Child link
+  // at checkout, so we no longer require buyer→child match in code.
+  // The match decision moves entirely to the buyer's explicit tap.
+  let buyerContext:
+    | Awaited<ReturnType<typeof resolveBuyerContext>>
+    | null = null;
+  let showClaimCard = false;
   if (!child.viewer_is_sponsor && child.record_id) {
     const buyerSessionId = await getBuyerSessionId();
     if (buyerSessionId) {
-      buyerHint = await lookupBuyerSessionMatch(buyerSessionId, child.record_id);
+      buyerContext = await resolveBuyerContext(buyerSessionId);
+      if (
+        buyerContext?.isShirtMonthly &&
+        buyerContext.donorRecordId &&
+        !(await donorHasActiveSponsorship(buyerContext.donorRecordId))
+      ) {
+        showClaimCard = true;
+      }
     }
   }
+  const buyerHint = buyerContext
+    ? { customerId: buyerContext.customerId, email: buyerContext.email }
+    : null;
+
+  // Treat any cookie-identified buyer as "has a shirt." Under the May
+  // 2026 stockpile model we no longer write ShirtAssignedAt to the
+  // Child record, so child.shirt_assigned is always false for new
+  // buyers. Falling back to buyerContext keeps the warm "Will you
+  // stay?" framing and the locked-merch teaser firing for buyers who
+  // came in via /shirts/success but aren't yet sponsors.
+  const viewerLooksLikeBuyer = child.shirt_assigned || Boolean(buyerContext);
 
   return (
     <div className="min-h-screen bg-[#FFF8F0]">
@@ -538,6 +616,21 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
           </svg>
           Back to home
         </Link>
+
+        {/* Stockpile model claim card. Renders when the visitor has a
+            ban_buyer_session cookie tied to a Shirt + Stay subscription
+            AND no Sponsorship is bound to that buyer yet. Tapping
+            "claim {firstName}" creates the Sponsorship server-side,
+            drops a sponsor_session cookie, and reloads the page in
+            authenticated sponsor mode. This is THE match event under
+            the new model — the buyer's first visit to /[number] for
+            the kid on the back of their shirt. */}
+        {showClaimCard && (
+          <ClaimMatchCard
+            shirtNumber={Number(number)}
+            firstName={firstName}
+          />
+        )}
 
         {/* Memo §11: gift recipient frame. Renders when the URL has
             ?gift=true (sent by the gift card email). Sets the emotional
@@ -728,7 +821,7 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
                   cold visitors get a slightly more cold-acquisition framing.
               ── */
               <div className="bg-white border-2 border-[#D4A843]/30 p-7">
-                {child.shirt_assigned ? (
+                {viewerLooksLikeBuyer ? (
                   <p
                     className="text-2xl text-[#0d0d0d] mb-4"
                     style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
@@ -772,7 +865,7 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
                   childId={child.child_id}
                   childDisplayName={displayName}
                   firstName={firstName}
-                  shirtAssigned={child.shirt_assigned}
+                  shirtAssigned={viewerLooksLikeBuyer}
                   existingCustomerId={buyerHint?.customerId || undefined}
                   buyerEmail={buyerHint?.email || undefined}
                 />
@@ -848,7 +941,7 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
               ))}
             </div>
           </div>
-        ) : child.shirt_assigned ? (
+        ) : viewerLooksLikeBuyer ? (
           <div className="mt-10 md:mt-16">
             <div className="relative">
               {/* Blurred product cards — visible but unreachable */}
@@ -887,7 +980,7 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
                     childId={child.child_id}
                     childDisplayName={displayName}
                     firstName={firstName}
-                    shirtAssigned={child.shirt_assigned}
+                    shirtAssigned={viewerLooksLikeBuyer}
                     existingCustomerId={buyerHint?.customerId || undefined}
                     buyerEmail={buyerHint?.email || undefined}
                   />
