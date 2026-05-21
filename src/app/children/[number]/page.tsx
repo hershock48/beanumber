@@ -11,6 +11,7 @@ import { NewsletterSignup } from './NewsletterSignup';
 import { ClaimMatchCard } from './ClaimMatchCard';
 import { MerchPurchaseTile } from './MerchPurchaseTile';
 import { SponsorPortalSections } from './SponsorPortalSections';
+import { SponsorRecoveryForm } from './SponsorRecoveryForm';
 import { SESSION } from '@/lib/constants';
 
 // Never statically optimize or cache this page. Sponsorship status and child
@@ -1032,6 +1033,11 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
                     childDisplayName={displayName}
                   />
                 </div>
+
+                {/* Magic-link recovery for sponsors who lost their cookie
+                    or are on a new device. Renders as a small collapsed
+                    prompt by default; expands into an email form on tap. */}
+                <SponsorRecoveryForm shirtNumber={Number(number)} />
               </div>
             )}
           </div>
