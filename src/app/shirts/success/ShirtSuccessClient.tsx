@@ -157,8 +157,8 @@ function ShippingConfirmation({
 
         <p className="text-lg text-[#555] leading-relaxed max-w-md mx-auto mb-4">
           {multi
-            ? <>Expect them within 5&ndash;7 business days. When they arrive, there&rsquo;s a number on each tag &mdash; every number belongs to a real child in Northern Uganda, and they&rsquo;re waiting to meet you.</>
-            : <>Expect it within 5&ndash;7 business days. When it arrives, there&rsquo;s a number on the tag &mdash; that number belongs to a real child in Northern Uganda, and they&rsquo;re waiting to meet you.</>}
+            ? <>Expect them within 5&ndash;7 business days. When they arrive, look at the back of each shirt &mdash; there&rsquo;s a number pressed below the main design, and every number belongs to a real child at the YDO campus in Northern Uganda.</>
+            : <>Expect it within 5&ndash;7 business days. When it arrives, look at the back of the shirt &mdash; there&rsquo;s a number pressed below the main design, and that number belongs to a real child at the YDO campus in Northern Uganda.</>}
         </p>
 
         <p className="text-[#777] leading-relaxed max-w-md mx-auto">
@@ -189,15 +189,15 @@ function ShippingConfirmation({
             Your monthly sponsorship is active.
           </h3>
           <p className="text-[#666] text-sm leading-relaxed mb-3">
-            Today&rsquo;s $25 got you the shirt and started their year at the campus.
-            Another $25 will be charged each month going forward, and it supports
-            the campus where the child your shirt is tied to goes to school, eats
-            meals, and gets medical care.
+            Another $25 will be charged each month going forward, and it
+            supports school, meals, and medical care at the YDO campus
+            in Northern Uganda.
           </p>
           <p className="text-[#666] text-sm leading-relaxed mb-3">
-            You&rsquo;ll get a <strong>sponsor code</strong> by email shortly
-            — that&rsquo;s your key to the sponsor portal, where updates,
-            photos, and letters will land over the coming months.
+            Once your shirt ships and you&rsquo;ve met the child on the
+            back, I&rsquo;ll send you a <strong>sponsor code</strong> for
+            the sponsor portal &mdash; that&rsquo;s where updates, photos,
+            and letters from that specific child will live going forward.
           </p>
           <p className="text-[#888] text-xs leading-relaxed">
             Cancel anytime from the sponsor portal, no questions asked.
@@ -223,7 +223,7 @@ function ShippingConfirmation({
             You&rsquo;ll get another email the day {multi ? 'they ship' : 'it ships'}, with tracking.
           </Step>
           <Step num="III">
-            When {multi ? 'your shirts arrive, look at the number on each tag' : 'your shirt arrives, look at the number on the tag'}. Go to
+            When {multi ? 'your shirts arrive, look at the back of each one' : 'your shirt arrives, look at the back'}. There&rsquo;s a number pressed below the main design. Go to
             {' '}<code className="text-[#666]">beanumber.org</code>, enter
             {multi ? ' each number' : ' your number'}, and meet the {multi ? 'children wearing them' : 'child wearing it'} with you.
           </Step>

@@ -166,11 +166,16 @@ function shirtNurtureEmail(
   const names = parseChildNames(childName);
   const multi = numbers.length > 1;
 
-  // For single-shirt, use direct URLs
+  // For single-shirt, use direct URLs. Under the May 2026 stockpile model
+  // a buyer may have no number recorded yet (assignment happens at unbox,
+  // not at checkout) — in that case childUrl/sponsorUrl fall back to the
+  // generic pages so the email is never sending people to broken URLs.
   const firstNumber = numbers[0];
   const firstName_ = names[0] || '';
-  const childUrl = `${SITE_URL}/children/${firstNumber}`;
-  const sponsorUrl = `${SITE_URL}/api/sponsor-checkout?number=${firstNumber}`;
+  const childUrl = firstNumber ? `${SITE_URL}/children/${firstNumber}` : SITE_URL;
+  const sponsorUrl = firstNumber
+    ? `${SITE_URL}/api/sponsor-checkout?number=${firstNumber}`
+    : `${SITE_URL}/sponsorship`;
 
   switch (stage) {
     // ── Email 1: Did it arrive? (Day ~10) ───────────────────────────────
@@ -419,9 +424,14 @@ function shirtSponsorEmail(
   const names = parseChildNames(childName);
   const multi = numbers.length > 1;
 
+  // Under the May 2026 stockpile model, Shirt + Stay buyers no longer have
+  // a child/number bound at checkout — the match happens when they visit
+  // /[number] after their shirt arrives, and the page auto-creates their
+  // Sponsorship + sponsor code on the spot. Fall back to homepage links
+  // so templates never link to /children/undefined.
   const firstNumber = numbers[0];
   const firstName_ = names[0] || '';
-  const childUrl = `${SITE_URL}/children/${firstNumber}`;
+  const childUrl = firstNumber ? `${SITE_URL}/children/${firstNumber}` : SITE_URL;
   const portalUrl = `${SITE_URL}/sponsor/login`;
 
   switch (stage) {
@@ -443,13 +453,33 @@ function shirtSponsorEmail(
         `),
       };
 
-    // ── Email 2: Reveal + portal access + sponsor code (Day ~15) ─────────
+    // ── Email 2: Meet the kid + how to get into the sponsor view (Day ~15) ──
+    //
+    // Under the May 2026 stockpile model, the buyer doesn't have a sponsor
+    // code yet at this point. When they enter their shirt number on the
+    // site, /[number] auto-creates their Sponsorship and unlocks the
+    // sponsor view inline. So this email's job is to push them to that
+    // visit, not hand them a separate code + portal URL. The legacy
+    // sponsor-code path is preserved for existing sponsors who already
+    // have a code in the system.
     case 1: {
       const subjectLine = multi
         ? `Meet your ${numbers.length} kids`
         : firstName_
           ? `Meet ${firstName_}`
-          : "Did your shirt arrive?";
+          : "Have you met your child yet?";
+
+      // Body shape depends on whether the buyer has already visited
+      // /[number] after their shirt arrived (in which case sponsorCode
+      // exists and is now their persistent portal key) or hasn't yet
+      // (sponsorCode is null and we point them at the number-entry path).
+      const codeBlock = sponsorCode
+        ? `<p>Your sponsor view is ready when you are. Use this code if you ever need to log in from another device:</p>
+           <div style="background: #FFF8F0; border: 1px solid #e8e0d4; padding: 16px 20px; margin: 16px 0; text-align: center;">
+             <p style="color: #999; font-size: 13px; margin: 0 0 4px 0;">Your sponsor code</p>
+             <p style="font-size: 22px; color: #0d0d0d; margin: 0; font-weight: bold; letter-spacing: 0.1em; font-family: monospace;">${sponsorCode}</p>
+           </div>`
+        : `<p>When you flip your shirt over and enter the number on the back at <a href="${SITE_URL}" style="color: #D4A843; font-weight: bold;">beanumber.org</a>, your sponsor view unlocks right on that page &mdash; updates, photos, the whole thing &mdash; no separate login to remember.</p>`;
 
       return {
         subject: subjectLine,
@@ -460,25 +490,16 @@ function shirtSponsorEmail(
                <div style="background: #FFF8F0; border: 1px solid #e8e0d4; padding: 16px 20px; margin: 16px 0;">
                  ${multiChildBlock(numbers, names)}
                </div>
-               <p>Your sponsorship is already covering school fees, meals, and medical care for the children at the campus. These are the kids connected to your shirts.</p>`
-            : `<p>Your shirt should be there by now, and if it is, you&rsquo;ve seen the number.</p>
-               ${firstName_
-                 ? `<p>That number belongs to <strong>${firstName_}</strong>. <a href="${childUrl}" style="color: #D4A843; font-weight: bold;">Here&rsquo;s their page.</a> This is the child your sponsorship is covering, and the one you&rsquo;ll be connected to from here on out.</p>`
-                 : `<p>The number on the back of the shirt belongs to a real child at our campus. Enter it at <a href="${SITE_URL}" style="color: #D4A843; font-weight: bold;">beanumber.org</a> to meet them. That&rsquo;s the child your sponsorship is supporting.</p>`
-               }`
+               <p>Your sponsorship is already supporting school fees, meals, and medical care for the children at the campus. These are the kids connected to your shirts.</p>`
+            : firstName_
+              ? `<p>Your shirt should be there by now, and if it is, you&rsquo;ve seen the number.</p>
+                 <p>That number belongs to <strong>${firstName_}</strong>. <a href="${childUrl}" style="color: #D4A843; font-weight: bold;">Here&rsquo;s their page.</a> This is the child your sponsorship is supporting.</p>`
+              : `<p>Your shirt should be there by now, and if it is, you&rsquo;ve seen the number on the back. That number is your kid. Enter it on the site to meet them.</p>
+                 <p style="text-align: center; margin: 24px 0;">
+                   <a href="${SITE_URL}" style="display: inline-block; background: #D4A843; color: #0d0d0d; font-weight: bold; text-decoration: none; padding: 14px 32px; font-size: 15px; letter-spacing: 0.05em;">ENTER YOUR NUMBER</a>
+                 </p>`
           }
-          <p>Here&rsquo;s your sponsor portal. This is where updates, photos, and letters will show up over the coming months:</p>
-          ${sponsorCode
-            ? `<div style="background: #FFF8F0; border: 1px solid #e8e0d4; padding: 16px 20px; margin: 16px 0; text-align: center;">
-                <p style="color: #999; font-size: 13px; margin: 0 0 4px 0;">Your sponsor code</p>
-                <p style="font-size: 22px; color: #0d0d0d; margin: 0; font-weight: bold; letter-spacing: 0.1em; font-family: monospace;">${sponsorCode}</p>
-              </div>`
-            : `<p style="color: #666; font-size: 14px;">(I wasn&rsquo;t able to pull your sponsor code automatically. Reply to this email and I&rsquo;ll get it to you right away.)</p>`
-          }
-          <p style="text-align: center; margin: 24px 0;">
-            <a href="${portalUrl}" style="display: inline-block; background: #D4A843; color: #0d0d0d; font-weight: bold; text-decoration: none; padding: 14px 32px; font-size: 15px; letter-spacing: 0.05em;">LOG IN TO YOUR PORTAL</a>
-          </p>
-          <p>You can write to ${multi ? 'your kids' : (firstName_ || 'your child')} through the portal or by replying to this email. The YDO team on the ground handles delivery and translation.</p>
+          ${codeBlock}
           <p>Kevin</p>
         `),
       };

@@ -443,8 +443,8 @@ function ShirtCard({ shirt, reversed }: { shirt: Shirt; reversed: boolean }) {
                 Pressed on the back, below the main design.
               </p>
               <p className="text-[#999]">
-                Sample shown &mdash; your real number is assigned at checkout
-                and heat-pressed by hand at fulfillment.
+                Sample shown &mdash; every shirt ships with a unique
+                number on the back. You meet the child when it arrives.
               </p>
             </div>
           </div>
@@ -510,12 +510,14 @@ function ShirtCard({ shirt, reversed }: { shirt: Shirt; reversed: boolean }) {
 
             {/* Memo §1: active-choice pattern. Two side-by-side buttons of
                 deliberately unequal visual weight. Primary path is "Shirt +
-                Stay" (filled, larger). Secondary is shirt-only (outlined,
-                smaller). Replaces the opt-in toggle + single CTA, which
-                implied continuation in its unchecked default state without
-                naming it. The explainer block above the buttons keeps the
-                "what does staying actually mean" context that the old card
-                was carrying — but as visible context, not a toggle. */}
+                Stay" (filled, larger) — this is the highest-converting
+                sponsor acquisition path BAN has. Secondary is shirt-only
+                (outlined, smaller). The "Stay in their life" explainer
+                names what staying actually means so the choice isn't
+                opaque. Under the May 2026 stockpile model the subscription
+                activates immediately at checkout but the Sponsorship
+                record + sponsor code are issued after the shirt ships and
+                Kevin records which number went out. */}
             <div className="mb-4 p-4 sm:p-5 border border-[#e8e0d4] bg-[#FFF8F0]">
               <div className="flex items-baseline justify-between gap-3 mb-1">
                 <p
@@ -684,7 +686,7 @@ export default function ShirtsPageContent() {
             {[
               {
                 q: 'What actually happens when I buy a shirt?',
-                a: 'Your order number becomes your shirt number, and that number belongs to a real child enrolled in our program in Northern Uganda. When your shirt arrives, you\'ll come back to the site, enter your number, and meet them: their name, their face, their story. $25 starts their year at the YDO campus \u2014 school, meals, medical care. $25/month finishes it and keeps you in their story all year: a monthly campus newsletter, photos of your matched child through the year, a handwritten letter from them, and a year-end report card.',
+                a: 'You pick your color and size, and we ship you a hand-printed shirt with a unique number pressed on the back. That number belongs to a real child enrolled in our program in Northern Uganda. When the shirt arrives, you flip it over, read your number off the back, come back to the site, enter it, and meet them: their name, their face, their story. $25 supports school, meals, and medical care at the YDO campus. $25/month keeps you in their story all year: a monthly campus newsletter, photos of your matched child, a handwritten letter from them, and a year-end report card.',
               },
               {
                 q: 'Where does the $25 actually go?',

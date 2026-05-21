@@ -177,7 +177,11 @@ function vinylColorForShirt(shirtColor: string): string {
 // Creates one Fulfillment record per shirt in Airtable. Non-fatal — if this
 // fails the order still succeeds. Called from all three shirt flows.
 async function createFulfillmentRecord(opts: {
-  shirtNumber: number;
+  // Stockpile model (May 2026 forward): shirts ship from pre-printed stock,
+  // so the order # / matched child are no longer known at purchase time.
+  // Kevin grabs a shirt that matches color+size from the pile, then
+  // reconciles the number into the Fulfillment row when shipping.
+  shirtNumber?: number | null;     // optional under stockpile model
   design: string;        // 2026 lineup: always "Number Tee" — must match singleSelect
   shirtColor: string;    // e.g. "Black" — must match singleSelect
   shirtSize: string;     // e.g. "L" — must match singleSelect
@@ -190,7 +194,7 @@ async function createFulfillmentRecord(opts: {
     state?: string;
     postal_code?: string;
   } | null;
-  childName: string;     // display name for Child Name field
+  childName?: string | null;       // optional under stockpile model
   orderDate: string;     // ISO date string
   notes?: string;
 }): Promise<void> {
@@ -203,7 +207,6 @@ async function createFulfillmentRecord(opts: {
   const vinylBack = vinylColorForShirt(opts.shirtColor);
 
   const fields: Record<string, unknown> = {
-    'fldsUZIXLFesyzg8u': opts.shirtNumber,       // Order #
     'fldsWHbE3yq7Xoyn4': opts.design,            // Design
     'fldaVW0nkpBjz0Gm7': opts.shirtColor,        // Shirt Color
     'fldicYGUVXRbCP4ze': opts.shirtSize,          // Size
@@ -211,11 +214,20 @@ async function createFulfillmentRecord(opts: {
     'fldp3RObd3abl3O7w': vinylBack,               // Vinyl Back
     'fldbGofwASSXDYj9R': opts.buyerName,          // Buyer
     'fldUakXkAhW2hYLxL': opts.buyerEmail,         // Email
-    'fldkACkyAtFQCOPFL': opts.childName,          // Child Name
     'fldnXiHlwBtEWP3io': opts.orderDate,          // Order Date
     'fldbBZtOLYVVDS28X': 'Pending',               // Production
     'fldJ6ehpDkpindHtO': 'Not Shipped',            // Shipping
   };
+
+  // Order # and Child Name are only written when the assignment is known
+  // (portal repeats, gift sponsorships). For initial purchases under the
+  // stockpile model, both stay blank until Kevin records what shipped.
+  if (typeof opts.shirtNumber === 'number' && !Number.isNaN(opts.shirtNumber)) {
+    fields['fldsUZIXLFesyzg8u'] = opts.shirtNumber;  // Order #
+  }
+  if (opts.childName) {
+    fields['fldkACkyAtFQCOPFL'] = opts.childName;    // Child Name
+  }
 
   // Address fields (only set if we have an address object)
   if (opts.address) {
@@ -248,7 +260,8 @@ async function createFulfillmentRecord(opts: {
     })
   );
 
-  console.log(`[WH] Fulfillment record created: #${opts.shirtNumber} ${opts.design} / ${opts.shirtColor} / ${opts.shirtSize}`);
+  const numLabel = typeof opts.shirtNumber === 'number' ? `#${opts.shirtNumber}` : '#TBD';
+  console.log(`[WH] Fulfillment record created: ${numLabel} ${opts.design} / ${opts.shirtColor} / ${opts.shirtSize}`);
 }
 
 // Find or create donor with deduplication
@@ -855,16 +868,22 @@ async function assignNextShirtChild(
 
 // Send shirt order confirmation email via SendGrid.
 //
-// IMPORTANT: this email intentionally does NOT name, show, or number the
-// assigned child. The entire point of Be A Number is that the buyer
-// discovers their match by opening the package and entering the number
-// printed on the shirt tag at beanumber.org. Spoiling it in an inbox
-// undermines the product. Internally we've already assigned the child and
-// the webhook has created the records; we just don't tell the buyer yet.
+// Under the May 2026 stockpile model, the buyer's specific number and
+// matched child are NOT known at purchase time — Kevin pulls a shirt
+// that matches the buyer's color+size from inventory and the number
+// on the back of that shirt is what the buyer ends up with. This email
+// reflects that: it does not name a child, does not show a number, and
+// instructs the buyer to look at the back of the shirt when it arrives,
+// then visit beanumber.org/[that number] to meet the child it belongs to.
 //
-// For shirt+monthly opt-in buyers, we fold the sponsor code into this
-// email (generic copy, no child name) rather than sending a second
-// sponsor-welcome email. One email, no spoiler, sponsor code delivered.
+// Portal repeat orders (active sponsors reordering with their existing
+// number) still know the number and child upfront — Kevin hand-prints
+// those. The isPortalRepeat branch handles that case.
+//
+// Shirt+monthly opt-in buyers get an "your monthly is active" block but
+// no sponsor code (none generated yet under the stockpile model). The
+// sponsor code + portal access activates once Kevin reconciles the
+// shipped number into Airtable.
 async function sendShirtConfirmationEmail(orderData: {
   email: string;
   name: string;
@@ -901,30 +920,22 @@ async function sendShirtConfirmationEmail(orderData: {
               <p>This one ships with <strong>#${orderData.shirtNumber || ''}</strong> pressed on the back &mdash; the same number you already know, matched to ${orderData.childDisplayName || 'your child'}. Free shipping, no new sponsorship started, your monthly is unchanged.</p>
     `
     : `
-              <p>When it arrives, look at the back of the shirt. There&rsquo;s a number pressed below the main design, and that number belongs to a real child in Northern Uganda. Go to <a href="${siteUrl}" style="color: #D4A843; font-weight: bold;">beanumber.org</a>, enter your number, and meet them &mdash; their name, their face, their story. Your $25 today gets you the shirt and starts their year at the campus.</p>
+              <p>When it arrives, look at the back of the shirt. There&rsquo;s a number pressed below the main design, and that number belongs to a real child at the YDO campus in Northern Uganda. Go to <a href="${siteUrl}" style="color: #D4A843; font-weight: bold;">beanumber.org</a>, enter your number, and meet them &mdash; their name, their face, their story.</p>
+              <p>Your $25 today supports school, meals, and medical care for the kids on that campus. The number on the shirt is your way in.</p>
     `;
 
-  // Monthly sponsorship confirmation + sponsor code block. Only rendered
-  // for shirt+monthly opt-in buyers. No child name; that reveal is still
-  // locked to the physical-arrival moment.
+  // Monthly sponsorship "your monthly is active" block. Under the stockpile
+  // model, the sponsor code + portal access aren't issued at checkout —
+  // they activate after the shirt ships and the matched number is recorded.
   const sponsorBlock = orderData.alreadySponsoring
     ? `
               <hr style="border: none; border-top: 1px solid #e8e0d4; margin: 30px 0;">
 
               <p style="color: #D4A843; font-weight: bold; font-size: 13px; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 8px;">Your monthly sponsorship is active</p>
 
-              <p>You opted to keep sponsoring after this shirt, so another $25 will be charged each month going forward. It goes straight to school, meals, and medical care for the child your shirt is tied to.</p>
+              <p>You opted to keep sponsoring after this shirt, so another $25 will be charged each month going forward. It goes straight to school, meals, and medical care at the YDO campus.</p>
 
-              ${
-                orderData.sponsorCode
-                  ? `
-              <p style="color: #999; font-size: 14px; margin-bottom: 4px;">Your sponsor code:</p>
-              <p style="font-size: 20px; color: #0d0d0d; margin-top: 0; font-weight: bold; letter-spacing: 0.1em;">${orderData.sponsorCode}</p>
-
-              <p>Keep this somewhere safe. Once your shirt arrives and you&rsquo;ve met your child, use this code at <a href="${siteUrl}/sponsor/login" style="color: #D4A843; font-weight: bold;">${siteUrl.replace(/^https?:\/\//, '')}/sponsor/login</a> to check in on them anytime &mdash; photos, letters, updates.</p>
-                  `
-                  : ''
-              }
+              <p>Once your shirt ships and you&rsquo;ve had a chance to meet the child on the back, I&rsquo;ll send you your sponsor code and portal access. That&rsquo;s where updates, photos, and letters will live going forward.</p>
 
               <p>You can cancel anytime, no questions asked.</p>
     `
@@ -1618,67 +1629,48 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
       const donorId = await donorPromise;
       console.log('[WH] S3: donor resolved for cart, id=' + donorId);
 
-      // Assign a child for each shirt in the cart
+      // Stockpile model (May 2026 forward): no per-item child assignment.
+      // Kevin pulls pre-printed shirts that match color+size from inventory
+      // and reconciles the shipped numbers into Fulfillment after shipping.
       const assignments: Array<{
         itemIndex: number;
         shirtName: string;
         shirtColor: string;
         shirtSize: string;
         continueMonthly: boolean;
-        child: Awaited<ReturnType<typeof assignNextShirtChild>>;
-      }> = [];
-
-      for (const item of cartItems) {
-        let child: Awaited<ReturnType<typeof assignNextShirtChild>> = null;
-        try {
-          child = await assignNextShirtChild(email, name);
-        } catch (err) {
-          console.error('[WH] Cart child assignment failed for item ' + item.i + ':', err);
-        }
-        assignments.push({
-          itemIndex: item.i,
-          shirtName: item.n,
-          shirtColor: item.c,
-          shirtSize: item.z,
-          continueMonthly: item.m === 1,
-          child,
-        });
-      }
+      }> = cartItems.map(item => ({
+        itemIndex: item.i,
+        shirtName: item.n,
+        shirtColor: item.c,
+        shirtSize: item.z,
+        continueMonthly: item.m === 1,
+      }));
 
       // Create Fulfillment records FIRST — before the donation upsert.
-      // The idempotency guard checks for an existing donation and bails if
-      // found.  If fulfillment runs AFTER the donation write, a Stripe retry
-      // that lands between those two steps will skip fulfillment forever.
+      // Order # and Child Name stay blank; Kevin fills them in when he
+      // reconciles which stockpile shirts went out.
       for (const a of assignments) {
-        if (!a.child) continue;
         try {
           await createFulfillmentRecord({
-            shirtNumber: a.child.shirtNumber,
-            design: 'Number Tee',  // 2026 lineup: every shirt is the same design (4 colorways)
+            design: 'Number Tee',
             shirtColor: a.shirtColor,
             shirtSize: a.shirtSize,
             buyerName: name,
             buyerEmail: email,
             address: address || null,
-            childName: a.child.displayName,
             orderDate: donationDate,
+            notes: a.continueMonthly ? 'Cart item with monthly opt-in — match pending shipment' : 'Cart item — match pending shipment',
           });
         } catch (err: any) {
-          console.error('[WH] Cart fulfillment record failed for #' + a.child.shirtNumber + ':', String(err?.message || err).slice(0, 200));
+          console.error('[WH] Cart fulfillment record failed:', String(err?.message || err).slice(0, 200));
         }
       }
 
-      // Create one donation record for the full cart amount
-      const childRecordIds = assignments
-        .filter(a => a.child)
-        .map(a => a.child!.recordId);
-
+      // Create one donation record for the full cart amount. No child link
+      // — matches resolved post-shipment.
       const assignmentNotes = assignments.map(a => {
-        const childNote = a.child
-          ? `#${a.child.shirtNumber} (${a.child.displayName})`
-          : 'unassigned';
         const monthlyNote = a.continueMonthly ? ' +monthly' : '';
-        return `${a.shirtName} / ${a.shirtColor} / ${a.shirtSize} → ${childNote}${monthlyNote}`;
+        return `${a.shirtName} / ${a.shirtColor} / ${a.shirtSize} -> pending stockpile match${monthlyNote}`;
       });
 
       console.log('[WH] S4: upsert donation (cart)');
@@ -1697,73 +1689,48 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
         organization: organization || undefined,
         address,
         donationSource: 'Shirt Order',
-        notes: `[Cart: ${cartItems.length} shirts]${session.metadata?.ref_code ? ` [Ref: ${session.metadata.ref_code}]` : ''}\n${assignmentNotes.join('\n')}`,
-        childRecordId: childRecordIds[0],
+        notes: `[Cart: ${cartItems.length} shirts, stockpile fulfillment]${session.metadata?.ref_code ? ` [Ref: ${session.metadata.ref_code}]` : ''}\n${assignmentNotes.join('\n')}`,
+        // childRecordId intentionally omitted — match resolved post-shipment
       });
 
-      // For items with monthly opt-in, create deferred subscriptions
-      // using the customer's saved payment method.
-      const monthlyItems = assignments.filter(a => a.continueMonthly && a.child);
-      if (monthlyItems.length > 0 && !stripeCustomerId) {
-        // CRITICAL: If we get here, the cart checkout didn't create a Stripe
-        // customer (missing customer_creation:'always'). Log loudly and flag
-        // the donation so Kevin can see the failure immediately.
-        console.error('[WH] CRITICAL: Cart has ' + monthlyItems.length + ' monthly items but NO Stripe customer ID. Subscriptions CANNOT be created. Session: ' + session.id + ', email: ' + email);
-        // Update the donation note to flag the failure
-        if (donationId && AIRTABLE_API_KEY && AIRTABLE_BASE_ID) {
-          try {
-            const donRec = await airtableAPICall(() =>
-              fetch(`https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_DONATIONS_TABLE}/${donationId}?fields%5B%5D=Donation%20Note`, { headers: getAirtableHeaders() })
-            );
-            if (donRec.ok) {
-              const donData = await donRec.json();
-              const existingNote = donData.fields?.['Donation Note'] || '';
-              await airtableAPICall(() =>
-                fetch(`https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_DONATIONS_TABLE}/${donationId}`, {
-                  method: 'PATCH',
-                  headers: getAirtableHeaders(),
-                  body: JSON.stringify({ fields: { 'Donation Note': existingNote + '\n⚠️ FAILED: Monthly subscription not created — no Stripe customer ID. Needs manual backfill.' } }),
-                })
-              );
-            }
-          } catch (flagErr) {
-            console.error('[WH] Could not flag donation note:', flagErr);
-          }
-        }
-        // Alert Kevin immediately so this never goes unnoticed again
-        const childNames = monthlyItems.map(i => i.child?.displayName || 'unknown').join(', ');
+      // Cart monthly opt-ins — the Shirt + Stay conversion path through
+      // the cart. Under the stockpile model we still create the deferred
+      // Stripe subscription (the buyer wants ongoing sponsorship and
+      // their payment method is saved), but we skip the Sponsorship
+      // record creation since we can't link to a child we haven't
+      // matched yet. Kevin issues the Sponsorship + sponsor code
+      // manually after shipping when he knows which number went out.
+      const monthlyOptIns = assignments.filter(a => a.continueMonthly);
+      if (monthlyOptIns.length > 0 && !stripeCustomerId) {
+        // CRITICAL: Cart checkout should have set customer_creation:'always'.
+        // If we have monthly items but no customer, the saved-payment-method
+        // path fails and we can't create deferred subscriptions.
+        console.error('[WH] CRITICAL: Cart has ' + monthlyOptIns.length + ' monthly items but NO Stripe customer ID. Subscriptions cannot be created. Session: ' + session.id + ', email: ' + email);
         await sendEmail({
           to: { email: 'kevin@beanumber.org', name: 'Kevin' },
-          subject: '🚨 Monthly subscription failed — needs manual fix',
-          html: `<p>A cart checkout just completed with ${monthlyItems.length} monthly opt-in(s), but Stripe didn't create a customer record so the subscription(s) could not be set up.</p>
+          subject: 'Cart monthly subscription needs manual setup (no Stripe customer)',
+          html: `<p>A cart checkout completed with ${monthlyOptIns.length} monthly opt-in(s), but Stripe didn't create a customer record so deferred subscriptions could not be set up.</p>
 <p><strong>Buyer:</strong> ${name || 'unknown'} (${email})<br/>
-<strong>Children:</strong> ${childNames}<br/>
 <strong>Session:</strong> ${session.id}</p>
-<p>The shirt order went through fine — the buyer paid. But their monthly sponsorship is NOT active. Run the backfill endpoint or create the subscription manually in Stripe.</p>`,
+<p>The shirts paid for went through fine. The monthly subscription(s) are NOT active — create them manually in Stripe.</p>`,
         }).catch(e => console.error('[WH] Failed to send subscription-failure alert:', e));
       }
-      if (monthlyItems.length > 0 && stripeCustomerId) {
+      if (monthlyOptIns.length > 0 && stripeCustomerId) {
         const stripe = await getStripe();
-
-        for (const item of monthlyItems) {
+        for (const item of monthlyOptIns) {
           try {
-            // Get the customer's payment methods (saved via setup_future_usage)
             const paymentMethods = await stripe.paymentMethods.list({
               customer: stripeCustomerId,
               type: 'card',
             });
             const pm = paymentMethods.data[0];
-
             if (!pm) {
               console.error('[WH] No saved payment method for cart subscription, item ' + item.itemIndex);
               continue;
             }
-
-            // Create a subscription starting 30 days from now.
-            // The $25 they already paid covers month one.
+            // Month 1 already paid as part of the cart lump sum; billing
+            // anchor 30 days out so the next charge lands on day 30.
             const billingAnchor = Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60;
-
-            const childName = item.child?.displayName ?? 'a child';
             const sub = await stripe.subscriptions.create({
               customer: stripeCustomerId,
               items: [
@@ -1771,7 +1738,7 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
                   price_data: {
                     currency: 'usd',
                     product_data: {
-                      name: `Monthly Sponsorship (${childName})`,
+                      name: 'Be A Number monthly sponsorship',
                     },
                     unit_amount: SHIRT_PRICE * 100,
                     recurring: { interval: 'month' },
@@ -1786,55 +1753,27 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
                 shirt_name: item.shirtName,
                 shirt_color: item.shirtColor,
                 shirt_size: item.shirtSize,
-                child_id: item.child!.childId,
-                child_record_id: item.child!.recordId,
-                child_display_name: item.child!.displayName,
                 referring_cart_session_id: session.id,
+                pending_child_match: 'true',
               },
             });
-
-            console.log('[WH] Created deferred subscription for cart item ' + item.itemIndex + ':', sub.id);
-
-            // Create a Sponsorship record for this child
-            try {
-              const childRecord = await fetchChildRecord(item.child!.recordId);
-              const childFields = childRecord?.fields || {};
-              await createSponsorshipRecord({
-                childRecordId: item.child!.recordId,
-                childId: item.child!.childId,
-                childDisplayName: item.child!.displayName,
-                childAge: childFields.DateOfBirth ? undefined : childFields.GradeClass,
-                childLocation: childFields.SchoolLocation,
-                childPhoto: childFields.ProfilePhoto,
-                sponsorEmail: email,
-                sponsorName: name,
-                donorRecordId: donorId,
-                subscriptionId: sub.id,
-                monthlyAmount: SHIRT_PRICE,
-              });
-            } catch (err) {
-              console.error('[WH] Failed to create sponsorship for cart item ' + item.itemIndex + ':', err);
-            }
+            console.log('[WH] Created deferred cart subscription (match pending):', sub.id);
           } catch (err: any) {
-            console.error('[WH] Failed to create subscription for cart item ' + item.itemIndex + ':', err);
-            // Alert Kevin — the buyer paid but their monthly sponsorship didn't activate
-            const failedChildName = item.child?.displayName || 'unknown';
+            console.error('[WH] Failed to create cart deferred subscription:', String(err?.message || err).slice(0, 200));
             await sendEmail({
               to: { email: 'kevin@beanumber.org', name: 'Kevin' },
-              subject: '🚨 Monthly subscription failed for ' + failedChildName,
-              html: `<p>A cart checkout completed and the shirt order went through, but creating the monthly subscription failed.</p>
+              subject: 'Cart monthly subscription failed',
+              html: `<p>A cart checkout completed and the shirt order(s) went through, but creating one of the monthly subscriptions failed.</p>
 <p><strong>Buyer:</strong> ${name || 'unknown'} (${email})<br/>
-<strong>Child:</strong> ${failedChildName} (#${item.child?.childId || '?'})<br/>
 <strong>Error:</strong> ${err?.message || String(err)}<br/>
 <strong>Session:</strong> ${session.id}</p>
-<p>The buyer's $25/mo is NOT active. Create the subscription manually in Stripe or run the backfill endpoint.</p>`,
+<p>The buyer's $25/mo for this item is NOT active. Create it manually in Stripe.</p>`,
             }).catch(e => console.error('[WH] Failed to send subscription-failure alert:', e));
           }
         }
       }
 
       // Send one combined confirmation email
-      const firstAssigned = assignments.find(a => a.child);
       let emailStatus = 'Sent';
       try {
         await sendShirtConfirmationEmail({
@@ -1850,7 +1789,7 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
             ? assignments[0].shirtSize
             : 'assorted',
           amount,
-          alreadySponsoring: monthlyItems.length > 0,
+          alreadySponsoring: monthlyOptIns.length > 0,
         });
       } catch (err) {
         console.error('[WH] Cart confirmation email failed:', err);
@@ -1872,69 +1811,27 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
       // Admin notification
       try {
         await sendAdminOrderNotification({
-          kind: monthlyItems.length > 0 ? 'Shirt + Monthly' : 'Shirt',
+          kind: monthlyOptIns.length > 0 ? 'Shirt + Monthly' : 'Shirt',
           customerName: name,
           customerEmail: email,
           amount,
-          isRecurring: monthlyItems.length > 0,
+          isRecurring: monthlyOptIns.length > 0,
           shirtName: cartItems.length === 1 ? assignments[0].shirtName : `${cartItems.length} shirts`,
           shirtColor: cartItems.length === 1 ? assignments[0].shirtColor : 'assorted',
           shirtSize: cartItems.length === 1 ? assignments[0].shirtSize : 'assorted',
-          childDisplayName: firstAssigned?.child?.displayName,
-          shirtNumber: firstAssigned?.child?.shirtNumber,
           stripeSessionId: session.id,
         });
       } catch (err: any) {
         console.error('[WH] Cart admin notify failed:', String(err?.message || err).slice(0, 200));
       }
 
-      // Drip enrollment — store ALL assigned children (comma-separated) so
-      // multi-shirt buyers get emails that reference every child, not just #1.
-      const assignedChildren = assignments.filter(a => a.child);
-      if (assignedChildren.length > 0 && donorId) {
+      // Drip enrollment — under the stockpile model, names/numbers are
+      // blank because no assignment happened. The drip templates branch
+      // on whether a child name is set, so they'll render the generic
+      // "the child connected to your shirt" copy.
+      if (donorId) {
         try {
-          const pipeline = monthlyItems.length > 0 ? 'shirt_sponsor' : 'shirt_nurture';
-          // DripNextSend intentionally NOT set here — drip starts when shirt
-          // is marked as shipped, not at purchase time.
-
-          // Comma-separated for multi-shirt orders, single value for single
-          const newChildNames = assignedChildren
-            .map(a => a.child!.displayName?.split(' ')[0] || '')
-            .filter(Boolean);
-          const newShirtNumbers = assignedChildren
-            .map(a => String(a.child!.shirtNumber));
-
-          // Check for existing drip fields (repeat buyer with prior order)
-          let mergedNames = newChildNames;
-          let mergedNumbers = newShirtNumbers;
-          try {
-            const existingRes = await airtableAPICall(() =>
-              fetch(
-                `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_DONORS_TABLE}/${donorId}?fields%5B%5D=DripChildName&fields%5B%5D=DripShirtNumber`,
-                { headers: getAirtableHeaders() }
-              )
-            );
-            const existingData = await existingRes.json();
-            const existingNames = (existingData.fields?.DripChildName || '').split(',').filter(Boolean);
-            const existingNumbers = (existingData.fields?.DripShirtNumber || '').split(',').filter(Boolean);
-            if (existingNames.length > 0) {
-              // Prepend existing, dedup
-              const allNames = [...existingNames];
-              const allNums = [...existingNumbers];
-              for (let i = 0; i < newShirtNumbers.length; i++) {
-                if (!allNums.includes(newShirtNumbers[i])) {
-                  allNums.push(newShirtNumbers[i]);
-                  if (newChildNames[i]) allNames.push(newChildNames[i]);
-                }
-              }
-              mergedNames = allNames;
-              mergedNumbers = allNums;
-            }
-          } catch { /* first purchase — use new values only */ }
-
-          const allChildNames = mergedNames.join(',');
-          const allShirtNumbers = mergedNumbers.join(',');
-
+          const pipeline = monthlyOptIns.length > 0 ? 'shirt_sponsor' : 'shirt_nurture';
           await airtableAPICall(() =>
             fetch(
               `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_DONORS_TABLE}/${donorId}`,
@@ -1946,14 +1843,13 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
                     DripPipeline: pipeline,
                     DripStage: 0,
                     // DripNextSend left blank — set when shirt ships
-                    DripChildName: allChildNames,
-                    DripShirtNumber: allShirtNumbers,
+                    // DripChildName / DripShirtNumber left blank
                   },
                 }),
               }
             )
           );
-          console.log('[WH] Cart: enrolled in ' + pipeline + ' drip, children: ' + allShirtNumbers);
+          console.log('[WH] Cart: enrolled in ' + pipeline + ' drip (no numbers yet)');
         } catch (err: any) {
           console.error('[WH] Cart drip enrollment failed:', String(err?.message || err).slice(0, 200));
         }
@@ -1962,8 +1858,8 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
       console.log('[WH] Cart order complete:', {
         sessionId: session.id,
         items: cartItems.length,
-        assigned: assignments.filter(a => a.child).length,
-        subscriptions: monthlyItems.length,
+        assigned: 'pending stockpile reconciliation',
+        monthlyOptIns: monthlyOptIns.length,
       });
 
       return { donorId, donationId, assignments };
@@ -2103,46 +1999,29 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
     } else if (isShirtPlusMonthly) {
       // --- SHIRT + MONTHLY SPONSORSHIP FLOW ---
       //
-      // The "aha moment #1" path: someone bought the shirt AND opted into
-      // ongoing sponsorship at checkout in a single transaction. Stripe gives
-      // us a subscription (month 1 already paid = today's $25, which also
-      // funds the shirt). We need to:
-      //   1. Assign the next child (same pool as shirt-only)
-      //   2. Backfill subscription.metadata with child_id + referring_shirt_session_id
-      //      so activation attribution + the sponsor portal work
-      //   3. Record the first month as a Donation tagged 'Shirt + Monthly'
-      //   4. Create a Sponsorship record (real sponsor from day 1)
-      //   5. Send one combined welcome email (don't double-email them)
+      // Under the May 2026 stockpile model the /shirts page hides the
+      // "also sponsor monthly" toggle, so this branch should rarely fire.
+      // It still exists as a defensive fallback for in-flight orders, deep
+      // links, or session replays. When it does fire we:
+      //   - record the Donation (the customer paid; they need a receipt)
+      //   - NOT assign a child or create a Sponsorship (no number known yet)
+      //   - NOT issue a sponsor code (no Sponsorship to attach it to)
+      //   - send the standard shirt confirmation email plus a note that
+      //     their monthly is active and portal access comes after shipping
       const shirtName = session.metadata?.shirt_name || 'Unknown';
       const shirtColor = session.metadata?.shirt_color || 'Unknown';
       const shirtSize = session.metadata?.shirt_size || 'Unknown';
       const shirtId = session.metadata?.shirt_id || 'unknown';
       const referral = session.custom_fields?.find(f => f.key === 'referral')?.text?.value || '';
 
-      console.log('[WH] S2: shirt+monthly flow, sub=' + subscriptionId);
+      console.log('[WH] S2: shirt+monthly flow (no assignment), sub=' + subscriptionId);
 
-      // Parallelize: donor lookup + child assignment (independent of each other)
-      let assignedChild: Awaited<ReturnType<typeof assignNextShirtChild>> = null;
-      let donorId: string;
-      try {
-        const [donorResult, childResult] = await Promise.all([
-          donorPromise,
-          assignNextShirtChild(email, name).catch(err => {
-            console.error('[Webhook] Unexpected error during shirt+monthly assignment:', err);
-            return null;
-          }),
-        ]);
-        donorId = donorResult;
-        assignedChild = childResult;
-      } catch (error) {
-        // If donorPromise fails, we can't continue
-        throw error;
-      }
+      const donorId: string = await donorPromise;
 
-      // Step 3: Backfill subscription metadata so the sponsor portal and
-      // retention analytics can find this sponsorship. Stripe does not
-      // substitute {CHECKOUT_SESSION_ID} into metadata at checkout create
-      // time, so we do it here once we know everything.
+      // Step 3: Backfill subscription metadata so retention analytics and
+      // future reconciliation can find this subscription. No child yet —
+      // Kevin links the child after he ships the shirt and records the
+      // number that went out.
       if (subscriptionId) {
         try {
           const stripe = await getStripe();
@@ -2155,12 +2034,8 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
             customer_name: name || '',
             continue_monthly: 'true',
             referring_shirt_session_id: session.id,
+            pending_child_match: 'true',
           };
-          if (assignedChild) {
-            backfillMeta.child_id = assignedChild.childId;
-            backfillMeta.child_record_id = assignedChild.recordId;
-            backfillMeta.child_display_name = assignedChild.displayName;
-          }
           await stripe.subscriptions.update(subscriptionId, {
             metadata: backfillMeta,
           });
@@ -2171,32 +2046,27 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
       }
 
       // Create Fulfillment record BEFORE the donation upsert.
-      // The idempotency guard checks for an existing donation — if fulfillment
-      // runs after the donation, a Stripe retry can skip it permanently.
-      if (assignedChild) {
-        try {
-          await createFulfillmentRecord({
-            shirtNumber: assignedChild.shirtNumber,
-            design: 'Number Tee',  // 2026 lineup: every shirt is the same design (4 colorways)
-            shirtColor,
-            shirtSize,
-            buyerName: name,
-            buyerEmail: email,
-            address: address || null,
-            childName: assignedChild.displayName,
-            orderDate: donationDate,
-          });
-        } catch (err: any) {
-          console.error('[WH] Fulfillment record failed (shirt+monthly):', String(err?.message || err).slice(0, 200));
-        }
+      // Order # and Child Name stay blank — Kevin fills them in when he
+      // reconciles which stockpile shirt was shipped.
+      try {
+        await createFulfillmentRecord({
+          design: 'Number Tee',
+          shirtColor,
+          shirtSize,
+          buyerName: name,
+          buyerEmail: email,
+          address: address || null,
+          orderDate: donationDate,
+          notes: 'Shirt + Monthly — match pending shipment',
+        });
+      } catch (err: any) {
+        console.error('[WH] Fulfillment record failed (shirt+monthly):', String(err?.message || err).slice(0, 200));
       }
 
-      // Step 4: Record first month as a Donation. We tag it 'Shirt + Monthly'
-      // so retention / revenue-source reports can split it out from pure
-      // shirt orders and pure sponsorship signups.
-      const assignmentNote = assignedChild
-        ? ` / Assigned to #${assignedChild.shirtNumber} (${assignedChild.displayName})`
-        : ' / No child assigned (out of stock or assignment failed)';
+      // Step 4: Record first month as a Donation. Tagged 'Shirt + Monthly'
+      // for revenue-source reports. No child link yet \u2014 Kevin reconciles
+      // after shipping.
+      const assignmentNote = ' / Number + child match pending shipment (stockpile fulfillment)';
       console.log('[WH] S4: upsert donation (shirt+monthly)');
       const donationId = await upsertDonation(paymentIntentId, {
         sessionId: session.id,
@@ -2214,67 +2084,18 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
         address,
         donationSource: 'Shirt + Monthly',
         notes: `Shirt+Monthly: ${shirtName} / ${shirtColor} / ${shirtSize}${assignmentNote}${session.metadata?.ref_code ? ` [Ref: ${session.metadata.ref_code}]` : ''}${referral ? ` \u00b7 Heard via: ${referral}` : ''}`,
-        childRecordId: assignedChild?.recordId,
+        // childRecordId intentionally omitted \u2014 match resolved post-shipment
       });
 
-      // Step 5: Create Sponsorship record so this person shows up in the
-      // sponsor portal and gets a sponsor code. Only possible if we managed
-      // to assign a child.
-      let sponsorCode = '';
-      let sponsorshipRecordId = '';
-      if (assignedChild) {
-        try {
-          const childRecord = await fetchChildRecord(assignedChild.recordId);
-          const childFields = childRecord?.fields || {};
-          const result = await createSponsorshipRecord({
-            childRecordId: assignedChild.recordId,
-            childId: assignedChild.childId,
-            childDisplayName: assignedChild.displayName,
-            childAge: childFields.DateOfBirth ? undefined : childFields.GradeClass,
-            childLocation: childFields.SchoolLocation,
-            childPhoto: childFields.ProfilePhoto,
-            sponsorEmail: email,
-            sponsorName: name,
-            donorRecordId: donorId,
-            subscriptionId,
-            monthlyAmount: amount,
-          });
-          sponsorCode = result.sponsorCode;
-          sponsorshipRecordId = result.recordId;
-        } catch (err: any) {
-          console.error('[Webhook] CRITICAL: Failed to create sponsorship record (shirt+monthly):', String(err?.message || err).slice(0, 500));
-          // Flag the donation note so Kevin can see the failure
-          if (donationId && AIRTABLE_API_KEY && AIRTABLE_BASE_ID) {
-            try {
-              const donRec = await airtableAPICall(() =>
-                fetch(`https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_DONATIONS_TABLE}/${donationId}?fields%5B%5D=Donation%20Note`, { headers: getAirtableHeaders() })
-              );
-              if (donRec.ok) {
-                const donData = await donRec.json();
-                const existingNote = donData.fields?.['Donation Note'] || '';
-                await airtableAPICall(() =>
-                  fetch(`https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_DONATIONS_TABLE}/${donationId}`, {
-                    method: 'PATCH',
-                    headers: getAirtableHeaders(),
-                    body: JSON.stringify({ fields: { 'Donation Note': existingNote + `\n⚠️ FAILED: Sponsorship record not created. Error: ${String(err?.message || err).slice(0, 200)}` } }),
-                  })
-                );
-              }
-            } catch (flagErr) {
-              console.error('[WH] Could not flag donation note:', flagErr);
-            }
-          }
-        }
-      }
+      // Step 5: Sponsorship record creation deferred under the stockpile
+      // model. We can't link a sponsor to a child we haven't matched yet.
+      // Kevin creates the Sponsorship row + issues the sponsor code manually
+      // after shipping. The buyer's monthly is active in Stripe and tracked
+      // on the Donation, just without portal access until reconciliation.
 
-      // Step 6: Send ONE combined welcome email. The shirt confirmation
-      // email has been extended to include the monthly-sponsorship
-      // confirmation + sponsor code inline when alreadySponsoring is true.
-      // We do NOT send the standalone sendSponsorWelcomeEmail here because
-      // that email names the child, which would spoil the reveal. The
-      // sponsor code is delivered inside the shirt confirmation (generic,
-      // no child name) and the child reveal stays locked to the moment
-      // the physical shirt arrives.
+      // Step 6: Send shirt confirmation email. alreadySponsoring=true so the
+      // email includes the "monthly is active" block — but with no sponsor
+      // code (none generated yet). The reveal block stays generic.
       let emailStatus = 'Sent';
       try {
         await sendShirtConfirmationEmail({
@@ -2285,7 +2106,6 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
           shirtSize,
           amount,
           alreadySponsoring: true,
-          sponsorCode: sponsorCode || undefined,
         });
       } catch (err) {
         console.error('[Webhook] Failed to send shirt+monthly welcome email:', err);
@@ -2294,16 +2114,10 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
 
       // Step 7: Communication record
       try {
-        const commSubject = assignedChild
-          ? `Your shirt is being made. You're sponsoring ${assignedChild.displayName}.`
-          : 'Your shirt + monthly sponsorship is confirmed.';
-        const commBody = assignedChild
-          ? `Shirt+Monthly: ${shirtName} (${shirtColor}, ${shirtSize}) / $${amount.toFixed(2)}/mo / Sponsoring #${assignedChild.shirtNumber} ${assignedChild.displayName} / Sponsor code: ${sponsorCode || 'pending'}`
-          : `Shirt+Monthly (no child assigned): ${shirtName} (${shirtColor}, ${shirtSize}) / $${amount.toFixed(2)}/mo`;
         await createCommunicationRecord(donationId, donorId, {
           email,
-          subject: commSubject,
-          body: commBody,
+          subject: 'Your shirt + monthly sponsorship is confirmed.',
+          body: `Shirt+Monthly (stockpile, match pending): ${shirtName} (${shirtColor}, ${shirtSize}) / $${amount.toFixed(2)}/mo`,
           status: emailStatus,
         });
       } catch (err) {
@@ -2322,138 +2136,93 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
           shirtName,
           shirtColor,
           shirtSize,
-          childDisplayName: assignedChild?.displayName,
-          shirtNumber: assignedChild?.shirtNumber,
-          sponsorCode: sponsorCode || undefined,
           stripeSessionId: session.id,
         });
       } catch (err: any) {
         console.error('[WH] admin notify failed:', String(err?.message || err).slice(0, 200));
       }
 
-      // Step 9: Enroll shirt+monthly buyer into the combined drip sequence.
-      // This pipeline covers both shirt anticipation AND sponsor onboarding
-      // in one coherent sequence, so they don't get bombarded by two pipelines.
-      // For repeat buyers: append child info to existing drip fields.
-      if (assignedChild && donorId) {
-        try {
-          // DripNextSend intentionally NOT set — drip starts when shirt ships.
-          const newChildName = assignedChild.displayName?.split(' ')[0] || '';
-          const newShirtNumber = String(assignedChild.shirtNumber);
-
-          // Check for existing drip fields (repeat buyer)
-          let mergedChildName = newChildName;
-          let mergedShirtNumber = newShirtNumber;
-          try {
-            const existingRes = await airtableAPICall(() =>
-              fetch(
-                `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_DONORS_TABLE}/${donorId}?fields%5B%5D=DripChildName&fields%5B%5D=DripShirtNumber`,
-                { headers: getAirtableHeaders() }
-              )
-            );
-            const existingData = await existingRes.json();
-            const existingName = existingData.fields?.DripChildName || '';
-            const existingNumber = existingData.fields?.DripShirtNumber || '';
-            if (existingName && !existingName.split(',').includes(newChildName)) {
-              mergedChildName = `${existingName},${newChildName}`;
+      // Step 9: Enroll into shirt_sponsor drip with no specific child/number.
+      // The drip templates already branch on whether a child name is set, so
+      // they'll render the generic "the child connected to your shirt" copy.
+      try {
+        await airtableAPICall(() =>
+          fetch(
+            `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_DONORS_TABLE}/${donorId}`,
+            {
+              method: 'PATCH',
+              headers: getAirtableHeaders(),
+              body: JSON.stringify({
+                fields: {
+                  DripPipeline: 'shirt_sponsor',
+                  DripStage: 0,
+                  // DripNextSend left blank — set when shirt ships
+                  // DripChildName / DripShirtNumber left blank
+                },
+              }),
             }
-            if (existingNumber && !existingNumber.split(',').includes(newShirtNumber)) {
-              mergedShirtNumber = `${existingNumber},${newShirtNumber}`;
-            }
-          } catch { /* first purchase — no existing fields, use new values */ }
-
-          await airtableAPICall(() =>
-            fetch(
-              `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_DONORS_TABLE}/${donorId}`,
-              {
-                method: 'PATCH',
-                headers: getAirtableHeaders(),
-                body: JSON.stringify({
-                  fields: {
-                    DripPipeline: 'shirt_sponsor',
-                    DripStage: 0,
-                    // DripNextSend left blank — set when shirt ships
-                    DripChildName: mergedChildName,
-                    DripShirtNumber: mergedShirtNumber,
-                  },
-                }),
-              }
-            )
-          );
-          console.log('[WH] Enrolled in shirt_sponsor drip, children:', mergedShirtNumber);
-        } catch (err: any) {
-          console.error('[WH] shirt_sponsor drip enrollment failed (non-fatal):', String(err?.message || err).slice(0, 200));
-        }
+          )
+        );
+        console.log('[WH] Enrolled in shirt_sponsor drip (no number yet)');
+      } catch (err: any) {
+        console.error('[WH] shirt_sponsor drip enrollment failed (non-fatal):', String(err?.message || err).slice(0, 200));
       }
 
       console.log('[Webhook] Successfully processed shirt + monthly:', {
         sessionId: session.id,
         donorId,
         donationId,
-        sponsorshipRecordId,
-        sponsorCode,
         shirt: `${shirtName} / ${shirtColor} / ${shirtSize}`,
-        assigned: assignedChild
-          ? `#${assignedChild.shirtNumber} ${assignedChild.displayName}`
-          : 'none',
+        assigned: 'pending stockpile reconciliation',
       });
 
-      return { donorId, donationId, sponsorshipRecordId, sponsorCode, assignedChild };
+      return { donorId, donationId };
 
     } else if (isShirtOrder) {
       // --- SHIRT ORDER FLOW ---
+      //
+      // Stockpile model (May 2026 forward): we no longer assign a child or
+      // shirt number at purchase time. Kevin pulls a pre-printed shirt that
+      // matches the buyer's color+size from inventory, then reconciles the
+      // shipped number into Fulfillment when the package goes out. The
+      // buyer discovers their match by looking at the back of the shirt
+      // when it arrives and visiting beanumber.org/[number].
+      //
+      // Everything below still happens — Fulfillment row, Donation, drip
+      // enrollment, email — they just no longer carry a number or child.
       const shirtName = session.metadata?.shirt_name || 'Unknown';
       const shirtColor = session.metadata?.shirt_color || 'Unknown';
       const shirtSize = session.metadata?.shirt_size || 'Unknown';
       const shirtId = session.metadata?.shirt_id || 'unknown';
 
-      console.log('[WH] S2: shirt-only flow, shirt=' + shirtName);
+      console.log('[WH] S2: shirt-only flow (no assignment), shirt=' + shirtName);
 
-      // Parallelize: donor lookup + child assignment (independent of each other)
-      let assignedChild: Awaited<ReturnType<typeof assignNextShirtChild>> = null;
-      let donorId: string;
-      try {
-        const [donorResult, childResult] = await Promise.all([
-          donorPromise,
-          assignNextShirtChild(email, name).catch(err => {
-            console.error('[Webhook] Unexpected error during shirt assignment:', err);
-            return null;
-          }),
-        ]);
-        donorId = donorResult;
-        assignedChild = childResult;
-      } catch (error) {
-        throw error;
-      }
+      const donorId: string = await donorPromise;
 
       // Create Fulfillment record BEFORE the donation upsert.
       // The idempotency guard checks for an existing donation — if fulfillment
       // runs after the donation, a Stripe retry can skip it permanently.
-      if (assignedChild) {
-        try {
-          await createFulfillmentRecord({
-            shirtNumber: assignedChild.shirtNumber,
-            design: 'Number Tee',  // 2026 lineup: every shirt is the same design (4 colorways)
-            shirtColor,
-            shirtSize,
-            buyerName: name,
-            buyerEmail: email,
-            address: address || null,
-            childName: assignedChild.displayName,
-            orderDate: donationDate,
-          });
-        } catch (err: any) {
-          console.error('[WH] Fulfillment record failed (shirt-only):', String(err?.message || err).slice(0, 200));
-        }
+      // Order # and Child Name stay blank; Kevin fills in the number that
+      // physically shipped when he reconciles in Airtable.
+      try {
+        await createFulfillmentRecord({
+          design: 'Number Tee',  // 2026 lineup: every shirt is the same design (4 colorways)
+          shirtColor,
+          shirtSize,
+          buyerName: name,
+          buyerEmail: email,
+          address: address || null,
+          orderDate: donationDate,
+        });
+      } catch (err: any) {
+        console.error('[WH] Fulfillment record failed (shirt-only):', String(err?.message || err).slice(0, 200));
       }
 
-      // Step 3a: Create donation record tagged as shirt order, linked to the
-      // assigned child if one was found. Notes include shirt spec plus the
-      // assigned number so the record is self-describing even without clicking
-      // through the Child link.
-      const assignmentNote = assignedChild
-        ? ` / Assigned to #${assignedChild.shirtNumber} (${assignedChild.displayName})`
-        : ' / No child assigned (out of stock or assignment failed)';
+      // Step 3a: Create donation record tagged as shirt order. No child link
+      // yet — that gets resolved manually when the shirt ships and the
+      // buyer's number is known. Notes flag the order so Kevin can find
+      // unreconciled shipments later.
+      const assignmentNote = ' / Number assigned at shipment (stockpile fulfillment)';
       console.log('[WH] S3: upsert donation (shirt-only)');
       const donationId = await upsertDonation(paymentIntentId, {
         sessionId: session.id,
@@ -2471,14 +2240,12 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
         address,
         donationSource: 'Shirt Order',
         notes: `Shirt: ${shirtName} / ${shirtColor} / ${shirtSize}${assignmentNote}${session.metadata?.ref_code ? ` [Ref: ${session.metadata.ref_code}]` : ''}`,
-        childRecordId: assignedChild?.recordId,
+        // childRecordId intentionally omitted — match not yet known
       });
 
-      // Step 4a: Send shirt confirmation email. Intentionally generic —
-      // the assigned child is NOT named, shown, or numbered in the email.
-      // The reveal is reserved for the moment the physical shirt arrives
-      // and the buyer enters their number at beanumber.org. Internally we
-      // still recorded the assignment above for fulfillment + analytics.
+      // Step 4a: Send shirt confirmation email. Generic copy — no number,
+      // no child name. The match is revealed when the physical shirt
+      // arrives and the buyer enters their number at beanumber.org.
       let emailStatus = 'Sent';
       try {
         await sendShirtConfirmationEmail({
@@ -2494,18 +2261,12 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
         emailStatus = 'Failed';
       }
 
-      // Step 5a: Create communication record for shirt order. Subject is
-      // generic to match the email; internal notes still include the
-      // assignment so staff can see who the buyer was linked to.
+      // Step 5a: Create communication record for shirt order.
       try {
-        const emailSubject = 'Your shirt is being made right now.';
-        const emailBodyNote = assignedChild
-          ? `Shirt order: ${shirtName} (${shirtColor}, ${shirtSize}) / $${amount.toFixed(2)} / Internal assignment: #${assignedChild.shirtNumber} ${assignedChild.displayName} (child not revealed to buyer yet)`
-          : `Shirt order confirmation (no child assigned): ${shirtName} (${shirtColor}, ${shirtSize}) / $${amount.toFixed(2)}`;
         await createCommunicationRecord(donationId, donorId, {
           email,
-          subject: emailSubject,
-          body: emailBodyNote,
+          subject: 'Your shirt is being made right now.',
+          body: `Shirt order (stockpile, number not yet assigned): ${shirtName} (${shirtColor}, ${shirtSize}) / $${amount.toFixed(2)}`,
           status: emailStatus,
         });
       } catch (error) {
@@ -2517,9 +2278,7 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
         donorId,
         donationId,
         shirt: `${shirtName} / ${shirtColor} / ${shirtSize}`,
-        assigned: assignedChild
-          ? `#${assignedChild.shirtNumber} ${assignedChild.displayName}`
-          : 'none',
+        assigned: 'pending stockpile reconciliation',
       });
 
       // Ping Kevin (email + SMS gateway) — non-fatal.
@@ -2534,8 +2293,6 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
           shirtName,
           shirtColor,
           shirtSize,
-          childDisplayName: assignedChild?.displayName,
-          shirtNumber: assignedChild?.shirtNumber,
           stripeSessionId: session.id,
         });
       } catch (err: any) {
@@ -2543,63 +2300,38 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
       }
 
       // Step 8: Enroll shirt-only buyer into the nurture drip sequence.
-      // The cron at /api/cron/drip will pick them up and send 4 follow-up
-      // emails over ~30 days nudging toward monthly sponsorship. If they
-      // later convert (subscription.created fires), the drip gets cleared.
-      // For repeat buyers: append child info to existing drip fields.
-      if (assignedChild) {
-        try {
-          // DripNextSend intentionally NOT set — drip starts when shirt ships.
-          const newChildName = assignedChild.displayName?.split(' ')[0] || '';
-          const newShirtNumber = String(assignedChild.shirtNumber);
-
-          // Check for existing drip fields (repeat buyer)
-          let mergedChildName = newChildName;
-          let mergedShirtNumber = newShirtNumber;
-          try {
-            const existingRes = await airtableAPICall(() =>
-              fetch(
-                `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_DONORS_TABLE}/${donorId}?fields%5B%5D=DripChildName&fields%5B%5D=DripShirtNumber`,
-                { headers: getAirtableHeaders() }
-              )
-            );
-            const existingData = await existingRes.json();
-            const existingName = existingData.fields?.DripChildName || '';
-            const existingNumber = existingData.fields?.DripShirtNumber || '';
-            if (existingName && !existingName.split(',').includes(newChildName)) {
-              mergedChildName = `${existingName},${newChildName}`;
+      // The cron at /api/cron/drip picks them up and sends generic follow-up
+      // emails over ~30 days nudging toward visiting their number and
+      // sponsoring. Under the stockpile model, DripChildName / DripShirtNumber
+      // stay blank — the drip templates already handle that case with
+      // generic copy ("the child connected to your shirt") and fall back to
+      // beanumber.org instead of a child-specific URL.
+      try {
+        await airtableAPICall(() =>
+          fetch(
+            `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_DONORS_TABLE}/${donorId}`,
+            {
+              method: 'PATCH',
+              headers: getAirtableHeaders(),
+              body: JSON.stringify({
+                fields: {
+                  DripPipeline: 'shirt_nurture',
+                  DripStage: 0,
+                  // DripNextSend left blank — set when shirt ships
+                  // DripChildName / DripShirtNumber left blank — match
+                  // happens at unboxing, not at checkout
+                },
+              }),
             }
-            if (existingNumber && !existingNumber.split(',').includes(newShirtNumber)) {
-              mergedShirtNumber = `${existingNumber},${newShirtNumber}`;
-            }
-          } catch { /* first purchase — no existing fields, use new values */ }
-
-          await airtableAPICall(() =>
-            fetch(
-              `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_DONORS_TABLE}/${donorId}`,
-              {
-                method: 'PATCH',
-                headers: getAirtableHeaders(),
-                body: JSON.stringify({
-                  fields: {
-                    DripPipeline: 'shirt_nurture',
-                    DripStage: 0,
-                    // DripNextSend left blank — set when shirt ships
-                    DripChildName: mergedChildName,
-                    DripShirtNumber: mergedShirtNumber,
-                  },
-                }),
-              }
-            )
-          );
-          console.log('[WH] Enrolled in shirt_nurture drip, children:', mergedShirtNumber);
-        } catch (err: any) {
-          // Non-fatal — the purchase still succeeded even if drip enrollment fails
-          console.error('[WH] Drip enrollment failed:', String(err?.message || err).slice(0, 200));
-        }
+          )
+        );
+        console.log('[WH] Enrolled in shirt_nurture drip (no number yet)');
+      } catch (err: any) {
+        // Non-fatal — the purchase still succeeded even if drip enrollment fails
+        console.error('[WH] Drip enrollment failed:', String(err?.message || err).slice(0, 200));
       }
 
-      return { donorId, donationId, assignedChild };
+      return { donorId, donationId };
 
     } else if (isPortalRepeat) {
       // --- SHOP YOUR NUMBER FLOW (memo §5) ---
