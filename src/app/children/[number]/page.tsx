@@ -10,6 +10,7 @@ import { SponsorButton } from './SponsorButton';
 import { NewsletterSignup } from './NewsletterSignup';
 import { ClaimMatchCard } from './ClaimMatchCard';
 import { MerchPurchaseTile } from './MerchPurchaseTile';
+import { SponsorPortalSections } from './SponsorPortalSections';
 import { SESSION } from '@/lib/constants';
 
 // Never statically optimize or cache this page. Sponsorship status and child
@@ -59,6 +60,8 @@ interface AirtableSponsorshipRecord {
     ChildPhoto?: Array<{ url: string; filename: string }>;
     Status?: string;
     SponsorCode?: string;
+    SponsorshipStartDate?: string;
+    MonthlyAmount?: number;
   };
 }
 
@@ -140,6 +143,119 @@ async function resolveBuyerContext(
     console.warn('[children/page] Buyer context lookup failed', err);
     return null;
   }
+}
+
+/**
+ * Pull the most recently sent Newsletter. The sponsor view on /[number]
+ * surfaces this as "from the campus" — one record applies to all
+ * sponsors so Kevin only writes it once a month. Status is the gate:
+ * we only show what's been actually sent, not drafts or scheduled
+ * future sends.
+ */
+async function getLatestCampusNewsletter(): Promise<{
+  title: string;
+  subject: string;
+  bodyHtml: string;
+  heroPhotoUrl?: string;
+  publishedAt?: string;
+} | null> {
+  const newslettersTable = 'tblqP1zrRsh4mblHq'; // Newsletters
+  try {
+    // Sent records — Status = "Sent" OR PublishedAt is set. Sorted
+    // newest first.
+    const formula = encodeURIComponent(`OR({Status}="Sent", NOT({PublishedAt}=BLANK()))`);
+    const res = await airtableRequest<{
+      records: Array<{ id: string; fields: Record<string, any> }>;
+    }>(
+      `/${encodeURIComponent(newslettersTable)}?filterByFormula=${formula}&sort%5B0%5D%5Bfield%5D=PublishedAt&sort%5B0%5D%5Bdirection%5D=desc&maxRecords=1`
+    );
+    const r = res.records?.[0];
+    if (!r) return null;
+    const f = r.fields;
+    return {
+      title: (f.Title as string) || '',
+      subject: (f.Subject as string) || '',
+      bodyHtml: (f.BodyHTML as string) || '',
+      heroPhotoUrl: (f.HeroPhoto as Array<{ url: string }> | undefined)?.[0]?.url,
+      publishedAt: f.PublishedAt as string | undefined,
+    };
+  } catch (err) {
+    console.warn('[children/page] Newsletter fetch failed', err);
+    return null;
+  }
+}
+
+/**
+ * Pull the most recent visible Child Update for a specific child. The
+ * sponsor view surfaces this above the merch grid as "the latest from
+ * {firstName}" — photos and short updates the YDO team batches each
+ * term. Drafts and rejected records stay hidden via VisibleToSponsor.
+ */
+async function getLatestChildUpdate(childRecordId: string): Promise<{
+  title: string;
+  content: string;
+  photos: Array<{ url: string; filename?: string }>;
+  updateDate?: string;
+} | null> {
+  const updatesTable = 'tblrmtVBVzL7zCQDE'; // Child Updates
+  try {
+    // We filter by the linked Child record ID using FIND across
+    // ARRAYJOIN({Child}). Same pattern as donorHasActiveSponsorship.
+    const formula = encodeURIComponent(
+      `AND(FIND("${childRecordId}", ARRAYJOIN({Child}, ",")), {VisibleToSponsor}=TRUE())`
+    );
+    const res = await airtableRequest<{
+      records: Array<{ id: string; fields: Record<string, any> }>;
+    }>(
+      `/${encodeURIComponent(updatesTable)}?filterByFormula=${formula}&sort%5B0%5D%5Bfield%5D=UpdateDate&sort%5B0%5D%5Bdirection%5D=desc&maxRecords=1`
+    );
+    const r = res.records?.[0];
+    if (!r) return null;
+    const f = r.fields;
+    return {
+      title: (f.Title as string) || '',
+      content: (f.Content as string) || '',
+      photos: (f.Photos as Array<{ url: string; filename?: string }> | undefined) || [],
+      updateDate: f.UpdateDate as string | undefined,
+    };
+  } catch (err) {
+    console.warn('[children/page] Child Update fetch failed', err);
+    return null;
+  }
+}
+
+/**
+ * Compute retention-friendly impact stats from the sponsorship start
+ * date. These are honest descriptions of what the campus has been
+ * doing while the sponsor has been on board — not 1:1 financial
+ * earmarking (see funding_model.md).
+ */
+function computeSponsorStats(startDate: string | undefined, monthlyAmount = 25): {
+  daysAsSponsor: number;
+  mealsSupported: number;
+  schoolDaysSupported: number;
+  totalContributedUsd: number;
+} {
+  if (!startDate) {
+    return { daysAsSponsor: 0, mealsSupported: 0, schoolDaysSupported: 0, totalContributedUsd: 0 };
+  }
+  const start = new Date(startDate);
+  const now = new Date();
+  const ms = Math.max(0, now.getTime() - start.getTime());
+  const days = Math.floor(ms / (24 * 60 * 60 * 1000));
+  // Two campus meals per child per day (porridge in the morning, hot lunch).
+  const meals = days * 2;
+  // School-week ratio applied to the elapsed days.
+  const schoolDays = Math.round(days * (5 / 7));
+  // Months elapsed, charged monthly at monthlyAmount.
+  const monthsElapsed = Math.max(1, Math.floor(days / 30) + 1);
+  const total = monthsElapsed * monthlyAmount;
+  return {
+    daysAsSponsor: days,
+    mealsSupported: meals,
+    schoolDaysSupported: schoolDays,
+    totalContributedUsd: total,
+  };
 }
 
 /**
@@ -309,6 +425,16 @@ const getChildByShirtNumber = cache(async function getChildByShirtNumber(shirtNu
       // sponsorship record's SponsorCode.
       viewer_is_sponsor: viewerIsSponsor,
       sponsor_code: viewerIsSponsor ? sponsorship!.SponsorCode : undefined,
+      // Surfaced for the impact stats strip in the unified sponsor view.
+      // Only populated when this viewer is the verified sponsor, since
+      // it's their relationship start date specifically.
+      sponsorship_start_date: viewerIsSponsor
+        ? (sponsorship?.SponsorshipStartDate as string | undefined)
+        : undefined,
+      monthly_amount:
+        viewerIsSponsor && typeof sponsorship?.MonthlyAmount === 'number'
+          ? (sponsorship.MonthlyAmount as number)
+          : undefined,
       // Structured intake fields — any may be empty; the page renders each
       // block conditionally so a half-filled profile still looks intentional.
       home_village: child.HomeVillage,
@@ -597,6 +723,29 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
   // stay?" framing and the locked-merch teaser firing for buyers who
   // came in via /shirts/success but aren't yet sponsors.
   const viewerLooksLikeBuyer = child.shirt_assigned || Boolean(buyerContext);
+
+  // Sponsor portal content. Only fetched when the viewer is verified
+  // as the sponsor of THIS child — these surfaces are the bulk of
+  // what /sponsor used to render, folded onto /[number] so there's
+  // one URL per kid that does double duty as public profile and
+  // authenticated sponsor view. Fetched in parallel to keep latency
+  // off the critical path.
+  let portalData: {
+    stats: ReturnType<typeof computeSponsorStats>;
+    latestChildUpdate: Awaited<ReturnType<typeof getLatestChildUpdate>>;
+    latestNewsletter: Awaited<ReturnType<typeof getLatestCampusNewsletter>>;
+  } | null = null;
+  if (child.viewer_is_sponsor && child.record_id) {
+    const [latestChildUpdate, latestNewsletter] = await Promise.all([
+      getLatestChildUpdate(child.record_id),
+      getLatestCampusNewsletter(),
+    ]);
+    portalData = {
+      stats: computeSponsorStats(child.sponsorship_start_date, child.monthly_amount ?? 25),
+      latestChildUpdate,
+      latestNewsletter,
+    };
+  }
 
   return (
     <div className="min-h-screen bg-[#FFF8F0]">
@@ -888,9 +1037,24 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
           </div>
         </div>
 
+        {/* ── Sponsor portal content folded onto /[number] ────
+            Stats, latest update from this kid, latest campus
+            newsletter. Renders only when the viewer is verified as
+            the sponsor of this child. The data is fetched server-
+            side in parallel so this adds at most one Airtable
+            round-trip to page load. */}
+        {child.viewer_is_sponsor && portalData && (
+          <SponsorPortalSections
+            firstName={firstName}
+            stats={portalData.stats}
+            latestChildUpdate={portalData.latestChildUpdate}
+            latestNewsletter={portalData.latestNewsletter}
+          />
+        )}
+
         {/* ── Sponsor-gated merch collection ────────────────────
             Three states:
-            1. Active sponsor  → unlocked catalog, "I want this" → email Kevin
+            1. Active sponsor  → unlocked catalog with real Stripe checkout
             2. Shirt buyer     → locked teaser, blurred cards, sponsor CTA
             3. Cold visitor    → nothing (focus stays on sponsorship CTA)
         ── */}
