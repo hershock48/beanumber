@@ -318,6 +318,25 @@ async function airtableRequest<T>(endpoint: string): Promise<T> {
   return response.json();
 }
 
+/**
+ * Cycle-number → canonical-kid resolver.
+ *
+ * BAN's roster has ~53 real children (shirt numbers 1-53). Shirt
+ * numbers 54+ are cycle records: each new number mirrors a real kid
+ * from the original roster on a 52-wide cycle starting at 2. So
+ * shirt #54 = kid #2, shirt #105 = kid #53, shirt #106 = kid #2
+ * (next cycle), and so on. Cycle records carry the kid's name +
+ * status but typically lack the photo/bio fields, so /[number]
+ * looks up the canonical record at render time and merges those
+ * fields onto the cycle record. The cycle record's ShirtNumber
+ * and ChildID stay authoritative — sponsorships/donations link to
+ * the cycle record, not the canonical one.
+ */
+function canonicalShirtNumber(n: number): number | null {
+  if (n <= 53) return null;
+  return ((n - 54) % 52) + 2;
+}
+
 // React cache() deduplicates calls within a single server request.
 // Both generateMetadata() and the page component call this function,
 // so without cache() the page would hit Airtable 4× instead of 2×.
@@ -339,9 +358,56 @@ const getChildByShirtNumber = cache(async function getChildByShirtNumber(shirtNu
     }
 
     const childRecord = childRes.records[0];
-    const child = childRecord.fields;
-    const childId = child.ChildID;
+    const baseChild = childRecord.fields;
     const recordId = childRecord.id;
+
+    // Cycle-record fallback: if this is a cycle number and the
+    // current record lacks photo + structured fields, fetch the
+    // canonical kid's record and merge their profile fields onto
+    // ours. Identity fields (ShirtNumber, ChildID, DisplayName)
+    // come from the cycle record; presentation fields (ProfilePhoto,
+    // HomeVillage, FamilyContext, ChildQuote, etc.) come from the
+    // canonical kid.
+    const canonicalNum = canonicalShirtNumber(shirtNumber);
+    const isSparse = !(baseChild.ProfilePhoto?.length) &&
+      !baseChild.HomeVillage &&
+      !baseChild.FamilyContext &&
+      !baseChild.Loves &&
+      !baseChild.ChildQuote &&
+      !baseChild.TeacherQuote &&
+      !baseChild.Notes;
+    let canonicalChildFields: AirtableChildRecord['fields'] | null = null;
+    if (canonicalNum && isSparse) {
+      try {
+        const canonFormula = encodeURIComponent(`{ShirtNumber}=${canonicalNum}`);
+        const canonRes = await airtableRequest<{ records: AirtableChildRecord[] }>(
+          `/${encodeURIComponent(childrenTable)}?filterByFormula=${canonFormula}&maxRecords=1`
+        );
+        if (canonRes.records.length) {
+          canonicalChildFields = canonRes.records[0].fields;
+        }
+      } catch {
+        // Best effort — fall through to whatever the cycle record has.
+      }
+    }
+
+    // Build the effective child fields: cycle-record identity overrides,
+    // canonical kid's presentation fields fill in the gaps.
+    const child: AirtableChildRecord['fields'] = canonicalChildFields
+      ? {
+          ...canonicalChildFields,
+          // Identity stays with this number's record:
+          ChildID: baseChild.ChildID || canonicalChildFields.ChildID,
+          ShirtNumber: baseChild.ShirtNumber,
+          DisplayName: baseChild.DisplayName || canonicalChildFields.DisplayName,
+          FirstName: baseChild.FirstName || canonicalChildFields.FirstName,
+          LastInitial: baseChild.LastInitial || canonicalChildFields.LastInitial,
+          Status: baseChild.Status || canonicalChildFields.Status,
+          ReservedForAuction: baseChild.ReservedForAuction,
+          ShirtAssignedAt: baseChild.ShirtAssignedAt,
+        }
+      : baseChild;
+    const childId = child.ChildID;
 
     // Reserved-for-auction numbers short-circuit here. The Child record exists
     // to hold the number, but we don't want to expose placeholder details
@@ -1128,12 +1194,18 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
               </a>.
             </p>
           </div>
-        ) : viewerLooksLikeBuyer ? (
+        ) : (
+          /* ── Locked teaser for non-sponsors ──────────────────────
+              Shown to every non-sponsor visitor (cookie-identified
+              buyer OR cold visitor). Reframed from "unlock merch
+              only" to "unlock the whole sponsor surface" — the
+              sponsor view (updates, photos, letters) + the merch
+              collection live behind the same gate. */
           <div className="mt-10 md:mt-16">
             <div className="relative">
               {/* Blurred product cards — visible but unreachable */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 opacity-30 blur-[3px] pointer-events-none select-none" aria-hidden>
-                {['Hoodie', 'Hat', 'Sticker Pack', 'Another Shirt'].map((name) => (
+                {['Hoodie', 'Hat', 'Sticker Pack', 'Updates'].map((name) => (
                   <div key={name} className="bg-white border border-[#e8e0d4] p-3 md:p-4">
                     <div className="aspect-[4/3] bg-[#f5f0e8] flex items-center justify-center mb-3">
                       <p className="text-3xl md:text-4xl font-bold text-[#0d0d0d] opacity-20">
@@ -1151,7 +1223,7 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
               <div className="absolute inset-0 flex items-center justify-center">
                 <div className="bg-white/95 backdrop-blur-sm border border-[#e8e0d4] p-6 md:p-8 text-center max-w-sm mx-4 shadow-lg">
                   <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-3">
-                    Your #{number} collection
+                    Sponsor view &middot; #{number} collection
                   </p>
                   <p
                     className="text-lg md:text-xl text-[#0d0d0d] mb-3"
@@ -1160,7 +1232,7 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
                     Sponsor {firstName} to unlock.
                   </p>
                   <p className="text-[#777] text-sm mb-5 leading-relaxed">
-                    Sponsors get exclusive #{number} gear &mdash; hoodies, hats, stickers &mdash; all handmade with your number.
+                    Sponsors get monthly updates, photos, and letters from {firstName} on this page &mdash; plus access to the #{number} collection: hoodies, hats, and sticker packs, all handmade with your number on them.
                   </p>
                   <SponsorButton
                     childRecordId={child.record_id}
@@ -1175,7 +1247,7 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
               </div>
             </div>
           </div>
-        ) : null}
+        )}
 
         </RevealOverlay>
       </main>

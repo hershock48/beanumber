@@ -314,6 +314,34 @@ Fields like `Address Line 1`, `City`, `State`, `Postal Code`, `Country` do not e
 
 Field names in the codebase don't always match the actual Airtable field names. Examples: the doc used to say `Name` but the field is `Donor Name`; used to say `Email` but the field is `Email Address`; Sponsorships uses `StripeSubscriptionID` not `Stripe Subscription ID`. **Always verify with `get_table_schema` before writing.** Copy field names exactly.
 
+### Trap 3.5: Cycle records — shirts #54+ mirror real kids #2-53
+
+BAN has roughly 53 unique children at the YDO campus. Shirt numbers
+go higher than 53 because shirts are an outreach product, not a
+child-count cap. Numbers from 54 onward are **cycle records** in the
+Children table: each new number is a sparse stub linked by name to a
+real kid from the original roster, on a 52-wide cycle that starts at
+shirt #54 = kid #2.
+
+Mapping formula (for `n >= 54`): canonical kid `((n - 54) % 52) + 2`.
+
+So #54 = kid 2 (Marvin), #67 = kid 15 (Isaiah), #105 = kid 53
+(Amarorwot), #106 = kid 2 (Marvin again, next cycle).
+
+Cycle records typically carry only ShirtNumber, FirstName,
+DisplayName, ChildID, Status. They do NOT have photos, structured
+intake fields, DateOfBirth, or Notes. The `/[number]` page handles
+this transparently: when it detects a sparse cycle record, it
+fetches the canonical kid's record and merges presentation fields
+(ProfilePhoto, HomeVillage, FamilyContext, Loves, ChildQuote,
+TeacherQuote, Notes) onto the cycle record's identity. The cycle
+record's ShirtNumber + ChildID stay authoritative for sponsorship
+and donation links.
+
+**Operational implication:** when assigning new shirt numbers, just
+follow the cycle. The actual people, photos, bios stay maintained on
+records 1-53 only.
+
 ### Trap 4: ChildID vs ShirtNumber
 
 `ChildID` is the legacy join key between Sponsorships and Children, still referenced in ~20 files. The Ugandan team only uses shirt numbers. We chose not to do the migration mid-stream. When writing new code, prefer `ShirtNumber` for new joins, but don't break the old path — add, don't replace.
