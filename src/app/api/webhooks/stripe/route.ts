@@ -1916,7 +1916,11 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
                   fields: {
                     DripPipeline: pipeline,
                     DripStage: 0,
-                    // DripNextSend left blank — set when shirt ships
+                    // Drip kicks off 10 days from enrollment. The first
+                    // email is "Did your shirt arrive?" — by day 10 most
+                    // shirts have landed. Skipping the manual "set when
+                    // shipped" gate keeps the sequence from getting stuck.
+                    DripNextSend: new Date(Date.now() + 10 * 86400000).toISOString().split('T')[0],
                     // DripChildName / DripShirtNumber left blank
                   },
                 }),
@@ -2230,7 +2234,9 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
                 fields: {
                   DripPipeline: 'shirt_sponsor',
                   DripStage: 0,
-                  // DripNextSend left blank — set when shirt ships
+                  // Drip kicks off 10 days from enrollment. See shirt-only
+                  // branch for rationale.
+                  DripNextSend: new Date(Date.now() + 10 * 86400000).toISOString().split('T')[0],
                   // DripChildName / DripShirtNumber left blank
                 },
               }),
@@ -2391,7 +2397,9 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
                 fields: {
                   DripPipeline: 'shirt_nurture',
                   DripStage: 0,
-                  // DripNextSend left blank — set when shirt ships
+                  // Drip kicks off 10 days from enrollment. See shirt+monthly
+                  // branch for rationale.
+                  DripNextSend: new Date(Date.now() + 10 * 86400000).toISOString().split('T')[0],
                   // DripChildName / DripShirtNumber left blank — match
                   // happens at unboxing, not at checkout
                 },
