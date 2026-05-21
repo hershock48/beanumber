@@ -1003,6 +1003,75 @@ async function sendShirtConfirmationEmail(orderData: {
 }
 
 // ---------------------------------------------------------------------------
+// Number Collection merch confirmation
+// ---------------------------------------------------------------------------
+
+/**
+ * Confirmation email for hoodie / hat / sticker pack purchases from the
+ * /[number] sponsor view. The matched child is named here because the
+ * buyer is already a verified sponsor of that child — there's nothing
+ * to spoil. Tone matches the shirt confirmation: warm, specific, short.
+ */
+async function sendMerchConfirmationEmail(orderData: {
+  email: string;
+  name: string;
+  merchName: string;
+  shirtNumber: string;
+  size?: string;
+  amount: number;
+  childDisplayName?: string;
+}): Promise<void> {
+  if (!orderData.email) {
+    console.log('[Webhook] No buyer email, skipping merch confirmation');
+    return;
+  }
+  const fromEmail = process.env.SENDGRID_FROM_EMAIL || 'Kevin@beanumber.org';
+  const firstName = orderData.name.split(' ')[0] || 'Friend';
+  const childLine = orderData.childDisplayName
+    ? ` Same number as ${orderData.childDisplayName}'s shirt.`
+    : '';
+  const sizeLine = orderData.size ? ` (Size ${orderData.size})` : '';
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      </head>
+      <body style="font-family: Georgia, 'Times New Roman', serif; line-height: 1.7; color: #333; max-width: 560px; margin: 0 auto; padding: 30px 20px;">
+        <p style="margin-top: 0;">Hey ${firstName},</p>
+        <p>Your <strong>${orderData.merchName}</strong>${sizeLine} is on the make-bench. I&rsquo;ll press <strong>#${orderData.shirtNumber}</strong> on it by hand and ship it within 5&ndash;7 business days.${childLine}</p>
+        <p style="color: #999; font-size: 14px; margin-bottom: 4px;">Your order:</p>
+        <p style="font-size: 15px; color: #555; margin-top: 0;">
+          ${orderData.merchName}${sizeLine} &middot; #${orderData.shirtNumber}<br>
+          <span style="color: #999;">$${orderData.amount.toFixed(2)} &middot; free shipping</span>
+        </p>
+        <p>Thanks for staying in the relationship.</p>
+        <p>Kevin</p>
+        <hr style="border: none; border-top: 1px solid #e8e0d4; margin: 30px 0;">
+        <p style="font-size: 12px; color: #999; line-height: 1.5;">
+          Be A Number, International<br>
+          <a href="https://www.beanumber.org" style="color: #D4A843;">beanumber.org</a>
+        </p>
+      </body>
+    </html>
+  `;
+
+  const result = await sendEmail({
+    to: { email: orderData.email, name: orderData.name },
+    from: { email: fromEmail, name: 'Kevin at Be A Number' },
+    subject: `Your ${orderData.merchName} is being made (#${orderData.shirtNumber}).`,
+    html,
+  });
+  if (!result.success) {
+    console.error('[Webhook] Merch confirmation email failed:', result.error);
+    return;
+  }
+  console.log('[Webhook] Merch confirmation email sent to:', orderData.email);
+}
+
+// ---------------------------------------------------------------------------
 // Gift sponsorship emails (memo §11)
 // ---------------------------------------------------------------------------
 
@@ -1597,6 +1666,11 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
     // gets matched to a child and emailed an intro. Recipient may
     // convert to a $25/mo sponsor from the reveal page.
     const isGiftSponsorship = session.metadata?.order_type === 'gift_sponsorship';
+    // Number Collection (Hoodie / Hat / Stickers): active sponsor buying
+    // a merch item with their child's number on it. No Sponsorship
+    // changes, no drip enrollment, no Fulfillment row — Kevin makes the
+    // item by hand from the admin notification email and ships it.
+    const isMerchPurchase = session.metadata?.order_type === 'merch_purchase';
 
     const donorArgs = {
       name,
@@ -2462,6 +2536,114 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
       // Deliberately skip drip enrollment — they're already a sponsor.
 
       return { donorId, donationId, isPortalRepeat: true, existingShirtNumber };
+
+    } else if (isMerchPurchase) {
+      // --- NUMBER COLLECTION MERCH FLOW ---
+      //
+      // Active sponsor bought a hoodie / hat / sticker pack from the
+      // /[number] page. The merch carries their child's shirt number.
+      //
+      // We deliberately skip Fulfillment row creation here — merch
+      // volume is small and Kevin makes each piece by hand. The
+      // admin notification email has everything needed to fulfill:
+      // item, sponsor's number, size, ship-to address. We DO record
+      // the Donation so retention/LTV reporting picks it up.
+      const merchType = session.metadata?.merch_type || 'unknown';
+      const merchName = session.metadata?.merch_name || 'Merch item';
+      const shirtNumber = session.metadata?.shirt_number || '?';
+      const size = session.metadata?.size || '';
+      const sponsorCode = session.metadata?.sponsor_code || '';
+      const childDisplayName = session.metadata?.child_display_name || '';
+
+      console.log(
+        `[WH] S2: merch flow, ${merchName}, #${shirtNumber}${size ? `, size ${size}` : ''}`
+      );
+
+      const donorId = await donorPromise;
+
+      // Step 3: Donation record for accounting + LTV reporting. The
+      // Donation Source 'Merch' isn't a singleSelect option yet, so the
+      // VALID_SOURCES normalizer will route this to 'Website' and stash
+      // the real label as a prefix on Donation Note. Once Kevin adds
+      // 'Merch' as an Airtable option this flips to the real value
+      // automatically.
+      const donationId = await upsertDonation(paymentIntentId, {
+        sessionId: session.id,
+        customerId: stripeCustomerId,
+        donorId,
+        amount,
+        currency,
+        donationDate,
+        isRecurring: false,
+        subscriptionId: null,
+        status,
+        email,
+        name,
+        organization: organization || undefined,
+        address,
+        donationSource: 'Merch',
+        notes: `Number Collection — ${merchName}${size ? ` (Size ${size})` : ''} stamped with #${shirtNumber}, matched to ${childDisplayName || 'sponsor child'}. Sponsor ${sponsorCode}.`,
+      });
+
+      // Step 4: Confirmation email to the buyer.
+      let emailStatus = 'Sent';
+      try {
+        await sendMerchConfirmationEmail({
+          email,
+          name,
+          merchName,
+          shirtNumber: String(shirtNumber),
+          size,
+          amount,
+          childDisplayName,
+        });
+      } catch (err) {
+        console.error('[WH] Failed to send merch confirmation email:', err);
+        emailStatus = 'Failed';
+      }
+
+      // Step 5: Communication record (audit trail)
+      try {
+        await createCommunicationRecord(donationId, donorId, {
+          email,
+          subject: `Your ${merchName} order is being made.`,
+          body: `Merch order: ${merchName}${size ? ` (${size})` : ''}, #${shirtNumber}, ${childDisplayName || ''} / $${amount.toFixed(2)}`,
+          status: emailStatus,
+        });
+      } catch (err) {
+        console.error('[WH] Failed to create communication record (merch):', err);
+      }
+
+      // Step 6: Admin email — what Kevin needs to fulfill the order.
+      console.log('[WH] S6: admin notify (merch)');
+      try {
+        const fromEmail = process.env.SENDGRID_FROM_EMAIL || 'Kevin@beanumber.org';
+        const adminEmail = process.env.ADMIN_NOTIFY_EMAIL || 'kevin@beanumber.org';
+        const shipAddr = address
+          ? `${address.line1 || ''}${address.line2 ? `, ${address.line2}` : ''}, ${address.city || ''}, ${address.state || ''} ${address.postal_code || ''}`.replace(/^,\s*/, '')
+          : '(no shipping address on file)';
+        const adminHtml = `
+          <p><strong>${name || 'unknown buyer'}</strong> just ordered a <strong>${merchName}</strong>${size ? ` (size ${size})` : ''} with <strong>#${shirtNumber}</strong> on it.</p>
+          <p><strong>What to make:</strong> ${merchName}${size ? ` size ${size}` : ''}, press/embroider #${shirtNumber}.</p>
+          <p><strong>Ship to:</strong><br>${name}<br>${shipAddr}</p>
+          <p><strong>Sponsor:</strong> ${sponsorCode} (${childDisplayName || 'child'})<br><strong>Buyer email:</strong> ${email}</p>
+          <p><strong>Paid:</strong> $${amount.toFixed(2)} (Stripe session ${session.id})</p>
+        `;
+        await sendEmail({
+          to: { email: adminEmail, name: 'Kevin' },
+          from: { email: fromEmail, name: 'BAN Orders' },
+          subject: `Merch order: ${merchName} #${shirtNumber}${size ? ` (${size})` : ''}`,
+          html: adminHtml,
+        });
+      } catch (err: any) {
+        console.error('[WH] merch admin notify failed:', String(err?.message || err).slice(0, 200));
+      }
+
+      // No drip enrollment, no Sponsorship changes. The sponsor is
+      // already in the relationship; this purchase deepens it but
+      // doesn't change the relationship structure.
+
+      return { donorId, donationId, isMerchPurchase: true, merchType, shirtNumber };
 
     } else if (isGiftSponsorship) {
       // --- GIFT SPONSORSHIP FLOW (memo §11) ---

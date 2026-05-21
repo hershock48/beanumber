@@ -9,6 +9,7 @@ import { RevealOverlay } from './RevealOverlay';
 import { SponsorButton } from './SponsorButton';
 import { NewsletterSignup } from './NewsletterSignup';
 import { ClaimMatchCard } from './ClaimMatchCard';
+import { MerchPurchaseTile } from './MerchPurchaseTile';
 import { SESSION } from '@/lib/constants';
 
 // Never statically optimize or cache this page. Sponsorship status and child
@@ -893,7 +894,7 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
             2. Shirt buyer     → locked teaser, blurred cards, sponsor CTA
             3. Cold visitor    → nothing (focus stays on sponsorship CTA)
         ── */}
-        {child.viewer_is_sponsor ? (
+        {child.viewer_is_sponsor && child.sponsor_code ? (
           <div className="mt-10 md:mt-16">
             <div className="text-center mb-6 md:mb-8">
               <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-3">
@@ -906,40 +907,56 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
                 You&rsquo;re a sponsor. These are yours.
               </h2>
               <p className="text-[#777] text-sm max-w-md mx-auto">
-                Every piece is handmade with your number on it. Request what you want and we&rsquo;ll make it.
+                Every piece is handmade with your number on it. One tap, charged to your saved card.
               </p>
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
-              {[
-                { name: 'Hoodie', slug: 'hoodie', detail: `#${number} on the back`, price: '$45' },
-                { name: 'Hat', slug: 'hat', detail: `#${number} front and center`, price: '$30' },
-                { name: 'Sticker Pack', slug: 'stickers', detail: 'Laptop, water bottle, wherever', price: '$10' },
-                { name: 'Another Shirt', slug: 'shirt', detail: 'Different design, same number', price: '$25' },
-              ].map((item) => (
-                <a
-                  key={item.slug}
-                  href={`mailto:Kevin@beanumber.org?subject=${encodeURIComponent(`I want a #${number} ${item.name}`)}&body=${encodeURIComponent(`Hey Kevin,\n\nI'd love a ${item.name.toLowerCase()} with #${number} on it.\n\nThanks!`)}`}
-                  className="group block bg-white border border-[#e8e0d4] p-3 md:p-4 hover:border-[#D4A843] transition-colors"
-                >
-                  <div className="aspect-[4/3] bg-[#f5f0e8] flex items-center justify-center mb-3">
-                    <p className="text-3xl md:text-4xl font-bold text-[#D4A843] opacity-30">
-                      #{number}
-                    </p>
-                  </div>
-                  <p
-                    className="text-sm font-semibold text-[#0d0d0d] mb-0.5"
-                    style={{ fontFamily: 'var(--font-lora), serif' }}
-                  >
-                    {item.name}
-                  </p>
-                  <p className="text-xs text-[#999] mb-3">{item.detail}</p>
-                  <p className="text-xs font-bold text-[#D4A843] uppercase tracking-wider group-hover:text-[#c49a3a] transition-colors">
-                    I want this &rarr;
-                  </p>
-                </a>
-              ))}
+            {/* Three buyable items. Hoodie needs a size selector; hat and
+                stickers go straight to Stripe Checkout on tap. Pricing
+                lives server-side in /api/sponsor/merch-purchase so the
+                client can't tamper with it. */}
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
+              <MerchPurchaseTile
+                merchType="hoodie"
+                shirtNumber={Number(number)}
+                sponsorCode={child.sponsor_code}
+                itemName="Hoodie"
+                detail={`#${number} on the back`}
+                priceLabel="$45 · free shipping"
+                needsSize
+              />
+              <MerchPurchaseTile
+                merchType="hat"
+                shirtNumber={Number(number)}
+                sponsorCode={child.sponsor_code}
+                itemName="Hat"
+                detail={`#${number} front and center`}
+                priceLabel="$30 · free shipping"
+                needsSize={false}
+              />
+              <MerchPurchaseTile
+                merchType="stickers"
+                shirtNumber={Number(number)}
+                sponsorCode={child.sponsor_code}
+                itemName="Sticker Pack"
+                detail="Laptop, water bottle, wherever"
+                priceLabel="$10 · free shipping"
+                needsSize={false}
+              />
             </div>
+
+            {/* Repeat shirts use the existing Shop Your Number flow on
+                the sponsor portal — Kevin hand-prints those. */}
+            <p className="text-center text-xs text-[#999] mt-6">
+              Want another shirt with #{number} on it? Kevin makes those
+              by hand &mdash;{' '}
+              <a
+                href={`mailto:Kevin@beanumber.org?subject=${encodeURIComponent(`Another #${number} shirt`)}&body=${encodeURIComponent(`Hey Kevin,\n\nI'd love another shirt with #${number} on it. Same color/size as my original works for me.\n\nThanks!`)}`}
+                className="text-[#D4A843] underline hover:text-[#c49a3a]"
+              >
+                send me one
+              </a>.
+            </p>
           </div>
         ) : viewerLooksLikeBuyer ? (
           <div className="mt-10 md:mt-16">
