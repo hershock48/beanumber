@@ -17,13 +17,6 @@ interface Update {
   photos: string[];
 }
 
-interface SponsorMessage {
-  id: string;
-  date: string;
-  content: string;
-  status: string;
-}
-
 interface Sponsorship {
   startDate: string | null;
   totalPaid: number;
@@ -62,8 +55,11 @@ const PORTAL_DESIGNS: { id: string; name: string; color: string; price: number }
 ];
 const PORTAL_SIZES = ['S', 'M', 'L', 'XL', '2XL'] as const;
 
-// A single timeline entry — the component merges updates, messages, and
-// computed milestones into this shape and sorts chronologically.
+// A single timeline entry — the component merges updates and computed
+// milestones into this shape and sorts chronologically. Sponsor-to-child
+// messaging was retired in May 2026 (no clean delivery path on the
+// Uganda side); the 'message' kind is preserved here so historical
+// timelines still type-check, but no new entries of that kind are added.
 interface TimelineEntry {
   id: string;
   date: string;
@@ -73,7 +69,7 @@ interface TimelineEntry {
   title?: string;
   content?: string;
   photos?: string[];
-  // message fields
+  // legacy message fields (no new entries created since May 2026)
   messageStatus?: string;
   // milestone fields
   milestoneLabel?: string;
@@ -125,68 +121,6 @@ function countSchoolDays(start: Date, end: Date): number {
 /** Calendar days between two dates (exclusive of start, inclusive of end). */
 function daysBetween(start: Date, end: Date): number {
   return Math.max(0, Math.floor((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
-}
-
-// ---------------------------------------------------------------------------
-// Conversation starter pools — randomly sampled each time the prompt
-// drawer opens so the experience stays fresh across visits.
-// ---------------------------------------------------------------------------
-
-// Templates use CHILD as a placeholder replaced with the actual first name.
-const SHARE_PROMPTS = [
-  'Hi CHILD! I wanted to introduce myself. I work as _____ and I live in _____.',
-  'One thing I love doing on weekends is _____. What do you do on weekends?',
-  'My favorite food is _____. What\u2019s yours?',
-  'I have _____ siblings. Do you have brothers or sisters?',
-  'My favorite animal is _____. Do you have a favorite animal?',
-  'Something that made me smile this week was _____.',
-  'Right now where I live the weather is _____. What is the weather like where you are?',
-  'When I was your age, I really loved _____.',
-  'I\u2019m learning how to _____. It\u2019s harder than I thought!',
-  'My favorite holiday is _____ because _____.',
-  'I just finished reading a book called _____. Do you like reading?',
-  'If I could visit anywhere in the world, I\u2019d go to _____.',
-  'The best meal I ever had was _____.',
-  'One of my favorite memories is _____.',
-  'I work as a _____ and the best part of my job is _____.',
-  'I\u2019m from a place called _____. It\u2019s known for _____.',
-  'My favorite song right now is _____. Do you like music?',
-  'I play _____ for fun. Do you play any sports or games?',
-  'If I could have any superpower, I\u2019d pick _____.',
-  'My favorite color is _____. What\u2019s yours?',
-];
-
-const ASK_PROMPTS = [
-  'What is your favorite subject in school and why?',
-  'What do you like to do with your friends?',
-  'What do you want to be when you grow up?',
-  'What made you happy this week?',
-  'What\u2019s your favorite game to play?',
-  'Do you have a best friend? What do you like to do together?',
-  'What\u2019s the funniest thing that happened to you recently?',
-  'What are you most proud of?',
-  'If you could learn anything in the world, what would it be?',
-  'What is your favorite thing about your school?',
-  'What\u2019s your favorite time of day and why?',
-  'What do you like to do after school?',
-  'What\u2019s your favorite thing to eat for lunch?',
-  'Is there a teacher at school you really like? What makes them special?',
-  'Do you like to draw or make things? What do you make?',
-  'What\u2019s a song you like to sing?',
-  'What\u2019s the best thing that happened at school this term?',
-  'If you could have any animal as a pet, what would you pick?',
-  'What do you want to tell me about yourself?',
-  'What is something you\u2019re really good at?',
-];
-
-/** Fisher-Yates shuffle (non-mutating) and return the first `n` items. */
-function pickRandom<T>(pool: T[], n: number): T[] {
-  const a = [...pool];
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-  return a.slice(0, n);
 }
 
 function isBirthdaySoon(birthday: string | undefined): { upcoming: boolean; daysAway: number; dateLabel: string } {
@@ -460,7 +394,6 @@ function ShopYourNumberSection({
 
 export function SponsorDashboard({ sponsorCode, email }: SponsorDashboardProps) {
   const [updates, setUpdates] = useState<Update[]>([]);
-  const [sponsorMessages, setSponsorMessages] = useState<SponsorMessage[]>([]);
   const [childInfo, setChildInfo] = useState<ChildInfo | null>(null);
   const [childRevealed, setChildRevealed] = useState<boolean>(false);
   const [sponsorship, setSponsorship] = useState<Sponsorship>({ startDate: null, totalPaid: 0, monthlyAmount: 25, monthsActive: 0, status: null });
@@ -487,16 +420,6 @@ export function SponsorDashboard({ sponsorCode, email }: SponsorDashboardProps) 
     return () => clearTimeout(timer);
   }, [sponsorCode]);
 
-  // Write-to-child state
-  const [messageText, setMessageText] = useState('');
-  const [sendingMessage, setSendingMessage] = useState(false);
-  const [messageSent, setMessageSent] = useState(false);
-  const [messageError, setMessageError] = useState('');
-  const [showPrompts, setShowPrompts] = useState(false);
-  // Counter that increments every time the prompt drawer opens so we
-  // get a fresh random selection each time.
-  const [promptSeed, setPromptSeed] = useState(0);
-
   useEffect(() => {
     loadSponsorData();
   }, [sponsorCode]);
@@ -508,7 +431,6 @@ export function SponsorDashboard({ sponsorCode, email }: SponsorDashboardProps) 
 
       if (response.ok) {
         setUpdates(data.updates || []);
-        setSponsorMessages(data.sponsorMessages || []);
         setChildInfo(data.childInfo || null);
         setChildRevealed(!!data.childRevealed);
         setSponsorship(data.sponsorship || { startDate: null, totalPaid: 0, monthlyAmount: 25, monthsActive: 0, status: null });
@@ -537,17 +459,10 @@ export function SponsorDashboard({ sponsorCode, email }: SponsorDashboardProps) 
   // Birthday
   const birthdayInfo = isBirthdaySoon(childInfo?.birthday);
 
-  // Random conversation starters — 3 "share" + 3 "ask" picked fresh
-  // each time the drawer opens (keyed on promptSeed).
-  const randomPrompts = useMemo(() => {
-    const share = pickRandom(SHARE_PROMPTS, 3).map((p) => p.replace(/CHILD/g, firstName));
-    const ask = pickRandom(ASK_PROMPTS, 3).map((p) => p.replace(/CHILD/g, firstName));
-    return { share, ask };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [promptSeed, firstName]);
-
   // -------------------------------------------------------------------
-  // Build the timeline — merges updates, messages, and milestones
+  // Build the timeline — merges YDO updates with computed milestones
+  // (sponsor-to-child messaging was retired in May 2026 — see comment
+  // on TimelineEntry interface).
   // -------------------------------------------------------------------
   const timeline = useMemo(() => {
     const entries: TimelineEntry[] = [];
@@ -573,17 +488,6 @@ export function SponsorDashboard({ sponsorCode, email }: SponsorDashboardProps) 
         title: u.title,
         content: u.content,
         photos: u.photos,
-      });
-    }
-
-    // Sponsor messages
-    for (const m of sponsorMessages) {
-      entries.push({
-        id: m.id,
-        date: m.date,
-        kind: 'message',
-        content: m.content,
-        messageStatus: m.status,
       });
     }
 
@@ -630,22 +534,6 @@ export function SponsorDashboard({ sponsorCode, email }: SponsorDashboardProps) 
       }
     }
 
-    // First message milestone
-    if (sponsorMessages.length > 0) {
-      const firstMsg = [...sponsorMessages].sort(
-        (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
-      )[0];
-      if (firstMsg) {
-        entries.push({
-          id: 'milestone-first-message',
-          date: firstMsg.date,
-          kind: 'milestone',
-          milestoneLabel: `You wrote your first message to ${firstName}.`,
-          milestoneIcon: 'pencil',
-        });
-      }
-    }
-
     // Child's birthday (each year since sponsorship started)
     if (childInfo?.birthday && sponsorship.startDate) {
       const start = new Date(sponsorship.startDate);
@@ -671,7 +559,7 @@ export function SponsorDashboard({ sponsorCode, email }: SponsorDashboardProps) 
     entries.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
     return entries;
-  }, [updates, sponsorMessages, sponsorship.startDate, firstName, childInfo?.birthday]);
+  }, [updates, sponsorship.startDate, firstName, childInfo?.birthday]);
 
   // Collect all photos from updates for the gallery
   const allPhotos = useMemo(() => {
@@ -713,35 +601,6 @@ export function SponsorDashboard({ sponsorCode, email }: SponsorDashboardProps) 
       alert('Failed to submit request. Please try again.');
     } finally {
       setRequestingUpdate(false);
-    }
-  }
-
-  async function handleSendMessage() {
-    if (!messageText.trim() || sendingMessage) return;
-    setSendingMessage(true);
-    setMessageError('');
-    setMessageSent(false);
-
-    try {
-      const response = await fetch('/api/sponsor/send-message', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sponsorCode, email, message: messageText.trim() }),
-      });
-
-      if (response.ok) {
-        setMessageSent(true);
-        setMessageText('');
-        setShowPrompts(false);
-        await loadSponsorData();
-      } else {
-        const errorData = await response.json();
-        setMessageError(errorData.error || 'Failed to send message. Please try again.');
-      }
-    } catch {
-      setMessageError('Failed to send message. Please try again.');
-    } finally {
-      setSendingMessage(false);
     }
   }
 
@@ -888,8 +747,8 @@ export function SponsorDashboard({ sponsorCode, email }: SponsorDashboardProps) 
             </p>
             <p className="text-sm text-[#666] mt-0.5">
               {birthdayInfo.daysAway <= 7
-                ? `Write ${firstName} a birthday message using the form below.`
-                : `A perfect time to send a note.`}
+                ? `Watch for a birthday update from the campus.`
+                : `Watch for a birthday update from the campus when the day comes.`}
             </p>
           </div>
         </div>
@@ -899,7 +758,7 @@ export function SponsorDashboard({ sponsorCode, email }: SponsorDashboardProps) 
         <div className="bg-[#FFF8F0] border border-[#e8e0d4] p-4 md:p-5 mb-6 flex items-center gap-4">
           <span className="text-2xl flex-shrink-0" role="img" aria-label="birthday">🎂</span>
           <p className="text-[#666]">
-            {firstName} just had a birthday on {birthdayInfo.dateLabel}. It&rsquo;s not too late to send a message.
+            {firstName} just had a birthday on {birthdayInfo.dateLabel}.
           </p>
         </div>
       )}
@@ -1125,129 +984,6 @@ export function SponsorDashboard({ sponsorCode, email }: SponsorDashboardProps) 
             </>
           )}
         </div>
-
-        {/* Write to Your Child */}
-        <div className="bg-white border border-[#e8e0d4] p-6">
-          <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-3">
-            Write to {firstName}
-          </p>
-
-          {messageSent ? (
-            <div className="bg-[#FFF8F0] border border-[#e8e0d4] p-4 text-sm text-[#444]">
-              <p className="font-medium text-[#0d0d0d] mb-1">Message sent.</p>
-              <p className="text-[#666] mb-2">
-                Kevin will relay your message to {firstName} through the YDO team on the ground in Omoro District.
-              </p>
-              <div className="bg-white border border-[#e8e0d4] p-3 text-xs text-[#888] mb-3">
-                <p className="font-semibold text-[#666] mb-1">What happens next</p>
-                <p>Your message goes to Kevin, then to the YDO team, then to {firstName}. If you asked a question, {firstName}&rsquo;s response comes back the same way. Expect 2&ndash;4 weeks.</p>
-              </div>
-              <button
-                onClick={() => setMessageSent(false)}
-                className="text-sm text-[#D4A843] hover:underline font-medium"
-              >
-                Write another message
-              </button>
-            </div>
-          ) : (
-            <>
-              {messageError && (
-                <div className="bg-[#FFF8F0] border border-[#D4A843] text-[#0d0d0d] px-3 py-2 text-sm mb-3">
-                  {messageError}
-                </div>
-              )}
-
-              <p className="text-sm text-[#666] leading-relaxed mb-3">
-                Send a note, a question, encouragement &mdash; whatever you want {firstName} to hear.
-                Kevin relays every message through the YDO team.
-              </p>
-
-              {/* Prompt suggestions — expandable, randomized each open */}
-              {!showPrompts ? (
-                <button
-                  onClick={() => { setPromptSeed((s) => s + 1); setShowPrompts(true); }}
-                  className="text-xs text-[#D4A843] hover:underline font-medium mb-3 block"
-                >
-                  Not sure what to say? Here are some ideas.
-                </button>
-              ) : (
-                <div className="bg-[#FFF8F0] border border-[#e8e0d4] p-3 mb-3 text-sm">
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="text-xs font-semibold text-[#888] uppercase tracking-wider">Conversation starters</p>
-                    <div className="flex items-center gap-3">
-                      <button
-                        onClick={() => setPromptSeed((s) => s + 1)}
-                        className="text-xs text-[#D4A843] hover:underline"
-                      >
-                        Shuffle
-                      </button>
-                      <button
-                        onClick={() => setShowPrompts(false)}
-                        className="text-xs text-[#aaa] hover:text-[#666]"
-                      >
-                        Hide
-                      </button>
-                    </div>
-                  </div>
-                  <p className="text-xs text-[#999] mb-2">Tap any to add it to your message:</p>
-                  <div className="space-y-1.5">
-                    <p className="text-xs font-semibold text-[#D4A843] uppercase tracking-wider mt-1">Tell {firstName} about you</p>
-                    {randomPrompts.share.map((prompt) => (
-                      <button
-                        key={prompt}
-                        onClick={() => setMessageText((prev) => prev ? `${prev}\n\n${prompt}` : prompt)}
-                        className="block w-full text-left px-3 py-2 border border-[#e8e0d4] bg-white text-[#666] text-xs hover:border-[#D4A843]/50 hover:bg-white transition-colors"
-                      >
-                        {prompt}
-                      </button>
-                    ))}
-                    <p className="text-xs font-semibold text-[#D4A843] uppercase tracking-wider mt-3">Ask {firstName} something</p>
-                    {randomPrompts.ask.map((prompt) => (
-                      <button
-                        key={prompt}
-                        onClick={() => setMessageText((prev) => prev ? `${prev}\n\n${prompt}` : prompt)}
-                        className="block w-full text-left px-3 py-2 border border-[#e8e0d4] bg-white text-[#666] text-xs hover:border-[#D4A843]/50 hover:bg-white transition-colors"
-                      >
-                        {prompt}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              <textarea
-                value={messageText}
-                onChange={(e) => setMessageText(e.target.value)}
-                placeholder={`Hey ${firstName}...`}
-                rows={4}
-                maxLength={2000}
-                className="w-full px-4 py-3 border border-[#e8e0d4] bg-white text-[#0d0d0d] text-sm leading-relaxed focus:outline-none focus:border-[#D4A843] focus:ring-1 focus:ring-[#D4A843] transition-colors resize-none mb-2"
-              />
-
-              {/* Response time expectation */}
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-xs text-[#aaa]">{messageText.length}/2000</span>
-              </div>
-
-              <div className="bg-[#f9f6f0] border border-[#e8e0d4] px-3 py-2 text-xs text-[#888] mb-4 flex items-start gap-2">
-                <svg className="w-4 h-4 text-[#D4A843] mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <span>Messages travel from Kevin to the YDO team to {firstName} in Northern Uganda. Expect a response in 2&ndash;4 weeks.</span>
-              </div>
-
-              <div className="flex justify-end">
-                <button
-                  onClick={handleSendMessage}
-                  disabled={!messageText.trim() || sendingMessage}
-                  className="px-5 py-2.5 bg-[#D4A843] text-[#0d0d0d] font-bold text-sm tracking-[0.05em] hover:bg-[#c49a3a] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {sendingMessage ? 'SENDING...' : 'SEND MESSAGE'}
-                </button>
-              </div>
-            </>
-          )}
-        </div>
       </div>
 
       {/* ============================================================
@@ -1265,14 +1001,14 @@ export function SponsorDashboard({ sponsorCode, email }: SponsorDashboardProps) 
               Welcome to your portal.
             </h2>
             <p className="text-[#666] leading-relaxed mb-4 max-w-lg">
-              This is where your relationship with {firstName} will take shape — updates from the campus,
-              photos, notes from their teacher, and messages you send.
-              The first update is on its way.
+              This is where your relationship with {firstName} will take shape &mdash; updates
+              from the campus, photos, notes from their teacher, the occasional letter
+              from {firstName}. The first update is on its way.
             </p>
             <p className="text-[#666] leading-relaxed mb-6 max-w-lg">
-              In the meantime, you can request an update or write {firstName} a message
-              using the forms above. Every message gets delivered through our team on
-              the ground in Omoro District.
+              You can also request a fresh update using the button above. Our team in
+              Omoro District batches per-child updates each term, and a request from
+              you pushes {firstName}&rsquo;s next one up the queue.
             </p>
             <p className="text-sm text-[#aaa]">
               Questions? Email{' '}
