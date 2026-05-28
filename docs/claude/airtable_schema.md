@@ -136,6 +136,7 @@ Structured intake fields (April 15 redesign):
 - `ChildQuote` (multilineText) — renders as Lora italic pull-quote.
 - `TeacherName` (singleLineText).
 - `TeacherQuote` (multilineText).
+- `NameMeaning` (singleLineText) — renders as small italic line directly under the kid's name on `/[number]`. Cultural meaning of their Acholi/Luo name. Added May 28, 2026.
 
 Shirt assignment fields:
 - `ShirtAssignedAt` (dateTime) — BLANK means shirt number is available.

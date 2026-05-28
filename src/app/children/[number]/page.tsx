@@ -48,6 +48,7 @@ interface AirtableChildRecord {
     ChildQuote?: string;
     TeacherName?: string;
     TeacherQuote?: string;
+    NameMeaning?: string;
   };
 }
 
@@ -403,6 +404,7 @@ const getChildByShirtNumber = cache(async function getChildByShirtNumber(shirtNu
       !baseChild.Loves &&
       !baseChild.ChildQuote &&
       !baseChild.TeacherQuote &&
+      !baseChild.NameMeaning &&
       !baseChild.Notes;
     let canonicalChildFields: AirtableChildRecord['fields'] | null = null;
     if (canonicalNum && isSparse) {
@@ -538,6 +540,7 @@ const getChildByShirtNumber = cache(async function getChildByShirtNumber(shirtNu
       child_quote: child.ChildQuote,
       teacher_name: child.TeacherName,
       teacher_quote: child.TeacherQuote,
+      name_meaning: child.NameMeaning,
     };
   } catch (error) {
     console.error('[children/page] Error fetching child', {
@@ -928,11 +931,23 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
           {/* Details */}
           <div className="flex flex-col justify-center py-0 md:py-4">
             <h1
-              className="text-4xl md:text-5xl text-[#0d0d0d] mb-3"
+              className="text-4xl md:text-5xl text-[#0d0d0d] mb-2"
               style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
             >
               {displayName}
             </h1>
+
+            {/* Cultural meaning of the kid's Acholi/Luo name. Small italic
+                line directly under their name — gives sponsors something to
+                remember and share. */}
+            {child.name_meaning && (
+              <p
+                className="text-base md:text-lg text-[#888] italic mb-4 leading-snug"
+                style={{ fontFamily: 'var(--font-lora), serif' }}
+              >
+                {child.name_meaning}
+              </p>
+            )}
 
             <div className="flex items-center gap-3 text-[#777] mb-6">
               {child.age && <span className="text-lg">Age {child.age}</span>}
