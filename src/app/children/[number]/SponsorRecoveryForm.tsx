@@ -66,6 +66,11 @@ export function SponsorRecoveryForm({ shirtNumber }: { shirtNumber: number }) {
           If we have an active sponsorship for that email on this kid,
           a one-tap link is on its way. The link expires in 30 minutes.
         </p>
+        <p className="text-xs text-[#aaa] leading-relaxed mt-2">
+          Nothing showing up? Email{' '}
+          <a href="mailto:Kevin@beanumber.org" className="text-[#D4A843] hover:underline">Kevin@beanumber.org</a>{' '}
+          and I&rsquo;ll get you back in.
+        </p>
         <button
           type="button"
           onClick={() => {
@@ -115,6 +120,11 @@ export function SponsorRecoveryForm({ shirtNumber }: { shirtNumber: number }) {
       {state === 'error' && (
         <p className="text-xs text-red-600 mt-2">{errorMessage}</p>
       )}
+      <p className="text-xs text-[#aaa] mt-3 leading-relaxed">
+        Don&rsquo;t remember which email, or stuck for any other reason? Email{' '}
+        <a href="mailto:Kevin@beanumber.org" className="text-[#D4A843] hover:underline">Kevin@beanumber.org</a>{' '}
+        and I&rsquo;ll get you back in.
+      </p>
       <button
         type="button"
         onClick={() => {
