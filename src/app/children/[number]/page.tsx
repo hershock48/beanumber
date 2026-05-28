@@ -1001,161 +1001,171 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
                 )}
               </div>
             )}
+          </div>
+        </div>
 
-            {/* Longer-form bio paragraph from the Notes field. Renders below
-                the scannable structured blocks as the deeper-read section.
-                Scoped to whatever the structured fields don't already cover:
-                academic moments, walk to school, what their day looks like,
-                family history. Always renders when Notes has content. */}
-            {child.fun_fact && (
-              <div className="bg-white border border-[#e8e0d4] p-5 mb-8">
-                <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-3">
-                  More about {firstName}
-                </p>
-                <div className="text-[#444] leading-relaxed space-y-3 whitespace-pre-line">
-                  {child.fun_fact}
-                </div>
+        {/* ── Below the photo+intro grid: deeper read, then the CTA ──
+            Pulled out of the right column so the photo height and the
+            right column don't fight on desktop. Centered at a
+            comfortable reading width regardless of viewport. */}
+        <div className="max-w-2xl mx-auto mt-10 md:mt-12">
+          {/* Longer-form bio paragraph from the Notes field. Renders
+              below the scannable structured blocks as the deeper-read
+              section. Scoped to whatever the structured fields don't
+              already cover: academic moments, walk to school, what
+              their day looks like, family history. Always renders when
+              Notes has content. Styled to match the structured
+              Family/About blocks above — no card chrome. */}
+          {child.fun_fact && (
+            <div className="mb-8">
+              <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-2">
+                More about {firstName}
+              </p>
+              <div className="text-[#444] leading-relaxed [&_p+p]:mt-4 whitespace-pre-line">
+                {child.fun_fact}
               </div>
-            )}
+            </div>
+          )}
 
-            {/* Teacher quote — attributed, treated as a second human voice
-                on the page. Only appears when TeacherQuote is present. */}
-            {child.teacher_quote && (
-              <div className="bg-white border border-[#e8e0d4] p-5 mb-8">
-                <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-3">
-                  From {firstName}&rsquo;s teacher
-                </p>
-                <p className="text-[#444] leading-relaxed italic">
-                  &ldquo;{child.teacher_quote}&rdquo;
-                </p>
-                {child.teacher_name && (
-                  <p className="mt-3 text-sm text-[#888]">— {child.teacher_name}</p>
-                )}
-              </div>
-            )}
+          {/* Teacher quote — attributed, treated as a second human
+              voice on the page. Only appears when TeacherQuote is
+              present. Soft-bordered block so the attributed voice
+              reads visually distinct from the rest of the body copy. */}
+          {child.teacher_quote && (
+            <div className="border-l-2 border-[#D4A843] pl-5 mb-8">
+              <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-2">
+                From {firstName}&rsquo;s teacher
+              </p>
+              <p className="text-[#444] leading-relaxed italic">
+                &ldquo;{child.teacher_quote}&rdquo;
+              </p>
+              {child.teacher_name && (
+                <p className="mt-3 text-sm text-[#888]">— {child.teacher_name}</p>
+              )}
+            </div>
+          )}
 
-            {/* "Story coming" placeholder — only when this kid has neither
-                structured intake fields nor a Notes bio. Tells sponsors the
-                full profile is in flight from the campus. */}
-            {!hasStructured && !child.fun_fact && (
-              <div className="bg-white border border-[#e8e0d4] p-5 mb-8">
-                <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-2">
-                  {firstName}&rsquo;s story
-                </p>
-                <p className="text-[#666] leading-relaxed">
-                  We&rsquo;re gathering {firstName}&rsquo;s full profile from
-                  the campus in Omoro District right now — home, family, what
-                  they love, and a note from their teacher. Sponsor them today
-                  and we&rsquo;ll send it to you as soon as it&rsquo;s in our
-                  hands.
-                </p>
-              </div>
-            )}
+          {/* "Story coming" placeholder — only when this kid has neither
+              structured intake fields nor a Notes bio. Tells sponsors
+              the full profile is in flight from the campus. */}
+          {!hasStructured && !child.fun_fact && (
+            <div className="bg-white border border-[#e8e0d4] p-5 mb-8">
+              <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-2">
+                {firstName}&rsquo;s story
+              </p>
+              <p className="text-[#666] leading-relaxed">
+                We&rsquo;re gathering {firstName}&rsquo;s full profile
+                from the campus in Omoro District right now — home,
+                family, what they love, and a note from their teacher.
+                Sponsor them today and we&rsquo;ll send it to you as
+                soon as it&rsquo;s in our hands.
+              </p>
+            </div>
+          )}
 
-            {/* ── CTA — three states based on viewer identity ──── */}
-            {child.viewer_is_sponsor ? (
-              /* ── Verified sponsor: acknowledge, link to portal ── */
-              <div className="bg-white border-2 border-[#D4A843]/30 p-7 text-center">
+          {/* ── CTA — three states based on viewer identity ──── */}
+          {child.viewer_is_sponsor ? (
+            /* ── Verified sponsor: acknowledge, link to portal ── */
+            <div className="bg-white border-2 border-[#D4A843]/30 p-7 text-center">
+              <p
+                className="text-xl text-[#0d0d0d] mb-3"
+                style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
+              >
+                You&rsquo;re {firstName}&rsquo;s sponsor.
+              </p>
+              <p className="text-[#555] leading-relaxed mb-5">
+                Through your $25/month, {firstName} has school fees, books,
+                a uniform, morning porridge and a hot meal every day, access to
+                the on-site medical center, and a classroom where teachers know{' '}
+                {firstName}&rsquo;s name.
+              </p>
+              <Link
+                href={`/sponsor/${child.sponsor_code}`}
+                className="inline-block bg-[#D4A843] text-[#0d0d0d] font-bold uppercase tracking-wider py-4 px-10 hover:bg-[#c49a3a] transition-colors"
+              >
+                Go to your portal
+              </Link>
+              <p className="text-center text-xs text-[#bbb] mt-4">
+                On behalf of our entire team &mdash; thank you.
+              </p>
+            </div>
+          ) : (
+            /* ── Not the sponsor: single-decision CTA (memo §2).
+                Primary ask: "Will you stay with [child]?" with $25/mo.
+                Secondary ask: monthly newsletter signup (free, captures
+                email for nurture). The shirt-buyer variant warms the
+                headline since they've already given the first month;
+                cold visitors get a slightly more cold-acquisition framing.
+            ── */
+            <div className="bg-white border-2 border-[#D4A843]/30 p-7">
+              {viewerLooksLikeBuyer ? (
                 <p
-                  className="text-xl text-[#0d0d0d] mb-3"
+                  className="text-2xl text-[#0d0d0d] mb-4"
                   style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
                 >
-                  You&rsquo;re {firstName}&rsquo;s sponsor.
+                  Will you stay with {firstName}?
                 </p>
-                <p className="text-[#555] leading-relaxed mb-5">
-                  Through your $25/month, {firstName} has school fees, books,
-                  a uniform, morning porridge and a hot meal every day, access to
-                  the on-site medical center, and a classroom where teachers know{' '}
-                  {firstName}&rsquo;s name.
-                </p>
-                <Link
-                  href={`/sponsor/${child.sponsor_code}`}
-                  className="inline-block bg-[#D4A843] text-[#0d0d0d] font-bold uppercase tracking-wider py-4 px-10 hover:bg-[#c49a3a] transition-colors"
+              ) : (
+                <p
+                  className="text-2xl text-[#0d0d0d] mb-4"
+                  style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
                 >
-                  Go to your portal
-                </Link>
-                <p className="text-center text-xs text-[#bbb] mt-4">
-                  On behalf of our entire team &mdash; thank you.
+                  Stay with {firstName}.
                 </p>
+              )}
+
+              <p className="text-[#555] leading-relaxed mb-4">
+                Your $25/month supports the campus where {firstName} goes to school,
+                eats morning porridge and a hot meal every day, gets care at the
+                on-site medical center, and learns from teachers who know{' '}
+                {firstName}&rsquo;s name.
+              </p>
+
+              <p className="text-[#555] leading-relaxed mb-5">
+                You&rsquo;ll get a monthly newsletter from the campus, photos
+                of {firstName} through the year, a handwritten letter
+                from {firstName}, and a year-end report card.
+              </p>
+
+              <div className="flex items-baseline gap-1 mb-4">
+                <span
+                  className="text-4xl text-[#D4A843]"
+                  style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 700 }}
+                >
+                  $25
+                </span>
+                <span className="text-[#aaa]">/month &middot; cancel anytime</span>
               </div>
-            ) : (
-              /* ── Not the sponsor: single-decision CTA (memo §2).
-                  Primary ask: "Will you stay with [child]?" with $25/mo.
-                  Secondary ask: monthly newsletter signup (free, captures
-                  email for nurture). The shirt-buyer variant warms the
-                  headline since they've already given the first month;
-                  cold visitors get a slightly more cold-acquisition framing.
-              ── */
-              <div className="bg-white border-2 border-[#D4A843]/30 p-7">
-                {viewerLooksLikeBuyer ? (
-                  <p
-                    className="text-2xl text-[#0d0d0d] mb-4"
-                    style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
-                  >
-                    Will you stay with {firstName}?
-                  </p>
-                ) : (
-                  <p
-                    className="text-2xl text-[#0d0d0d] mb-4"
-                    style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
-                  >
-                    Stay with {firstName}.
-                  </p>
-                )}
 
-                <p className="text-[#555] leading-relaxed mb-4">
-                  Your $25/month supports the campus where {firstName} goes to school,
-                  eats morning porridge and a hot meal every day, gets care at the
-                  on-site medical center, and learns from teachers who know{' '}
-                  {firstName}&rsquo;s name.
-                </p>
+              <SponsorButton
+                childRecordId={child.record_id}
+                childId={child.child_id}
+                childDisplayName={displayName}
+                firstName={firstName}
+                shirtAssigned={viewerLooksLikeBuyer}
+                existingCustomerId={buyerHint?.customerId || undefined}
+                buyerEmail={buyerHint?.email || undefined}
+              />
 
-                <p className="text-[#555] leading-relaxed mb-5">
-                  You&rsquo;ll get a monthly newsletter from the campus, photos
-                  of {firstName} through the year, a handwritten letter
-                  from {firstName}, and a year-end report card.
-                </p>
+              <p className="text-center text-xs text-[#bbb] mt-3 mb-6">
+                Continuing is your choice. No pressure if not now.
+              </p>
 
-                <div className="flex items-baseline gap-1 mb-4">
-                  <span
-                    className="text-4xl text-[#D4A843]"
-                    style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 700 }}
-                  >
-                    $25
-                  </span>
-                  <span className="text-[#aaa]">/month &middot; cancel anytime</span>
-                </div>
-
-                <SponsorButton
-                  childRecordId={child.record_id}
-                  childId={child.child_id}
-                  childDisplayName={displayName}
+              {/* Memo §2 secondary CTA — newsletter-only, no payment. */}
+              <div className="border-t border-[#e8e0d4] pt-5">
+                <NewsletterSignup
+                  shirtNumber={Number(number)}
                   firstName={firstName}
-                  shirtAssigned={viewerLooksLikeBuyer}
-                  existingCustomerId={buyerHint?.customerId || undefined}
-                  buyerEmail={buyerHint?.email || undefined}
+                  childDisplayName={displayName}
                 />
-
-                <p className="text-center text-xs text-[#bbb] mt-3 mb-6">
-                  Continuing is your choice. No pressure if not now.
-                </p>
-
-                {/* Memo §2 secondary CTA — newsletter-only, no payment. */}
-                <div className="border-t border-[#e8e0d4] pt-5">
-                  <NewsletterSignup
-                    shirtNumber={Number(number)}
-                    firstName={firstName}
-                    childDisplayName={displayName}
-                  />
-                </div>
-
-                {/* Magic-link recovery for sponsors who lost their cookie
-                    or are on a new device. Renders as a small collapsed
-                    prompt by default; expands into an email form on tap. */}
-                <SponsorRecoveryForm shirtNumber={Number(number)} />
               </div>
-            )}
-          </div>
+
+              {/* Magic-link recovery for sponsors who lost their cookie
+                  or are on a new device. Renders as a small collapsed
+                  prompt by default; expands into an email form on tap. */}
+              <SponsorRecoveryForm shirtNumber={Number(number)} />
+            </div>
+          )}
         </div>
 
         {/* ── Sponsor portal content folded onto /[number] ────
