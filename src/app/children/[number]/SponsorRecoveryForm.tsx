@@ -44,13 +44,13 @@ export function SponsorRecoveryForm({ shirtNumber }: { shirtNumber: number }) {
   if (!expanded) {
     return (
       <p className="text-center text-xs text-[#aaa] mt-6">
-        Already a sponsor of this kid and stuck out?{' '}
+        Already sponsoring this kid and can&rsquo;t get back in?{' '}
         <button
           type="button"
           onClick={() => setExpanded(true)}
           className="text-[#D4A843] underline hover:text-[#c49a3a]"
         >
-          Send me a link back in &rarr;
+          Email me a link &rarr;
         </button>
       </p>
     );

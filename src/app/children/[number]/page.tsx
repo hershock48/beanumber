@@ -1003,66 +1003,68 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
           </div>
         </div>
 
-        {/* ── Below the photo+intro grid: deeper read, then the CTA ──
-            Pulled out of the right column so the photo height and the
-            right column don't fight on desktop. Centered at a
-            comfortable reading width regardless of viewport. */}
-        <div className="max-w-2xl mx-auto mt-10 md:mt-12">
-          {/* Longer-form bio paragraph from the Notes field. Renders
-              below the scannable structured blocks as the deeper-read
-              section. Scoped to whatever the structured fields don't
-              already cover: academic moments, walk to school, what
-              their day looks like, family history. Always renders when
-              Notes has content. Styled to match the structured
-              Family/About blocks above — no card chrome. */}
-          {child.fun_fact && (
-            <div className="mb-8">
-              <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-2">
-                More about {firstName}
-              </p>
-              <div className="text-[#444] leading-relaxed [&_p+p]:mt-4 whitespace-pre-line">
-                {child.fun_fact}
+        {/* ── Bio + teacher: anchored under the photo column ─────
+            Left-aligned to match the photo's left edge on desktop, so the
+            kid's story visually continues right under the kid's face. On
+            mobile this stacks naturally below the photo+intro. */}
+        <div className="grid md:grid-cols-2 gap-5 md:gap-14 mt-10 md:mt-12">
+          <div>
+            {/* Longer-form bio paragraph from the Notes field. */}
+            {child.fun_fact && (
+              <div className="mb-8">
+                <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-2">
+                  More about {firstName}
+                </p>
+                <div className="text-[#444] leading-relaxed [&_p+p]:mt-4 whitespace-pre-line">
+                  {child.fun_fact}
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* Teacher quote — attributed, treated as a second human
-              voice on the page. Only appears when TeacherQuote is
-              present. Soft-bordered block so the attributed voice
-              reads visually distinct from the rest of the body copy. */}
-          {child.teacher_quote && (
-            <div className="border-l-2 border-[#D4A843] pl-5 mb-8">
-              <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-2">
-                From {firstName}&rsquo;s teacher
-              </p>
-              <p className="text-[#444] leading-relaxed italic">
-                &ldquo;{child.teacher_quote}&rdquo;
-              </p>
-              {child.teacher_name && (
-                <p className="mt-3 text-sm text-[#888]">— {child.teacher_name}</p>
-              )}
-            </div>
-          )}
+            {/* Teacher quote — attributed, second human voice. */}
+            {child.teacher_quote && (
+              <div className="border-l-2 border-[#D4A843] pl-5 mb-8">
+                <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-2">
+                  From {firstName}&rsquo;s teacher
+                </p>
+                <p className="text-[#444] leading-relaxed italic">
+                  &ldquo;{child.teacher_quote}&rdquo;
+                </p>
+                {child.teacher_name && (
+                  <p className="mt-3 text-sm text-[#888]">— {child.teacher_name}</p>
+                )}
+              </div>
+            )}
 
-          {/* "Story coming" placeholder — only when this kid has neither
-              structured intake fields nor a Notes bio. Tells sponsors
-              the full profile is in flight from the campus. */}
-          {!hasStructured && !child.fun_fact && (
-            <div className="bg-white border border-[#e8e0d4] p-5 mb-8">
-              <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-2">
-                {firstName}&rsquo;s story
-              </p>
-              <p className="text-[#666] leading-relaxed">
-                We&rsquo;re gathering {firstName}&rsquo;s full profile
-                from the campus in Omoro District right now — home,
-                family, what they love, and a note from their teacher.
-                Sponsor them today and we&rsquo;ll send it to you as
-                soon as it&rsquo;s in our hands.
-              </p>
-            </div>
-          )}
+            {/* "Story coming" placeholder — only when this kid has
+                neither structured intake fields nor a Notes bio. */}
+            {!hasStructured && !child.fun_fact && (
+              <div className="bg-white border border-[#e8e0d4] p-5 mb-8">
+                <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-2">
+                  {firstName}&rsquo;s story
+                </p>
+                <p className="text-[#666] leading-relaxed">
+                  We&rsquo;re gathering {firstName}&rsquo;s full profile
+                  from the campus in Omoro District right now — home,
+                  family, what they love, and a note from their teacher.
+                  Sponsor them today and we&rsquo;ll send it to you as
+                  soon as it&rsquo;s in our hands.
+                </p>
+              </div>
+            )}
+          </div>
+          {/* Right column intentionally empty — the bio anchors under
+              the photo column; the CTA below is centered for emphasis. */}
+          <div className="hidden md:block" aria-hidden />
+        </div>
 
-          {/* ── CTA — three states based on viewer identity ──── */}
+        {/* ── CTA — three states based on viewer identity ────────
+            Centered for emphasis. For non-sponsors, a campus-update
+            preview card sits behind/above the CTA so visitors get a
+            visual taste of what sponsors see each month — the CTA
+            then sits in front of it like the answer to "what do I
+            get for $25/mo." */}
+        <div className="max-w-2xl mx-auto mt-12 md:mt-16">
           {child.viewer_is_sponsor ? (
             /* ── Verified sponsor: acknowledge, link to portal ── */
             <div className="bg-white border-2 border-[#D4A843]/30 p-7 text-center">
@@ -1089,80 +1091,107 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
               </p>
             </div>
           ) : (
-            /* ── Not the sponsor: single-decision CTA (memo §2).
-                Primary ask: "Will you stay with [child]?" with $25/mo.
-                Secondary ask: monthly newsletter signup (free, captures
-                email for nurture). The shirt-buyer variant warms the
-                headline since they've already given the first month;
-                cold visitors get a slightly more cold-acquisition framing.
-            ── */
-            <div className="bg-white border-2 border-[#D4A843]/30 p-7">
-              {viewerLooksLikeBuyer ? (
-                <p
-                  className="text-2xl text-[#0d0d0d] mb-4"
-                  style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
-                >
-                  Will you stay with {firstName}?
-                </p>
-              ) : (
-                <p
-                  className="text-2xl text-[#0d0d0d] mb-4"
-                  style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
-                >
-                  Stay with {firstName}.
-                </p>
-              )}
-
-              <p className="text-[#555] leading-relaxed mb-4">
-                Your $25/month supports the campus where {firstName} goes to school,
-                eats morning porridge and a hot meal every day, gets care at the
-                on-site medical center, and learns from teachers who know{' '}
-                {firstName}&rsquo;s name.
-              </p>
-
-              <p className="text-[#555] leading-relaxed mb-5">
-                You&rsquo;ll get a monthly newsletter from the campus, photos
-                of {firstName} through the year, a handwritten letter
-                from {firstName}, and a year-end report card.
-              </p>
-
-              <div className="flex items-baseline gap-1 mb-4">
-                <span
-                  className="text-4xl text-[#D4A843]"
-                  style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 700 }}
-                >
-                  $25
-                </span>
-                <span className="text-[#aaa]">/month &middot; cancel anytime</span>
+            /* ── Not the sponsor: campus-update preview + CTA stack.
+                The preview card looks like a real campus update with a
+                header, a few lines of body, fading into white at the
+                bottom. The CTA card overlaps from below via negative
+                margin, sitting in front of the fade — visually it reads
+                as "here's what you'd get; here's the door." */
+            <div>
+              {/* Campus-update preview teaser (desktop emphasized;
+                  still renders on mobile but with tighter padding). */}
+              <div className="relative bg-white border border-[#e8e0d4] shadow-sm overflow-hidden">
+                <div className="px-6 py-6 md:px-10 md:py-8">
+                  <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-2">
+                    Latest from the campus
+                  </p>
+                  <h3
+                    className="text-2xl md:text-3xl text-[#0d0d0d] mb-4 leading-tight"
+                    style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
+                  >
+                    Each month from Hope Bridge
+                  </h3>
+                  <p className="text-[#444] leading-relaxed mb-3">
+                    Sponsors get a campus newsletter from our team in Omoro District &mdash; what the kids are working on this term, how the clinic is doing, who&rsquo;s starting school for the first time, who graduated up to the next class.
+                  </p>
+                  <p className="text-[#444] leading-relaxed mb-3">
+                    Plus photos of {firstName} as the term goes on, a handwritten letter from {firstName} once a year, and a year-end report card.
+                  </p>
+                  <p className="text-[#444] leading-relaxed">
+                    You&rsquo;ll know how {firstName} is doing. {firstName}&rsquo;ll know who you are.
+                  </p>
+                </div>
+                {/* Soft fade-out at the bottom suggests "more behind
+                    the sponsor wall" without literally blurring text. */}
+                <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-white via-white/80 to-transparent pointer-events-none" />
               </div>
 
-              <SponsorButton
-                childRecordId={child.record_id}
-                childId={child.child_id}
-                childDisplayName={displayName}
-                firstName={firstName}
-                shirtAssigned={viewerLooksLikeBuyer}
-                existingCustomerId={buyerHint?.customerId || undefined}
-                buyerEmail={buyerHint?.email || undefined}
-              />
+              {/* CTA card overlaps the preview's bottom via negative
+                  margin. On mobile the overlap is gentler so the cards
+                  don't feel cramped. */}
+              <div className="relative -mt-12 md:-mt-16 mx-3 md:mx-10">
+                <div className="bg-[#FFF8F0] border-2 border-[#D4A843] p-7 shadow-lg">
+                  {viewerLooksLikeBuyer ? (
+                    <p
+                      className="text-2xl text-[#0d0d0d] mb-4"
+                      style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
+                    >
+                      Will you stay with {firstName}?
+                    </p>
+                  ) : (
+                    <p
+                      className="text-2xl text-[#0d0d0d] mb-4"
+                      style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
+                    >
+                      Stay with {firstName}.
+                    </p>
+                  )}
 
-              <p className="text-center text-xs text-[#bbb] mt-3 mb-6">
-                Continuing is your choice. No pressure if not now.
-              </p>
+                  <p className="text-[#555] leading-relaxed mb-5">
+                    Your $25/month supports the campus where {firstName} goes to school,
+                    eats morning porridge and a hot meal every day, gets care at the
+                    on-site medical center, and learns from teachers who know{' '}
+                    {firstName}&rsquo;s name.
+                  </p>
 
-              {/* Memo §2 secondary CTA — newsletter-only, no payment. */}
-              <div className="border-t border-[#e8e0d4] pt-5">
-                <NewsletterSignup
-                  shirtNumber={Number(number)}
-                  firstName={firstName}
-                  childDisplayName={displayName}
-                />
+                  <div className="flex items-baseline gap-1 mb-4">
+                    <span
+                      className="text-4xl text-[#D4A843]"
+                      style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 700 }}
+                    >
+                      $25
+                    </span>
+                    <span className="text-[#aaa]">/month &middot; cancel anytime</span>
+                  </div>
+
+                  <SponsorButton
+                    childRecordId={child.record_id}
+                    childId={child.child_id}
+                    childDisplayName={displayName}
+                    firstName={firstName}
+                    shirtAssigned={viewerLooksLikeBuyer}
+                    existingCustomerId={buyerHint?.customerId || undefined}
+                    buyerEmail={buyerHint?.email || undefined}
+                  />
+
+                  <p className="text-center text-xs text-[#bbb] mt-3 mb-6">
+                    Continuing is your choice. No pressure if not now.
+                  </p>
+
+                  {/* Memo §2 secondary CTA — newsletter-only, no payment. */}
+                  <div className="border-t border-[#e8e0d4] pt-5">
+                    <NewsletterSignup
+                      shirtNumber={Number(number)}
+                      firstName={firstName}
+                      childDisplayName={displayName}
+                    />
+                  </div>
+
+                  {/* Magic-link recovery for sponsors who lost their cookie
+                      or are on a new device. */}
+                  <SponsorRecoveryForm shirtNumber={Number(number)} />
+                </div>
               </div>
-
-              {/* Magic-link recovery for sponsors who lost their cookie
-                  or are on a new device. Renders as a small collapsed
-                  prompt by default; expands into an email form on tap. */}
-              <SponsorRecoveryForm shirtNumber={Number(number)} />
             </div>
           )}
         </div>
