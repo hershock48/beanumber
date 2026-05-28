@@ -1003,11 +1003,12 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
           </div>
         </div>
 
-        {/* ── Bio + teacher: anchored under the photo column ─────
-            Left-aligned to match the photo's left edge on desktop, so the
-            kid's story visually continues right under the kid's face. On
-            mobile this stacks naturally below the photo+intro. */}
-        <div className="grid md:grid-cols-2 gap-5 md:gap-14 mt-10 md:mt-12">
+        {/* ── Below the photo+intro grid: bio on the left, CTA on the right.
+            Same 2-column rhythm as the intro grid above it. Deep read
+            and conversion ask sit side-by-side on desktop; stacks on
+            mobile. */}
+        <div className="grid md:grid-cols-2 gap-5 md:gap-14 mt-10 md:mt-12 items-start">
+          {/* LEFT — bio + teacher + story placeholder */}
           <div>
             {/* Longer-form bio paragraph from the Notes field. */}
             {child.fun_fact && (
@@ -1053,147 +1054,99 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
               </div>
             )}
           </div>
-          {/* Right column intentionally empty — the bio anchors under
-              the photo column; the CTA below is centered for emphasis. */}
-          <div className="hidden md:block" aria-hidden />
-        </div>
 
-        {/* ── CTA — three states based on viewer identity ────────
-            Centered for emphasis. For non-sponsors, a campus-update
-            preview card sits behind/above the CTA so visitors get a
-            visual taste of what sponsors see each month — the CTA
-            then sits in front of it like the answer to "what do I
-            get for $25/mo." */}
-        <div className="max-w-2xl mx-auto mt-12 md:mt-16">
-          {child.viewer_is_sponsor ? (
-            /* ── Verified sponsor: acknowledge, link to portal ── */
-            <div className="bg-white border-2 border-[#D4A843]/30 p-7 text-center">
-              <p
-                className="text-xl text-[#0d0d0d] mb-3"
-                style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
-              >
-                You&rsquo;re {firstName}&rsquo;s sponsor.
-              </p>
-              <p className="text-[#555] leading-relaxed mb-5">
-                Through your $25/month, {firstName} has school fees, books,
-                a uniform, morning porridge and a hot meal every day, access to
-                the on-site medical center, and a classroom where teachers know{' '}
-                {firstName}&rsquo;s name.
-              </p>
-              <Link
-                href={`/sponsor/${child.sponsor_code}`}
-                className="inline-block bg-[#D4A843] text-[#0d0d0d] font-bold uppercase tracking-wider py-4 px-10 hover:bg-[#c49a3a] transition-colors"
-              >
-                Go to your portal
-              </Link>
-              <p className="text-center text-xs text-[#bbb] mt-4">
-                On behalf of our entire team &mdash; thank you.
-              </p>
-            </div>
-          ) : (
-            /* ── Not the sponsor: campus-update preview + CTA stack.
-                The preview card looks like a real campus update with a
-                header, a few lines of body, fading into white at the
-                bottom. The CTA card overlaps from below via negative
-                margin, sitting in front of the fade — visually it reads
-                as "here's what you'd get; here's the door." */
-            <div>
-              {/* Campus-update preview teaser (desktop emphasized;
-                  still renders on mobile but with tighter padding). */}
-              <div className="relative bg-white border border-[#e8e0d4] shadow-sm overflow-hidden">
-                <div className="px-6 py-6 md:px-10 md:py-8">
-                  <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-2">
-                    Latest from the campus
-                  </p>
-                  <h3
-                    className="text-2xl md:text-3xl text-[#0d0d0d] mb-4 leading-tight"
+          {/* RIGHT — CTA card (3 states based on viewer identity) */}
+          <div>
+            {child.viewer_is_sponsor ? (
+              /* Verified sponsor: acknowledge, link to portal */
+              <div className="bg-white border-2 border-[#D4A843]/30 p-7 text-center">
+                <p
+                  className="text-xl text-[#0d0d0d] mb-3"
+                  style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
+                >
+                  You&rsquo;re {firstName}&rsquo;s sponsor.
+                </p>
+                <p className="text-[#555] leading-relaxed mb-5">
+                  Through your $25/month, {firstName} has school fees, books,
+                  a uniform, morning porridge and a hot meal every day, access to
+                  the on-site medical center, and a classroom where teachers know{' '}
+                  {firstName}&rsquo;s name.
+                </p>
+                <Link
+                  href={`/sponsor/${child.sponsor_code}`}
+                  className="inline-block bg-[#D4A843] text-[#0d0d0d] font-bold uppercase tracking-wider py-4 px-10 hover:bg-[#c49a3a] transition-colors"
+                >
+                  Go to your portal
+                </Link>
+                <p className="text-center text-xs text-[#bbb] mt-4">
+                  On behalf of our entire team &mdash; thank you.
+                </p>
+              </div>
+            ) : (
+              /* Not the sponsor: single-decision CTA */
+              <div className="bg-[#FFF8F0] border-2 border-[#D4A843] p-7 shadow-sm">
+                {viewerLooksLikeBuyer ? (
+                  <p
+                    className="text-2xl text-[#0d0d0d] mb-4"
                     style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
                   >
-                    Each month from Hope Bridge
-                  </h3>
-                  <p className="text-[#444] leading-relaxed mb-3">
-                    Sponsors get a campus newsletter from our team in Omoro District &mdash; what the kids are working on this term, how the clinic is doing, who&rsquo;s starting school for the first time, who graduated up to the next class.
+                    Will you stay with {firstName}?
                   </p>
-                  <p className="text-[#444] leading-relaxed mb-3">
-                    Plus photos of {firstName} as the term goes on, a handwritten letter from {firstName} once a year, and a year-end report card.
+                ) : (
+                  <p
+                    className="text-2xl text-[#0d0d0d] mb-4"
+                    style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
+                  >
+                    Stay with {firstName}.
                   </p>
-                  <p className="text-[#444] leading-relaxed">
-                    You&rsquo;ll know how {firstName} is doing. {firstName}&rsquo;ll know who you are.
-                  </p>
+                )}
+
+                <p className="text-[#555] leading-relaxed mb-5">
+                  Your $25/month supports the campus where {firstName} goes to school,
+                  eats morning porridge and a hot meal every day, gets care at the
+                  on-site medical center, and learns from teachers who know{' '}
+                  {firstName}&rsquo;s name.
+                </p>
+
+                <div className="flex items-baseline gap-1 mb-4">
+                  <span
+                    className="text-4xl text-[#D4A843]"
+                    style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 700 }}
+                  >
+                    $25
+                  </span>
+                  <span className="text-[#aaa]">/month &middot; cancel anytime</span>
                 </div>
-                {/* Soft fade-out at the bottom suggests "more behind
-                    the sponsor wall" without literally blurring text. */}
-                <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-white via-white/80 to-transparent pointer-events-none" />
-              </div>
 
-              {/* CTA card overlaps the preview's bottom via negative
-                  margin. On mobile the overlap is gentler so the cards
-                  don't feel cramped. */}
-              <div className="relative -mt-12 md:-mt-16 mx-3 md:mx-10">
-                <div className="bg-[#FFF8F0] border-2 border-[#D4A843] p-7 shadow-lg">
-                  {viewerLooksLikeBuyer ? (
-                    <p
-                      className="text-2xl text-[#0d0d0d] mb-4"
-                      style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
-                    >
-                      Will you stay with {firstName}?
-                    </p>
-                  ) : (
-                    <p
-                      className="text-2xl text-[#0d0d0d] mb-4"
-                      style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
-                    >
-                      Stay with {firstName}.
-                    </p>
-                  )}
+                <SponsorButton
+                  childRecordId={child.record_id}
+                  childId={child.child_id}
+                  childDisplayName={displayName}
+                  firstName={firstName}
+                  shirtAssigned={viewerLooksLikeBuyer}
+                  existingCustomerId={buyerHint?.customerId || undefined}
+                  buyerEmail={buyerHint?.email || undefined}
+                />
 
-                  <p className="text-[#555] leading-relaxed mb-5">
-                    Your $25/month supports the campus where {firstName} goes to school,
-                    eats morning porridge and a hot meal every day, gets care at the
-                    on-site medical center, and learns from teachers who know{' '}
-                    {firstName}&rsquo;s name.
-                  </p>
+                <p className="text-center text-xs text-[#bbb] mt-3 mb-6">
+                  Continuing is your choice. No pressure if not now.
+                </p>
 
-                  <div className="flex items-baseline gap-1 mb-4">
-                    <span
-                      className="text-4xl text-[#D4A843]"
-                      style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 700 }}
-                    >
-                      $25
-                    </span>
-                    <span className="text-[#aaa]">/month &middot; cancel anytime</span>
-                  </div>
-
-                  <SponsorButton
-                    childRecordId={child.record_id}
-                    childId={child.child_id}
-                    childDisplayName={displayName}
+                {/* Memo §2 secondary CTA — newsletter-only, no payment. */}
+                <div className="border-t border-[#e8e0d4] pt-5">
+                  <NewsletterSignup
+                    shirtNumber={Number(number)}
                     firstName={firstName}
-                    shirtAssigned={viewerLooksLikeBuyer}
-                    existingCustomerId={buyerHint?.customerId || undefined}
-                    buyerEmail={buyerHint?.email || undefined}
+                    childDisplayName={displayName}
                   />
-
-                  <p className="text-center text-xs text-[#bbb] mt-3 mb-6">
-                    Continuing is your choice. No pressure if not now.
-                  </p>
-
-                  {/* Memo §2 secondary CTA — newsletter-only, no payment. */}
-                  <div className="border-t border-[#e8e0d4] pt-5">
-                    <NewsletterSignup
-                      shirtNumber={Number(number)}
-                      firstName={firstName}
-                      childDisplayName={displayName}
-                    />
-                  </div>
-
-                  {/* Magic-link recovery for sponsors who lost their cookie
-                      or are on a new device. */}
-                  <SponsorRecoveryForm shirtNumber={Number(number)} />
                 </div>
+
+                {/* Magic-link recovery for sponsors who lost their cookie
+                    or are on a new device. */}
+                <SponsorRecoveryForm shirtNumber={Number(number)} />
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
 
         {/* ── Sponsor portal content folded onto /[number] ────
