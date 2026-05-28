@@ -161,21 +161,18 @@ function shirtNurtureEmail(
   stage: number,
   donor: DripDonor
 ): { subject: string; html: string } | null {
-  const { firstName, childName, shirtNumber } = donor;
+  const { firstName, shirtNumber } = donor;
+  // Stockpile model: never name a specific child or quote a specific
+  // shirt number in any of these emails. The buyer-to-child match
+  // happens when the buyer reads the number off the back of their
+  // shirt and visits beanumber.org/[number] — we don't pre-assign at
+  // checkout anymore, so we don't write the match as if we know it.
+  // `multi` is still useful for grammar ("your shirts" vs "your shirt"),
+  // since the buyer literally has more than one physical shirt — but
+  // we don't list the numbers.
   const numbers = parseShirtNumbers(shirtNumber);
-  const names = parseChildNames(childName);
   const multi = numbers.length > 1;
-
-  // For single-shirt, use direct URLs. Under the May 2026 stockpile model
-  // a buyer may have no number recorded yet (assignment happens at unbox,
-  // not at checkout) — in that case childUrl/sponsorUrl fall back to the
-  // generic pages so the email is never sending people to broken URLs.
-  const firstNumber = numbers[0];
-  const firstName_ = names[0] || '';
-  const childUrl = firstNumber ? `${SITE_URL}/children/${firstNumber}` : SITE_URL;
-  const sponsorUrl = firstNumber
-    ? `${SITE_URL}/api/sponsor-checkout?number=${firstNumber}`
-    : `${SITE_URL}/sponsorship`;
+  const sponsorUrl = `${SITE_URL}/sponsorship`;
 
   switch (stage) {
     // ── Email 1: Did it arrive? (Day ~10) ───────────────────────────────
@@ -186,10 +183,9 @@ function shirtNurtureEmail(
           <p style="margin-top: 0;">Hey ${firstName},</p>
           ${multi
             ? `<p>You ordered ${numbers.length} shirts, and I wanted to check if they made it. I make each one by hand (screen press, ink, the whole thing), so they were all made specifically for you.</p>
-               <p>Each shirt has a different number on the back, and each number belongs to a different child at our campus in Northern Uganda. You have ${numbers.length} kids waiting to meet you. Go to <a href="${SITE_URL}" style="color: #D4A843; font-weight: bold;">beanumber.org</a>, enter each number one at a time, and meet them all.</p>
-               <p>Your numbers are: <strong>${numbers.map(n => '#' + n).join(', ')}</strong></p>`
+               <p>Each shirt has a different number pressed on the back, and each number belongs to a different child at our campus in Northern Uganda. Flip each shirt over, read the number, and visit <a href="${SITE_URL}" style="color: #D4A843; font-weight: bold;">beanumber.org</a> to meet the kid behind it.</p>`
             : `<p>I wanted to check in and see if your shirt made it. I make each one by hand (screen press, ink, the whole thing), so it was made specifically for you.</p>
-               <p>When you get it, look at the back. There&rsquo;s a number pressed below the main design, and that number belongs to a real child at our campus in Northern Uganda. Go to <a href="${SITE_URL}" style="color: #D4A843; font-weight: bold;">beanumber.org</a>, enter the number, and meet them.</p>`
+               <p>When you get it, look at the back. There&rsquo;s a number pressed below the main design, and that number belongs to a real child at our campus in Northern Uganda. Go to <a href="${SITE_URL}" style="color: #D4A843; font-weight: bold;">beanumber.org</a>, enter the number from the back of your shirt, and meet them.</p>`
           }
           <p style="text-align: center; margin: 24px 0;">
             <a href="${SITE_URL}" style="display: inline-block; background: #D4A843; color: #0d0d0d; font-weight: bold; text-decoration: none; padding: 14px 32px; font-size: 15px; letter-spacing: 0.05em;">ENTER YOUR ${multi ? 'NUMBERS' : 'NUMBER'}</a>
@@ -202,17 +198,16 @@ function shirtNurtureEmail(
     case 1:
       return {
         subject: multi
-          ? `You have ${numbers.length} kids waiting to meet you`
+          ? "Have you met your kids yet?"
           : "Have you met your child yet?",
         html: wrapEmail(`
           <p style="margin-top: 0;">Hey ${firstName},</p>
           ${multi
-            ? `<p>Each of your ${numbers.length} shirts is connected to a different child at the campus. If you haven&rsquo;t entered your numbers yet, here they are:</p>
-               <div style="background: #FFF8F0; border: 1px solid #e8e0d4; padding: 16px 20px; margin: 16px 0;">
-                 ${multiChildBlock(numbers, names)}
-               </div>
-               <p>Tap any number to meet that child.</p>`
-            : `<p>If you&rsquo;ve had a chance to check the number on the back of your shirt, you already know who your shirt is connected to. If not, no rush at all, but when you&rsquo;re ready:</p>
+            ? `<p>Each of your ${numbers.length} shirts is connected to a different child at the campus. The number on the back of each shirt is the key — enter it at <a href="${SITE_URL}" style="color: #D4A843; font-weight: bold;">beanumber.org</a> and you meet the kid it belongs to.</p>
+               <p style="text-align: center; margin: 24px 0;">
+                 <a href="${SITE_URL}" style="display: inline-block; background: #D4A843; color: #0d0d0d; font-weight: bold; text-decoration: none; padding: 14px 32px; font-size: 15px; letter-spacing: 0.05em;">ENTER YOUR NUMBERS</a>
+               </p>`
+            : `<p>If you&rsquo;ve had a chance to read the number off the back of your shirt, you already know who your shirt is connected to. If not, no rush at all, but when you&rsquo;re ready:</p>
                <p style="text-align: center; margin: 24px 0;">
                  <a href="${SITE_URL}" style="display: inline-block; background: #D4A843; color: #0d0d0d; font-weight: bold; text-decoration: none; padding: 14px 32px; font-size: 15px; letter-spacing: 0.05em;">ENTER YOUR NUMBER</a>
                </p>`
@@ -221,54 +216,35 @@ function shirtNurtureEmail(
         `),
       };
 
-    // ── Email 3: Meet the child + sponsorship (Day ~24) ──────────────────
-    case 2: {
-      const subjectLine = multi
-        ? `About the ${numbers.length} kids behind your shirts`
-        : firstName_
-          ? `Wanted to tell you about ${firstName_}`
-          : "Wanted to tell you about the kid behind your shirt";
-
+    // ── Email 3: How sponsorship works (Day ~22) ─────────────────────────
+    case 2:
       return {
-        subject: subjectLine,
+        subject: multi
+          ? "About the kids behind your shirts"
+          : "About the kid behind your shirt",
         html: wrapEmail(`
           <p style="margin-top: 0;">Hey ${firstName},</p>
           ${multi
-            ? `<p>Your shirts are connected to ${numbers.length} different children at the campus. Each one has a name, a classroom, and a teacher who knows them by it.</p>
-               <div style="background: #FFF8F0; border: 1px solid #e8e0d4; padding: 16px 20px; margin: 16px 0;">
-                 ${multiChildBlock(numbers, names)}
-               </div>
-               <p>Right now, $25 a month supports school fees, two meals a day, and medical care at the campus. If you sponsor any of these kids, you get a direct connection to them: letters, photos, report cards, and a place to write to them whenever you want.</p>
-               <p style="text-align: center; margin: 24px 0;">
-                 <a href="${sponsorUrl}" style="display: inline-block; background: #D4A843; color: #0d0d0d; font-weight: bold; text-decoration: none; padding: 14px 32px; font-size: 15px; letter-spacing: 0.05em;">SPONSOR A CHILD FOR $25/MO</a>
-               </p>`
-            : `${firstName_
-                ? `<p>The child connected to your shirt is ${firstName_}. If you haven&rsquo;t met them yet, <a href="${childUrl}" style="color: #D4A843; font-weight: bold;">here&rsquo;s their page</a>.</p>
-                   <p>Right now, $25 a month supports school fees, two meals a day, and medical care at the campus. That&rsquo;s what sponsorship supports, and it starts the day you sign up.</p>`
-                : `<p>Right now, $25 a month supports school fees, two meals a day, and medical care at the campus. That&rsquo;s what sponsorship supports, and it starts the day you sign up.</p>`
-              }
-              <p>If you sponsor ${firstName_ || 'a child'}, you get a direct connection to them. Letters, photos, report cards, and a place to write to them whenever you want.</p>
-              <p style="text-align: center; margin: 24px 0;">
-                <a href="${sponsorUrl}" style="display: inline-block; background: #D4A843; color: #0d0d0d; font-weight: bold; text-decoration: none; padding: 14px 32px; font-size: 15px; letter-spacing: 0.05em;">SPONSOR ${firstName_ ? firstName_.toUpperCase() : 'A CHILD'} FOR $25/MO</a>
-              </p>`
+            ? `<p>Your shirts are connected to ${numbers.length} different children at the campus. Each one has a name, a classroom, and a teacher who knows them by it.</p>`
+            : `<p>The number on the back of your shirt is connected to a real kid at our campus in Northern Uganda. They have a name, a classroom, and a teacher who knows them by it.</p>`
           }
+          <p>Right now, $25 a month supports school fees, two meals a day, and medical care at the campus. That&rsquo;s what sponsorship supports, and it starts the day you sign up. If you sponsor, you get a direct connection to ${multi ? 'the kid you pick' : 'the kid your shirt&rsquo;s number belongs to'}: letters, photos, report cards, and a place to write to them whenever you want.</p>
+          <p style="text-align: center; margin: 24px 0;">
+            <a href="${sponsorUrl}" style="display: inline-block; background: #D4A843; color: #0d0d0d; font-weight: bold; text-decoration: none; padding: 14px 32px; font-size: 15px; letter-spacing: 0.05em;">SPONSOR FOR $25/MO</a>
+          </p>
           <p>Kevin</p>
         `),
       };
-    }
 
-    // ── Email 4: Last email (Day ~34) ────────────────────────────────────
+    // ── Email 4: Last email (Day ~30) ────────────────────────────────────
     case 3:
       return {
         subject: "Last email from me about this",
         html: wrapEmail(`
           <p style="margin-top: 0;">Hey ${firstName},</p>
           <p>This is the last email I&rsquo;ll send you about this, and I&rsquo;ll keep it short.</p>
-          <p>The shirts are how most people find us, and sponsorship is how we keep the campus running. $25 a month supports school fees, two meals a day, and medical care at the campus, and the sponsor gets letters, photos, and a real relationship with a specific kid by name.</p>
-          ${multi
-            ? `<p>You have ${numbers.length} children connected to your shirts. Any one of them can be sponsored at <a href="${SITE_URL}" style="color: #D4A843; font-weight: bold;">beanumber.org</a>. And if not now, the door is always open.</p>`
-            : `<p>If you want in, you can <a href="${sponsorUrl}" style="color: #D4A843; font-weight: bold;">sponsor ${firstName_ || 'a child'} here</a>. And if not, wear that shirt with pride. You can always come back later, or grab another design and get matched to a different child.</p>`
-          }
+          <p>The shirts are how most people find us, and sponsorship is how we keep the campus running. $25 a month supports school fees, two meals a day, and medical care at the campus, and the sponsor gets letters, photos, and a real relationship with the kid their shirt&rsquo;s number belongs to.</p>
+          <p>If you want in, you can <a href="${sponsorUrl}" style="color: #D4A843; font-weight: bold;">start a sponsorship here</a>. And if not, wear that shirt with pride. You can always come back later.</p>
           <p>Kevin</p>
         `),
       };
@@ -419,19 +395,16 @@ function shirtSponsorEmail(
   donor: DripDonor,
   sponsorCode?: string | null
 ): { subject: string; html: string } | null {
-  const { firstName, childName, shirtNumber } = donor;
+  const { firstName, shirtNumber } = donor;
+  // Stockpile model: never name a specific child or quote a specific
+  // shirt number. Buyer-to-child match happens when the buyer reads
+  // the number off the back of their shirt and visits beanumber.org/
+  // [number]. We don't pre-assign at checkout anymore, so we don't
+  // write the match as if we know it. `multi` is kept for grammar
+  // ("your shirts" vs "your shirt"), since the buyer literally has
+  // more than one physical shirt — but we don't list the numbers.
   const numbers = parseShirtNumbers(shirtNumber);
-  const names = parseChildNames(childName);
   const multi = numbers.length > 1;
-
-  // Under the May 2026 stockpile model, Shirt + Stay buyers no longer have
-  // a child/number bound at checkout — the match happens when they visit
-  // /[number] after their shirt arrives, and the page auto-creates their
-  // Sponsorship + sponsor code on the spot. Fall back to homepage links
-  // so templates never link to /children/undefined.
-  const firstNumber = numbers[0];
-  const firstName_ = names[0] || '';
-  const childUrl = firstNumber ? `${SITE_URL}/children/${firstNumber}` : SITE_URL;
   const portalUrl = `${SITE_URL}/sponsor/login`;
 
   switch (stage) {
@@ -443,36 +416,24 @@ function shirtSponsorEmail(
           <p style="margin-top: 0;">Hey ${firstName},</p>
           ${multi
             ? `<p>Your ${numbers.length} shirts are being made right now. I screen-print every one by hand, and yours will ship within the next few days.</p>
-               <p>When they arrive, check the back of each one. Every shirt has a different number pressed below the main design, and every number belongs to a different child at our campus in Northern Uganda. You&rsquo;ll come back to the site, enter each number, and meet them all by name.</p>`
+               <p>When they arrive, check the back of each one. Every shirt has a different number pressed below the main design, and every number belongs to a different child at our campus in Northern Uganda. You&rsquo;ll come back to the site, enter each number, and meet them.</p>`
             : `<p>Your shirt is being made right now. I screen-print every one by hand, and yours will ship within the next few days.</p>
-               <p>When it arrives, check the back of the shirt. There&rsquo;s a number pressed below the main design, and that number belongs to a real child at our campus in Northern Uganda. You&rsquo;ll come back to the site, enter the number, and meet them by name.</p>`
+               <p>When it arrives, check the back of the shirt. There&rsquo;s a number pressed below the main design, and that number belongs to a real child at our campus in Northern Uganda. You&rsquo;ll come back to the site, enter the number, and meet them.</p>`
           }
           <p>You also signed up for monthly sponsorship, which means your $25 a month is already at work. It supports school fees, two meals a day, and medical care at the campus, and that started the day you signed up. You&rsquo;re a sponsor right now, even before the ${multi ? 'shirts arrive' : 'shirt arrives'}.</p>
-          <p>Once you&rsquo;ve gotten your ${multi ? 'shirts' : 'shirt'} and had that moment where you meet ${multi ? 'the kids' : 'your child'}, I&rsquo;ll follow up with your sponsor portal access so you can see updates, photos, and write to them directly. I want you to have the ${multi ? 'shirts' : 'shirt'} in hand first.</p>
+          <p>Once you&rsquo;ve gotten your ${multi ? 'shirts' : 'shirt'} and entered the number on the site, your sponsor view unlocks right on that page &mdash; updates, photos, the whole thing. I want you to have the ${multi ? 'shirts' : 'shirt'} in hand first.</p>
           <p>Kevin</p>
         `),
       };
 
-    // ── Email 2: Meet the kid + how to get into the sponsor view (Day ~15) ──
+    // ── Email 2: Meet the kid + how to get into the sponsor view (Day ~13)
     //
-    // Under the May 2026 stockpile model, the buyer doesn't have a sponsor
-    // code yet at this point. When they enter their shirt number on the
-    // site, /[number] auto-creates their Sponsorship and unlocks the
-    // sponsor view inline. So this email's job is to push them to that
-    // visit, not hand them a separate code + portal URL. The legacy
-    // sponsor-code path is preserved for existing sponsors who already
-    // have a code in the system.
+    // No personalization. The buyer's shirt has the number; the site
+    // does the reveal. If sponsorCode is set (because they already
+    // visited /[number] and the claim-match auto-bound them, or because
+    // Kevin issued one manually), we surface it as a portable recovery
+    // key — but we still don't name the child or quote their number.
     case 1: {
-      const subjectLine = multi
-        ? `Meet your ${numbers.length} kids`
-        : firstName_
-          ? `Meet ${firstName_}`
-          : "Have you met your child yet?";
-
-      // Body shape depends on whether the buyer has already visited
-      // /[number] after their shirt arrived (in which case sponsorCode
-      // exists and is now their persistent portal key) or hasn't yet
-      // (sponsorCode is null and we point them at the number-entry path).
       const codeBlock = sponsorCode
         ? `<p>Your sponsor view is ready when you are. Use this code if you ever need to log in from another device:</p>
            <div style="background: #FFF8F0; border: 1px solid #e8e0d4; padding: 16px 20px; margin: 16px 0; text-align: center;">
@@ -482,22 +443,13 @@ function shirtSponsorEmail(
         : `<p>When you flip your shirt over and enter the number on the back at <a href="${SITE_URL}" style="color: #D4A843; font-weight: bold;">beanumber.org</a>, your sponsor view unlocks right on that page &mdash; updates, photos, the whole thing &mdash; no separate login to remember.</p>`;
 
       return {
-        subject: subjectLine,
+        subject: multi ? "Have you met your kids yet?" : "Have you met your child yet?",
         html: wrapEmail(`
           <p style="margin-top: 0;">Hey ${firstName},</p>
           ${multi
-            ? `<p>Your shirts should be there by now. Each one has a different number pressed on the back, and each number belongs to a different child at the campus.</p>
-               <div style="background: #FFF8F0; border: 1px solid #e8e0d4; padding: 16px 20px; margin: 16px 0;">
-                 ${multiChildBlock(numbers, names)}
-               </div>
-               <p>Your sponsorship is already supporting school fees, meals, and medical care for the children at the campus. These are the kids connected to your shirts.</p>`
-            : firstName_
-              ? `<p>Your shirt should be there by now, and if it is, you&rsquo;ve seen the number.</p>
-                 <p>That number belongs to <strong>${firstName_}</strong>. <a href="${childUrl}" style="color: #D4A843; font-weight: bold;">Here&rsquo;s their page.</a> This is the child your sponsorship is supporting.</p>`
-              : `<p>Your shirt should be there by now, and if it is, you&rsquo;ve seen the number on the back. That number is your kid. Enter it on the site to meet them.</p>
-                 <p style="text-align: center; margin: 24px 0;">
-                   <a href="${SITE_URL}" style="display: inline-block; background: #D4A843; color: #0d0d0d; font-weight: bold; text-decoration: none; padding: 14px 32px; font-size: 15px; letter-spacing: 0.05em;">ENTER YOUR NUMBER</a>
-                 </p>`
+            ? `<p>Your shirts should be there by now. Each one has a different number pressed on the back, and each number belongs to a different child at the campus. Enter each number at <a href="${SITE_URL}" style="color: #D4A843; font-weight: bold;">beanumber.org</a> to meet the kid behind it.</p>
+               <p>Your sponsorship is already supporting school fees, meals, and medical care for the children at the campus.</p>`
+            : `<p>Your shirt should be there by now, and if it is, you&rsquo;ve seen the number on the back. That number is your kid. Enter it at <a href="${SITE_URL}" style="color: #D4A843; font-weight: bold;">beanumber.org</a> to meet them.</p>`
           }
           ${codeBlock}
           <p>Kevin</p>
@@ -505,39 +457,26 @@ function shirtSponsorEmail(
       };
     }
 
-    // ── Email 3: Two weeks in (Day ~22) ──────────────────────────────────
+    // ── Email 3: Two weeks in (Day ~18) ──────────────────────────────────
     case 2:
       return {
-        subject: multi
-          ? "Two weeks as a sponsor"
-          : firstName_
-            ? `Two weeks with ${firstName_}`
-            : "Your first two weeks as a sponsor",
+        subject: "Two weeks as a sponsor",
         html: wrapEmail(`
           <p style="margin-top: 0;">Hey ${firstName},</p>
           <p>You&rsquo;ve been sponsoring for about two weeks now, and I wanted to give you a picture of what that looks like on the ground.</p>
-          ${multi
-            ? `<p>Your $25 this month went toward school fees, breakfast and lunch every day, and a nurse on campus for the children. You have ${numbers.length} kids connected to your shirts, and your sponsorship is part of what keeps the whole campus running.</p>
-               <div style="background: #FFF8F0; border: 1px solid #e8e0d4; padding: 16px 20px; margin: 16px 0;">
-                 ${multiChildBlock(numbers, names)}
-               </div>`
-            : `<p>Your $25 this month went toward school fees, breakfast and lunch every day, and a nurse on campus whenever ${firstName_ || 'your child'} needed one. That&rsquo;s what sponsorship looks like in practice, and it happens every month you&rsquo;re here.</p>`
-          }
+          <p>Your $25 this month went toward school fees, breakfast and lunch every day, and a nurse on campus whenever the kids needed one. That&rsquo;s what sponsorship looks like in practice, and it happens every month you&rsquo;re here.</p>
           <p>Your first update from the campus should be coming soon. The YDO team sends photos, report cards, and sometimes handwritten letters from the kids, and they show up in your <a href="${portalUrl}" style="color: #D4A843; font-weight: bold;">portal</a> and by email.</p>
           <p>Kevin</p>
         `),
       };
 
-    // ── Email 4: One month (Day ~32) ─────────────────────────────────────
+    // ── Email 4: One month (Day ~25) ─────────────────────────────────────
     case 3:
       return {
         subject: "One month in",
         html: wrapEmail(`
           <p style="margin-top: 0;">Hey ${firstName},</p>
-          ${multi
-            ? `<p>You bought ${numbers.length} shirts and signed up to sponsor in the same decision, and that decision has been covering school fees, meals, and medical care for a full month now.</p>`
-            : `<p>You bought a shirt and signed up to sponsor ${firstName_ || 'a child'} in the same decision, and that decision has been covering school fees, meals, and medical care for a full month now.</p>`
-          }
+          <p>You bought ${multi ? `${numbers.length} shirts` : 'a shirt'} and signed up to sponsor in the same decision, and that decision has been supporting school fees, meals, and medical care for a full month now.</p>
           <p>If you know someone who&rsquo;d be into what we do, the best thing you can do is send them a text. Doesn&rsquo;t need to be a big deal, something like &ldquo;I sponsor a kid in Uganda through Be A Number, you should check it out.&rdquo; That&rsquo;s how most of our sponsors find us.</p>
           <p>Your <a href="${portalUrl}" style="color: #D4A843; font-weight: bold;">portal</a> has the latest updates whenever you want to check in.</p>
           <p>Kevin</p>
