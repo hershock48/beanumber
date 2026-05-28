@@ -114,6 +114,60 @@ function validateInput(input: unknown): ValidationResult<ProcessRecurringPayment
 // ============================================================================
 
 /**
+ * Resolve the sponsor's child context (display name + shirt number) from a
+ * Stripe subscription ID. Returns null when the subscription isn't tied to a
+ * sponsorship (i.e. it's a plain recurring donation). Best-effort: any failure
+ * returns null so the renewal email still goes out, just in donor flavor.
+ */
+async function resolveSponsorChildContext(
+  subscriptionId: string
+): Promise<{ childName: string | null; shirtNumber: number | null } | null> {
+  const AIRTABLE_API_KEY = process.env.AIRTABLE_API_KEY;
+  const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID;
+  if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) return null;
+
+  const headers = {
+    Authorization: `Bearer ${AIRTABLE_API_KEY}`,
+    'Content-Type': 'application/json',
+  };
+
+  try {
+    const SPONSORSHIPS_TABLE = process.env.AIRTABLE_SPONSORSHIPS_TABLE || 'Sponsorships';
+    const formula = `{StripeSubscriptionID} = "${subscriptionId}"`;
+    const res = await fetch(
+      `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${SPONSORSHIPS_TABLE}?filterByFormula=${encodeURIComponent(formula)}&maxRecords=1`,
+      { headers }
+    );
+    if (!res.ok) return null;
+    const json = await res.json();
+    const sponsorship = json.records?.[0];
+    if (!sponsorship) return null;
+
+    const childName: string | null = sponsorship.fields?.ChildDisplayName || null;
+    const childLinks = sponsorship.fields?.Children as string[] | undefined;
+    const childRecordId = childLinks && childLinks.length > 0 ? childLinks[0] : null;
+
+    let shirtNumber: number | null = null;
+    if (childRecordId) {
+      const CHILDREN_TABLE = process.env.AIRTABLE_CHILDREN_TABLE || 'Children';
+      const childRes = await fetch(
+        `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${CHILDREN_TABLE}/${childRecordId}`,
+        { headers }
+      );
+      if (childRes.ok) {
+        const childJson = await childRes.json();
+        const sn = childJson.fields?.ShirtNumber;
+        if (typeof sn === 'number') shirtNumber = sn;
+      }
+    }
+
+    return { childName, shirtNumber };
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Record recurring donation in Airtable
  */
 async function recordRecurringDonation(data: ProcessRecurringPaymentInput): Promise<string | null> {
@@ -320,11 +374,16 @@ export async function processRecurringPaymentTool(
     let emailProvider: string | undefined;
 
     try {
+      // If this subscription is a sponsorship, the renewal email gets the
+      // kid's-page flavor; otherwise it stays a plain donation thank-you.
+      const sponsorContext = await resolveSponsorChildContext(data.subscriptionId);
+
       const emailResult: EmailSendResult = await sendRecurringDonationThankYouEmail(
         data.email,
         data.name,
         data.amountCents / 100,
-        data.currency
+        data.currency,
+        sponsorContext ?? undefined
       );
 
       if (emailResult.success) {

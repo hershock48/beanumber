@@ -195,28 +195,35 @@ export async function sendSponsorWelcomeEmail(
   sponsorEmail: string,
   sponsorName: string,
   childName: string,
-  sponsorCode: string
+  sponsorCode: string,
+  shirtNumber?: number | null
 ): Promise<EmailSendResult> {
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.beanumber.org';
-  const dashboardUrl = `${siteUrl}/sponsor/login`;
   const firstName = (sponsorName || 'Friend').trim().split(/\s+/)[0] || 'Friend';
+  // sponsorCode is retained on the record for internal lookup, but we don't
+  // show it to the sponsor. The kid's page is their home base; the browser
+  // remembers them, and recovery is an email to Kevin.
+  void sponsorCode;
+
+  // When we know the shirt number, link straight to the kid's page; otherwise
+  // point at the homepage and tell them to enter the number.
+  const hasNumber = typeof shirtNumber === 'number';
+  const childUrl = hasNumber ? `${siteUrl}/children/${shirtNumber}` : siteUrl;
+  const childUrlLabel = hasNumber ? `beanumber.org/${shirtNumber}` : 'beanumber.org';
+  const pageLine = hasNumber
+    ? `<p><strong>${childName}'s page is at <a href="${childUrl}" style="color: #D4A843;">${childUrlLabel}</a>.</strong> Bookmark it. That's where photos, updates, and letters from the campus show up over the year, and where you can pick up gear with their number on it. Your browser remembers you, so most of the time you'll just land on their page when you visit.</p>`
+    : `<p><strong>${childName}'s page lives at <a href="${childUrl}" style="color: #D4A843;">${childUrlLabel}</a></strong> — enter their number and you'll land right on it. Bookmark it. That's where photos, updates, and letters from the campus show up over the year. Your browser remembers you, so most of the time you'll just land on their page when you visit.</p>`;
 
   const html = wrapTransactionalEmail(`
     <p style="margin-top: 0;">Hey ${firstName},</p>
 
-    <p>Your sponsorship of ${childName} is active. That means ${childName} goes to school at the YDO campus, eats two meals a day, and has the on-site clinic when they need it. You also have a direct connection to them through your sponsor portal.</p>
+    <p>Your sponsorship of ${childName} is active. That means ${childName} goes to school at the YDO campus, eats two meals a day, and has the on-site clinic when they need it.</p>
 
-    <div style="background: #f5f0e8; border: 1px solid #e8e0d4; padding: 16px 20px; margin: 24px 0;">
-      <p style="margin: 0 0 8px 0; font-size: 13px; color: #999; text-transform: uppercase; letter-spacing: 0.1em;">Your portal access</p>
-      <p style="margin: 0; font-size: 15px;"><strong>Sponsor Code:</strong> ${sponsorCode}</p>
-      <p style="margin: 4px 0 0 0; font-size: 15px;"><strong>Email:</strong> ${sponsorEmail}</p>
-    </div>
+    ${pageLine}
 
-    <p style="text-align: center; margin: 24px 0;">
-      <a href="${dashboardUrl}" style="display: inline-block; background: #D4A843; color: #0d0d0d; font-weight: bold; text-decoration: none; padding: 14px 32px; font-size: 15px; letter-spacing: 0.05em;">LOG IN TO YOUR PORTAL</a>
-    </p>
+    <p>You'll also get a monthly campus newsletter from our team in Northern Uganda, photos of ${childName} every few months, a handwritten letter from them once a year, and a year-end report card.</p>
 
-    <p>From there you can see updates about ${childName}, write them a letter, and request photos. You will also get a monthly campus newsletter from our team in Northern Uganda, and a year-end report card.</p>
+    <p>If you ever can't get back to their page, or you want to write back, change your monthly, or ask anything at all, reply to this email or write me at <a href="mailto:Kevin@beanumber.org" style="color: #D4A843;">Kevin@beanumber.org</a>. I read every one.</p>
 
     <p>Kevin</p>
   `);
@@ -442,25 +449,41 @@ export async function sendRecurringDonationThankYouEmail(
   donorEmail: string,
   donorName: string,
   amount: number,
-  currency: string
+  currency: string,
+  sponsor?: { childName?: string | null; shirtNumber?: number | null }
 ): Promise<EmailSendResult> {
   const formattedAmount = amount.toFixed(2);
   const firstName = (donorName || 'Friend').trim().split(/\s+/)[0] || 'Friend';
   const dateStr = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
 
+  const isSponsor = !!(sponsor && (sponsor.childName || typeof sponsor.shirtNumber === 'number'));
+  const childName = sponsor?.childName || 'your child';
+  const childUrl = typeof sponsor?.shirtNumber === 'number'
+    ? `${SITE_URL}/children/${sponsor.shirtNumber}`
+    : SITE_URL;
+  const childUrlLabel = typeof sponsor?.shirtNumber === 'number'
+    ? `beanumber.org/${sponsor.shirtNumber}`
+    : 'beanumber.org';
+
+  const bodyMiddle = isSponsor
+    ? `<p>Your monthly sponsorship of $${formattedAmount} was processed on ${dateStr}. That keeps ${childName} in school at the YDO campus, eating two meals a day, with the on-site clinic when they need it.</p>
+
+    <p>The latest photos, updates, and letters from the campus show up on ${childName === 'your child' ? 'your kid&rsquo;s' : `${childName}&rsquo;s`} page at <a href="${childUrl}" style="color: #D4A843;">${childUrlLabel}</a>. If you ever can&rsquo;t get back to it, or you need to change or cancel your monthly for any reason, reply to this email or write me at <a href="mailto:Kevin@beanumber.org" style="color: #D4A843;">Kevin@beanumber.org</a> and I&rsquo;ll take care of it.</p>`
+    : `<p>Your monthly donation of $${formattedAmount} was processed on ${dateStr}. It goes to the same place as last month: a six-acre campus in Northern Uganda with a school built for 380 kids, a medical clinic that has treated 700+ patients, and vocational training where 60 women are learning trades.</p>
+
+    <p>If you ever want to see what your monthly support adds up to, the <a href="${SITE_URL}/impact" style="color: #D4A843;">impact page</a> has the full breakdown. And if you need to change or cancel your donation for any reason, reply to this email or write me at <a href="mailto:Kevin@beanumber.org" style="color: #D4A843;">Kevin@beanumber.org</a> and I&rsquo;ll take care of it.</p>`;
+
   const html = wrapTransactionalEmail(`
     <p style="margin-top: 0;">Hey ${firstName},</p>
 
-    <p>Your monthly donation of $${formattedAmount} was processed on ${dateStr}. It goes to the same place as last month: a six-acre campus in Northern Uganda with a school built for 380 kids, a medical clinic that has treated 700+ patients, and vocational training where 60 women are learning trades.</p>
-
-    <p>If you ever want to see what your monthly support adds up to, the <a href="${SITE_URL}/impact" style="color: #D4A843;">impact page</a> has the full breakdown. And if you need to change or cancel your donation for any reason, reply to this email and I will take care of it.</p>
+    ${bodyMiddle}
 
     <p>Kevin</p>
   `);
 
   return sendEmail({
     to: { email: donorEmail, name: donorName },
-    subject: `Your monthly donation was processed`,
+    subject: isSponsor ? `Your monthly sponsorship was processed` : `Your monthly donation was processed`,
     html,
   });
 }

@@ -688,12 +688,10 @@ export function SponsorDashboard({ sponsorCode, email }: SponsorDashboardProps) 
           </p>
 
           <div className="bg-[#FFF8F0] border border-[#e8e0d4] p-4 mb-8 text-sm text-[#666] inline-block">
-            <p className="mb-1">
-              <strong className="text-[#0d0d0d]">Your sponsor code:</strong>{' '}
-              <span className="font-mono tracking-wider">{sponsorCode}</span>
-            </p>
             <p className="text-xs text-[#aaa]">
-              Keep this somewhere safe. You&rsquo;ll use it to log back in.
+              This browser will remember you, so you&rsquo;ll land right here
+              next time. If you ever can&rsquo;t get back in, email{' '}
+              <a href="mailto:Kevin@beanumber.org" className="text-[#D4A843] hover:underline">Kevin@beanumber.org</a>.
             </p>
           </div>
 
@@ -1114,10 +1112,11 @@ export function SponsorDashboard({ sponsorCode, email }: SponsorDashboardProps) 
         )}
       </div>
 
-      {/* Sponsor code reminder */}
+      {/* Recovery escape hatch */}
       <div className="mt-8 text-center">
         <p className="text-xs text-[#aaa]">
-          Your sponsor code: <span className="font-mono tracking-wider">{sponsorCode}</span>
+          Can&rsquo;t get back in on another device? Email{' '}
+          <a href="mailto:Kevin@beanumber.org" className="text-[#D4A843] hover:underline">Kevin@beanumber.org</a>.
         </p>
       </div>
     </div>

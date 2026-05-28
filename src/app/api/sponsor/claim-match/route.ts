@@ -29,6 +29,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { z } from 'zod';
 import { SESSION, SPONSORSHIP_STATUS, AUTH_STATUS } from '@/lib/constants';
+import { sendSponsorWelcomeEmail } from '@/lib/email';
 
 const AIRTABLE_API_KEY = process.env.AIRTABLE_API_KEY;
 const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID;
@@ -287,7 +288,22 @@ export async function POST(request: NextRequest) {
       // Non-fatal
     }
 
-    // 11. Set sponsor_session cookie so the page reload renders the
+    // 11. Send the no-code welcome email. This is the first email a Shirt +
+    // Stay buyer gets that names their child, since the shirt purchase email
+    // is deliberately generic. Best-effort — never block the claim on email.
+    try {
+      await sendSponsorWelcomeEmail(
+        sponsorEmail,
+        sponsorName,
+        childDisplayName,
+        sponsorCode,
+        shirtNumber
+      );
+    } catch (err) {
+      console.warn('[ClaimMatch] Welcome email failed (non-fatal):', err);
+    }
+
+    // 12. Set sponsor_session cookie so the page reload renders the
     // authenticated view.
     await setSponsorSessionCookie(cookieStore, sponsorEmail, sponsorCode);
 
