@@ -9,7 +9,6 @@ import { RevealOverlay } from './RevealOverlay';
 import { SponsorButton } from './SponsorButton';
 import { NewsletterSignup } from './NewsletterSignup';
 import { ClaimMatchCard } from './ClaimMatchCard';
-import { MerchPurchaseTile } from './MerchPurchaseTile';
 import { SponsorPortalSections } from './SponsorPortalSections';
 import { SponsorRecoveryForm } from './SponsorRecoveryForm';
 import { SESSION } from '@/lib/constants';
@@ -1181,131 +1180,6 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
             latestChildUpdate={portalData.latestChildUpdate}
             latestNewsletter={portalData.latestNewsletter}
           />
-        )}
-
-        {/* ── Sponsor-gated merch collection ────────────────────
-            Three states:
-            1. Active sponsor  → unlocked catalog with real Stripe checkout
-            2. Shirt buyer     → locked teaser, blurred cards, sponsor CTA
-            3. Cold visitor    → nothing (focus stays on sponsorship CTA)
-        ── */}
-        {child.viewer_is_sponsor && child.sponsor_code ? (
-          <div className="mt-10 md:mt-16">
-            <div className="text-center mb-6 md:mb-8">
-              <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-3">
-                Your #{number} collection
-              </p>
-              <h2
-                className="text-2xl md:text-3xl text-[#0d0d0d] mb-2"
-                style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
-              >
-                You&rsquo;re a sponsor. These are yours.
-              </h2>
-              <p className="text-[#777] text-sm max-w-md mx-auto">
-                Every piece is handmade with your number on it. One tap, charged to your saved card.
-              </p>
-            </div>
-
-            {/* Three buyable items. Hoodie needs a size selector; hat and
-                stickers go straight to Stripe Checkout on tap. Pricing
-                lives server-side in /api/sponsor/merch-purchase so the
-                client can't tamper with it. */}
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
-              <MerchPurchaseTile
-                merchType="hoodie"
-                shirtNumber={Number(number)}
-                sponsorCode={child.sponsor_code}
-                itemName="Hoodie"
-                detail={`#${number} on the back`}
-                priceLabel="$45 · free shipping"
-                needsSize
-              />
-              <MerchPurchaseTile
-                merchType="hat"
-                shirtNumber={Number(number)}
-                sponsorCode={child.sponsor_code}
-                itemName="Hat"
-                detail={`#${number} front and center`}
-                priceLabel="$30 · free shipping"
-                needsSize={false}
-              />
-              <MerchPurchaseTile
-                merchType="stickers"
-                shirtNumber={Number(number)}
-                sponsorCode={child.sponsor_code}
-                itemName="Sticker Pack"
-                detail="Laptop, water bottle, wherever"
-                priceLabel="$10 · free shipping"
-                needsSize={false}
-              />
-            </div>
-
-            {/* Repeat shirts use the existing Shop Your Number flow on
-                the sponsor portal — Kevin hand-prints those. */}
-            <p className="text-center text-xs text-[#999] mt-6">
-              Want another shirt with #{number} on it? Kevin makes those
-              by hand &mdash;{' '}
-              <a
-                href={`mailto:Kevin@beanumber.org?subject=${encodeURIComponent(`Another #${number} shirt`)}&body=${encodeURIComponent(`Hey Kevin,\n\nI'd love another shirt with #${number} on it. Same color/size as my original works for me.\n\nThanks!`)}`}
-                className="text-[#D4A843] underline hover:text-[#c49a3a]"
-              >
-                send me one
-              </a>.
-            </p>
-          </div>
-        ) : (
-          /* ── Locked teaser for non-sponsors ──────────────────────
-              Shown to every non-sponsor visitor (cookie-identified
-              buyer OR cold visitor). Reframed from "unlock merch
-              only" to "unlock the whole sponsor surface" — the
-              sponsor view (updates, photos, letters) + the merch
-              collection live behind the same gate. */
-          <div className="mt-10 md:mt-16">
-            <div className="relative">
-              {/* Blurred product cards — visible but unreachable */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 opacity-30 blur-[3px] pointer-events-none select-none" aria-hidden>
-                {['Hoodie', 'Hat', 'Sticker Pack', 'Updates'].map((name) => (
-                  <div key={name} className="bg-white border border-[#e8e0d4] p-3 md:p-4">
-                    <div className="aspect-[4/3] bg-[#f5f0e8] flex items-center justify-center mb-3">
-                      <p className="text-3xl md:text-4xl font-bold text-[#0d0d0d] opacity-20">
-                        #{number}
-                      </p>
-                    </div>
-                    <p className="text-sm font-semibold text-[#0d0d0d]" style={{ fontFamily: 'var(--font-lora), serif' }}>
-                      {name}
-                    </p>
-                  </div>
-                ))}
-              </div>
-
-              {/* Lock overlay */}
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="bg-white/95 backdrop-blur-sm border border-[#e8e0d4] p-6 md:p-8 text-center max-w-sm mx-4 shadow-lg">
-                  <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-3">
-                    Sponsor view &middot; #{number} collection
-                  </p>
-                  <p
-                    className="text-lg md:text-xl text-[#0d0d0d] mb-3"
-                    style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
-                  >
-                    Sponsor {firstName} to unlock.
-                  </p>
-                  <p className="text-[#777] text-sm mb-5 leading-relaxed">
-                    Sponsors get monthly updates, photos, and letters from {firstName} on this page &mdash; plus access to the #{number} collection: hoodies, hats, and sticker packs, all handmade with your number on them.
-                  </p>
-                  <SponsorButton
-                    childRecordId={child.record_id}
-                    childId={child.child_id}
-                    childDisplayName={displayName}
-                    firstName={firstName}
-                    shirtAssigned={viewerLooksLikeBuyer}
-                    existingCustomerId={buyerHint?.customerId || undefined}
-                    buyerEmail={buyerHint?.email || undefined}
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
         )}
 
         </RevealOverlay>
