@@ -335,24 +335,34 @@ const ROSTER_REDIRECTS: Record<number, number> = {
 /**
  * Cycle-number → canonical-kid resolver.
  *
- * BAN's roster has ~53 real children (shirt numbers 1–53). Shirt
- * numbers 54+ are cycle records: each new number mirrors a real kid
- * from the original roster on a 52-wide cycle starting at 2. So
- * shirt #54 = kid #2, shirt #105 = kid #53, shirt #106 = kid #2
- * (next cycle), and so on. Cycle records carry the kid's name +
+ * BAN's roster has 53 real children (shirt numbers 1–53). Shirt
+ * numbers 54+ are cycle records, looking up the canonical kid's
+ * photo/bio at render time. Cycle records carry the kid's name +
  * status but typically lack the photo/bio fields, so /[number]
  * looks up the canonical record at render time and merges those
  * fields onto the cycle record. The cycle record's ShirtNumber
  * and ChildID stay authoritative — sponsorships/donations link to
  * the cycle record, not the canonical one.
  *
- * Roster gaps (ROSTER_REDIRECTS above) are handled first so that a
+ * Two cycle eras live side by side:
+ *
+ *   Era 1 (#54–150): 52-wide cycle covering roster #2–53. Naume (#1)
+ *     was excluded from the original cycle. So #54 = #2, #105 = #53,
+ *     #106 = #2 (next loop), …, #150 = #46. Existing data ships
+ *     against this formula and we don't disturb it.
+ *
+ *   Era 2 (#151 and up): 53-wide cycle covering the full roster
+ *     #1–53. Naume is in from here on. So #151 = #1, #152 = #2, …,
+ *     #203 = #53, #204 = #1 (next loop), and so on.
+ *
+ * Roster gaps (ROSTER_REDIRECTS above) are handled first so a
  * missing roster kid still renders the stand-in's profile.
  */
 function canonicalShirtNumber(n: number): number | null {
   if (ROSTER_REDIRECTS[n] != null) return ROSTER_REDIRECTS[n];
   if (n <= 53) return null;
-  return ((n - 54) % 52) + 2;
+  if (n <= 150) return ((n - 54) % 52) + 2;
+  return ((n - 151) % 53) + 1;
 }
 
 // React cache() deduplicates calls within a single server request.
