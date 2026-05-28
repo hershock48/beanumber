@@ -1002,6 +1002,22 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
               </div>
             )}
 
+            {/* Longer-form bio paragraph from the Notes field. Renders below
+                the scannable structured blocks as the deeper-read section.
+                Scoped to whatever the structured fields don't already cover:
+                academic moments, walk to school, what their day looks like,
+                family history. Always renders when Notes has content. */}
+            {child.fun_fact && (
+              <div className="bg-white border border-[#e8e0d4] p-5 mb-8">
+                <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-3">
+                  More about {firstName}
+                </p>
+                <div className="text-[#444] leading-relaxed space-y-3 whitespace-pre-line">
+                  {child.fun_fact}
+                </div>
+              </div>
+            )}
+
             {/* Teacher quote — attributed, treated as a second human voice
                 on the page. Only appears when TeacherQuote is present. */}
             {child.teacher_quote && (
@@ -1018,19 +1034,9 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
               </div>
             )}
 
-            {/* When no structured intake fields exist, fall back to the
-                Notes field (mapped as fun_fact) if it has content. This covers
-                children like #37 whose bios were written before the structured
-                intake form existed. Only show the "story coming" placeholder
-                when Notes is also empty. */}
-            {!hasStructured && child.fun_fact && (
-              <div className="bg-white border border-[#e8e0d4] p-5 mb-8">
-                <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-2">
-                  About {firstName}
-                </p>
-                <p className="text-[#444] leading-relaxed">{child.fun_fact}</p>
-              </div>
-            )}
+            {/* "Story coming" placeholder — only when this kid has neither
+                structured intake fields nor a Notes bio. Tells sponsors the
+                full profile is in flight from the campus. */}
             {!hasStructured && !child.fun_fact && (
               <div className="bg-white border border-[#e8e0d4] p-5 mb-8">
                 <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-2">
