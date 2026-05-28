@@ -6,6 +6,61 @@ import { useSearchParams } from 'next/navigation';
 import { BANNavigation } from '@/components/BANNavigation';
 import { BANFooter } from '@/components/BANFooter';
 
+/**
+ * Mount-time count-up. Runs on hydration regardless of scroll
+ * position so the number actually animates (the IntersectionObserver
+ * variant on the homepage left counters stuck at 0 for users whose
+ * viewport happened to put the section just below the trigger line).
+ */
+function useCountUp(end: number, duration = 1800) {
+  const [count, setCount] = useState(0);
+  const started = useRef(false);
+
+  useEffect(() => {
+    if (started.current) return;
+    started.current = true;
+    const start = performance.now();
+    let raf = 0;
+    const step = (now: number) => {
+      const elapsed = now - start;
+      const progress = Math.min(elapsed / duration, 1);
+      const eased = 1 - (1 - progress) * (1 - progress);
+      setCount(Math.round(eased * end));
+      if (progress < 1) raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [end, duration]);
+
+  return count;
+}
+
+/**
+ * Enrollment progress: current count animated up to today's number,
+ * shown against the campus capacity. Tells the real story — the
+ * school is built for 380 kids, currently serving 65, and the gap
+ * is what sponsorship grows. Update CURRENT_ENROLLMENT when YDO
+ * sends the next term-end count.
+ */
+const CURRENT_ENROLLMENT = 65;
+const CAMPUS_CAPACITY = 380;
+
+function EnrollmentStat() {
+  const count = useCountUp(CURRENT_ENROLLMENT);
+  return (
+    <>
+      <div
+        className="text-4xl text-[#D4A843] tabular-nums"
+        style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 700 }}
+      >
+        {count}
+        <span className="text-2xl text-[#bbb] font-normal"> / {CAMPUS_CAPACITY}</span>
+      </div>
+      <p className="text-[#777] text-sm mt-1">children enrolled at the campus</p>
+    </>
+  );
+}
+
 interface AvailableChild {
   recordId: string;
   id: string;
@@ -266,13 +321,7 @@ function SponsorshipPageContent() {
                   <p className="text-[#777] text-sm mt-2">Cancel anytime. No questions asked.</p>
                 </div>
                 <div className="text-center md:text-right">
-                  <div
-                    className="text-4xl text-[#D4A843]"
-                    style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 700 }}
-                  >
-                    380
-                  </div>
-                  <p className="text-[#777] text-sm mt-1">children enrolled at the campus</p>
+                  <EnrollmentStat />
                 </div>
               </div>
             </div>
