@@ -1398,6 +1398,7 @@ async function sendSponsorWelcomeEmail(data: {
   childDisplayName: string;
   sponsorCode: string;
   amount: number;
+  shirtNumber?: number | null;
 }): Promise<void> {
   if (!data.email) {
     console.log('[Webhook] No customer email, skipping sponsor welcome email');
@@ -1406,6 +1407,16 @@ async function sendSponsorWelcomeEmail(data: {
 
   const fromEmail = process.env.SENDGRID_FROM_EMAIL || 'Kevin@beanumber.org';
   const firstName = data.name.split(' ')[0] || 'Friend';
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.beanumber.org';
+  // The kid's page is the sponsor's home base. No sponsor code shown \u2014
+  // the browser remembers them via cookie, and the page itself has a
+  // "send me a link back in" recovery if they're ever on a new device.
+  const childUrl = typeof data.shirtNumber === 'number'
+    ? `${siteUrl}/children/${data.shirtNumber}`
+    : siteUrl;
+  const childUrlLabel = typeof data.shirtNumber === 'number'
+    ? `beanumber.org/${data.shirtNumber}`
+    : 'beanumber.org';
 
   const html = `
           <!DOCTYPE html>
@@ -1416,12 +1427,11 @@ async function sendSponsorWelcomeEmail(data: {
 
               <p>You're officially sponsoring <strong>${data.childDisplayName}</strong>. Your $${data.amount.toFixed(2)}/month supports the YDO campus where they go to school, eat two meals a day, and get medical care.</p>
 
-              <p style="color: #999; font-size: 14px; margin-bottom: 4px;">Your sponsor code:</p>
-              <p style="font-size: 20px; color: #0d0d0d; margin-top: 0; font-weight: bold; letter-spacing: 0.1em;">${data.sponsorCode}</p>
+              <p><strong>${data.childDisplayName}'s page is at <a href="${childUrl}" style="color: #D4A843;">${childUrlLabel}</a>.</strong> Bookmark it. That's where photos, updates, and letters from the campus will show up over the year, and where you can pick up gear with their number on it. Your browser will remember you, so most of the time you'll just land on your page when you visit.</p>
 
-              <p>Use that code to log into the sponsor portal anytime. Here\u2019s what to expect from us: a monthly newsletter from our team on the campus in Gulu, photos of ${data.childDisplayName} every few months, a handwritten letter from them once a year, and a year-end report card. Everything lands in the portal; you\u2019ll also get an email when something new is posted.</p>
+              <p>Here's what to expect from us: a monthly newsletter from the campus in Gulu, photos of ${data.childDisplayName} every few months, a handwritten letter from them once a year, and a year-end report card. You'll get an email each time something new lands on their page.</p>
 
-              <p>If you ever want to write back, visit, or just have questions, reply to this email. I read every one.</p>
+              <p>If you ever can't get back into your page, or you want to write back, visit, change your monthly, or ask anything at all, reply to this email or write me at <a href="mailto:Kevin@beanumber.org" style="color: #D4A843;">Kevin@beanumber.org</a>. I read every one.</p>
 
               <p>Thanks for being in their corner,<br>
               <strong>Kevin</strong></p>
@@ -1965,6 +1975,8 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
       const childId = childFields.ChildID || childFields['Child ID'] || childIdMeta;
       const childPhoto = childFields.ProfilePhoto;
       const childLocation = childFields.SchoolLocation;
+      const childShirtNumber =
+        typeof childFields.ShirtNumber === 'number' ? childFields.ShirtNumber : null;
 
       // Step 2c: Record the first month as a donation tagged as Sponsorship
       console.log('[WH] S3: upsert donation, pi=' + paymentIntentId);
@@ -2028,6 +2040,7 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
             childDisplayName,
             sponsorCode,
             amount,
+            shirtNumber: childShirtNumber,
           });
         }
       } catch (err) {
