@@ -130,19 +130,13 @@ Running `npm install` in the external clone (e.g. to test a build) can modify `p
 
 `src/lib/email.ts` tries Gmail OAuth2 first, falls back to SendGrid. In production, Gmail is active. If Gmail credentials expire or break, email will silently fall through to SendGrid (if its API key is set) or fail entirely. The Gmail refresh token is the most fragile piece — if Kevin changes his Google password or revokes OAuth access, all outbound email stops until the token is refreshed. Don't assume SendGrid is active unless you've confirmed Gmail is down.
 
-### Legacy email templates in email.ts violate voice.md
+### Legacy email templates in email.ts — REWRITTEN (May 2026)
 
-Several template functions in `src/lib/email.ts` were written before the brand voice was established and use banned phrases, wrong tone, and wrong visual styling:
+The five template functions in `src/lib/email.ts` (`sendSponsorWelcomeEmail`, `sendDonationReceiptEmail`, `sendRecurringDonationThankYouEmail`, `sendUpdateNotificationEmail`, `sendUpdateRequestConfirmationEmail`) were previously called out here as violating voice.md — banned phrases, wrong tone, Helvetica/dark-header styling.
 
-- `sendSponsorWelcomeEmail` — uses "Dear", "Thank you for partnering with us", "sustainable community systems", "empowerment", "The Be A Number Team". Uses Helvetica + dark `#1a1a1a` headers instead of Georgia + cream `#FFF8F0`.
-- `sendDonationReceiptEmail` — uses "Dear", "Thank you for changing lives", "Your generosity", "empowerment", "making a difference", "96-97% of your contribution". Also references a stale efficiency percentage.
-- `sendRecurringDonationThankYouEmail` — uses "Dear", "Your ongoing commitment is truly making a difference", "The Be A Number Team".
-- `sendUpdateNotificationEmail` — uses "Dear", wrong visual styling.
-- `sendUpdateRequestConfirmationEmail` — uses "Dear", wrong visual styling.
+All five were rewritten by an earlier session and now match voice.md: "Hey ${firstName}," opening, Georgia serif on cream, gold/sand palette, signed "Kevin," no banned phrases. Verified by grep against the full banned-phrase list — zero hits.
 
-The webhook thank-you email (in the webhook route itself, not in email.ts) was rewritten to match voice.md. The drip emails (in the drip cron route) were written from scratch in voice. These template functions in email.ts have not been touched yet.
-
-**Fix when revisiting:** rewrite each template to match voice.md and the email wrapper style (Georgia serif, 560px max-width, cream/gold/sand colors, "Hey ${firstName}," opening, signed "Kevin" not "The Be A Number Team").
+Going forward, when writing or modifying email templates here: stay in the `wrapTransactionalEmail` wrapper (already styled correctly), open "Hey ${firstName}," sign "Kevin," avoid em dashes in body copy (rare even in dev comms, never in user-facing email).
 
 ### Cowork workspace layout is user-facing
 
