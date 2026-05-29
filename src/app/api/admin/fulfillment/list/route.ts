@@ -13,6 +13,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getEnv } from '@/lib/env';
+import { verifyAdminToken } from '@/lib/auth';
 
 const FULFILLMENT_TABLE_ID = 'tblkSZBRrMiHhT3MP';
 const DONORS_TABLE_ID = 'tblhuLpJgYLB0pTjx';
@@ -61,11 +62,8 @@ function fieldVal(rec: AirtableRecord, fieldId: string): string {
 export async function GET(request: NextRequest) {
   const env = getEnv();
 
-  // Auth
-  const adminToken = process.env.ADMIN_API_TOKEN;
-  const adminPassword = process.env.ADMIN_PASSWORD;
-  const token = request.headers.get('X-Admin-Token') || request.nextUrl.searchParams.get('token');
-  if ((!adminToken && !adminPassword) || (token !== adminToken && token !== adminPassword)) {
+  // Auth — accepts admin session cookie OR X-Admin-Token header.
+  if (!verifyAdminToken(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

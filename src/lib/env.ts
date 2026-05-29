@@ -94,7 +94,10 @@ function validateEnvironment(): EnvironmentVariables {
   }
 
   return {
-    AIRTABLE_API_KEY: process.env.AIRTABLE_API_KEY!,
+    // Accept either AIRTABLE_PAT (newer Airtable personal access tokens)
+    // or AIRTABLE_API_KEY (legacy). Different parts of the codebase
+    // grew up using different names; this normalizes them.
+    AIRTABLE_API_KEY: (process.env.AIRTABLE_PAT || process.env.AIRTABLE_API_KEY)!,
     AIRTABLE_BASE_ID: process.env.AIRTABLE_BASE_ID!,
     AIRTABLE_SPONSORSHIPS_TABLE: process.env.AIRTABLE_SPONSORSHIPS_TABLE!,
     AIRTABLE_UPDATES_TABLE: process.env.AIRTABLE_UPDATES_TABLE!,

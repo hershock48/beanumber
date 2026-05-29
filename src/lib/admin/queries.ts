@@ -39,6 +39,30 @@ async function atGet<T>(path: string): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+/**
+ * Page through an Airtable table, returning every record. Airtable
+ * caps pageSize at 100, so anything larger needs offset pagination.
+ */
+async function atListAll<F = Record<string, unknown>>(
+  tableName: string,
+  extraParams = ''
+): Promise<AirtableRecord<F>[]> {
+  const out: AirtableRecord<F>[] = [];
+  let offset: string | undefined;
+  do {
+    const params = new URLSearchParams();
+    params.set('pageSize', '100');
+    if (offset) params.set('offset', offset);
+    const combined = extraParams ? `${extraParams}&${params.toString()}` : params.toString();
+    const page = await atGet<AirtableList<F>>(
+      `/${encodeURIComponent(tableName)}?${combined}`
+    );
+    out.push(...page.records);
+    offset = page.offset;
+  } while (offset);
+  return out;
+}
+
 interface AirtableRecord<F = Record<string, unknown>> {
   id: string;
   createdTime: string;
@@ -244,11 +268,13 @@ export async function getRosterGapsCard(): Promise<RosterGapsCard> {
   try {
     // Pull everything (canonical kids only — exclude cycle records and
     // the empty stubs). Canonical kids have ShirtNumber 1–53 and a real
-    // ChildID. We just pull all and filter in JS to keep the query
-    // simple.
-    const data = await atGet<AirtableList>(
-      `/${encodeURIComponent(CHILDREN_TABLE)}?pageSize=200&fields%5B%5D=ShirtNumber&fields%5B%5D=ProfilePhoto&fields%5B%5D=NameMeaning&fields%5B%5D=FamilyContext&fields%5B%5D=Loves&fields%5B%5D=Notes&fields%5B%5D=ChildID`
+    // ChildID. Paginated because Airtable caps pageSize at 100 and we
+    // have ~165 child records (canonical + cycles + stubs).
+    const records = await atListAll(
+      CHILDREN_TABLE,
+      'fields%5B%5D=ShirtNumber&fields%5B%5D=ProfilePhoto&fields%5B%5D=NameMeaning&fields%5B%5D=FamilyContext&fields%5B%5D=Loves&fields%5B%5D=Notes&fields%5B%5D=ChildID'
     );
+    const data = { records };
     let totalKids = 0;
     let missingPhoto = 0;
     let missingNameMeaning = 0;
@@ -371,6 +397,128 @@ export async function getThisMonthCard(): Promise<ThisMonthCard> {
       error: err instanceof Error ? err.message : String(err),
     };
   }
+}
+
+// ────────────────────────────────────────────────────────────────────────
+// Roster — full canonical kid list with completeness signals
+// ────────────────────────────────────────────────────────────────────────
+
+export interface RosterKid {
+  recordId: string;
+  childId: string;
+  shirtNumber: number;
+  displayName: string;
+  firstName: string;
+  gradeClass: string | null;
+  photoUrl: string | null;
+  // Completeness — true means the field has content.
+  has: {
+    photo: boolean;
+    nameMeaning: boolean;
+    familyContext: boolean;
+    loves: boolean;
+    childQuote: boolean;
+    notes: boolean;
+  };
+  // Last time any structured field was touched. Best-effort via the
+  // Airtable record's createdTime when there's no LastModified field.
+  lastModified: string;
+}
+
+export async function getRoster(): Promise<RosterKid[]> {
+  const records = await atListAll(CHILDREN_TABLE);
+  const kids: RosterKid[] = [];
+  for (const rec of records) {
+    const f = rec.fields as Record<string, unknown>;
+    const n = f.ShirtNumber as number | undefined;
+    const childId = (f.ChildID as string) || '';
+    if (typeof n !== 'number' || n < 1 || n > 53) continue;
+    if (!childId || !childId.startsWith('HSP/BAN-')) continue;
+    const photoArr = (f.ProfilePhoto as Array<{ url: string; thumbnails?: { large?: { url: string } } }>) || [];
+    const photoUrl = photoArr[0]?.thumbnails?.large?.url || photoArr[0]?.url || null;
+    kids.push({
+      recordId: rec.id,
+      childId,
+      shirtNumber: n,
+      displayName: (f.DisplayName as string) || (f.FirstName as string) || `Kid #${n}`,
+      firstName: (f.FirstName as string) || '',
+      gradeClass: (f.GradeClass as string) || null,
+      photoUrl,
+      has: {
+        photo: photoArr.length > 0,
+        nameMeaning: !!(f.NameMeaning as string),
+        familyContext: !!(f.FamilyContext as string),
+        loves: !!(f.Loves as string),
+        childQuote: !!(f.ChildQuote as string),
+        notes: !!(f.Notes as string),
+      },
+      lastModified: rec.createdTime,
+    });
+  }
+  // Sort by shirt number ascending — natural roster order.
+  kids.sort((a, b) => a.shirtNumber - b.shirtNumber);
+  return kids;
+}
+
+// Single-kid fetch for the editor page — pulls the full field set.
+export interface RosterKidDetail extends RosterKid {
+  nameMeaning: string;
+  familyContext: string;
+  loves: string;
+  childQuote: string;
+  notes: string;
+  age: string | null;
+  homeVillage: string | null;
+}
+
+export async function getRosterKidByNumber(shirtNumber: number): Promise<RosterKidDetail | null> {
+  const formula = encodeURIComponent(`{ShirtNumber}=${shirtNumber}`);
+  const data = await atGet<AirtableList>(
+    `/${encodeURIComponent(CHILDREN_TABLE)}?filterByFormula=${formula}&maxRecords=1`
+  );
+  const rec = data.records[0];
+  if (!rec) return null;
+  const f = rec.fields as Record<string, unknown>;
+  const photoArr = (f.ProfilePhoto as Array<{ url: string; thumbnails?: { large?: { url: string } } }>) || [];
+  const photoUrl = photoArr[0]?.thumbnails?.large?.url || photoArr[0]?.url || null;
+
+  // Compute age from DateOfBirth if present (matches /[number] logic).
+  let ageStr: string | null = null;
+  const dob = f.DateOfBirth as string | undefined;
+  if (dob) {
+    const birth = new Date(dob);
+    const today = new Date();
+    let years = today.getFullYear() - birth.getFullYear();
+    const m = today.getMonth() - birth.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) years -= 1;
+    ageStr = String(Math.max(0, years));
+  }
+
+  return {
+    recordId: rec.id,
+    childId: (f.ChildID as string) || '',
+    shirtNumber: f.ShirtNumber as number,
+    displayName: (f.DisplayName as string) || (f.FirstName as string) || `Kid #${shirtNumber}`,
+    firstName: (f.FirstName as string) || '',
+    gradeClass: (f.GradeClass as string) || null,
+    photoUrl,
+    has: {
+      photo: photoArr.length > 0,
+      nameMeaning: !!(f.NameMeaning as string),
+      familyContext: !!(f.FamilyContext as string),
+      loves: !!(f.Loves as string),
+      childQuote: !!(f.ChildQuote as string),
+      notes: !!(f.Notes as string),
+    },
+    lastModified: rec.createdTime,
+    nameMeaning: (f.NameMeaning as string) || '',
+    familyContext: (f.FamilyContext as string) || '',
+    loves: (f.Loves as string) || '',
+    childQuote: (f.ChildQuote as string) || '',
+    notes: (f.Notes as string) || '',
+    age: ageStr,
+    homeVillage: (f.HomeVillage as string) || null,
+  };
 }
 
 // ────────────────────────────────────────────────────────────────────────
