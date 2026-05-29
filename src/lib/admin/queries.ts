@@ -272,7 +272,7 @@ export async function getRosterGapsCard(): Promise<RosterGapsCard> {
     // have ~165 child records (canonical + cycles + stubs).
     const records = await atListAll(
       CHILDREN_TABLE,
-      'fields%5B%5D=ShirtNumber&fields%5B%5D=ProfilePhoto&fields%5B%5D=NameMeaning&fields%5B%5D=FamilyContext&fields%5B%5D=Loves&fields%5B%5D=Notes&fields%5B%5D=ChildID'
+      'fields%5B%5D=ShirtNumber&fields%5B%5D=ProfilePhoto&fields%5B%5D=NameMeaning&fields%5B%5D=FamilyContext&fields%5B%5D=Loves&fields%5B%5D=Notes&fields%5B%5D=ChildID&fields%5B%5D=DisplayName&fields%5B%5D=FirstName'
     );
     const data = { records };
     let totalKids = 0;
