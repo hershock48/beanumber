@@ -37,6 +37,7 @@ export function RosterEditor({
   initial,
   reportCards,
   letters,
+  photos,
   lastEditedBySimon,
   pendingFields,
   deletionRequestedAt,
@@ -48,6 +49,9 @@ export function RosterEditor({
   initial: Fields;
   reportCards: RosterKidAttachment[];
   letters: RosterKidAttachment[];
+  /** Every ProfilePhoto attached to this kid, oldest first. Rendered
+   *  as a thumbnail grid with per-photo delete buttons. */
+  photos: RosterKidAttachment[];
   /** ISO timestamp; null means no pending edits from Simon. */
   lastEditedBySimon: string | null;
   /** Subset of NameMeaning | FamilyContext | Loves | ChildQuote | Notes
@@ -224,6 +228,7 @@ export function RosterEditor({
       <PhotoUploadSection
         shirtNumber={shirtNumber}
         firstName={firstName}
+        photos={photos}
         onUploaded={() => router.refresh()}
       />
 
@@ -373,30 +378,41 @@ export function RosterEditor({
   );
 }
 
-// ─── Photo upload (single-attachment, replaces the hero photo) ───
+// ─── Photo upload (multi-attachment, 5-photo gallery) ────────────
+
+const MAX_PHOTOS = 5;
 
 function PhotoUploadSection({
   shirtNumber,
   firstName,
+  photos,
   onUploaded,
 }: {
   shirtNumber: number;
   firstName: string;
+  photos: RosterKidAttachment[];
   onUploaded: () => void;
 }) {
   const [uploading, setUploading] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const atCapacity = photos.length >= MAX_PHOTOS;
 
   async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     const rawFile = e.target.files?.[0];
     if (!rawFile) return;
     setError(null);
     setStatus(null);
+    if (atCapacity) {
+      setError(
+        `${firstName} already has ${MAX_PHOTOS} photos. Remove one before adding another.`
+      );
+      e.target.value = '';
+      return;
+    }
     setUploading(true);
     try {
-      // Shrink huge phone photos automatically before upload so the
-      // user never has to think about sizes.
       const file = await compressImageIfNeeded(rawFile);
       const base64 = await fileToBase64(file);
       const res = await fetch('/api/admin/roster/upload', {
@@ -412,7 +428,7 @@ function PhotoUploadSection({
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.error || `Upload failed: ${res.status}`);
-      setStatus('Photo updated.');
+      setStatus('Photo added.');
       onUploaded();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Upload failed.');
@@ -422,25 +438,89 @@ function PhotoUploadSection({
     }
   }
 
+  async function deletePhoto(attachmentId: string) {
+    if (deletingId) return;
+    if (!confirm('Remove this photo?')) return;
+    setDeletingId(attachmentId);
+    setStatus(null);
+    setError(null);
+    try {
+      const res = await fetch('/api/admin/roster/photo-delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ shirtNumber, attachmentId }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || `Delete failed: ${res.status}`);
+      setStatus('Photo removed.');
+      onUploaded();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Delete failed.');
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
   return (
     <div>
       <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-1">
-        Photo
+        Photos
       </p>
       <p className="text-xs text-[#888] mb-3 leading-relaxed">
-        Upload a head-and-shoulders photo of {firstName || 'this kid'}.
-        Replaces the current one. JPG or PNG, up to 3.7 MB.
+        Up to {MAX_PHOTOS} photos of {firstName || 'this kid'}. JPG or PNG,
+        any size — big phone photos get shrunk in your browser before
+        upload. Sponsors see them as a carousel on the public profile.
       </p>
-      <label className="inline-flex items-center justify-center bg-white border border-[#e8e0d4] text-[#0d0d0d] font-bold text-xs uppercase tracking-wider px-5 py-3 hover:border-[#D4A843] cursor-pointer transition-colors">
+
+      {photos.length > 0 && (
+        <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 mb-3">
+          {photos.map(p => (
+            <div key={p.id} className="relative bg-[#f5f0e8] border border-[#e8e0d4] aspect-[4/5]">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={p.thumbnailUrl || p.url}
+                alt=""
+                className="w-full h-full object-cover"
+              />
+              <button
+                type="button"
+                onClick={() => deletePhoto(p.id)}
+                disabled={!!deletingId || uploading}
+                className="absolute top-1 right-1 inline-flex items-center justify-center w-6 h-6 bg-white/95 text-red-700 hover:bg-red-50 border border-red-200 text-sm leading-none disabled:opacity-50"
+                title="Remove this photo"
+              >
+                {deletingId === p.id ? '…' : '×'}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <label
+        className={`inline-flex items-center justify-center font-bold text-xs uppercase tracking-wider px-5 py-3 transition-colors ${
+          atCapacity
+            ? 'bg-[#f5f0e8] border border-[#e8e0d4] text-[#aaa] cursor-not-allowed'
+            : 'bg-white border border-[#e8e0d4] text-[#0d0d0d] hover:border-[#D4A843] cursor-pointer'
+        }`}
+      >
         <input
           type="file"
           className="sr-only"
           accept="image/*"
           onChange={onFile}
-          disabled={uploading}
+          disabled={uploading || atCapacity}
         />
-        {uploading ? 'Uploading…' : 'Upload photo'}
+        {uploading
+          ? 'Uploading…'
+          : atCapacity
+            ? `Max ${MAX_PHOTOS} reached — remove one to add another`
+            : photos.length === 0
+              ? 'Upload first photo'
+              : 'Add another photo'}
       </label>
+      <p className="text-xs text-[#aaa] mt-1">
+        {photos.length} of {MAX_PHOTOS} photos
+      </p>
       {status && <p className="mt-2 text-sm text-[#888]">{status}</p>}
       {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
     </div>

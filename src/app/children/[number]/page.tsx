@@ -483,6 +483,12 @@ const getChildByShirtNumber = cache(async function getChildByShirtNumber(shirtNu
     }
 
     const photo = child.ProfilePhoto?.[0]?.url || sponsorship?.ChildPhoto?.[0]?.url;
+    // Full gallery — used for the carousel. Falls back to the
+    // sponsorship's single ChildPhoto if no ProfilePhoto attached.
+    const photoUrls: string[] =
+      (child.ProfilePhoto?.map(p => p.url).filter(Boolean) as string[]) ||
+      (sponsorship?.ChildPhoto?.map(p => p.url).filter(Boolean) as string[]) ||
+      [];
 
     const viewerIsSponsor = Boolean(
       viewerCode &&
@@ -501,6 +507,7 @@ const getChildByShirtNumber = cache(async function getChildByShirtNumber(shirtNu
       grade_class: child.GradeClass,
       fun_fact: child.Notes,
       photo_url: photo,
+      photo_urls: photoUrls,
       location: sponsorship?.ChildLocation || 'Gulu, Northern Uganda',
       sponsorship_status: sponsorship?.Status,
       // True when a shirt buyer has been matched to this number. Used on the
@@ -898,9 +905,24 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
         <RevealOverlay shirtNumber={Number(number)} childName={displayName}>
         <div className="grid md:grid-cols-2 gap-5 md:gap-14 items-start">
           {/* Photo — shorter on mobile to keep the CTA reachable without
-              a marathon scroll. Desktop keeps the taller portrait crop. */}
+              a marathon scroll. Desktop keeps the taller portrait crop.
+              Multiple photos render as a horizontal scroll-snap
+              carousel; single photo or none falls back to the static
+              hero. */}
           <div className="aspect-[4/4] md:aspect-[4/5] bg-[#f5f0e8] border border-[#e8e0d4] overflow-hidden relative">
-            {photoUrl.startsWith('http') ? (
+            {child.photo_urls && child.photo_urls.length > 1 ? (
+              <div className="w-full h-full overflow-x-auto snap-x snap-mandatory flex">
+                {child.photo_urls.map((url, i) => (
+                  <img
+                    key={url + i}
+                    src={url}
+                    alt={`${displayName} — photo ${i + 1}`}
+                    className="w-full h-full object-cover flex-shrink-0 snap-center"
+                    style={{ scrollSnapAlign: 'center' }}
+                  />
+                ))}
+              </div>
+            ) : photoUrl.startsWith('http') ? (
               <img
                 src={photoUrl}
                 alt={displayName}
@@ -912,6 +934,14 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
                   <div className="text-6xl mb-3 opacity-40">👤</div>
                   <p className="text-[#aaa] text-sm">Photo coming soon</p>
                 </div>
+              </div>
+            )}
+            {/* Photo count indicator — small chip in the corner when
+                there's a carousel. Tells the viewer to scroll. */}
+            {child.photo_urls && child.photo_urls.length > 1 && (
+              <div className="absolute bottom-3 left-3 inline-flex items-center gap-1 bg-white/95 backdrop-blur-sm text-xs text-[#666] px-2 py-1 pointer-events-none">
+                <span aria-hidden>↔</span>
+                {child.photo_urls.length} photos
               </div>
             )}
             {/* Shirt number badge */}

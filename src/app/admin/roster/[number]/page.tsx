@@ -88,6 +88,7 @@ export default async function AdminRosterEditPage({ params }: Props) {
           }}
           reportCards={kid.reportCards}
           letters={kid.letters}
+          photos={kid.photos}
           lastEditedBySimon={kid.lastEditedBySimon}
           pendingFields={kid.pendingFields}
           deletionRequestedAt={kid.deletionRequestedAt}

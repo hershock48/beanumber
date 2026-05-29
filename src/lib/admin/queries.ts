@@ -594,6 +594,11 @@ export interface RosterKidDetail extends RosterKid {
   homeVillage: string | null;
   reportCards: RosterKidAttachment[];
   letters: RosterKidAttachment[];
+  /** Every ProfilePhoto attached to this kid. Used by the editor to
+   *  list them with delete controls, and by the public profile
+   *  carousel. The single `photoUrl` (large thumbnail of the first)
+   *  remains on the base RosterKid for the grid card. */
+  photos: RosterKidAttachment[];
   /** Raw intake notes from Simon / YDO team. Kevin polishes these
    *  into the public fields, then clears the field. */
   intakeFromCampus: string;
@@ -682,6 +687,10 @@ export async function getRosterKidByNumber(shirtNumber: number): Promise<RosterK
     homeVillage: (f.HomeVillage as string) || null,
     reportCards: mapAttachments('ReportCards'),
     letters: mapAttachments('Letters'),
+    // mapAttachments reverses order (most-recent first). For photos
+    // we want oldest first so the carousel ordering matches what
+    // Kevin sees in the editor.
+    photos: mapAttachments('ProfilePhoto').slice().reverse(),
     intakeFromCampus: (f.IntakeFromCampus as string) || '',
   };
 }
