@@ -337,6 +337,74 @@ function escapeAttr(s: string): string {
 }
 
 /**
+ * Send a SHORT notification email — the new monthly-newsletter
+ * delivery model. We no longer ship the full newsletter body to every
+ * sponsor's inbox; the body lives on /[number] for each kid they
+ * sponsor. This email tells them the newsletter is up, gives them
+ * a teaser (first paragraph), and links to the kid page(s) where they
+ * can read the full thing.
+ *
+ * One email per sponsor (deduped by email). When a sponsor has
+ * multiple kids, all kid links are listed in the email body.
+ */
+export async function sendNewsletterNotificationEmail(params: {
+  sponsorEmail: string;
+  sponsorName: string;
+  subject: string;            // newsletter subject — used as email subject too
+  teaser: string;             // first paragraph of the newsletter body, plain text
+  kids: Array<{ firstName: string; shirtNumber: number }>;
+  heroPhotoUrl?: string;
+}): Promise<EmailSendResult> {
+  const { sponsorEmail, sponsorName, subject, teaser, kids, heroPhotoUrl } = params;
+  const firstName = (sponsorName || 'Friend').trim().split(/\s+/)[0] || 'Friend';
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.beanumber.org';
+
+  // Build the per-kid link list. Most sponsors will have one entry.
+  // Multi-kid sponsors get the full list — one click per relationship.
+  const kidLines = kids
+    .filter(k => typeof k.shirtNumber === 'number')
+    .map(k => {
+      const url = `${siteUrl}/children/${k.shirtNumber}`;
+      const label = `beanumber.org/${k.shirtNumber}`;
+      const name = escapeHtml(k.firstName || `kid #${k.shirtNumber}`);
+      return `<p style="margin: 8px 0;"><a href="${url}" style="color: #D4A843; font-weight: bold;">Read on ${name}&rsquo;s page &middot; ${label}</a></p>`;
+    })
+    .join('');
+
+  const heroBlock = heroPhotoUrl
+    ? `<img src="${escapeAttr(heroPhotoUrl)}" alt="From the campus" style="display:block;width:100%;max-width:560px;height:auto;border-radius:4px;margin:0 0 24px 0;">`
+    : '';
+
+  const teaserBlock = teaser
+    ? `<p style="color: #555; font-style: italic; border-left: 3px solid #D4A843; padding-left: 16px; margin: 24px 0;">${escapeHtml(teaser)}</p>`
+    : '';
+
+  const html = wrapTransactionalEmail(`
+    <p style="margin-top: 0;">Hey ${escapeHtml(firstName)},</p>
+
+    <p>The latest campus newsletter just went up &mdash; <strong>${escapeHtml(subject)}</strong>.</p>
+
+    ${heroBlock}
+
+    ${teaserBlock}
+
+    <p>Read the rest on your kid${kids.length === 1 ? "&rsquo;s" : "s&rsquo;"} page:</p>
+
+    ${kidLines}
+
+    <p style="margin-top: 24px; font-size: 14px; color: #888;">Reply to this email if anything&rsquo;s not loading or you want to write back to the campus &mdash; I read every one.</p>
+
+    <p>Kevin</p>
+  `);
+
+  return sendEmail({
+    to: { email: sponsorEmail, name: sponsorName },
+    subject,
+    html,
+  });
+}
+
+/**
  * Send update notification to sponsor
  */
 export async function sendUpdateNotificationEmail(

@@ -38,6 +38,8 @@ export interface AirtableSponsorshipRecord {
     ChildRevealedAt?: string;
     StripeSubscriptionID?: string;
     MonthlyAmount?: number;
+    /** Linked record IDs in the Children table (the kid(s) this sponsorship is for). */
+    Children?: string[];
   };
   createdTime: string;
 }

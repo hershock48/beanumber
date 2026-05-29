@@ -7,7 +7,6 @@ import { BANFooter } from '@/components/BANFooter';
 import { RevealBeacon } from './RevealBeacon';
 import { RevealOverlay } from './RevealOverlay';
 import { SponsorButton } from './SponsorButton';
-import { NewsletterSignup } from './NewsletterSignup';
 import { ClaimMatchCard } from './ClaimMatchCard';
 import { SponsorPortalSections } from './SponsorPortalSections';
 import { SponsorRecoveryForm } from './SponsorRecoveryForm';
@@ -48,6 +47,9 @@ interface AirtableChildRecord {
     TeacherName?: string;
     TeacherQuote?: string;
     NameMeaning?: string;
+    // ── Sponsor-only attachments uploaded via /admin/roster/[number].
+    ReportCards?: Array<{ id: string; url: string; filename: string; size?: number; type?: string; thumbnails?: { large?: { url: string }; small?: { url: string } } }>;
+    Letters?: Array<{ id: string; url: string; filename: string; size?: number; type?: string; thumbnails?: { large?: { url: string }; small?: { url: string } } }>;
   };
 }
 
@@ -1132,18 +1134,11 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
                   Continuing is your choice. No pressure if not now.
                 </p>
 
-                {/* Memo §2 secondary CTA — newsletter-only, no payment. */}
-                <div className="border-t border-[#e8e0d4] pt-5">
-                  <NewsletterSignup
-                    shirtNumber={Number(number)}
-                    firstName={firstName}
-                    childDisplayName={displayName}
-                  />
-                </div>
-
                 {/* Magic-link recovery for sponsors who lost their cookie
                     or are on a new device. */}
-                <SponsorRecoveryForm shirtNumber={Number(number)} />
+                <div className="border-t border-[#e8e0d4] pt-5">
+                  <SponsorRecoveryForm shirtNumber={Number(number)} />
+                </div>
               </div>
             )}
           </div>

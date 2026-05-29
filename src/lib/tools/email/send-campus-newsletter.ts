@@ -25,7 +25,100 @@ import {
   findDonorByEmail,
   type AirtableNewsletterRecord,
 } from '../../airtable';
-import { sendCampusNewsletterEmail } from '../../email';
+import { sendNewsletterNotificationEmail } from '../../email';
+
+// Notification model: the full newsletter body lives on /[number] for
+// each kid the sponsor sponsors. The email is a short ping with a
+// teaser + per-kid link list — every newsletter becomes a reason for
+// the sponsor to come back to their kid's page.
+
+const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID || '';
+const AIRTABLE_API_KEY =
+  process.env.AIRTABLE_PAT || process.env.AIRTABLE_API_KEY || '';
+const CHILDREN_TABLE = process.env.AIRTABLE_CHILDREN_TABLE || 'Children';
+
+/**
+ * Pull ShirtNumber + FirstName for a batch of Children record IDs.
+ * Returns a Map keyed by record ID.
+ */
+async function fetchChildrenByRecordIds(
+  ids: string[]
+): Promise<Map<string, { shirtNumber: number | null; firstName: string }>> {
+  const map = new Map<string, { shirtNumber: number | null; firstName: string }>();
+  if (ids.length === 0 || !AIRTABLE_BASE_ID || !AIRTABLE_API_KEY) return map;
+
+  // Airtable formula limit ~16k chars. Chunk to keep below.
+  const chunkSize = 50;
+  for (let i = 0; i < ids.length; i += chunkSize) {
+    const chunk = ids.slice(i, i + chunkSize);
+    const formula = `OR(${chunk.map(id => `RECORD_ID()="${id}"`).join(',')})`;
+    const params = new URLSearchParams();
+    params.set('filterByFormula', formula);
+    params.set('pageSize', '100');
+    params.append('fields[]', 'ShirtNumber');
+    params.append('fields[]', 'FirstName');
+    params.append('fields[]', 'DisplayName');
+    try {
+      const res = await fetch(
+        `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(CHILDREN_TABLE)}?${params}`,
+        {
+          headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` },
+          cache: 'no-store',
+        }
+      );
+      if (!res.ok) continue;
+      const data = await res.json();
+      for (const rec of (data.records || []) as Array<{
+        id: string;
+        fields: { ShirtNumber?: number; FirstName?: string; DisplayName?: string };
+      }>) {
+        map.set(rec.id, {
+          shirtNumber: typeof rec.fields.ShirtNumber === 'number' ? rec.fields.ShirtNumber : null,
+          firstName: rec.fields.FirstName || rec.fields.DisplayName || '',
+        });
+      }
+    } catch {
+      // Skip; we'll just send without per-kid links for these.
+    }
+  }
+  return map;
+}
+
+/**
+ * Pull the first paragraph of plain text out of an HTML body.
+ * Strips tags, normalizes whitespace, cuts at the first double-newline
+ * or after ~280 characters at a word boundary.
+ */
+function extractTeaser(html: string): string {
+  if (!html) return '';
+  // Take everything before any later <h2/h3 (skip the rest of the article).
+  const beforeHeader = html.split(/<h[1-4]\b/i)[0] || html;
+  // Replace block-level tag breaks with double newlines so we get
+  // paragraph boundaries when we strip.
+  const withBreaks = beforeHeader
+    .replace(/<\/(p|div|li|h[1-6])>/gi, '\n\n')
+    .replace(/<br\s*\/?>/gi, '\n');
+  const stripped = withBreaks
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&rsquo;/g, '’')
+    .replace(/&lsquo;/g, '‘')
+    .replace(/&ldquo;/g, '“')
+    .replace(/&rdquo;/g, '”')
+    .replace(/&mdash;/g, '—');
+  const firstPara = stripped.split(/\n\s*\n/).map(s => s.trim()).find(s => s.length > 0) || '';
+
+  if (firstPara.length <= 320) return firstPara;
+  // Soft-cut at a word boundary just past 280 chars.
+  const slice = firstPara.slice(0, 320);
+  const lastSpace = slice.lastIndexOf(' ');
+  return (lastSpace > 240 ? slice.slice(0, lastSpace) : slice).trimEnd() + '…';
+}
 
 export interface SendCampusNewsletterInput {
   /** Airtable record ID (starts with 'rec') for the Newsletters table row. */
@@ -129,16 +222,30 @@ export async function sendCampusNewsletterTool(
     };
   }
 
-  // Deduplicate by lowercase email — one person might have multiple
-  // sponsorships and we don't want to spam them twice.
-  const byEmail = new Map<string, { email: string; name: string }>();
+  // Deduplicate by lowercase email AND collect every kid each sponsor
+  // sponsors — we list all their kids' page links in the notification
+  // email, since the notification model wants every relationship
+  // surfaced as a click target.
+  type GroupedRecipient = {
+    email: string;
+    name: string;
+    childRecordIds: string[];
+  };
+  const byEmail = new Map<string, GroupedRecipient>();
   for (const s of sponsors) {
     const email = (s.fields.SponsorEmail || '').trim().toLowerCase();
     if (!email) continue;
-    if (!byEmail.has(email)) {
+    const childIds = (s.fields.Children as string[] | undefined) || [];
+    const existing = byEmail.get(email);
+    if (existing) {
+      for (const id of childIds) {
+        if (!existing.childRecordIds.includes(id)) existing.childRecordIds.push(id);
+      }
+    } else {
       byEmail.set(email, {
         email: s.fields.SponsorEmail,
         name: s.fields.SponsorName || 'Friend',
+        childRecordIds: [...childIds],
       });
     }
   }
@@ -152,7 +259,12 @@ export async function sendCampusNewsletterTool(
   // thousands) and doing it sponsor-by-sponsor avoids a full Donors-table
   // scan + lets us fail-open per row — a hiccup on one lookup doesn't
   // nuke the whole send.
-  const recipients: Array<{ email: string; name: string }> = [];
+  type FinalRecipient = {
+    email: string;
+    name: string;
+    childRecordIds: string[];
+  };
+  const recipients: FinalRecipient[] = [];
   let suppressedCount = 0;
   for (const r of candidateRecipients) {
     try {
@@ -172,6 +284,16 @@ export async function sendCampusNewsletterTool(
     }
     recipients.push(r);
   }
+
+  // 3c. Resolve every linked child record to (firstName, shirtNumber)
+  // so the notification email can include per-kid page links.
+  const allChildIds = Array.from(
+    new Set(recipients.flatMap(r => r.childRecordIds))
+  );
+  const childMap = await fetchChildrenByRecordIds(allChildIds);
+
+  // 3d. Build the teaser once — same first paragraph for every email.
+  const teaser = extractTeaser(bodyHtml);
 
   logger.info('Campus newsletter send starting', {
     newsletterId,
@@ -208,12 +330,32 @@ export async function sendCampusNewsletterTool(
   const failures: Array<{ email: string; error: string }> = [];
 
   for (const r of recipients) {
+    // Map this sponsor's linked child record IDs to (firstName, shirtNumber).
+    const kids = r.childRecordIds
+      .map(id => childMap.get(id))
+      .filter((k): k is { shirtNumber: number | null; firstName: string } => !!k)
+      .filter(k => typeof k.shirtNumber === 'number')
+      .map(k => ({ firstName: k.firstName, shirtNumber: k.shirtNumber as number }));
+
+    // Sponsor with no resolvable kids: skip. They'd get an email with
+    // nothing to click. Rare edge case (sponsorship missing Children
+    // link or child record was deleted).
+    if (kids.length === 0) {
+      failedCount += 1;
+      failures.push({
+        email: r.email,
+        error: 'No resolvable kid links for this sponsor',
+      });
+      continue;
+    }
+
     try {
-      const result = await sendCampusNewsletterEmail({
+      const result = await sendNewsletterNotificationEmail({
         sponsorEmail: r.email,
         sponsorName: r.name,
         subject,
-        bodyHtml,
+        teaser,
+        kids,
         heroPhotoUrl: hero,
       });
       if (result.success) {
