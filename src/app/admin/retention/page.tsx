@@ -56,8 +56,7 @@ interface MetricsResponse {
 const RUN_RATE_STORAGE_KEY = 'ban:retention:monthlyRunRateUsd';
 
 export default function RetentionDashboard() {
-  const [token, setToken] = useState('');
-  const [authed, setAuthed] = useState(false);
+  // Auth handled by middleware.ts + admin session cookie.
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [metrics, setMetrics] = useState<MetricsResponse | null>(null);
@@ -68,12 +67,11 @@ export default function RetentionDashboard() {
     if (saved) setRunRate(Number(saved) || 0);
   }, []);
 
-  async function load(tokenValue: string) {
+  async function load() {
     setLoading(true);
     setError('');
     try {
       const res = await fetch('/api/admin/retention/metrics', {
-        headers: { 'X-Admin-Token': tokenValue },
         cache: 'no-store',
       });
       if (!res.ok) {
@@ -82,13 +80,17 @@ export default function RetentionDashboard() {
       }
       const data: MetricsResponse = await res.json();
       setMetrics(data);
-      setAuthed(true);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load metrics');
     } finally {
       setLoading(false);
     }
   }
+
+  // Auto-load on mount.
+  useEffect(() => {
+    load();
+  }, []);
 
   function saveRunRate(v: number) {
     setRunRate(v);
@@ -97,49 +99,43 @@ export default function RetentionDashboard() {
     }
   }
 
-  if (!authed) {
+  if (!metrics) {
     return (
       <div className="min-h-screen bg-gray-50">
         <AdminNav />
         <div className="max-w-md mx-auto px-6 py-16">
-          <div className="bg-white rounded-lg shadow-lg p-8">
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">Retention Dashboard</h1>
-            <p className="text-gray-600 mb-6">Enter your admin token to continue.</p>
-            {error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md mb-4 text-sm">
-                {error}
-              </div>
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center">
+            {error ? (
+              <>
+                <p className="text-red-600 text-sm mb-3">{error}</p>
+                <button
+                  onClick={() => load()}
+                  className="px-4 py-2 bg-gray-900 text-white rounded-md hover:bg-gray-800 transition-colors text-sm font-medium"
+                >
+                  Retry
+                </button>
+              </>
+            ) : (
+              <p className="text-gray-500 text-sm">{loading ? 'Loading retention metrics…' : 'Loading…'}</p>
             )}
-            <label className="block text-sm font-medium text-gray-700 mb-2">Admin token</label>
-            <input
-              type="password"
-              value={token}
-              onChange={e => setToken(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && token && load(token)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-gray-900 focus:border-transparent mb-4"
-              placeholder="Enter admin token"
-            />
-            <button
-              onClick={() => load(token)}
-              disabled={loading || !token}
-              className="w-full px-4 py-3 bg-gray-900 text-white rounded-md hover:bg-gray-800 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {loading ? 'Loading…' : 'Access Dashboard'}
-            </button>
           </div>
         </div>
       </div>
     );
   }
 
-  if (!metrics) return null;
-
   const runRateCents = runRate * 100;
   const mrrPct = runRateCents > 0 ? (metrics.totals.mrrCents / runRateCents) * 100 : 0;
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <AdminNav showLogout onLogout={() => { setAuthed(false); setToken(''); setMetrics(null); }} />
+      <AdminNav
+        showLogout
+        onLogout={async () => {
+          await fetch('/api/admin/logout', { method: 'POST' });
+          window.location.href = '/admin/login';
+        }}
+      />
 
       <div className="max-w-6xl mx-auto px-6 py-8">
         <div className="flex items-start justify-between mb-8">
@@ -151,7 +147,7 @@ export default function RetentionDashboard() {
             </p>
           </div>
           <button
-            onClick={() => load(token)}
+            onClick={() => load()}
             className="px-4 py-2 bg-gray-900 text-white rounded-md hover:bg-gray-800 transition-colors text-sm font-medium"
           >
             Refresh

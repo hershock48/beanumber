@@ -9,7 +9,7 @@
  * shipping and need a check-in.
  */
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Logo } from '@/components/Logo';
 
@@ -36,28 +36,22 @@ interface RevealStatusPayload {
 const STALE_DAYS_THRESHOLD = 14;
 
 export default function AdminSponsorsPage() {
-  const [adminToken, setAdminToken] = useState('');
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  // Auth handled by middleware.ts + admin session cookie.
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [data, setData] = useState<RevealStatusPayload | null>(null);
 
-  const loadData = async (token: string) => {
+  const loadData = async () => {
     setError('');
     setIsLoading(true);
     try {
-      const response = await fetch('/api/admin/sponsors/reveal-status', {
-        headers: { 'X-Admin-Token': token },
-      });
-
+      const response = await fetch('/api/admin/sponsors/reveal-status');
       if (!response.ok) {
         const body = await response.json().catch(() => ({}));
         throw new Error(body?.message || `HTTP ${response.status}`);
       }
-
       const payload = await response.json();
       setData(payload.data as RevealStatusPayload);
-      setIsAuthenticated(true);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to load sponsor reveal status');
     } finally {
@@ -65,10 +59,9 @@ export default function AdminSponsorsPage() {
     }
   };
 
-  const handleAuthenticate = () => {
-    if (!adminToken) return;
-    void loadData(adminToken);
-  };
+  useEffect(() => {
+    loadData();
+  }, []);
 
   const formatDate = (iso?: string) => {
     if (!iso) return '—';
@@ -78,58 +71,6 @@ export default function AdminSponsorsPage() {
       day: 'numeric',
     });
   };
-
-  if (!isAuthenticated) {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <nav className="bg-white border-b border-gray-200">
-          <div className="max-w-6xl mx-auto px-6 py-4">
-            <Link href="/" className="flex items-center gap-3">
-              <Logo className="h-8 w-8 text-gray-900" />
-              <span className="text-xl font-semibold text-gray-900">Be A Number</span>
-            </Link>
-          </div>
-        </nav>
-
-        <div className="max-w-md mx-auto px-6 py-16">
-          <div className="bg-white rounded-lg shadow-lg p-8">
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">Sponsor Reveal Status</h1>
-            <p className="text-gray-600 mb-6">Enter your admin token to continue</p>
-
-            {error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md mb-4 text-sm">
-                {error}
-              </div>
-            )}
-
-            <div className="space-y-4">
-              <div>
-                <label htmlFor="adminToken" className="block text-sm font-medium text-gray-700 mb-2">
-                  Admin Token
-                </label>
-                <input
-                  type="password"
-                  id="adminToken"
-                  value={adminToken}
-                  onChange={(e) => setAdminToken(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-                  placeholder="Enter admin token"
-                  onKeyDown={(e) => e.key === 'Enter' && handleAuthenticate()}
-                />
-              </div>
-              <button
-                onClick={handleAuthenticate}
-                disabled={isLoading || !adminToken}
-                className="w-full bg-gray-900 text-white py-2 rounded-md hover:bg-gray-800 disabled:opacity-50 transition-colors"
-              >
-                {isLoading ? 'Loading…' : 'Continue'}
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   const totals = data?.totals ?? { revealed: 0, waiting: 0, all: 0 };
 
