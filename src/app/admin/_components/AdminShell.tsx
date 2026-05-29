@@ -19,18 +19,18 @@ import { Logo } from '@/components/Logo';
 
 export type AdminTab =
   | 'home'
+  | 'newsletter'
+  | 'roster'
+  // Legacy tabs — kept in the type so existing pages compile, but no
+  // longer rendered in the nav. Pages still exist on direct URLs.
   | 'updates'
   | 'fulfillment'
-  | 'newsletter'
   | 'sponsors'
   | 'retention';
 
 const TABS: Array<{ id: AdminTab; label: string; href: string }> = [
-  { id: 'updates', label: 'Updates', href: '/admin/dashboard' },
-  { id: 'fulfillment', label: 'Fulfillment', href: '/admin/fulfillment' },
   { id: 'newsletter', label: 'Newsletter', href: '/admin/newsletter' },
-  { id: 'sponsors', label: 'Sponsors', href: '/admin/sponsors' },
-  { id: 'retention', label: 'Retention', href: '/admin/retention' },
+  { id: 'roster', label: 'Roster', href: '/admin/roster' },
 ];
 
 export function AdminShell({

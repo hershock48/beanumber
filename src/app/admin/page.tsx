@@ -53,64 +53,6 @@ export default async function AdminHomePage() {
         </h1>
 
         <div className="space-y-4">
-          {/* ── Card: Updates pending publish ────────────────────── */}
-          <Card
-            label="Updates from the campus"
-            urgent={data.pendingUpdates.count > 0}
-            error={data.pendingUpdates.error}
-          >
-            {data.pendingUpdates.count > 0 ? (
-              <>
-                <Headline>
-                  {data.pendingUpdates.count} child update
-                  {data.pendingUpdates.count === 1 ? '' : 's'} waiting for you.
-                </Headline>
-                {data.pendingUpdates.recent.length > 0 && (
-                  <ul className="mt-3 space-y-1 text-sm text-[#666]">
-                    {data.pendingUpdates.recent.slice(0, 3).map(u => (
-                      <li key={u.id}>
-                        <span className="font-medium text-[#0d0d0d]">{u.childDisplayName}</span>
-                        {' — '}
-                        {u.title}
-                      </li>
-                    ))}
-                    {data.pendingUpdates.recent.length > 3 && (
-                      <li className="text-[#aaa]">+ {data.pendingUpdates.recent.length - 3} more</li>
-                    )}
-                  </ul>
-                )}
-                <Actions>
-                  <PrimaryLink href="/admin/dashboard">Review &amp; publish</PrimaryLink>
-                </Actions>
-              </>
-            ) : (
-              <CalmState>No updates waiting. Inbox zero.</CalmState>
-            )}
-          </Card>
-
-          {/* ── Card: Shirts to ship ────────────────────────────── */}
-          <Card
-            label="Fulfillment"
-            urgent={data.shirtsToShip.count > 0}
-            error={data.shirtsToShip.error}
-          >
-            {data.shirtsToShip.count > 0 ? (
-              <>
-                <Headline>
-                  {data.shirtsToShip.count} order{data.shirtsToShip.count === 1 ? '' : 's'} to ship.
-                </Headline>
-                <p className="mt-2 text-sm text-[#666]">
-                  Print packing slips, mark shipped, send tracking.
-                </p>
-                <Actions>
-                  <PrimaryLink href="/admin/fulfillment">Open shipping queue</PrimaryLink>
-                </Actions>
-              </>
-            ) : (
-              <CalmState>Nothing to ship. The queue is clear.</CalmState>
-            )}
-          </Card>
-
           {/* ── Card: Newsletter due ────────────────────────────── */}
           <Card
             label="Monthly newsletter"
@@ -141,35 +83,6 @@ export default async function AdminHomePage() {
             </Actions>
           </Card>
 
-          {/* ── Card: Sponsor activity ─────────────────────────── */}
-          <Card
-            label="Sponsors"
-            error={data.sponsorActivity.error}
-          >
-            <Headline>
-              {data.sponsorActivity.newThisWeek > 0
-                ? `${data.sponsorActivity.newThisWeek} new sponsor${data.sponsorActivity.newThisWeek === 1 ? '' : 's'} this week.`
-                : 'No new sponsors this week.'}
-            </Headline>
-            {data.sponsorActivity.newRecent.length > 0 && (
-              <ul className="mt-3 space-y-1 text-sm text-[#666]">
-                {data.sponsorActivity.newRecent.slice(0, 5).map(s => (
-                  <li key={s.id}>
-                    <span className="font-medium text-[#0d0d0d]">{s.sponsorName}</span>
-                    {' → '}
-                    {s.childDisplayName}
-                  </li>
-                ))}
-                {data.sponsorActivity.newRecent.length > 5 && (
-                  <li className="text-[#aaa]">+ {data.sponsorActivity.newRecent.length - 5} more</li>
-                )}
-              </ul>
-            )}
-            <Actions>
-              <SecondaryLink href="/admin/sponsors">View all sponsors</SecondaryLink>
-            </Actions>
-          </Card>
-
           {/* ── Card: Roster gaps ──────────────────────────────── */}
           <Card
             label="Roster"
@@ -188,33 +101,8 @@ export default async function AdminHomePage() {
               </div>
             )}
             <Actions>
-              <SecondaryLink href="/admin/roster">Open roster manager</SecondaryLink>
+              <PrimaryLink href="/admin/roster">Open roster manager</PrimaryLink>
             </Actions>
-          </Card>
-
-          {/* ── Card: This month numbers ───────────────────────── */}
-          <Card
-            label="This month"
-            error={data.thisMonth.error}
-          >
-            <div className="grid grid-cols-2 gap-4">
-              <Stat
-                value={String(data.thisMonth.newSponsorshipsThisMonth)}
-                label="New sponsorships"
-              />
-              <Stat
-                value={formatDollars(data.thisMonth.donationsThisMonthCents)}
-                label="Donations this month"
-              />
-              <Stat
-                value={String(data.thisMonth.activeSponsorships)}
-                label="Active sponsorships"
-              />
-              <Stat
-                value={`${formatDollars(data.thisMonth.monthlyRecurringCents)}/mo`}
-                label="Recurring monthly"
-              />
-            </div>
           </Card>
         </div>
 
