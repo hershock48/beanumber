@@ -25,7 +25,10 @@ import {
   findDonorByEmail,
   type AirtableNewsletterRecord,
 } from '../../airtable';
-import { sendNewsletterNotificationEmail } from '../../email';
+import {
+  sendNewsletterNotificationEmail,
+  sendNewsletterNotificationEmailForNonSponsor,
+} from '../../email';
 
 // Notification model: the full newsletter body lives on /[number] for
 // each kid the sponsor sponsors. The email is a short ping with a
@@ -36,6 +39,53 @@ const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID || '';
 const AIRTABLE_API_KEY =
   process.env.AIRTABLE_PAT || process.env.AIRTABLE_API_KEY || '';
 const CHILDREN_TABLE = process.env.AIRTABLE_CHILDREN_TABLE || 'Children';
+const DONORS_TABLE = process.env.AIRTABLE_DONORS_TABLE || 'Donors';
+
+/**
+ * Fetch every opted-in Donor (Communication Opt-In = true). Used to
+ * extend the newsletter notification to non-sponsors who've engaged
+ * with BAN before — shirt buyers who didn't convert, one-time donors,
+ * etc. The caller subtracts the sponsor email list so opted-in
+ * sponsors don't get the email twice.
+ */
+async function fetchOptedInDonors(): Promise<
+  Array<{ email: string; name: string }>
+> {
+  if (!AIRTABLE_BASE_ID || !AIRTABLE_API_KEY) return [];
+  const out: Array<{ email: string; name: string }> = [];
+  let offset: string | undefined;
+  do {
+    const params = new URLSearchParams();
+    params.set('filterByFormula', `{Communication Opt-In} = TRUE()`);
+    params.set('pageSize', '100');
+    params.append('fields[]', 'Email Address');
+    params.append('fields[]', 'Donor Name');
+    if (offset) params.set('offset', offset);
+    try {
+      const res = await fetch(
+        `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(DONORS_TABLE)}?${params}`,
+        {
+          headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` },
+          cache: 'no-store',
+        }
+      );
+      if (!res.ok) break;
+      const data = await res.json();
+      for (const rec of (data.records || []) as Array<{
+        id: string;
+        fields: { 'Email Address'?: string; 'Donor Name'?: string };
+      }>) {
+        const email = (rec.fields['Email Address'] || '').trim();
+        if (!email) continue;
+        out.push({ email, name: rec.fields['Donor Name'] || 'Friend' });
+      }
+      offset = data.offset;
+    } catch {
+      break;
+    }
+  } while (offset);
+  return out;
+}
 
 /**
  * Pull ShirtNumber + FirstName for a batch of Children record IDs.
@@ -85,16 +135,16 @@ async function fetchChildrenByRecordIds(
 }
 
 /**
- * Pull the first paragraph of plain text out of an HTML body.
- * Strips tags, normalizes whitespace, cuts at the first double-newline
- * or after ~280 characters at a word boundary.
+ * Pull a clean 1–2-sentence teaser out of the newsletter body HTML.
+ * Strips tags, normalizes whitespace, then walks sentence by sentence
+ * and accumulates until the result feels like a complete thought
+ * around 180–320 characters. Always cuts at a real sentence boundary,
+ * never mid-word.
  */
 function extractTeaser(html: string): string {
   if (!html) return '';
   // Take everything before any later <h2/h3 (skip the rest of the article).
   const beforeHeader = html.split(/<h[1-4]\b/i)[0] || html;
-  // Replace block-level tag breaks with double newlines so we get
-  // paragraph boundaries when we strip.
   const withBreaks = beforeHeader
     .replace(/<\/(p|div|li|h[1-6])>/gi, '\n\n')
     .replace(/<br\s*\/?>/gi, '\n');
@@ -110,14 +160,36 @@ function extractTeaser(html: string): string {
     .replace(/&lsquo;/g, '‘')
     .replace(/&ldquo;/g, '“')
     .replace(/&rdquo;/g, '”')
-    .replace(/&mdash;/g, '—');
-  const firstPara = stripped.split(/\n\s*\n/).map(s => s.trim()).find(s => s.length > 0) || '';
+    .replace(/&mdash;/g, '—')
+    .replace(/[ \t]+/g, ' ');
 
-  if (firstPara.length <= 320) return firstPara;
-  // Soft-cut at a word boundary just past 280 chars.
-  const slice = firstPara.slice(0, 320);
-  const lastSpace = slice.lastIndexOf(' ');
-  return (lastSpace > 240 ? slice.slice(0, lastSpace) : slice).trimEnd() + '…';
+  const firstPara = stripped
+    .split(/\n\s*\n/)
+    .map(s => s.trim())
+    .find(s => s.length > 0) || '';
+
+  if (firstPara.length <= 280) return firstPara;
+
+  // Sentence-by-sentence accumulator. Take whole sentences until the
+  // result is either (a) past ~180 chars and at a sentence end, or
+  // (b) would exceed ~320 chars with the next sentence added.
+  const sentences = firstPara.match(/[^.!?]+[.!?]+\s*/g);
+  if (!sentences || sentences.length === 0) {
+    // Fallback: no sentence punctuation found, just return the para
+    // capped at 280 with no mid-word cut.
+    const slice = firstPara.slice(0, 280);
+    const lastSpace = slice.lastIndexOf(' ');
+    return (lastSpace > 200 ? slice.slice(0, lastSpace) : slice).trimEnd() + '…';
+  }
+
+  let acc = '';
+  for (const s of sentences) {
+    const next = (acc + s).trim();
+    if (acc.length > 0 && next.length > 320) break;
+    acc = next;
+    if (acc.length >= 180) break;
+  }
+  return acc.trim();
 }
 
 export interface SendCampusNewsletterInput {
@@ -376,6 +448,61 @@ export async function sendCampusNewsletterTool(
     await new Promise((resolve) => setTimeout(resolve, 50));
   }
 
+  // 5b. Extend the send to opted-in NON-sponsors. Shirt buyers who
+  // never converted, one-time donors who went quiet. Same teaser +
+  // hero photo; different CTA (homepage + soft sponsor nudge) since
+  // they don't have a sponsored kid page to land on. We subtract the
+  // sponsor email set so opted-in sponsors don't get two emails.
+  let nonSponsorSent = 0;
+  let nonSponsorFailed = 0;
+  try {
+    const sponsorEmailSet = new Set(
+      recipients.map(r => r.email.trim().toLowerCase())
+    );
+    const optedInDonors = await fetchOptedInDonors();
+    const nonSponsorRecipients = optedInDonors.filter(
+      d => !sponsorEmailSet.has(d.email.trim().toLowerCase())
+    );
+
+    logger.info('Newsletter non-sponsor send starting', {
+      newsletterId,
+      candidateCount: nonSponsorRecipients.length,
+    });
+
+    for (const r of nonSponsorRecipients) {
+      try {
+        const result = await sendNewsletterNotificationEmailForNonSponsor({
+          recipientEmail: r.email,
+          recipientName: r.name,
+          subject,
+          teaser,
+          heroPhotoUrl: hero,
+        });
+        if (result.success) {
+          nonSponsorSent += 1;
+        } else {
+          nonSponsorFailed += 1;
+          failures.push({
+            email: r.email,
+            error: `(non-sponsor) ${result.error || 'Unknown send error'}`,
+          });
+        }
+      } catch (err) {
+        nonSponsorFailed += 1;
+        const msg = err instanceof Error ? err.message : String(err);
+        failures.push({ email: r.email, error: `(non-sponsor) ${msg}` });
+      }
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+  } catch (err) {
+    logger.warn('Non-sponsor send list fetch failed; continuing without it', {
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+
+  sentCount += nonSponsorSent;
+  failedCount += nonSponsorFailed;
+
   // 6. Write back the result.
   const finalStatus: 'Sent' | 'Failed' =
     sentCount > 0 ? 'Sent' : 'Failed';
@@ -387,11 +514,12 @@ export async function sendCampusNewsletterTool(
       (failures.length > 25 ? `\n...and ${failures.length - 25} more.` : '')
     : '';
 
+  const totalRecipients = recipients.length + nonSponsorSent + nonSponsorFailed;
   try {
     await updateNewsletter(newsletterId, {
       Status: finalStatus,
       PublishedAt: new Date().toISOString(),
-      RecipientCount: recipients.length,
+      RecipientCount: totalRecipients,
       SentCount: sentCount,
       FailedCount: failedCount,
       SendNotes: sendNotes,

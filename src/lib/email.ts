@@ -405,6 +405,58 @@ export async function sendNewsletterNotificationEmail(params: {
 }
 
 /**
+ * Same monthly-newsletter notification, but for opted-in non-sponsors
+ * (shirt buyers who haven't sponsored, donors who gave once and went
+ * quiet, etc). Same teaser + hero photo as the sponsor version, but
+ * the CTA is the homepage + a soft sponsor nudge instead of per-kid
+ * page links (they don't have a sponsored kid yet).
+ */
+export async function sendNewsletterNotificationEmailForNonSponsor(params: {
+  recipientEmail: string;
+  recipientName: string;
+  subject: string;
+  teaser: string;
+  heroPhotoUrl?: string;
+}): Promise<EmailSendResult> {
+  const { recipientEmail, recipientName, subject, teaser, heroPhotoUrl } = params;
+  const firstName = (recipientName || 'Friend').trim().split(/\s+/)[0] || 'Friend';
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.beanumber.org';
+  const sponsorshipUrl = `${siteUrl}/sponsorship`;
+
+  const heroBlock = heroPhotoUrl
+    ? `<img src="${escapeAttr(heroPhotoUrl)}" alt="From the campus" style="display:block;width:100%;max-width:560px;height:auto;border-radius:4px;margin:0 0 24px 0;">`
+    : '';
+
+  const teaserBlock = teaser
+    ? `<p style="color: #555; font-style: italic; border-left: 3px solid #D4A843; padding-left: 16px; margin: 24px 0;">${escapeHtml(teaser)}</p>`
+    : '';
+
+  const html = wrapTransactionalEmail(`
+    <p style="margin-top: 0;">Hey ${escapeHtml(firstName)},</p>
+
+    <p>The latest campus newsletter just went up &mdash; <strong>${escapeHtml(subject)}</strong>. You&rsquo;re on the list because you bought a shirt or gave at some point this year, and I thought you&rsquo;d want to see what&rsquo;s been happening on the ground.</p>
+
+    ${heroBlock}
+
+    ${teaserBlock}
+
+    <p style="margin: 24px 0;">
+      <a href="${siteUrl}" style="color: #D4A843; font-weight: bold;">Read the rest at beanumber.org</a>
+    </p>
+
+    <p style="font-size: 14px; color: #555;">If you ever want to go from one-time supporter to monthly sponsor of a kid at the campus, that&rsquo;s a <a href="${sponsorshipUrl}" style="color: #D4A843;">$25-a-month decision</a>. No pressure &mdash; the work runs either way. Just wanted you to know the door is open.</p>
+
+    <p>Kevin</p>
+  `);
+
+  return sendEmail({
+    to: { email: recipientEmail, name: recipientName },
+    subject,
+    html,
+  });
+}
+
+/**
  * Send update notification to sponsor
  */
 export async function sendUpdateNotificationEmail(
