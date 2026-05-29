@@ -13,6 +13,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { compressImageIfNeeded } from '@/lib/client/compress-image';
 
 export function CampusUpdateEditor({
   initialBody,
@@ -33,20 +34,22 @@ export function CampusUpdateEditor({
 
   const dirty = body !== initialBody || photoFile !== null;
 
-  function onPhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  async function onPhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const rawFile = e.target.files?.[0];
+    if (!rawFile) return;
     setError(null);
     setStatus(null);
-    if (file.size > 3.7 * 1024 * 1024) {
-      setError('Photo too large (max 3.7 MB). Compress and try again.');
+    try {
+      // Auto-shrink big phone photos so Simon never hits the size cap.
+      const file = await compressImageIfNeeded(rawFile);
+      setPhotoFile(file);
+      const reader = new FileReader();
+      reader.onload = () => setPhotoPreview(reader.result as string);
+      reader.readAsDataURL(file);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Couldn\'t prep photo.');
       e.target.value = '';
-      return;
     }
-    setPhotoFile(file);
-    const reader = new FileReader();
-    reader.onload = () => setPhotoPreview(reader.result as string);
-    reader.readAsDataURL(file);
   }
 
   async function save(e: React.FormEvent) {

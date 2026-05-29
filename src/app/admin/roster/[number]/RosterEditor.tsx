@@ -18,6 +18,7 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import type { RosterKidAttachment } from '@/lib/admin/queries';
+import { compressImageIfNeeded } from '@/lib/client/compress-image';
 
 interface Fields {
   nameMeaning: string;
@@ -388,17 +389,15 @@ function PhotoUploadSection({
   const [error, setError] = useState<string | null>(null);
 
   async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const rawFile = e.target.files?.[0];
+    if (!rawFile) return;
     setError(null);
     setStatus(null);
-    if (file.size > 3.7 * 1024 * 1024) {
-      setError('Photo too large (max 3.7 MB). Compress and try again.');
-      e.target.value = '';
-      return;
-    }
     setUploading(true);
     try {
+      // Shrink huge phone photos automatically before upload so the
+      // user never has to think about sizes.
+      const file = await compressImageIfNeeded(rawFile);
       const base64 = await fileToBase64(file);
       const res = await fetch('/api/admin/roster/upload', {
         method: 'POST',
@@ -546,22 +545,23 @@ function UploadSection({
   const [error, setError] = useState<string | null>(null);
 
   async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const rawFile = e.target.files?.[0];
+    if (!rawFile) return;
     setError(null);
     setStatus(null);
 
-    // 3.7 MB cap matches the upload endpoint's base64 limit. Files
-    // larger than this would inflate past Airtable's 5 MB request
-    // body limit once base64-encoded.
-    if (file.size > 3.7 * 1024 * 1024) {
-      setError('File too large (max 3.7 MB). Compress it and try again.');
-      e.target.value = '';
-      return;
-    }
-
     setUploading(true);
     try {
+      // Auto-compress photos. PDFs (report cards) pass through
+      // untouched — compressImageIfNeeded is a no-op for non-images.
+      const file = await compressImageIfNeeded(rawFile);
+      // Server still enforces a hard cap; this surfaces the error
+      // nicely if a non-image PDF is somehow over 3.7 MB.
+      if (file.size > 3.7 * 1024 * 1024) {
+        throw new Error(
+          `File too large (${(file.size / 1024 / 1024).toFixed(1)} MB). Try a different file.`
+        );
+      }
       const base64 = await fileToBase64(file);
       const res = await fetch('/api/admin/roster/upload', {
         method: 'POST',
