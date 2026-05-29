@@ -1,17 +1,20 @@
 /**
- * Admin · Student of the Month picker.
+ * Admin · Student of the Month picker (per-grade).
  *
- * Visual grid of every kid — photo + name. Click a kid to nominate
- * (Simon) or approve (Kevin). Designed to be the easy entry point
- * for the SOTM workflow without having to dive into a kid's editor.
+ * Seven grade sections (Pre-K through 5th, plus an 'Unknown grade'
+ * catch-all if any kids have empty GradeClass). Each section has its
+ * own current winner / pending nomination / kid grid. Simon nominates
+ * one kid per grade per month; Kevin approves each grade's winner
+ * independently.
  *
- * Server-rendered shell + a client-side picker that handles the
- * click-to-select interaction.
+ * Server-rendered shell — pulls the roster once, splits by
+ * normalized grade, hands each grade's state to the client picker.
  */
 
 import { AdminShell } from '../_components/AdminShell';
 import { getRoster } from '@/lib/admin/queries';
 import { getAdminRole } from '@/lib/admin-session';
+import { CANONICAL_GRADES, normalizeGrade } from '@/lib/admin/grade';
 import { SOTMPicker } from './SOTMPicker';
 
 export const dynamic = 'force-dynamic';
@@ -23,12 +26,46 @@ function currentMonthLabel(): string {
 }
 
 export default async function SOTMPage() {
-  const kids = await getRoster();
+  const allKids = await getRoster();
   const role = (await getAdminRole()) || 'admin';
   const month = currentMonthLabel();
 
-  const published = kids.find(k => !!k.studentOfMonth);
-  const pending = kids.find(k => !!k.pendingSOTMMonth);
+  // Group kids by normalized grade key.
+  const byGradeKey = new Map<
+    string,
+    { label: string; order: number; kids: typeof allKids }
+  >();
+  for (const kid of allKids) {
+    // Skip departed kids — they shouldn't be SOTM eligible.
+    if (kid.departedAt) continue;
+    const grade = normalizeGrade(kid.gradeClass);
+    const bucket = byGradeKey.get(grade.key);
+    if (bucket) bucket.kids.push(kid);
+    else
+      byGradeKey.set(grade.key, {
+        label: grade.label,
+        order: grade.order,
+        kids: [kid],
+      });
+  }
+
+  // Render the 7 canonical grades in age order, then any unknown bucket.
+  const orderedKeys: string[] = [
+    ...CANONICAL_GRADES.map(g => g.key),
+    'unknown',
+  ];
+  const sections = orderedKeys
+    .map(key => {
+      const bucket = byGradeKey.get(key);
+      if (!bucket || bucket.kids.length === 0) return null;
+      return { key, ...bucket };
+    })
+    .filter(Boolean) as Array<{
+      key: string;
+      label: string;
+      order: number;
+      kids: typeof allKids;
+    }>;
 
   return (
     <AdminShell activeTab="sotm" role={role}>
@@ -42,31 +79,59 @@ export default async function SOTMPage() {
             style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
           >
             {role === 'simon'
-              ? `Nominate a kid for ${month}`
+              ? `Nominate one kid per grade for ${month}`
               : `Student of the Month — ${month}`}
           </h1>
           <p className="text-[#666]">
             {role === 'simon'
-              ? "Tap the kid who deserves the award this month. You'll add a short reason, Kevin will approve before it shows up publicly. You can change your pick anytime — only the last one stands."
-              : "You don't pick — Simon does, from the campus. When his nomination comes in, it shows up here with his reason and you approve or reject. If you need to override or pick directly, the grid below lets you."}
+              ? "One Student of the Month per grade — seven total winners. Tap a kid in their grade's section to nominate; you'll add a short reason, Kevin will approve before it shows up publicly."
+              : "Seven winners, one per grade. Simon nominates from the campus; you approve each grade's winner here. Pending nominations show as red cards inside their grade section."}
           </p>
         </div>
 
-        <SOTMPicker
-          kids={kids.map(k => ({
-            shirtNumber: k.shirtNumber,
-            displayName: k.displayName,
-            photoUrl: k.photoUrl,
-            studentOfMonth: k.studentOfMonth,
-            studentOfMonthReason: k.studentOfMonthReason,
-            pendingSOTMMonth: k.pendingSOTMMonth,
-            pendingSOTMReason: k.pendingSOTMReason,
-          }))}
-          role={role}
-          month={month}
-          publishedShirtNumber={published?.shirtNumber}
-          pendingShirtNumber={pending?.shirtNumber}
-        />
+        <div className="space-y-10">
+          {sections.map(section => {
+            const published = section.kids.find(k => !!k.studentOfMonth);
+            const pending = section.kids.find(k => !!k.pendingSOTMMonth);
+            return (
+              <section key={section.key}>
+                <header className="mb-3 pb-2 border-b border-[#e8e0d4] flex items-baseline justify-between gap-3">
+                  <h2
+                    className="text-xl md:text-2xl text-[#0d0d0d]"
+                    style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
+                  >
+                    {section.label}
+                  </h2>
+                  <p className="text-xs text-[#aaa] tabular-nums flex-shrink-0">
+                    {section.kids.length} kid{section.kids.length === 1 ? '' : 's'}
+                  </p>
+                </header>
+                <SOTMPicker
+                  kids={section.kids.map(k => ({
+                    shirtNumber: k.shirtNumber,
+                    displayName: k.displayName,
+                    photoUrl: k.photoUrl,
+                    studentOfMonth: k.studentOfMonth,
+                    studentOfMonthReason: k.studentOfMonthReason,
+                    pendingSOTMMonth: k.pendingSOTMMonth,
+                    pendingSOTMReason: k.pendingSOTMReason,
+                  }))}
+                  role={role}
+                  month={month}
+                  gradeLabel={section.label}
+                  publishedShirtNumber={published?.shirtNumber}
+                  pendingShirtNumber={pending?.shirtNumber}
+                />
+              </section>
+            );
+          })}
+          {sections.length === 0 && (
+            <p className="text-sm text-[#888] italic">
+              No active kids on the roster yet. Add some via the roster
+              page first.
+            </p>
+          )}
+        </div>
       </div>
     </AdminShell>
   );

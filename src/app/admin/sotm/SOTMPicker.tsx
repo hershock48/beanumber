@@ -37,12 +37,18 @@ export function SOTMPicker({
   kids,
   role,
   month,
+  gradeLabel,
   publishedShirtNumber,
   pendingShirtNumber,
 }: {
   kids: PickerKid[];
   role: 'admin' | 'simon';
   month: string;
+  /** When rendered inside a per-grade section, the grade name is
+   *  passed in so the override / nomination copy can be specific
+   *  ("Approving Marvin for P3 May 2026"). Optional — falls back
+   *  to just the month if not supplied. */
+  gradeLabel?: string;
   publishedShirtNumber: number | undefined;
   pendingShirtNumber: number | undefined;
 }) {
