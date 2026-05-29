@@ -38,6 +38,7 @@ export function RosterEditor({
   letters,
   lastEditedBySimon,
   pendingFields,
+  deletionRequestedAt,
 }: {
   shirtNumber: number;
   firstName: string;
@@ -51,6 +52,9 @@ export function RosterEditor({
    *  that Simon has touched and Kevin hasn't reviewed. Drives the red
    *  field borders shown only to admin. */
   pendingFields: string[];
+  /** ISO timestamp set when someone requested this kid be deleted.
+   *  Null = no pending request. */
+  deletionRequestedAt: string | null;
 }) {
   const router = useRouter();
   const [fields, setFields] = useState<Fields>(initial);
@@ -329,6 +333,15 @@ export function RosterEditor({
         {status && <span className="text-sm text-[#888]">{status}</span>}
         {error && <span className="text-sm text-red-600">{error}</span>}
       </div>
+
+      {/* Delete control — bottom of form. Two-step flow: Simon
+          requests, Kevin approves. Admin can also delete directly. */}
+      <DeleteSection
+        shirtNumber={shirtNumber}
+        firstName={firstName}
+        role={role}
+        deletionRequestedAt={deletionRequestedAt}
+      />
 
       <div className="pt-8 border-t border-[#e8e0d4] space-y-8">
         <UploadSection
@@ -651,6 +664,162 @@ function fileToBase64(file: File): Promise<string> {
     reader.onerror = () => reject(new Error('Failed to read file'));
     reader.readAsDataURL(file);
   });
+}
+
+// ─── Delete (request + approve flow) ─────────────────────────────
+
+function DeleteSection({
+  shirtNumber,
+  firstName,
+  role,
+  deletionRequestedAt,
+}: {
+  shirtNumber: number;
+  firstName: string;
+  role: 'admin' | 'simon';
+  deletionRequestedAt: string | null;
+}) {
+  const router = useRouter();
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function call(action: 'request' | 'delete' | 'reject') {
+    if (busy) return;
+    const verb =
+      action === 'delete'
+        ? `Delete ${firstName} permanently? This can't be undone.`
+        : action === 'reject'
+          ? `Reject the deletion request? ${firstName} stays on the roster.`
+          : `Request that Kevin delete ${firstName}? He'll review and approve.`;
+    if (!confirm(verb)) return;
+
+    setBusy(action);
+    setError(null);
+    try {
+      const res = await fetch('/api/admin/roster/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ shirtNumber, action }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || `Failed: ${res.status}`);
+      if (action === 'delete') {
+        // Hard delete — kid is gone, go back to the roster.
+        router.push('/admin/roster');
+        router.refresh();
+      } else {
+        router.refresh();
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed.');
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  const requestedLabel = deletionRequestedAt
+    ? new Date(deletionRequestedAt).toLocaleString(undefined, {
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+      })
+    : null;
+
+  // Admin sees the approve/reject banner when there's a pending request,
+  // otherwise a direct delete button.
+  if (role === 'admin') {
+    if (deletionRequestedAt) {
+      return (
+        <div className="border-2 border-red-300 bg-red-50/50 p-5 rounded-sm">
+          <p className="text-xs font-bold uppercase tracking-[0.2em] text-red-700 mb-1">
+            Deletion request
+          </p>
+          <p className="text-sm text-[#444] mb-3">
+            Someone requested {firstName} be removed from the roster on{' '}
+            {requestedLabel}. Approve only if this is a test entry or a
+            duplicate. Sponsorships and shirt assignments will block
+            the delete — those have to be cleared first.
+          </p>
+          {error && <p className="text-sm text-red-600 mb-2">{error}</p>}
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => call('delete')}
+              disabled={!!busy}
+              className="bg-red-600 text-white hover:bg-red-700 font-bold text-xs uppercase tracking-wider px-4 py-2 transition-colors disabled:opacity-50"
+            >
+              {busy === 'delete' ? 'Deleting…' : `Approve & delete ${firstName}`}
+            </button>
+            <button
+              type="button"
+              onClick={() => call('reject')}
+              disabled={!!busy}
+              className="bg-white border border-[#888] text-[#0d0d0d] hover:bg-[#f5f0e8] font-bold text-xs uppercase tracking-wider px-4 py-2 transition-colors disabled:opacity-50"
+            >
+              {busy === 'reject' ? 'Rejecting…' : 'Reject (keep)'}
+            </button>
+          </div>
+        </div>
+      );
+    }
+    // No pending request — direct delete option.
+    return (
+      <div className="pt-6 mt-2 border-t border-[#e8e0d4]">
+        <p className="text-xs uppercase tracking-[0.2em] text-[#aaa] mb-2">
+          Danger zone
+        </p>
+        <p className="text-xs text-[#888] mb-3 leading-relaxed">
+          Permanently removes {firstName} from the roster. Blocked if
+          they have any active sponsorships or shirt assignment.
+        </p>
+        {error && <p className="text-sm text-red-600 mb-2">{error}</p>}
+        <button
+          type="button"
+          onClick={() => call('delete')}
+          disabled={!!busy}
+          className="bg-white border border-red-300 text-red-700 hover:bg-red-50 font-bold text-xs uppercase tracking-wider px-4 py-2 transition-colors disabled:opacity-50"
+        >
+          {busy === 'delete' ? 'Deleting…' : `Delete ${firstName}`}
+        </button>
+      </div>
+    );
+  }
+
+  // Simon's view
+  if (deletionRequestedAt) {
+    return (
+      <div className="pt-6 mt-2 border-t border-[#e8e0d4]">
+        <p className="text-xs uppercase tracking-[0.2em] text-[#aaa] mb-2">
+          Deletion
+        </p>
+        <p className="text-sm text-[#666]">
+          You&apos;ve requested {firstName} be removed. Kevin will review
+          and approve. No action needed from you.
+        </p>
+      </div>
+    );
+  }
+  return (
+    <div className="pt-6 mt-2 border-t border-[#e8e0d4]">
+      <p className="text-xs uppercase tracking-[0.2em] text-[#aaa] mb-2">
+        Wrong kid?
+      </p>
+      <p className="text-xs text-[#888] mb-3 leading-relaxed">
+        If this was a test or duplicate, request that Kevin delete the
+        record. He&apos;ll review before anything is removed.
+      </p>
+      {error && <p className="text-sm text-red-600 mb-2">{error}</p>}
+      <button
+        type="button"
+        onClick={() => call('request')}
+        disabled={!!busy}
+        className="bg-white border border-red-300 text-red-700 hover:bg-red-50 font-bold text-xs uppercase tracking-wider px-4 py-2 transition-colors disabled:opacity-50"
+      >
+        {busy === 'request' ? 'Sending…' : `Request to delete ${firstName}`}
+      </button>
+    </div>
+  );
 }
 
 // ─── Student of the month ────────────────────────────────────────

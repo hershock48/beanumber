@@ -473,6 +473,10 @@ export interface RosterKid {
   // Same format as studentOfMonth. Empty = no pending nomination.
   // Drives the red ★ on the roster card (admin view only).
   pendingSOTMMonth: string;
+  // ISO timestamp set when someone requests this kid be deleted.
+  // Null/empty = no pending request. Admin reviews via the editor
+  // banner and either approves (hard delete) or rejects (clears).
+  deletionRequestedAt: string | null;
   // Last time any structured field was touched. Best-effort via the
   // Airtable record's createdTime when there's no LastModified field.
   lastModified: string;
@@ -547,6 +551,7 @@ export async function getRoster(): Promise<RosterKid[]> {
       hasLetters: Array.isArray(f.Letters) && (f.Letters as unknown[]).length > 0,
       studentOfMonth: (f.StudentOfMonth as string) || '',
       pendingSOTMMonth: (f.PendingSOTMMonth as string) || '',
+      deletionRequestedAt: (f.DeletionRequestedAt as string) || null,
       lastModified: rec.createdTime,
     });
   }
@@ -660,6 +665,7 @@ export async function getRosterKidByNumber(shirtNumber: number): Promise<RosterK
     hasLetters: Array.isArray(f.Letters) && (f.Letters as unknown[]).length > 0,
     studentOfMonth: (f.StudentOfMonth as string) || '',
     pendingSOTMMonth: (f.PendingSOTMMonth as string) || '',
+    deletionRequestedAt: (f.DeletionRequestedAt as string) || null,
     lastModified: rec.createdTime,
     nameMeaning: (f.NameMeaning as string) || '',
     familyContext: (f.FamilyContext as string) || '',

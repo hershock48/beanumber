@@ -131,6 +131,15 @@ function RosterCard({ kid, role }: { kid: RosterKid; role: 'admin' | 'simon' }) 
         {role === 'admin' && (kid.hasPendingIntake || !!kid.lastEditedBySimon) && (
           <div className="absolute top-2 left-2 w-3 h-3 rounded-full bg-red-500 ring-2 ring-white" title="Simon edited this kid — review and polish" />
         )}
+        {role === 'admin' && kid.deletionRequestedAt && (
+          <div
+            className="absolute bottom-2 left-2 inline-flex items-center justify-center bg-red-600 text-white w-6 h-6 text-xs ring-2 ring-white"
+            title="Deletion requested — review in editor"
+            aria-hidden
+          >
+            🗑
+          </div>
+        )}
         {/* Gold ★ for the current Student of the Month; red ★ for a
             pending pick (admin sees both, Simon sees only the gold). */}
         {kid.studentOfMonth && (
