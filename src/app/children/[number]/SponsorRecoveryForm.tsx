@@ -50,7 +50,7 @@ export function SponsorRecoveryForm({ shirtNumber }: { shirtNumber: number }) {
           onClick={() => setExpanded(true)}
           className="text-[#D4A843] underline hover:text-[#c49a3a]"
         >
-          Email me a link &rarr;
+          click here &rarr;
         </button>
       </p>
     );
