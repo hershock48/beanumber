@@ -424,6 +424,11 @@ export interface RosterKid {
   // notes on this kid that Kevin hasn't yet polished into the public
   // fields. Drives the red-dot indicator on the admin roster grid.
   hasPendingIntake: boolean;
+  // ISO timestamp set by the save endpoint whenever Simon (role=simon)
+  // edits any field on this kid. Cleared by Kevin's "Mark as reviewed"
+  // banner click. Null means nothing pending. Drives the red-dot
+  // alongside hasPendingIntake.
+  lastEditedBySimon: string | null;
   // Last time any structured field was touched. Best-effort via the
   // Airtable record's createdTime when there's no LastModified field.
   lastModified: string;
@@ -436,7 +441,7 @@ export async function getRoster(): Promise<RosterKid[]> {
     const f = rec.fields as Record<string, unknown>;
     const n = f.ShirtNumber as number | undefined;
     const childId = (f.ChildID as string) || '';
-    if (typeof n !== 'number' || n < 1 || n > 53) continue;
+    if (typeof n !== 'number' || n < 1) continue;
     if (!childId || !childId.startsWith('HSP/BAN-')) continue;
     const photoArr = (f.ProfilePhoto as Array<{ url: string; thumbnails?: { large?: { url: string } } }>) || [];
     const photoUrl = photoArr[0]?.thumbnails?.large?.url || photoArr[0]?.url || null;
@@ -457,6 +462,7 @@ export async function getRoster(): Promise<RosterKid[]> {
         notes: !!(f.Notes as string),
       },
       hasPendingIntake: !!(f.IntakeFromCampus as string),
+      lastEditedBySimon: (f.LastEditedBySimon as string) || null,
       lastModified: rec.createdTime,
     });
   }
@@ -554,6 +560,7 @@ export async function getRosterKidByNumber(shirtNumber: number): Promise<RosterK
       notes: !!(f.Notes as string),
     },
     hasPendingIntake: !!(f.IntakeFromCampus as string),
+    lastEditedBySimon: (f.LastEditedBySimon as string) || null,
     lastModified: rec.createdTime,
     nameMeaning: (f.NameMeaning as string) || '',
     familyContext: (f.FamilyContext as string) || '',

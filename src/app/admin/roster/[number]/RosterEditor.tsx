@@ -1,13 +1,17 @@
 /**
- * Roster editor form. Client component. Five fields:
- *   - NameMeaning  (one line)
- *   - FamilyContext (one line)
- *   - Loves (one line)
- *   - ChildQuote (one line)
- *   - Notes (multi-paragraph bio)
+ * Roster editor form. Client component. Shared between Kevin (admin)
+ * and Simon (campus). Both roles see and can edit the same fields —
+ * photo, name meaning, family, loves, child quote, bio, intake notes
+ * — plus the report-card and letter upload sections at the bottom.
  *
- * Saves to /api/admin/roster/save which writes the changes to Airtable.
- * Cookie auth carries through.
+ * The only thing the role gates: when Simon saves anything, the
+ * server stamps LastEditedBySimon=now on the record. That drives the
+ * red review dot on Kevin's roster grid, and shows him a banner at
+ * the top of this editor with a "Mark as reviewed" button. Kevin's
+ * normal saves never trigger the flag.
+ *
+ * Saves write to Airtable via /api/admin/roster/save. Cookie auth
+ * carries through.
  */
 'use client';
 
@@ -31,6 +35,7 @@ export function RosterEditor({
   initial,
   reportCards,
   letters,
+  lastEditedBySimon,
 }: {
   shirtNumber: number;
   firstName: string;
@@ -38,12 +43,15 @@ export function RosterEditor({
   initial: Fields;
   reportCards: RosterKidAttachment[];
   letters: RosterKidAttachment[];
+  /** ISO timestamp; null means no pending edits from Simon. */
+  lastEditedBySimon: string | null;
 }) {
   const router = useRouter();
   const [fields, setFields] = useState<Fields>(initial);
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [clearingReview, setClearingReview] = useState(false);
 
   const dirty =
     fields.nameMeaning !== initial.nameMeaning ||
@@ -73,6 +81,7 @@ export function RosterEditor({
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.error || `Save failed: ${res.status}`);
       setStatus('Saved.');
+      router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Save failed.');
     } finally {
@@ -80,44 +89,36 @@ export function RosterEditor({
     }
   }
 
-  // Simon-only view: just the intake textarea. Save writes only to the
-  // intake field; the public copy stays untouched until Kevin polishes.
-  if (role === 'simon') {
-    return (
-      <form
-        onSubmit={e => {
-          e.preventDefault();
-          save();
-        }}
-        className="space-y-6"
-      >
-        <Field
-          label="Notes about this child"
-          helper={`Anything you can tell Kevin about ${firstName || 'this child'} — family, what they’re like, what they love, their dream, anything specific. Kevin will polish this into the website. Save when you’re done.`}
-        >
-          <textarea
-            value={fields.intakeFromCampus}
-            onChange={e => update('intakeFromCampus', e.target.value)}
-            rows={14}
-            className="w-full px-3 py-2 bg-white border border-[#e8e0d4] focus:outline-none focus:border-[#D4A843] focus:ring-1 focus:ring-[#D4A843] text-base leading-relaxed"
-            placeholder="Type or paste here."
-          />
-        </Field>
-
-        <div className="flex items-center gap-3 pt-2 border-t border-[#e8e0d4]">
-          <button
-            type="submit"
-            disabled={saving || !dirty}
-            className="bg-[#D4A843] text-[#0d0d0d] font-bold text-xs uppercase tracking-wider px-5 py-3 hover:bg-[#c49a3a] transition-colors disabled:opacity-50"
-          >
-            {saving ? 'Saving…' : dirty ? 'Save' : 'Saved'}
-          </button>
-          {status && <span className="text-sm text-[#888]">{status}</span>}
-          {error && <span className="text-sm text-red-600">{error}</span>}
-        </div>
-      </form>
-    );
+  async function markReviewed() {
+    if (clearingReview) return;
+    setClearingReview(true);
+    try {
+      const res = await fetch('/api/admin/roster/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ shirtNumber, fields: {}, clearSimonFlag: true }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data?.error || `Failed: ${res.status}`);
+      }
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to clear review flag.');
+    } finally {
+      setClearingReview(false);
+    }
   }
+
+  const simonEditedAt = lastEditedBySimon ? new Date(lastEditedBySimon) : null;
+  const simonEditedAtLabel = simonEditedAt
+    ? simonEditedAt.toLocaleString(undefined, {
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+      })
+    : null;
 
   return (
     <form
@@ -127,19 +128,48 @@ export function RosterEditor({
       }}
       className="space-y-6"
     >
-      {/* Intake banner — shows up at the top of the editor when the
-          campus has dropped raw notes. Kevin reads, polishes into the
-          structured fields below, then clears this field. */}
-      {initial.intakeFromCampus && (
+      {/* Review banner — admin only. Shows when Simon edited fields
+          here since the last review. Lists the action (review the
+          fields below, polish into your voice, then clear). */}
+      {role === 'admin' && lastEditedBySimon && (
         <div className="border-2 border-red-300 bg-red-50/50 p-5 rounded-sm">
+          <div className="flex items-start justify-between gap-4 mb-2">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.2em] text-red-700">
+                Edits from Simon
+              </p>
+              <p className="text-sm text-[#444] mt-1">
+                Simon updated this kid on {simonEditedAtLabel}. Review the
+                fields below — polish copy into your voice, then mark
+                reviewed.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={markReviewed}
+              disabled={clearingReview}
+              className="flex-shrink-0 bg-white border border-red-300 text-red-700 hover:bg-red-100 text-xs font-bold uppercase tracking-wider px-3 py-2 transition-colors disabled:opacity-50"
+            >
+              {clearingReview ? 'Clearing…' : 'Mark as reviewed'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Intake banner — separate from the review flag. Shows raw
+          campus notes that don't fit a structured field. Same "Mark
+          as polished" button (admin only) since the simplest way to
+          clear it is to wipe the text. */}
+      {role === 'admin' && initial.intakeFromCampus && (
+        <div className="border-2 border-amber-300 bg-amber-50/50 p-5 rounded-sm">
           <div className="flex items-center justify-between mb-2">
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-red-700">
-              New notes from the campus
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-amber-800">
+              Raw notes from the campus
             </p>
             <button
               type="button"
               onClick={() => update('intakeFromCampus', '')}
-              className="text-xs text-red-700 hover:text-red-900 underline"
+              className="text-xs text-amber-800 hover:text-amber-900 underline"
               title="Clear the intake once you've incorporated it into the polished fields below"
             >
               Mark as polished
@@ -150,6 +180,15 @@ export function RosterEditor({
           </div>
         </div>
       )}
+
+      {/* Photo — appears first so it anchors the editor. Both roles
+          can replace it; uploads are immediate and don't go through
+          the form save. */}
+      <PhotoUploadSection
+        shirtNumber={shirtNumber}
+        firstName={firstName}
+        onUploaded={() => router.refresh()}
+      />
 
       <Field
         label="Name meaning"
@@ -216,6 +255,27 @@ export function RosterEditor({
         />
       </Field>
 
+      <Field
+        label="Extra notes from the campus"
+        helper={
+          role === 'simon'
+            ? `Anything you want Kevin to know that doesn't fit the fields above. Family context, recent struggles, things you want to flag.`
+            : `Free-form notes Simon or the YDO team have added. Not public — Kevin polishes the content above; this is loose context that informs the polish.`
+        }
+      >
+        <textarea
+          value={fields.intakeFromCampus}
+          onChange={e => update('intakeFromCampus', e.target.value)}
+          rows={6}
+          className="w-full px-3 py-2 bg-white border border-[#e8e0d4] focus:outline-none focus:border-[#D4A843] focus:ring-1 focus:ring-[#D4A843] text-base leading-relaxed"
+          placeholder={
+            role === 'simon'
+              ? 'Anything you can tell Kevin.'
+              : 'Loose context from the campus.'
+          }
+        />
+      </Field>
+
       <div className="flex items-center gap-3 pt-2 border-t border-[#e8e0d4]">
         <button
           type="submit"
@@ -251,7 +311,83 @@ export function RosterEditor({
   );
 }
 
-// ─── Upload section ──────────────────────────────────────────────
+// ─── Photo upload (single-attachment, replaces the hero photo) ───
+
+function PhotoUploadSection({
+  shirtNumber,
+  firstName,
+  onUploaded,
+}: {
+  shirtNumber: number;
+  firstName: string;
+  onUploaded: () => void;
+}) {
+  const [uploading, setUploading] = useState(false);
+  const [status, setStatus] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setError(null);
+    setStatus(null);
+    if (file.size > 3.7 * 1024 * 1024) {
+      setError('Photo too large (max 3.7 MB). Compress and try again.');
+      e.target.value = '';
+      return;
+    }
+    setUploading(true);
+    try {
+      const base64 = await fileToBase64(file);
+      const res = await fetch('/api/admin/roster/upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          shirtNumber,
+          kind: 'photo',
+          filename: file.name,
+          contentType: file.type || 'image/jpeg',
+          data: base64,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || `Upload failed: ${res.status}`);
+      setStatus('Photo updated.');
+      onUploaded();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Upload failed.');
+    } finally {
+      setUploading(false);
+      e.target.value = '';
+    }
+  }
+
+  return (
+    <div>
+      <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-1">
+        Photo
+      </p>
+      <p className="text-xs text-[#888] mb-3 leading-relaxed">
+        Upload a head-and-shoulders photo of {firstName || 'this kid'}.
+        Replaces the current one. JPG or PNG, up to 3.7 MB.
+      </p>
+      <label className="inline-flex items-center justify-center bg-white border border-[#e8e0d4] text-[#0d0d0d] font-bold text-xs uppercase tracking-wider px-5 py-3 hover:border-[#D4A843] cursor-pointer transition-colors">
+        <input
+          type="file"
+          className="sr-only"
+          accept="image/*"
+          onChange={onFile}
+          disabled={uploading}
+        />
+        {uploading ? 'Uploading…' : 'Upload photo'}
+      </label>
+      {status && <p className="mt-2 text-sm text-[#888]">{status}</p>}
+      {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
+    </div>
+  );
+}
+
+// ─── Upload section (report cards / letters) ────────────────────
 
 function UploadSection({
   label,

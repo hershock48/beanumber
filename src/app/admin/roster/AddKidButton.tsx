@@ -1,9 +1,12 @@
 /**
  * "+ Add new kid" tile for the roster grid. Same dimensions as a
  * RosterCard so it slots cleanly at the end of the grid. Click
- * opens an inline form (shirt number, first name, optional notes).
- * On save, POSTs to /api/admin/roster/create and bounces to the
- * new kid's editor page.
+ * opens an inline form (first name + optional notes from the campus).
+ *
+ * Shirt number is auto-assigned by the server (next available),
+ * so neither Kevin nor Simon has to track or pick one. On save,
+ * bounces to the new kid's editor page where the photo and the
+ * rest of the record gets filled in.
  */
 'use client';
 
@@ -13,7 +16,6 @@ import { useState } from 'react';
 export function AddKidButton() {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [shirtNumber, setShirtNumber] = useState<string>('');
   const [firstName, setFirstName] = useState('');
   const [intake, setIntake] = useState('');
   const [busy, setBusy] = useState(false);
@@ -22,11 +24,6 @@ export function AddKidButton() {
   async function onSave(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    const n = Number(shirtNumber);
-    if (!Number.isInteger(n) || n < 1) {
-      setError('Shirt number must be a positive integer.');
-      return;
-    }
     if (!firstName.trim()) {
       setError('First name is required.');
       return;
@@ -37,13 +34,14 @@ export function AddKidButton() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          shirtNumber: n,
           firstName: firstName.trim(),
           intakeFromCampus: intake.trim(),
         }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.error || `Save failed: ${res.status}`);
+      const n = data?.shirtNumber;
+      if (!n) throw new Error('Server did not return a shirt number.');
       router.push(`/admin/roster/${n}`);
       router.refresh();
     } catch (err) {
@@ -89,17 +87,6 @@ export function AddKidButton() {
         New kid
       </p>
 
-      <label className="block text-xs text-[#888] mb-1">Shirt number</label>
-      <input
-        type="number"
-        min="1"
-        value={shirtNumber}
-        onChange={e => setShirtNumber(e.target.value)}
-        placeholder="e.g. 54"
-        className="w-full mb-3 px-2 py-1.5 text-sm bg-white border border-[#e8e0d4] focus:outline-none focus:border-[#D4A843]"
-        disabled={busy}
-      />
-
       <label className="block text-xs text-[#888] mb-1">First name</label>
       <input
         type="text"
@@ -108,27 +95,35 @@ export function AddKidButton() {
         placeholder="e.g. Sarah"
         className="w-full mb-3 px-2 py-1.5 text-sm bg-white border border-[#e8e0d4] focus:outline-none focus:border-[#D4A843]"
         disabled={busy}
+        autoFocus
       />
 
-      <label className="block text-xs text-[#888] mb-1">Notes from the campus (optional)</label>
+      <label className="block text-xs text-[#888] mb-1">
+        Notes about this child (optional)
+      </label>
       <textarea
         value={intake}
         onChange={e => setIntake(e.target.value)}
-        placeholder="Anything you can tell me about this child."
+        placeholder="Anything you can say — family, what they’re like, what they love. You can also add this on the next screen."
         rows={3}
         className="w-full mb-3 px-2 py-1.5 text-sm bg-white border border-[#e8e0d4] focus:outline-none focus:border-[#D4A843]"
         disabled={busy}
       />
+
+      <p className="text-xs text-[#aaa] mb-3 leading-relaxed">
+        We&apos;ll assign a shirt number automatically. On the next screen you can
+        add a photo and more details.
+      </p>
 
       {error && <p className="text-xs text-red-600 mb-2">{error}</p>}
 
       <div className="flex gap-2">
         <button
           type="submit"
-          disabled={busy || !shirtNumber || !firstName}
+          disabled={busy || !firstName.trim()}
           className="flex-1 bg-[#D4A843] text-[#0d0d0d] font-bold text-xs uppercase tracking-wider py-2 hover:bg-[#c49a3a] transition-colors disabled:opacity-50"
         >
-          {busy ? 'Saving…' : 'Add'}
+          {busy ? 'Adding…' : 'Add'}
         </button>
         <button
           type="button"

@@ -19,6 +19,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdminToken } from '@/lib/auth';
+import { getAdminRole } from '@/lib/admin-session';
 
 const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID || '';
 const AIRTABLE_API_KEY =
@@ -35,6 +36,7 @@ const F = {
   childQuote: 'flds9uA6MCoEbc2dJ',
   notes: 'fldbQuWFgNXnlZIVX',
   intakeFromCampus: 'fldZ3A6XK1yVUzhLJ',
+  lastEditedBySimon: 'fldHeGgc5op4WpqAq',
 };
 
 function atHeaders() {
@@ -59,6 +61,11 @@ export async function POST(request: NextRequest) {
       notes?: string;
       intakeFromCampus?: string;
     };
+    // Internal flag: when an admin (Kevin) clicks "Mark as reviewed"
+    // in the editor banner, the client sends clearSimonFlag=true and
+    // we wipe LastEditedBySimon back to null even though no other
+    // fields necessarily changed.
+    clearSimonFlag?: boolean;
   };
   try {
     body = await request.json();
@@ -98,13 +105,24 @@ export async function POST(request: NextRequest) {
     }
 
     // Build the patch — only include fields that were sent.
-    const patchFields: Record<string, string> = {};
+    const patchFields: Record<string, string | null> = {};
     if (typeof fields.nameMeaning === 'string') patchFields[F.nameMeaning] = fields.nameMeaning;
     if (typeof fields.familyContext === 'string') patchFields[F.familyContext] = fields.familyContext;
     if (typeof fields.loves === 'string') patchFields[F.loves] = fields.loves;
     if (typeof fields.childQuote === 'string') patchFields[F.childQuote] = fields.childQuote;
     if (typeof fields.notes === 'string') patchFields[F.notes] = fields.notes;
     if (typeof fields.intakeFromCampus === 'string') patchFields[F.intakeFromCampus] = fields.intakeFromCampus;
+
+    // Simon-edit flag bookkeeping:
+    //   - Simon saving anything → stamp LastEditedBySimon = now.
+    //   - Kevin saving with clearSimonFlag → wipe LastEditedBySimon.
+    //   - Kevin saving without that flag → leave LastEditedBySimon alone.
+    const role = await getAdminRole();
+    if (role === 'simon' && Object.keys(patchFields).length > 0) {
+      patchFields[F.lastEditedBySimon] = new Date().toISOString();
+    } else if (role === 'admin' && body.clearSimonFlag) {
+      patchFields[F.lastEditedBySimon] = null;
+    }
 
     if (Object.keys(patchFields).length === 0) {
       return NextResponse.json({ ok: true, updated: 0, note: 'No fields to update' });

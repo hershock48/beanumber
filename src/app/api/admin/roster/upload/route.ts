@@ -1,20 +1,21 @@
 /**
- * Admin · Roster file upload — attach a report card or letter to a kid.
+ * Admin · Roster file upload — attach a report card, letter, or
+ * profile photo to a kid.
  *
  * POST /api/admin/roster/upload
  * Body: {
  *   shirtNumber: number,
- *   kind: 'report_card' | 'letter',
+ *   kind: 'report_card' | 'letter' | 'photo',
  *   filename: string,
  *   contentType: string,   // e.g. "image/jpeg" | "application/pdf"
  *   data: string,          // base64-encoded file (raw, no data: prefix)
- *   skipNotify?: boolean,  // optional; defaults to false (notify on upload)
+ *   skipNotify?: boolean,  // optional; defaults to false for report_card/letter
  * }
  *
  * Posts the file to Airtable via their Upload Attachment endpoint
- * (no separate file host required). On success, fires a sponsor
- * notification email to every active sponsor of this child (unless
- * skipNotify is true).
+ * (no separate file host required). For report_card and letter, fires
+ * a sponsor notification email to every active sponsor of this child
+ * (unless skipNotify is true). For photo, never notifies.
  *
  * Auth: admin session cookie or X-Admin-Token header.
  */
@@ -32,6 +33,7 @@ const SPONSORSHIPS_TABLE =
 
 const FIELD_ID_REPORT_CARDS = 'fldY4lyVVdeSmtjaY';
 const FIELD_ID_LETTERS = 'fldJxNQd498dqknDj';
+const FIELD_ID_PROFILE_PHOTO = 'fldRejXxPKpuihgPa';
 
 // Airtable's upload endpoint accepts up to 5MB per request when using
 // the base64 inline upload. Anything bigger needs to be hosted
@@ -52,7 +54,7 @@ export async function POST(request: NextRequest) {
 
   let body: {
     shirtNumber?: number;
-    kind?: 'report_card' | 'letter';
+    kind?: 'report_card' | 'letter' | 'photo';
     filename?: string;
     contentType?: string;
     data?: string;
@@ -73,8 +75,8 @@ export async function POST(request: NextRequest) {
   if (typeof shirtNumber !== 'number' || !Number.isInteger(shirtNumber)) {
     return NextResponse.json({ error: 'shirtNumber required' }, { status: 400 });
   }
-  if (kind !== 'report_card' && kind !== 'letter') {
-    return NextResponse.json({ error: 'kind must be report_card or letter' }, { status: 400 });
+  if (kind !== 'report_card' && kind !== 'letter' && kind !== 'photo') {
+    return NextResponse.json({ error: 'kind must be report_card, letter, or photo' }, { status: 400 });
   }
   if (!filename || !contentType || !data) {
     return NextResponse.json({ error: 'filename, contentType, and data are required' }, { status: 400 });
@@ -86,7 +88,12 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const fieldId = kind === 'report_card' ? FIELD_ID_REPORT_CARDS : FIELD_ID_LETTERS;
+  const fieldId =
+    kind === 'report_card'
+      ? FIELD_ID_REPORT_CARDS
+      : kind === 'letter'
+        ? FIELD_ID_LETTERS
+        : FIELD_ID_PROFILE_PHOTO;
 
   try {
     // 1. Look up the kid's Airtable record.
@@ -137,7 +144,9 @@ export async function POST(request: NextRequest) {
       sent: 0,
       failed: 0,
     };
-    if (body.skipNotify) {
+    if (body.skipNotify || kind === 'photo') {
+      // Photos never trigger sponsor notifications — they're routine
+      // edits, not a delivered artifact.
       notifyResult = { sent: 0, failed: 0, skipped: true };
     } else {
       try {
