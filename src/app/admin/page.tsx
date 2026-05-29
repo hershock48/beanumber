@@ -137,6 +137,18 @@ export default async function AdminHomePage() {
               <PrimaryLink href="/admin/roster">Open roster manager</PrimaryLink>
             </Actions>
           </Card>
+
+          {/* ── Card: Donor directory ──────────────────────────── */}
+          <Card label="Donors">
+            <Headline>Open a donor to see everything about them.</Headline>
+            <p className="mt-2 text-sm text-[#666]">
+              Gift history, sponsored kids, drip status, your notes — one
+              page per person. Search by name or email.
+            </p>
+            <Actions>
+              <PrimaryLink href="/admin/donors">Open directory</PrimaryLink>
+            </Actions>
+          </Card>
         </div>
 
         <footer className="mt-10 pb-10 text-center text-xs text-[#aaa]">
