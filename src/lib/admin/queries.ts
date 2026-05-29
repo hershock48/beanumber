@@ -465,6 +465,14 @@ export interface RosterKid {
   hasReportCards: boolean;
   // True when Letters attachment field has at least one file.
   hasLetters: boolean;
+  // Current published Student of the Month award (e.g. "May 2026").
+  // Empty = no current award. Drives the gold ★ on the roster card
+  // and the badge on the public profile.
+  studentOfMonth: string;
+  // Simon's pending SOTM nomination, waiting for Kevin's approval.
+  // Same format as studentOfMonth. Empty = no pending nomination.
+  // Drives the red ★ on the roster card (admin view only).
+  pendingSOTMMonth: string;
   // Last time any structured field was touched. Best-effort via the
   // Airtable record's createdTime when there's no LastModified field.
   lastModified: string;
@@ -537,6 +545,8 @@ export async function getRoster(): Promise<RosterKid[]> {
       pendingFields: parsePendingFields(f.PendingFields),
       hasReportCards: Array.isArray(f.ReportCards) && (f.ReportCards as unknown[]).length > 0,
       hasLetters: Array.isArray(f.Letters) && (f.Letters as unknown[]).length > 0,
+      studentOfMonth: (f.StudentOfMonth as string) || '',
+      pendingSOTMMonth: (f.PendingSOTMMonth as string) || '',
       lastModified: rec.createdTime,
     });
   }
@@ -578,9 +588,6 @@ export interface RosterKidDetail extends RosterKid {
   /** Raw intake notes from Simon / YDO team. Kevin polishes these
    *  into the public fields, then clears the field. */
   intakeFromCampus: string;
-  /** Current Student of the Month label (e.g. "May 2026"). Empty
-   *  means no award. Shown as a badge on the public profile. */
-  studentOfMonth: string;
 }
 
 export async function getRosterKidByNumber(shirtNumber: number): Promise<RosterKidDetail | null> {
@@ -651,6 +658,8 @@ export async function getRosterKidByNumber(shirtNumber: number): Promise<RosterK
     pendingFields: parsePendingFields(f.PendingFields),
     hasReportCards: Array.isArray(f.ReportCards) && (f.ReportCards as unknown[]).length > 0,
     hasLetters: Array.isArray(f.Letters) && (f.Letters as unknown[]).length > 0,
+    studentOfMonth: (f.StudentOfMonth as string) || '',
+    pendingSOTMMonth: (f.PendingSOTMMonth as string) || '',
     lastModified: rec.createdTime,
     nameMeaning: (f.NameMeaning as string) || '',
     familyContext: (f.FamilyContext as string) || '',
@@ -662,7 +671,6 @@ export async function getRosterKidByNumber(shirtNumber: number): Promise<RosterK
     reportCards: mapAttachments('ReportCards'),
     letters: mapAttachments('Letters'),
     intakeFromCampus: (f.IntakeFromCampus as string) || '',
-    studentOfMonth: (f.StudentOfMonth as string) || '',
   };
 }
 

@@ -131,6 +131,26 @@ function RosterCard({ kid, role }: { kid: RosterKid; role: 'admin' | 'simon' }) 
         {role === 'admin' && (kid.hasPendingIntake || !!kid.lastEditedBySimon) && (
           <div className="absolute top-2 left-2 w-3 h-3 rounded-full bg-red-500 ring-2 ring-white" title="Simon edited this kid — review and polish" />
         )}
+        {/* Gold ★ for the current Student of the Month; red ★ for a
+            pending pick (admin sees both, Simon sees only the gold). */}
+        {kid.studentOfMonth && (
+          <span
+            className="absolute top-2 right-2 inline-flex items-center justify-center bg-[#D4A843] text-[#0d0d0d] w-7 h-7 text-base font-bold ring-2 ring-white"
+            title={`Student of the Month · ${kid.studentOfMonth}`}
+            aria-hidden
+          >
+            ★
+          </span>
+        )}
+        {role === 'admin' && !kid.studentOfMonth && kid.pendingSOTMMonth && (
+          <span
+            className="absolute top-2 right-2 inline-flex items-center justify-center bg-red-500 text-white w-7 h-7 text-base font-bold ring-2 ring-white"
+            title={`Pending SOTM pick · ${kid.pendingSOTMMonth}`}
+            aria-hidden
+          >
+            ★
+          </span>
+        )}
       </div>
 
       <div className="p-3">
