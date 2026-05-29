@@ -19,6 +19,7 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import type { RosterKidAttachment } from '@/lib/admin/queries';
 import { compressImageIfNeeded } from '@/lib/client/compress-image';
+import { ReassignBlock } from './ReassignBlock';
 
 interface Fields {
   nameMeaning: string;
@@ -842,42 +843,49 @@ function DepartureSection({
       })
     : null;
 
-  // 1) Already departed — show the official state + restore option.
+  // 1) Already departed — show the official state + reassign block
+  //    (admin only) + restore option.
   if (departedAt) {
     return (
-      <div className="border-2 border-[#888] bg-[#f5f0e8] p-5 rounded-sm">
-        <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#666] mb-1">
-          Departed · {departedLabel}
-        </p>
-        {departureNote && (
-          <p className="text-sm text-[#444] mb-3 leading-relaxed whitespace-pre-wrap">
-            {departureNote}
+      <div>
+        <div className="border-2 border-[#888] bg-[#f5f0e8] p-5 rounded-sm">
+          <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#666] mb-1">
+            Departed · {departedLabel}
           </p>
-        )}
-        <p className="text-xs text-[#888] mb-3">
-          {firstName}&apos;s record is preserved. Public profile shows a
-          respectful &ldquo;no longer here&rdquo; message. Sponsorships and
-          shirt assignments stay linked.
-        </p>
+          {departureNote && (
+            <p className="text-sm text-[#444] mb-3 leading-relaxed whitespace-pre-wrap">
+              {departureNote}
+            </p>
+          )}
+          <p className="text-xs text-[#888] mb-3">
+            {firstName}&apos;s record is preserved. Public profile shows a
+            respectful &ldquo;no longer here&rdquo; message until you reassign
+            the slot to another kid (if there are sponsors).
+          </p>
+          {role === 'admin' && (
+            <button
+              type="button"
+              onClick={() => {
+                if (
+                  confirm(
+                    `Restore ${firstName}? They'll show as active on the roster again.`
+                  )
+                ) {
+                  call('restore');
+                }
+              }}
+              disabled={!!busy}
+              className="text-xs text-[#888] hover:text-[#0d0d0d] underline disabled:opacity-50"
+            >
+              {busy === 'restore' ? 'Restoring…' : 'Restore (mark as active)'}
+            </button>
+          )}
+          {error && <p className="text-sm text-red-600 mt-2">{error}</p>}
+        </div>
+
         {role === 'admin' && (
-          <button
-            type="button"
-            onClick={() => {
-              if (
-                confirm(
-                  `Restore ${firstName}? They'll show as active on the roster again.`
-                )
-              ) {
-                call('restore');
-              }
-            }}
-            disabled={!!busy}
-            className="text-xs text-[#888] hover:text-[#0d0d0d] underline disabled:opacity-50"
-          >
-            {busy === 'restore' ? 'Restoring…' : 'Restore (mark as active)'}
-          </button>
+          <ReassignBlock shirtNumber={shirtNumber} firstName={firstName} />
         )}
-        {error && <p className="text-sm text-red-600 mt-2">{error}</p>}
       </div>
     );
   }
