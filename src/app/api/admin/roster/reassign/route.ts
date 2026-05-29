@@ -158,6 +158,10 @@ async function listEligibleReplacements(
     photoUrl: string | null;
     gradeClass: string;
     gradeKey: string;
+    /** True when this candidate is in the same grade as the
+     *  departed kid. Used by the UI to put same-grade candidates
+     *  first; not a filter. */
+    sameGrade: boolean;
   }>
 > {
   const targetGradeKey = normalizeGrade(departedKid.fields.GradeClass).key;
@@ -182,20 +186,21 @@ async function listEligibleReplacements(
   return out
     .filter(r => {
       const f = r.fields;
-      // Exclude: the departed kid themselves, kids with no shirt
-      // number (incomplete records), departed kids, kids already
-      // sponsored, kids in a different grade.
+      // Exclude only the cases that genuinely can't accept a
+      // sponsorship: the departed kid themselves, records with no
+      // shirt number (incomplete), departed kids, or kids who
+      // already have an active sponsor. Grade is NOT a filter —
+      // Kevin asked for it to be a soft sort instead.
       if (r.id === departedKid.id) return false;
       if (typeof f.ShirtNumber !== 'number' || f.ShirtNumber < 1) return false;
       if (f.DepartedAt) return false;
       if (sponsored.has(r.id)) return false;
-      const gradeKey = normalizeGrade(f.GradeClass).key;
-      if (gradeKey !== targetGradeKey) return false;
       return true;
     })
     .map(r => {
       const f = r.fields;
       const photoArr = f.ProfilePhoto || [];
+      const gradeKey = normalizeGrade(f.GradeClass).key;
       return {
         recordId: r.id,
         shirtNumber: f.ShirtNumber!,
@@ -203,10 +208,16 @@ async function listEligibleReplacements(
         photoUrl:
           photoArr[0]?.thumbnails?.large?.url || photoArr[0]?.url || null,
         gradeClass: f.GradeClass || '',
-        gradeKey: normalizeGrade(f.GradeClass).key,
+        gradeKey,
+        sameGrade: gradeKey === targetGradeKey,
       };
     })
-    .sort((a, b) => a.shirtNumber - b.shirtNumber);
+    .sort((a, b) => {
+      // Same-grade kids first (they're the obvious fit), then by
+      // shirt number ascending.
+      if (a.sameGrade !== b.sameGrade) return a.sameGrade ? -1 : 1;
+      return a.shirtNumber - b.shirtNumber;
+    });
 }
 
 // ─── GET — context for the reassign UI ───────────────────────────

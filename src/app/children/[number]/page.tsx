@@ -6,6 +6,7 @@ import { BANNavigation } from '@/components/BANNavigation';
 import { BANFooter } from '@/components/BANFooter';
 import { RevealBeacon } from './RevealBeacon';
 import { RevealOverlay } from './RevealOverlay';
+import { ReassignReveal } from './ReassignReveal';
 import { SponsorButton } from './SponsorButton';
 import { ClaimMatchCard } from './ClaimMatchCard';
 import { SponsorPortalSections } from './SponsorPortalSections';
@@ -69,6 +70,9 @@ interface AirtableSponsorshipRecord {
     SponsorCode?: string;
     SponsorshipStartDate?: string;
     MonthlyAmount?: number;
+    ChildRevealedAt?: string;
+    LastReassignedAt?: string;
+    PreviousChildIDs?: string;
   };
 }
 
@@ -499,6 +503,52 @@ const getChildByShirtNumber = cache(async function getChildByShirtNumber(shirtNu
       viewerCode === sponsorship.SponsorCode
     );
 
+    // Reassignment reveal detection. When this sponsor's sponsorship
+    // has LastReassignedAt set AND ChildRevealedAt is empty, the
+    // sponsor hasn't yet seen the 'meet your new kid' moment for
+    // this transfer. We send a flag + the previous kid's name to the
+    // client so it can show the overlay with confetti.
+    const needsReassignReveal =
+      viewerIsSponsor &&
+      !!sponsorship?.LastReassignedAt &&
+      !sponsorship?.ChildRevealedAt;
+    let previousKidName: string | null = null;
+    if (needsReassignReveal && sponsorship?.PreviousChildIDs) {
+      const previousIds = sponsorship.PreviousChildIDs
+        .split(/\r?\n/)
+        .map(s => s.trim())
+        .filter(Boolean);
+      const mostRecentPreviousId = previousIds[previousIds.length - 1];
+      if (mostRecentPreviousId) {
+        try {
+          const safe = mostRecentPreviousId.replace(/"/g, '\\"');
+          const url =
+            `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID || ''}` +
+            `/${encodeURIComponent(process.env.AIRTABLE_CHILDREN_TABLE || 'Children')}` +
+            `?filterByFormula=${encodeURIComponent(`{ChildID}="${safe}"`)}&maxRecords=1`;
+          const lookupRes = await fetch(url, {
+            headers: {
+              Authorization: `Bearer ${process.env.AIRTABLE_PAT || process.env.AIRTABLE_API_KEY || ''}`,
+            },
+            cache: 'no-store',
+          });
+          if (lookupRes.ok) {
+            const lookupData = await lookupRes.json();
+            const prev = lookupData.records?.[0];
+            if (prev) {
+              previousKidName =
+                (prev.fields?.DisplayName as string) ||
+                (prev.fields?.FirstName as string) ||
+                null;
+            }
+          }
+        } catch {
+          // Best-effort: if the lookup fails we just don't mention
+          // the previous kid by name in the overlay.
+        }
+      }
+    }
+
     return {
       reserved: false as const,
       record_id: recordId,
@@ -544,6 +594,8 @@ const getChildByShirtNumber = cache(async function getChildByShirtNumber(shirtNu
       student_of_month_reason: child.StudentOfMonthReason,
       departed_at: child.DepartedAt,
       departure_note: child.DepartureNote,
+      needs_reassign_reveal: needsReassignReveal,
+      previous_kid_name: previousKidName,
     };
   } catch (error) {
     console.error('[children/page] Error fetching child', {
@@ -906,6 +958,12 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
           </div>
         )}
 
+        <ReassignReveal
+          needsReveal={!!child.needs_reassign_reveal}
+          shirtNumber={Number(number)}
+          newChildName={displayName}
+          previousChildName={child.previous_kid_name ?? null}
+        >
         <RevealOverlay shirtNumber={Number(number)} childName={displayName}>
         <div className="grid md:grid-cols-2 gap-5 md:gap-14 items-start">
           {/* Photo — shorter on mobile to keep the CTA reachable without
@@ -1263,6 +1321,7 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
         )}
 
         </RevealOverlay>
+        </ReassignReveal>
       </main>
 
       <BANFooter />

@@ -21,6 +21,7 @@ interface Replacement {
   photoUrl: string | null;
   gradeClass: string;
   gradeKey: string;
+  sameGrade: boolean;
 }
 
 interface SponsorshipSummary {
@@ -162,15 +163,16 @@ export function ReassignBlock({
       ) : (
         <div>
           <p className="text-xs text-[#666] mb-3">
-            Grade: <span className="font-semibold">{context.kid.gradeLabel}</span>
-            . {context.replacements.length} eligible candidate
-            {context.replacements.length === 1 ? '' : 's'} (active, same
-            grade, no current sponsor).
+            {firstName}&apos;s grade:{' '}
+            <span className="font-semibold">{context.kid.gradeLabel}</span>.{' '}
+            {context.replacements.length} eligible candidate
+            {context.replacements.length === 1 ? '' : 's'} (active, no
+            current sponsor). Same-grade kids show first.
           </p>
           {context.replacements.length === 0 ? (
             <p className="text-sm text-red-700">
-              No eligible replacements in the same grade. Add a new kid via
-              the roster, then come back.
+              No eligible replacements on the active roster. Add a new
+              kid via the roster, then come back.
             </p>
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
@@ -180,7 +182,9 @@ export function ReassignBlock({
                   key={r.recordId}
                   onClick={() => reassignTo(r)}
                   disabled={!!busy}
-                  className="block bg-white border border-[#e8e0d4] hover:border-[#D4A843] text-left transition-colors disabled:opacity-50 overflow-hidden"
+                  className={`block bg-white border ${
+                    r.sameGrade ? 'border-[#D4A843]/60' : 'border-[#e8e0d4]'
+                  } hover:border-[#D4A843] text-left transition-colors disabled:opacity-50 overflow-hidden relative`}
                 >
                   <div className="aspect-[4/5] bg-[#f5f0e8] relative">
                     {r.photoUrl ? (
@@ -195,6 +199,14 @@ export function ReassignBlock({
                         👤
                       </div>
                     )}
+                    {r.sameGrade && (
+                      <span
+                        className="absolute top-1 left-1 bg-[#D4A843] text-[#0d0d0d] text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5"
+                        title={`Same grade as ${firstName}`}
+                      >
+                        Same grade
+                      </span>
+                    )}
                     {busy === r.recordId && (
                       <div className="absolute inset-0 bg-white/70 flex items-center justify-center text-xs uppercase tracking-wider text-[#666]">
                         Transferring…
@@ -205,8 +217,9 @@ export function ReassignBlock({
                     <p className="text-sm font-semibold text-[#0d0d0d] truncate">
                       {r.displayName}
                     </p>
-                    <p className="text-xs text-[#888]">
-                      currently #{r.shirtNumber}
+                    <p className="text-xs text-[#888] truncate">
+                      #{r.shirtNumber}
+                      {r.gradeClass ? ` · ${r.gradeClass}` : ''}
                     </p>
                   </div>
                 </button>
