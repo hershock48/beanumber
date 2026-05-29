@@ -144,7 +144,7 @@ export function ReassignReveal({
           <div className="text-center pointer-events-auto max-w-lg w-full">
             <div className="bg-white/95 backdrop-blur-sm border border-[#e8e0d4] py-10 px-8 md:py-14 md:px-12 shadow-xl">
               <p className="text-xs font-bold uppercase tracking-[0.3em] text-[#D4A843] mb-4">
-                An update for #{shirtNumber}
+                A note about #{shirtNumber}
               </p>
               <p
                 className="text-2xl md:text-3xl text-[#0d0d0d] mb-4 leading-tight"
@@ -152,11 +152,11 @@ export function ReassignReveal({
               >
                 {previousChildName
                   ? `${previousChildName}'s no longer at Hope Bridge.`
-                  : 'There’s been a change at Hope Bridge.'}
+                  : 'There’s a new kid at Hope Bridge.'}
               </p>
               <p className="text-base md:text-lg text-[#666] mb-7 leading-relaxed">
-                Same shirt, same campus, same hot lunch. Just a new
-                face in the photo.
+                Same shirt, same campus, same hot meal. New face in the
+                photo.
               </p>
               <p
                 className="text-4xl md:text-5xl text-[#D4A843] mb-8 leading-tight"
