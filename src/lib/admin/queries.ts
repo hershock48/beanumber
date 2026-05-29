@@ -283,15 +283,39 @@ export async function getRosterGapsCard(): Promise<RosterGapsCard> {
     let missingNotes = 0;
     let fullyComplete = 0;
 
+    // First pass — same shape as the roster grid query: collect any
+    // record with a positive shirt number and a name, then dedupe
+    // ghost duplicates (no photo, name copied from a lower kid).
+    type Row = {
+      f: Record<string, unknown>;
+      n: number;
+      displayName: string;
+      hasPhoto: boolean;
+    };
+    const raw: Row[] = [];
     for (const rec of data.records) {
       const f = rec.fields as Record<string, unknown>;
       const n = f.ShirtNumber as number | undefined;
-      const childId = f.ChildID as string | undefined;
-      // Only count the canonical roster (1–53) with a real ChildID.
-      if (typeof n !== 'number' || n < 1 || n > 53) continue;
-      if (!childId || !childId.startsWith('HSP/BAN-')) continue;
-      totalKids++;
+      if (typeof n !== 'number' || n < 1) continue;
+      const displayName =
+        ((f.DisplayName as string) || (f.FirstName as string) || '').trim();
+      if (!displayName) continue;
       const hasPhoto = Array.isArray(f.ProfilePhoto) && (f.ProfilePhoto as unknown[]).length > 0;
+      raw.push({ f, n, displayName, hasPhoto });
+    }
+    raw.sort((a, b) => a.n - b.n);
+    const seen = new Set<string>();
+    const real: Row[] = [];
+    for (const row of raw) {
+      const key = row.displayName.toLowerCase();
+      if (!row.hasPhoto && seen.has(key)) continue;
+      seen.add(key);
+      real.push(row);
+    }
+
+    for (const row of real) {
+      const { f, hasPhoto } = row;
+      totalKids++;
       const hasNameMeaning = !!(f.NameMeaning as string);
       const hasFamily = !!(f.FamilyContext as string);
       const hasLoves = !!(f.Loves as string);
@@ -436,25 +460,59 @@ export interface RosterKid {
 
 export async function getRoster(): Promise<RosterKid[]> {
   const records = await atListAll(CHILDREN_TABLE);
-  const kids: RosterKid[] = [];
+
+  // First pass — pull every record with a positive shirt number and a
+  // non-empty name. Don't filter on ChildID anymore: a bunch of real
+  // kids (added by the legacy Stripe webhook) have a photo + name but
+  // no explicit ChildID, and they need to appear too.
+  const raw: Array<{
+    rec: { id: string; createdTime: string; fields: Record<string, unknown> };
+    n: number;
+    displayName: string;
+    hasPhoto: boolean;
+  }> = [];
   for (const rec of records) {
     const f = rec.fields as Record<string, unknown>;
     const n = f.ShirtNumber as number | undefined;
-    const childId = (f.ChildID as string) || '';
     if (typeof n !== 'number' || n < 1) continue;
-    if (!childId || !childId.startsWith('HSP/BAN-')) continue;
+    const displayName =
+      ((f.DisplayName as string) || (f.FirstName as string) || '').trim();
+    if (!displayName) continue;
+    const photoArr = (f.ProfilePhoto as Array<unknown>) || [];
+    raw.push({ rec, n, displayName, hasPhoto: photoArr.length > 0 });
+  }
+  // Sort ascending so the lowest-numbered record claims a given name
+  // first — used by the dedupe logic below.
+  raw.sort((a, b) => a.n - b.n);
+
+  // Second pass — dedupe ghosts. Airtable has phantom records around
+  // certain shirt numbers (#101–113 etc.) that the legacy assignment
+  // system seeded with a name copied from a canonical kid but no
+  // photo of their own. Drop those: if a record has no photo AND we've
+  // already seen its DisplayName from a lower-numbered record, it's a
+  // ghost. Real kids with a photo always survive even if the name
+  // happens to match an earlier entry (Blessing Aloyo at #50 and #52
+  // both have unique photos and should both render).
+  const seen = new Set<string>();
+  const kids: RosterKid[] = [];
+  for (const { rec, n, displayName, hasPhoto } of raw) {
+    const key = displayName.toLowerCase();
+    if (!hasPhoto && seen.has(key)) continue;
+    seen.add(key);
+
+    const f = rec.fields as Record<string, unknown>;
     const photoArr = (f.ProfilePhoto as Array<{ url: string; thumbnails?: { large?: { url: string } } }>) || [];
     const photoUrl = photoArr[0]?.thumbnails?.large?.url || photoArr[0]?.url || null;
     kids.push({
       recordId: rec.id,
-      childId,
+      childId: (f.ChildID as string) || '',
       shirtNumber: n,
-      displayName: (f.DisplayName as string) || (f.FirstName as string) || `Kid #${n}`,
+      displayName,
       firstName: (f.FirstName as string) || '',
       gradeClass: (f.GradeClass as string) || null,
       photoUrl,
       has: {
-        photo: photoArr.length > 0,
+        photo: hasPhoto,
         nameMeaning: !!(f.NameMeaning as string),
         familyContext: !!(f.FamilyContext as string),
         loves: !!(f.Loves as string),
@@ -466,8 +524,6 @@ export async function getRoster(): Promise<RosterKid[]> {
       lastModified: rec.createdTime,
     });
   }
-  // Sort by shirt number ascending — natural roster order.
-  kids.sort((a, b) => a.shirtNumber - b.shirtNumber);
   return kids;
 }
 
