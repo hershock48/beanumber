@@ -43,6 +43,17 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   const role = verifyAdminPassword(candidate);
   if (!role) {
+    // TEMP DIAGNOSTIC — remove once Simon login is verified. Logs
+    // lengths only, never the actual password. Tells us whether the
+    // env vars are loaded and whether a length mismatch (e.g. Vercel
+    // pasted a trailing newline) is causing the failure.
+    console.log('[admin-auth-debug]', {
+      submittedLen: candidate.length,
+      adminPwSet: !!process.env.ADMIN_PASSWORD,
+      adminPwLen: (process.env.ADMIN_PASSWORD || '').length,
+      simonPwSet: !!process.env.SIMON_PASSWORD,
+      simonPwLen: (process.env.SIMON_PASSWORD || '').length,
+    });
     logger.apiResponse('POST', '/api/admin/auth', 401);
     return NextResponse.json(
       { ok: false, message: 'Wrong password' },
