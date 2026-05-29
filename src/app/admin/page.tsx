@@ -149,6 +149,18 @@ export default async function AdminHomePage() {
               <PrimaryLink href="/admin/donors">Open directory</PrimaryLink>
             </Actions>
           </Card>
+
+          {/* ── Card: Stripe sync ──────────────────────────────── */}
+          <Card label="Stripe → Airtable">
+            <Headline>Reconcile subscriptions.</Headline>
+            <p className="mt-2 text-sm text-[#666]">
+              Pulls every Stripe subscription and ensures Airtable has a
+              matching Donor + Sponsorship row. Safe to re-run.
+            </p>
+            <Actions>
+              <PrimaryLink href="/admin/stripe-sync">Open sync</PrimaryLink>
+            </Actions>
+          </Card>
         </div>
 
         <footer className="mt-10 pb-10 text-center text-xs text-[#aaa]">
