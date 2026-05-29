@@ -247,6 +247,7 @@ export async function sendCampusNewsletterTool(
   const subject = f.Subject || '';
   const bodyHtml = f.BodyHTML || '';
   const hero = f.HeroPhoto && f.HeroPhoto.length > 0 ? f.HeroPhoto[0].url : undefined;
+  const explicitTeaser = (f.Teaser || '').trim();
   const currentStatus = f.Status;
 
   if (!subject || !bodyHtml) {
@@ -364,8 +365,10 @@ export async function sendCampusNewsletterTool(
   );
   const childMap = await fetchChildrenByRecordIds(allChildIds);
 
-  // 3d. Build the teaser once — same first paragraph for every email.
-  const teaser = extractTeaser(bodyHtml);
+  // 3d. Build the teaser once. If the Newsletter record has an
+  // explicit Teaser, use it verbatim. Otherwise fall back to
+  // extracting the first paragraph from the body HTML.
+  const teaser = explicitTeaser || extractTeaser(bodyHtml);
 
   logger.info('Campus newsletter send starting', {
     newsletterId,

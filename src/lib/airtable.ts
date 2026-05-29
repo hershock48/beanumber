@@ -857,6 +857,10 @@ export interface AirtableNewsletterRecord {
     FailedCount?: number;
     SendNotes?: string;
     Author?: string;
+    /** Optional override for the notification-email teaser. If empty,
+     *  the send pipeline falls back to extracting the first paragraph
+     *  of BodyHTML. */
+    Teaser?: string;
   };
   createdTime: string;
 }

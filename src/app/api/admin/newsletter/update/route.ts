@@ -42,6 +42,7 @@ async function handler(request: NextRequest): Promise<NextResponse> {
     author?: string;
     status?: 'Draft' | 'Scheduled';
     sendDate?: string | null;
+    teaser?: string;
   };
 
   if (!body.id) throw new ValidationError('id is required');
@@ -63,6 +64,7 @@ async function handler(request: NextRequest): Promise<NextResponse> {
   if (body.bodyHtml !== undefined) fields.BodyHTML = body.bodyHtml;
   if (body.author !== undefined) fields.Author = body.author.trim();
   if (body.status !== undefined) fields.Status = body.status;
+  if (body.teaser !== undefined) fields.Teaser = body.teaser;
   // Allow nulling out send date by passing null explicitly.
   if (body.sendDate !== undefined) fields.SendDate = body.sendDate;
 

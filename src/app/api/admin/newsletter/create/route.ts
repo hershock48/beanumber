@@ -40,6 +40,7 @@ async function handler(request: NextRequest): Promise<NextResponse> {
     author?: string;
     status?: 'Draft' | 'Scheduled';
     sendDate?: string;
+    teaser?: string;
   };
 
   if (!body.title?.trim()) {
@@ -67,6 +68,7 @@ async function handler(request: NextRequest): Promise<NextResponse> {
   };
   if (body.author?.trim()) fields.Author = body.author.trim();
   if (body.sendDate) fields.SendDate = body.sendDate;
+  if (typeof body.teaser === 'string') fields.Teaser = body.teaser;
 
   const created = await createNewsletter(fields);
 

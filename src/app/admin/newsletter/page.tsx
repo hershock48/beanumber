@@ -36,6 +36,7 @@ interface Newsletter {
   sendNotes: string;
   author: string;
   heroPhoto: string | null;
+  teaser: string;
 }
 
 interface SendResult {
@@ -77,6 +78,7 @@ export default function AdminNewsletterPage() {
     subject: '',
     bodyHtml: '',
     author: '',
+    teaser: '',
   });
   const [showPreview, setShowPreview] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
@@ -123,6 +125,7 @@ export default function AdminNewsletterPage() {
       subject: '',
       bodyHtml: STARTER_BODY,
       author: 'Kevin',
+      teaser: '',
     });
     setShowPreview(false);
     setStatusMessage('');
@@ -137,6 +140,7 @@ export default function AdminNewsletterPage() {
       subject: n.subject,
       bodyHtml: n.bodyHtml,
       author: n.author,
+      teaser: n.teaser || '',
     });
     setShowPreview(false);
     setStatusMessage('');
@@ -161,6 +165,7 @@ export default function AdminNewsletterPage() {
             subject: editor.subject,
             bodyHtml: editor.bodyHtml,
             author: editor.author,
+            teaser: editor.teaser,
           }),
         });
         if (!res.ok) {
@@ -179,6 +184,7 @@ export default function AdminNewsletterPage() {
             subject: editor.subject,
             bodyHtml: editor.bodyHtml,
             author: editor.author,
+            teaser: editor.teaser,
             status: 'Draft',
           }),
         });
@@ -378,6 +384,30 @@ export default function AdminNewsletterPage() {
                   disabled={isReadOnly}
                   onChange={(e) => setEditor({ ...editor, subject: e.target.value })}
                   placeholder="A note from the campus"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm disabled:bg-gray-50"
+                />
+              </div>
+
+              {/* Teaser — the short hook used in the notification email.
+                  If left blank, the send pipeline falls back to the
+                  first paragraph of the body. Best for pulling the
+                  strongest moment from anywhere in the newsletter, not
+                  just the chronological opening. */}
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1">
+                  Teaser (email hook)
+                </label>
+                <p className="text-xs text-gray-500 mb-2">
+                  1–3 sentences. Renders as an italic blockquote in the notification email.
+                  Pull the strongest moment from the body — doesn&rsquo;t have to be the first paragraph.
+                  Leave blank to auto-extract from the body opening.
+                </p>
+                <textarea
+                  value={editor.teaser}
+                  disabled={isReadOnly}
+                  onChange={(e) => setEditor({ ...editor, teaser: e.target.value })}
+                  rows={3}
+                  placeholder="The line that earns the click."
                   className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm disabled:bg-gray-50"
                 />
               </div>

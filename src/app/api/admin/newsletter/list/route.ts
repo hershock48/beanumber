@@ -41,6 +41,7 @@ async function handler(request: NextRequest): Promise<NextResponse> {
     sendNotes: r.fields.SendNotes || '',
     author: r.fields.Author || '',
     heroPhoto: r.fields.HeroPhoto?.[0]?.url || null,
+    teaser: r.fields.Teaser || '',
   }));
 
   logger.apiResponse(method, path, 200);
