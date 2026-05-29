@@ -47,6 +47,7 @@ interface AirtableChildRecord {
     TeacherName?: string;
     TeacherQuote?: string;
     NameMeaning?: string;
+    StudentOfMonth?: string;
     // ── Sponsor-only attachments uploaded via /admin/roster/[number].
     ReportCards?: Array<{ id: string; url: string; filename: string; size?: number; type?: string; thumbnails?: { large?: { url: string }; small?: { url: string } } }>;
     Letters?: Array<{ id: string; url: string; filename: string; size?: number; type?: string; thumbnails?: { large?: { url: string }; small?: { url: string } } }>;
@@ -529,6 +530,7 @@ const getChildByShirtNumber = cache(async function getChildByShirtNumber(shirtNu
       teacher_name: child.TeacherName,
       teacher_quote: child.TeacherQuote,
       name_meaning: child.NameMeaning,
+      student_of_month: child.StudentOfMonth,
     };
   } catch (error) {
     console.error('[children/page] Error fetching child', {
@@ -918,6 +920,16 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
 
           {/* Details */}
           <div className="flex flex-col justify-center py-0 md:py-4">
+            {/* Student of the month badge — set by Simon/Kevin in the
+                roster editor when this kid is awarded for a month.
+                Sits above the name so it's the first thing a sponsor
+                sees. Empty StudentOfMonth = no badge. */}
+            {child.student_of_month && (
+              <p className="inline-flex self-start items-center gap-1.5 bg-[#D4A843] text-[#0d0d0d] text-xs font-bold uppercase tracking-wider px-3 py-1.5 mb-3">
+                <span aria-hidden>★</span>
+                Student of the Month · {child.student_of_month}
+              </p>
+            )}
             <h1
               className="text-4xl md:text-5xl text-[#0d0d0d] mb-2"
               style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}

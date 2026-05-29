@@ -26,6 +26,7 @@ interface Fields {
   childQuote: string;
   notes: string;
   intakeFromCampus: string;
+  studentOfMonth: string;
 }
 
 export function RosterEditor({
@@ -64,7 +65,8 @@ export function RosterEditor({
     fields.loves !== initial.loves ||
     fields.childQuote !== initial.childQuote ||
     fields.notes !== initial.notes ||
-    fields.intakeFromCampus !== initial.intakeFromCampus;
+    fields.intakeFromCampus !== initial.intakeFromCampus ||
+    fields.studentOfMonth !== initial.studentOfMonth;
 
   function update<K extends keyof Fields>(key: K, value: Fields[K]) {
     setFields(prev => ({ ...prev, [key]: value }));
@@ -214,6 +216,15 @@ export function RosterEditor({
         shirtNumber={shirtNumber}
         firstName={firstName}
         onUploaded={() => router.refresh()}
+      />
+
+      {/* Student of the month — one-click award for the current
+          month. Saves with the rest of the form, but the toggle is
+          visually distinct so it doesn't get lost. */}
+      <StudentOfMonthControl
+        value={fields.studentOfMonth}
+        firstName={firstName}
+        onChange={v => update('studentOfMonth', v)}
       />
 
       <Field
@@ -640,6 +651,73 @@ function fileToBase64(file: File): Promise<string> {
     reader.onerror = () => reject(new Error('Failed to read file'));
     reader.readAsDataURL(file);
   });
+}
+
+// ─── Student of the month ────────────────────────────────────────
+
+function currentMonthLabel(): string {
+  const d = new Date();
+  return `${d.toLocaleString('en-US', { month: 'long' })} ${d.getFullYear()}`;
+}
+
+function StudentOfMonthControl({
+  value,
+  firstName,
+  onChange,
+}: {
+  value: string;
+  firstName: string;
+  onChange: (next: string) => void;
+}) {
+  const monthLabel = currentMonthLabel();
+  const isAwarded = !!value;
+  const isCurrent = value === monthLabel;
+
+  return (
+    <div className="border border-[#e8e0d4] bg-[#FFF8F0] p-4">
+      <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-1">
+        Student of the month
+      </p>
+      <p className="text-xs text-[#888] mb-3 leading-relaxed">
+        One-click award. Renders as a small ★ badge on{' '}
+        {firstName || 'this kid'}&apos;s public profile.
+      </p>
+
+      {isAwarded ? (
+        <div className="flex items-center gap-3 flex-wrap">
+          <span className="inline-flex items-center gap-1.5 bg-[#D4A843] text-[#0d0d0d] text-sm font-bold px-3 py-1.5">
+            <span aria-hidden>★</span>
+            Student of the Month · {value}
+          </span>
+          {!isCurrent && (
+            <button
+              type="button"
+              onClick={() => onChange(monthLabel)}
+              className="text-xs text-[#D4A843] hover:underline"
+            >
+              Update to {monthLabel}
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => onChange('')}
+            className="text-xs text-[#888] hover:text-red-700 underline"
+          >
+            Remove award
+          </button>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => onChange(monthLabel)}
+          className="inline-flex items-center gap-1.5 bg-white border border-[#D4A843] text-[#D4A843] hover:bg-[#D4A843] hover:text-[#0d0d0d] text-xs font-bold uppercase tracking-wider px-3 py-2 transition-colors"
+        >
+          <span aria-hidden>★</span>
+          Award for {monthLabel}
+        </button>
+      )}
+    </div>
+  );
 }
 
 function Field({

@@ -578,6 +578,9 @@ export interface RosterKidDetail extends RosterKid {
   /** Raw intake notes from Simon / YDO team. Kevin polishes these
    *  into the public fields, then clears the field. */
   intakeFromCampus: string;
+  /** Current Student of the Month label (e.g. "May 2026"). Empty
+   *  means no award. Shown as a badge on the public profile. */
+  studentOfMonth: string;
 }
 
 export async function getRosterKidByNumber(shirtNumber: number): Promise<RosterKidDetail | null> {
@@ -659,6 +662,7 @@ export async function getRosterKidByNumber(shirtNumber: number): Promise<RosterK
     reportCards: mapAttachments('ReportCards'),
     letters: mapAttachments('Letters'),
     intakeFromCampus: (f.IntakeFromCampus as string) || '',
+    studentOfMonth: (f.StudentOfMonth as string) || '',
   };
 }
 

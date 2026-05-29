@@ -38,6 +38,7 @@ const F = {
   intakeFromCampus: 'fldZ3A6XK1yVUzhLJ',
   lastEditedBySimon: 'fldHeGgc5op4WpqAq',
   pendingFields: 'fldHnJHD0jv2lPgyU',
+  studentOfMonth: 'fldQrcXzw32aOZWZ3',
 };
 
 /** Maps a body.fields key → the matching PendingFields multi-select
@@ -72,6 +73,7 @@ export async function POST(request: NextRequest) {
       childQuote?: string;
       notes?: string;
       intakeFromCampus?: string;
+      studentOfMonth?: string;
     };
     // Internal flag: when an admin (Kevin) clicks "Mark as reviewed"
     // in the editor banner, the client sends clearSimonFlag=true and
@@ -128,6 +130,7 @@ export async function POST(request: NextRequest) {
       childQuote: F.childQuote,
       notes: F.notes,
       intakeFromCampus: F.intakeFromCampus,
+      studentOfMonth: F.studentOfMonth,
     };
 
     // Build the patch — only include fields that were sent AND differ
@@ -146,6 +149,7 @@ export async function POST(request: NextRequest) {
           childQuote: 'ChildQuote',
           notes: 'Notes',
           intakeFromCampus: 'IntakeFromCampus',
+          studentOfMonth: 'StudentOfMonth',
         } as Record<string, string>)[key]
       ] as string) || '';
       if (incoming === current) continue;
