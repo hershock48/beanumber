@@ -42,6 +42,10 @@ export function RosterEditor({
   pendingFields,
   deletionRequestedAt,
   studentOfMonthReason,
+  departedAt,
+  departureNote,
+  departureRequestedAt,
+  departureRequestedNote,
 }: {
   shirtNumber: number;
   firstName: string;
@@ -64,6 +68,12 @@ export function RosterEditor({
   /** Citation text shown alongside the SOTM badge in the inline
    *  card. Empty when no award is active. */
   studentOfMonthReason: string;
+  /** Departure state. departedAt set = official; requestedAt set =
+   *  Simon's nomination pending Kevin's review. */
+  departedAt: string | null;
+  departureNote: string;
+  departureRequestedAt: string | null;
+  departureRequestedNote: string;
 }) {
   const router = useRouter();
   const [fields, setFields] = useState<Fields>(initial);
@@ -343,6 +353,18 @@ export function RosterEditor({
         {status && <span className="text-sm text-[#888]">{status}</span>}
         {error && <span className="text-sm text-red-600">{error}</span>}
       </div>
+
+      {/* Departure (kid left the campus) — Simon nominates, Kevin
+          approves. Reversible. The kid stays in Airtable. */}
+      <DepartureSection
+        shirtNumber={shirtNumber}
+        firstName={firstName}
+        role={role}
+        departedAt={departedAt}
+        departureNote={departureNote}
+        departureRequestedAt={departureRequestedAt}
+        departureRequestedNote={departureRequestedNote}
+      />
 
       {/* Delete control — bottom of form. Two-step flow: Simon
           requests, Kevin approves. Admin can also delete directly. */}
@@ -748,6 +770,286 @@ function fileToBase64(file: File): Promise<string> {
     reader.onerror = () => reject(new Error('Failed to read file'));
     reader.readAsDataURL(file);
   });
+}
+
+// ─── Departure (request + approve flow, reversible) ─────────────
+
+function DepartureSection({
+  shirtNumber,
+  firstName,
+  role,
+  departedAt,
+  departureNote,
+  departureRequestedAt,
+  departureRequestedNote,
+}: {
+  shirtNumber: number;
+  firstName: string;
+  role: 'admin' | 'simon';
+  departedAt: string | null;
+  departureNote: string;
+  departureRequestedAt: string | null;
+  departureRequestedNote: string;
+}) {
+  const router = useRouter();
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [formOpen, setFormOpen] = useState(false);
+  const [noteInput, setNoteInput] = useState('');
+
+  async function call(
+    action: 'request' | 'approve' | 'reject' | 'restore',
+    note?: string
+  ) {
+    if (busy) return;
+    setBusy(action);
+    setError(null);
+    try {
+      const res = await fetch('/api/admin/roster/depart', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          shirtNumber,
+          action,
+          note: note ?? noteInput,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || `Failed: ${res.status}`);
+      setFormOpen(false);
+      setNoteInput('');
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed.');
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  const requestedLabel = departureRequestedAt
+    ? new Date(departureRequestedAt).toLocaleString(undefined, {
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+      })
+    : null;
+  const departedLabel = departedAt
+    ? new Date(departedAt).toLocaleString(undefined, {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+      })
+    : null;
+
+  // 1) Already departed — show the official state + restore option.
+  if (departedAt) {
+    return (
+      <div className="border-2 border-[#888] bg-[#f5f0e8] p-5 rounded-sm">
+        <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#666] mb-1">
+          Departed · {departedLabel}
+        </p>
+        {departureNote && (
+          <p className="text-sm text-[#444] mb-3 leading-relaxed whitespace-pre-wrap">
+            {departureNote}
+          </p>
+        )}
+        <p className="text-xs text-[#888] mb-3">
+          {firstName}&apos;s record is preserved. Public profile shows a
+          respectful &ldquo;no longer here&rdquo; message. Sponsorships and
+          shirt assignments stay linked.
+        </p>
+        {role === 'admin' && (
+          <button
+            type="button"
+            onClick={() => {
+              if (
+                confirm(
+                  `Restore ${firstName}? They'll show as active on the roster again.`
+                )
+              ) {
+                call('restore');
+              }
+            }}
+            disabled={!!busy}
+            className="text-xs text-[#888] hover:text-[#0d0d0d] underline disabled:opacity-50"
+          >
+            {busy === 'restore' ? 'Restoring…' : 'Restore (mark as active)'}
+          </button>
+        )}
+        {error && <p className="text-sm text-red-600 mt-2">{error}</p>}
+      </div>
+    );
+  }
+
+  // 2) Pending request — admin sees approve/reject; Simon sees status.
+  if (departureRequestedAt) {
+    if (role === 'admin') {
+      return (
+        <div className="border-2 border-red-300 bg-red-50/50 p-5 rounded-sm">
+          <p className="text-xs font-bold uppercase tracking-[0.2em] text-red-700 mb-1">
+            Departure request · {requestedLabel}
+          </p>
+          {departureRequestedNote ? (
+            <div className="bg-white border border-red-200 p-3 mb-3 text-sm text-[#444] whitespace-pre-wrap leading-relaxed">
+              {departureRequestedNote}
+            </div>
+          ) : (
+            <p className="text-sm text-[#666] italic mb-3">
+              No reason provided by the requester.
+            </p>
+          )}
+          <p className="text-xs text-[#666] mb-3">
+            Approve to mark {firstName} as departed publicly. You can
+            adjust the note before publishing.
+          </p>
+          {formOpen ? (
+            <div className="space-y-2">
+              <label className="block">
+                <span className="block text-[10px] uppercase tracking-wider text-[#888] mb-1">
+                  Public departure note (optional — uses the request
+                  note if blank)
+                </span>
+                <textarea
+                  value={noteInput}
+                  onChange={e => setNoteInput(e.target.value)}
+                  rows={3}
+                  placeholder={departureRequestedNote || 'Why this kid is no longer at the campus. Shown on the public profile.'}
+                  className="w-full px-3 py-2 text-sm bg-white border border-[#e8e0d4] focus:outline-none focus:border-[#D4A843]"
+                />
+              </label>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => call('approve')}
+                  disabled={!!busy}
+                  className="bg-red-600 text-white hover:bg-red-700 font-bold text-xs uppercase tracking-wider px-4 py-2 transition-colors disabled:opacity-50"
+                >
+                  {busy === 'approve' ? 'Publishing…' : 'Approve & mark departed'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFormOpen(false)}
+                  disabled={!!busy}
+                  className="text-xs text-[#888] hover:text-[#0d0d0d] underline"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setFormOpen(true)}
+                disabled={!!busy}
+                className="bg-red-600 text-white hover:bg-red-700 font-bold text-xs uppercase tracking-wider px-4 py-2 transition-colors disabled:opacity-50"
+              >
+                Approve…
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (
+                    confirm(
+                      `Reject the departure request? ${firstName} stays on the active roster.`
+                    )
+                  ) {
+                    call('reject');
+                  }
+                }}
+                disabled={!!busy}
+                className="bg-white border border-[#888] text-[#0d0d0d] hover:bg-[#f5f0e8] font-bold text-xs uppercase tracking-wider px-4 py-2 transition-colors disabled:opacity-50"
+              >
+                {busy === 'reject' ? 'Rejecting…' : 'Reject (keep active)'}
+              </button>
+            </div>
+          )}
+          {error && <p className="text-sm text-red-600 mt-2">{error}</p>}
+        </div>
+      );
+    }
+    // Simon's view of his own pending request.
+    return (
+      <div className="pt-6 mt-2 border-t border-[#e8e0d4]">
+        <p className="text-xs uppercase tracking-[0.2em] text-[#aaa] mb-2">
+          Departure pending
+        </p>
+        <p className="text-sm text-[#666]">
+          You&apos;ve flagged {firstName} as no longer at the campus.
+          Kevin will review and approve.
+        </p>
+      </div>
+    );
+  }
+
+  // 3) Active kid — show the action to flag departure.
+  return (
+    <div className="pt-6 mt-2 border-t border-[#e8e0d4]">
+      <p className="text-xs uppercase tracking-[0.2em] text-[#aaa] mb-2">
+        Has this kid left the campus?
+      </p>
+      {formOpen ? (
+        <div className="space-y-2">
+          <label className="block">
+            <span className="block text-[10px] uppercase tracking-wider text-[#888] mb-1">
+              {role === 'simon'
+                ? `Tell Kevin what happened`
+                : 'Note for the public profile (optional)'}
+            </span>
+            <textarea
+              value={noteInput}
+              onChange={e => setNoteInput(e.target.value)}
+              rows={3}
+              placeholder="When they left, why, what the family said. Keep it dignified."
+              className="w-full px-3 py-2 text-sm bg-white border border-[#e8e0d4] focus:outline-none focus:border-[#D4A843]"
+            />
+          </label>
+          <div className="flex gap-2 flex-wrap">
+            <button
+              type="button"
+              onClick={() => call(role === 'simon' ? 'request' : 'approve')}
+              disabled={!!busy}
+              className="bg-[#888] text-white hover:bg-[#666] font-bold text-xs uppercase tracking-wider px-4 py-2 transition-colors disabled:opacity-50"
+            >
+              {busy
+                ? 'Sending…'
+                : role === 'simon'
+                  ? `Send to Kevin`
+                  : `Mark ${firstName} as departed`}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setFormOpen(false);
+                setNoteInput('');
+              }}
+              disabled={!!busy}
+              className="text-xs text-[#888] hover:text-[#0d0d0d] underline"
+            >
+              Cancel
+            </button>
+          </div>
+          {error && <p className="text-sm text-red-600">{error}</p>}
+        </div>
+      ) : (
+        <>
+          <p className="text-xs text-[#888] mb-3 leading-relaxed">
+            {role === 'simon'
+              ? `If ${firstName} has left Hope Bridge — transferred, family moved, withdrew — tell Kevin so he can update the records and notify the sponsor.`
+              : `Mark ${firstName} as departed. The record stays for sponsor history; the public profile reframes. Reversible.`}
+          </p>
+          <button
+            type="button"
+            onClick={() => setFormOpen(true)}
+            className="bg-white border border-[#888] text-[#0d0d0d] hover:bg-[#f5f0e8] font-bold text-xs uppercase tracking-wider px-4 py-2 transition-colors"
+          >
+            {firstName} has left the campus
+          </button>
+        </>
+      )}
+    </div>
+  );
 }
 
 // ─── Delete (request + approve flow) ─────────────────────────────

@@ -49,6 +49,8 @@ interface AirtableChildRecord {
     NameMeaning?: string;
     StudentOfMonth?: string;
     StudentOfMonthReason?: string;
+    DepartedAt?: string;
+    DepartureNote?: string;
     // ── Sponsor-only attachments uploaded via /admin/roster/[number].
     ReportCards?: Array<{ id: string; url: string; filename: string; size?: number; type?: string; thumbnails?: { large?: { url: string }; small?: { url: string } } }>;
     Letters?: Array<{ id: string; url: string; filename: string; size?: number; type?: string; thumbnails?: { large?: { url: string }; small?: { url: string } } }>;
@@ -540,6 +542,8 @@ const getChildByShirtNumber = cache(async function getChildByShirtNumber(shirtNu
       name_meaning: child.NameMeaning,
       student_of_month: child.StudentOfMonth,
       student_of_month_reason: child.StudentOfMonthReason,
+      departed_at: child.DepartedAt,
+      departure_note: child.DepartureNote,
     };
   } catch (error) {
     console.error('[children/page] Error fetching child', {
@@ -952,12 +956,43 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
 
           {/* Details */}
           <div className="flex flex-col justify-center py-0 md:py-4">
+            {/* Departure banner — when the kid is no longer at the
+                campus. Renders above the name with the polite note +
+                a soft sponsor-another-kid link. Replaces (visually
+                supplants) the bio/CTA later in the page; existing
+                photos + name stay because the shirt is forever tied
+                to this kid. */}
+            {child.departed_at && (
+              <div className="mb-4 p-4 border-2 border-[#888] bg-[#f5f0e8]">
+                <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#666] mb-1">
+                  No longer at Hope Bridge
+                </p>
+                {child.departure_note ? (
+                  <p
+                    className="text-base text-[#444] leading-relaxed whitespace-pre-wrap"
+                    style={{ fontFamily: 'var(--font-lora), serif' }}
+                  >
+                    {child.departure_note}
+                  </p>
+                ) : (
+                  <p className="text-sm text-[#666] italic">
+                    {displayName} has moved on from the campus.
+                  </p>
+                )}
+                <a
+                  href="/"
+                  className="mt-3 inline-block text-sm text-[#D4A843] hover:text-[#0d0d0d] underline"
+                >
+                  Meet another kid at the campus →
+                </a>
+              </div>
+            )}
             {/* Student of the month badge — set when Simon nominates
                 + Kevin approves via /admin/sotm. Sits above the name
                 so it's the first thing a sponsor sees. Empty
                 StudentOfMonth = no badge. The reason text renders
                 below as an italic citation. */}
-            {child.student_of_month && (
+            {!child.departed_at && child.student_of_month && (
               <div className="mb-3">
                 <p className="inline-flex self-start items-center gap-1.5 bg-[#D4A843] text-[#0d0d0d] text-xs font-bold uppercase tracking-wider px-3 py-1.5">
                   <span aria-hidden>★</span>
@@ -1099,9 +1134,35 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
             )}
           </div>
 
-          {/* RIGHT — CTA card (3 states based on viewer identity) */}
+          {/* RIGHT — CTA card (3 states based on viewer identity).
+              Departed kids skip every CTA state and render a soft
+              "meet another kid" card instead — no point inviting
+              sponsorship of a kid who's no longer at the campus, and
+              existing sponsors already saw the departure banner up
+              top. */}
           <div>
-            {child.viewer_is_sponsor ? (
+            {child.departed_at ? (
+              <div className="bg-white border border-[#e8e0d4] p-7 text-center">
+                <p
+                  className="text-xl text-[#0d0d0d] mb-3"
+                  style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
+                >
+                  {firstName} is no longer at the campus.
+                </p>
+                <p className="text-[#555] leading-relaxed mb-5">
+                  Their record stays here because their shirt belongs
+                  to a sponsor and their story matters. If you&rsquo;re
+                  looking for a kid to support, meet the others at
+                  Hope Bridge.
+                </p>
+                <Link
+                  href="/"
+                  className="inline-block bg-[#D4A843] text-[#0d0d0d] font-bold uppercase tracking-wider py-4 px-10 hover:bg-[#c49a3a] transition-colors"
+                >
+                  Meet the kids
+                </Link>
+              </div>
+            ) : child.viewer_is_sponsor ? (
               /* Verified sponsor: acknowledge, link to portal */
               <div className="bg-white border-2 border-[#D4A843]/30 p-7 text-center">
                 <p

@@ -106,13 +106,21 @@ function RosterCard({ kid, role }: { kid: RosterKid; role: 'admin' | 'simon' }) 
     !isPending('Loves') &&
     !isPending('Notes');
 
+  const isDeparted = !!kid.departedAt;
+  const hasDepartureRequest =
+    role === 'admin' && !isDeparted && !!kid.departureRequestedAt;
+
   return (
     <Link
       href={`/admin/roster/${kid.shirtNumber}`}
       className={`block bg-white border ${
-        role === 'admin' && (kid.hasPendingIntake || !!kid.lastEditedBySimon)
-          ? 'border-red-400 ring-2 ring-red-100'
-          : 'border-[#e8e0d4]'
+        isDeparted
+          ? 'border-[#aaa] opacity-60 grayscale-[40%]'
+          : hasDepartureRequest
+            ? 'border-amber-400 ring-2 ring-amber-100'
+            : role === 'admin' && (kid.hasPendingIntake || !!kid.lastEditedBySimon)
+              ? 'border-red-400 ring-2 ring-red-100'
+              : 'border-[#e8e0d4]'
       } hover:border-[#D4A843] transition-colors overflow-hidden relative`}
     >
       <div className="aspect-[4/5] bg-[#f5f0e8] relative">
@@ -138,6 +146,22 @@ function RosterCard({ kid, role }: { kid: RosterKid; role: 'admin' | 'simon' }) 
             aria-hidden
           >
             🗑
+          </div>
+        )}
+        {isDeparted && (
+          <div
+            className="absolute bottom-2 right-2 bg-[#666] text-white text-[10px] font-bold uppercase tracking-wider px-2 py-1"
+            title="Departed — no longer at the campus"
+          >
+            Departed
+          </div>
+        )}
+        {hasDepartureRequest && (
+          <div
+            className="absolute bottom-2 right-2 bg-amber-600 text-white text-[10px] font-bold uppercase tracking-wider px-2 py-1"
+            title="Departure requested — review in editor"
+          >
+            Departure?
           </div>
         )}
         {/* Gold ★ for the current Student of the Month; red ★ for a

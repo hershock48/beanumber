@@ -479,6 +479,15 @@ export interface RosterKid {
   // Null/empty = no pending request. Admin reviews via the editor
   // banner and either approves (hard delete) or rejects (clears).
   deletionRequestedAt: string | null;
+  // ISO timestamp set when Kevin approves the kid has left the
+  // campus. Null = active. When set, roster card is greyed out and
+  // public profile reframes.
+  departedAt: string | null;
+  // Kevin's public-facing explanation of the departure.
+  departureNote: string;
+  // Simon's pending departure nomination. Null = none pending.
+  departureRequestedAt: string | null;
+  departureRequestedNote: string;
   // Last time any structured field was touched. Best-effort via the
   // Airtable record's createdTime when there's no LastModified field.
   lastModified: string;
@@ -556,6 +565,10 @@ export async function getRoster(): Promise<RosterKid[]> {
       pendingSOTMMonth: (f.PendingSOTMMonth as string) || '',
       pendingSOTMReason: (f.PendingSOTMReason as string) || '',
       deletionRequestedAt: (f.DeletionRequestedAt as string) || null,
+      departedAt: (f.DepartedAt as string) || null,
+      departureNote: (f.DepartureNote as string) || '',
+      departureRequestedAt: (f.DepartureRequestedAt as string) || null,
+      departureRequestedNote: (f.DepartureRequestedNote as string) || '',
       lastModified: rec.createdTime,
     });
   }
@@ -677,6 +690,10 @@ export async function getRosterKidByNumber(shirtNumber: number): Promise<RosterK
     pendingSOTMMonth: (f.PendingSOTMMonth as string) || '',
     pendingSOTMReason: (f.PendingSOTMReason as string) || '',
     deletionRequestedAt: (f.DeletionRequestedAt as string) || null,
+    departedAt: (f.DepartedAt as string) || null,
+    departureNote: (f.DepartureNote as string) || '',
+    departureRequestedAt: (f.DepartureRequestedAt as string) || null,
+    departureRequestedNote: (f.DepartureRequestedNote as string) || '',
     lastModified: rec.createdTime,
     nameMeaning: (f.NameMeaning as string) || '',
     familyContext: (f.FamilyContext as string) || '',
