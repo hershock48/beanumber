@@ -277,6 +277,7 @@ export default async function DonorProfilePage({ params }: Props) {
         <DonorProfileActions
           donorRecordId={donor.recordId}
           donorFirstName={donor.name.split(/\s+/)[0] || donor.name}
+          donorEmail={donor.email}
           initialNotes={donor.notes}
         />
 

@@ -1,8 +1,10 @@
 /**
  * Interactive bits of the donor profile:
- *   - Free-form Notes textarea, save button persists to Donors.Notes
- *   - "Mark contacted" — one click logs an outbound email interaction
- *   - "Add interaction" — inline form for inbound, phone, text, etc.
+ *   - Free-form Notes textarea persists to Donors.Notes
+ *   - "Email <name>" — opens an inline compose section, sends the
+ *     email via Gmail API on submit, and auto-logs an outbound
+ *     interaction in the same request
+ *   - "Other channel" — inline form for inbound, phone, text, event
  *
  * Stays on the same page; on save, calls router.refresh() so the
  * server-rendered Timeline / Last contact sections re-fetch.
@@ -15,31 +17,39 @@ import { useState } from 'react';
 export function DonorProfileActions({
   donorRecordId,
   donorFirstName,
+  donorEmail,
   initialNotes,
 }: {
   donorRecordId: string;
   donorFirstName: string;
+  donorEmail: string | null;
   initialNotes: string;
 }) {
   const router = useRouter();
+
+  // Notes
   const [notes, setNotes] = useState(initialNotes);
   const [savingNotes, setSavingNotes] = useState(false);
   const [notesStatus, setNotesStatus] = useState<string | null>(null);
   const [notesError, setNotesError] = useState<string | null>(null);
+  const notesDirty = notes !== initialNotes;
 
-  const [marking, setMarking] = useState(false);
-  const [markError, setMarkError] = useState<string | null>(null);
-  const [markStatus, setMarkStatus] = useState<string | null>(null);
+  // Inline compose
+  const [composeOpen, setComposeOpen] = useState(false);
+  const [subject, setSubject] = useState('');
+  const [emailBody, setEmailBody] = useState('');
+  const [sending, setSending] = useState(false);
+  const [sendStatus, setSendStatus] = useState<string | null>(null);
+  const [sendError, setSendError] = useState<string | null>(null);
 
+  // Other-channel form
   const [addOpen, setAddOpen] = useState(false);
   const [addSubject, setAddSubject] = useState('');
   const [addDirection, setAddDirection] = useState<'outbound' | 'inbound'>('inbound');
-  const [addChannel, setAddChannel] = useState<'email' | 'phone' | 'text' | 'event' | 'other'>('email');
+  const [addChannel, setAddChannel] = useState<'email' | 'phone' | 'text' | 'event' | 'other'>('phone');
   const [addNotes, setAddNotes] = useState('');
   const [addBusy, setAddBusy] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
-
-  const notesDirty = notes !== initialNotes;
 
   async function saveNotes() {
     if (savingNotes) return;
@@ -65,34 +75,32 @@ export function DonorProfileActions({
     }
   }
 
-  async function markContacted() {
-    if (marking) return;
-    setMarking(true);
-    setMarkError(null);
-    setMarkStatus(null);
+  async function sendEmail(e: React.FormEvent) {
+    e.preventDefault();
+    if (sending) return;
+    setSending(true);
+    setSendStatus(null);
+    setSendError(null);
     try {
       const res = await fetch(
-        `/api/admin/donor/${donorRecordId}/interaction`,
+        `/api/admin/donor/${donorRecordId}/send-email`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            direction: 'outbound',
-            channel: 'email',
-            subject: `Emailed ${donorFirstName}`,
-          }),
+          body: JSON.stringify({ subject, body: emailBody }),
         }
       );
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || `Log failed: ${res.status}`);
-      }
-      setMarkStatus('Logged.');
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `Send failed: ${res.status}`);
+      setSendStatus(`Sent to ${data.toEmail}.`);
+      setSubject('');
+      setEmailBody('');
+      setComposeOpen(false);
       router.refresh();
     } catch (err) {
-      setMarkError(err instanceof Error ? err.message : 'Log failed.');
+      setSendError(err instanceof Error ? err.message : 'Send failed.');
     } finally {
-      setMarking(false);
+      setSending(false);
     }
   }
 
@@ -155,41 +163,114 @@ export function DonorProfileActions({
             disabled={savingNotes || !notesDirty}
             className="bg-[#D4A843] text-[#0d0d0d] font-bold text-xs uppercase tracking-wider px-4 py-2 hover:bg-[#c49a3a] transition-colors disabled:opacity-50"
           >
-            {savingNotes
-              ? 'Saving…'
-              : notesDirty
-                ? 'Save notes'
-                : 'Saved'}
+            {savingNotes ? 'Saving…' : notesDirty ? 'Save notes' : 'Saved'}
           </button>
           {notesStatus && <span className="text-sm text-[#888]">{notesStatus}</span>}
           {notesError && <span className="text-sm text-red-600">{notesError}</span>}
         </div>
       </section>
 
-      {/* Mark contacted + Add interaction */}
+      {/* Compose email */}
       <section>
         <p className="text-xs uppercase tracking-[0.2em] text-[#aaa] mb-2">
-          Log an interaction
+          Reach out
         </p>
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={markContacted}
-            disabled={marking}
-            className="bg-white border border-[#D4A843] text-[#D4A843] hover:bg-[#D4A843] hover:text-[#0d0d0d] font-bold text-xs uppercase tracking-wider px-4 py-2 transition-colors disabled:opacity-50"
-          >
-            {marking ? 'Logging…' : `I emailed ${donorFirstName}`}
-          </button>
-          <button
-            type="button"
-            onClick={() => setAddOpen(o => !o)}
-            className="text-xs text-[#888] hover:text-[#0d0d0d] underline"
-          >
-            {addOpen ? 'Cancel' : 'Other channel (phone / text / event)'}
-          </button>
-          {markStatus && <span className="text-sm text-[#888]">{markStatus}</span>}
-          {markError && <span className="text-sm text-red-600">{markError}</span>}
-        </div>
+        {donorEmail ? (
+          <>
+            {!composeOpen && (
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setComposeOpen(true);
+                    setSendStatus(null);
+                    setSendError(null);
+                  }}
+                  className="bg-[#D4A843] text-[#0d0d0d] hover:bg-[#c49a3a] font-bold text-xs uppercase tracking-wider px-4 py-2 transition-colors"
+                >
+                  Email {donorFirstName}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAddOpen(o => !o)}
+                  className="text-xs text-[#888] hover:text-[#0d0d0d] underline"
+                >
+                  {addOpen ? 'Cancel' : 'Log a phone / text / in-person interaction instead'}
+                </button>
+                {sendStatus && (
+                  <span className="text-sm text-green-700">{sendStatus}</span>
+                )}
+              </div>
+            )}
+
+            {composeOpen && (
+              <form onSubmit={sendEmail} className="border border-[#D4A843] bg-white p-4 space-y-3">
+                <p className="text-xs text-[#888]">
+                  Sending to{' '}
+                  <span className="text-[#0d0d0d] font-semibold">{donorEmail}</span>
+                  . Your signature will be appended automatically.
+                </p>
+                <label className="block">
+                  <span className="block text-[10px] uppercase tracking-wider text-[#888] mb-1">
+                    Subject
+                  </span>
+                  <input
+                    type="text"
+                    value={subject}
+                    onChange={e => setSubject(e.target.value)}
+                    placeholder="Subject line"
+                    className="w-full px-3 py-2 text-sm bg-white border border-[#e8e0d4] focus:outline-none focus:border-[#D4A843]"
+                    disabled={sending}
+                    autoFocus
+                  />
+                </label>
+                <label className="block">
+                  <span className="block text-[10px] uppercase tracking-wider text-[#888] mb-1">
+                    Body
+                  </span>
+                  <textarea
+                    value={emailBody}
+                    onChange={e => setEmailBody(e.target.value)}
+                    rows={10}
+                    placeholder={`Hey ${donorFirstName},\n\n`}
+                    className="w-full px-3 py-2 text-sm leading-relaxed bg-white border border-[#e8e0d4] focus:outline-none focus:border-[#D4A843] font-mono"
+                    disabled={sending}
+                  />
+                </label>
+                {sendError && (
+                  <p className="text-sm text-red-600">{sendError}</p>
+                )}
+                <div className="flex items-center gap-3">
+                  <button
+                    type="submit"
+                    disabled={sending || !subject.trim() || !emailBody.trim()}
+                    className="bg-[#D4A843] text-[#0d0d0d] font-bold text-xs uppercase tracking-wider px-5 py-3 hover:bg-[#c49a3a] transition-colors disabled:opacity-50"
+                  >
+                    {sending ? 'Sending…' : `Send to ${donorFirstName}`}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setComposeOpen(false);
+                      setSubject('');
+                      setEmailBody('');
+                      setSendError(null);
+                    }}
+                    disabled={sending}
+                    className="text-xs text-[#888] hover:text-[#0d0d0d] underline"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            )}
+          </>
+        ) : (
+          <p className="text-sm text-[#888]">
+            No email on file for {donorFirstName}. Add one in Airtable and
+            reload to email from here.
+          </p>
+        )}
 
         {addOpen && (
           <form
@@ -230,10 +311,10 @@ export function DonorProfileActions({
                   }
                   className="w-full px-2 py-1.5 text-sm bg-white border border-[#e8e0d4] focus:outline-none focus:border-[#D4A843]"
                 >
-                  <option value="email">Email</option>
                   <option value="phone">Phone</option>
                   <option value="text">Text</option>
                   <option value="event">In person / event</option>
+                  <option value="email">Email (sent outside the admin)</option>
                   <option value="other">Other</option>
                 </select>
               </label>
