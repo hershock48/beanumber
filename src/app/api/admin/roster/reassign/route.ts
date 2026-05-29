@@ -120,34 +120,6 @@ async function findSponsorshipsForKid(
   return (data.records || []) as SponsorshipRecord[];
 }
 
-async function fetchActiveSponsorshipChildIds(): Promise<Set<string>> {
-  // Returns every Children record ID that has an active or awaiting
-  // sponsorship — used to exclude already-sponsored kids from the
-  // replacement-candidate list.
-  const formula = `OR({Status}="Active", {Status}="Awaiting Sponsor")`;
-  const set = new Set<string>();
-  let offset: string | undefined;
-  do {
-    const params = new URLSearchParams();
-    params.set('filterByFormula', formula);
-    params.set('pageSize', '100');
-    params.append('fields[]', 'Children');
-    if (offset) params.set('offset', offset);
-    const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(
-      SPONSORSHIPS_TABLE
-    )}?${params.toString()}`;
-    const res = await fetch(url, { headers: atHeaders(), cache: 'no-store' });
-    if (!res.ok) break;
-    const data = await res.json();
-    for (const r of data.records || []) {
-      const kids = (r.fields?.Children as string[]) || [];
-      for (const k of kids) set.add(k);
-    }
-    offset = data.offset;
-  } while (offset);
-  return set;
-}
-
 async function listEligibleReplacements(
   departedKid: ChildRecord
 ): Promise<
@@ -165,7 +137,6 @@ async function listEligibleReplacements(
   }>
 > {
   const targetGradeKey = normalizeGrade(departedKid.fields.GradeClass).key;
-  const sponsored = await fetchActiveSponsorshipChildIds();
   // Pull all active kids.
   const out: ChildRecord[] = [];
   let offset: string | undefined;
@@ -186,15 +157,13 @@ async function listEligibleReplacements(
   return out
     .filter(r => {
       const f = r.fields;
-      // Exclude only the cases that genuinely can't accept a
-      // sponsorship: the departed kid themselves, records with no
-      // shirt number (incomplete), departed kids, or kids who
-      // already have an active sponsor. Grade is NOT a filter —
-      // Kevin asked for it to be a soft sort instead.
+      // Sponsorships pool — multiple sponsors per kid is fine. The
+      // only exclusions are records that genuinely can't accept a
+      // reassignment: the departed kid themselves, records with no
+      // shirt number (incomplete), and other departed kids.
       if (r.id === departedKid.id) return false;
       if (typeof f.ShirtNumber !== 'number' || f.ShirtNumber < 1) return false;
       if (f.DepartedAt) return false;
-      if (sponsored.has(r.id)) return false;
       return true;
     })
     .map(r => {

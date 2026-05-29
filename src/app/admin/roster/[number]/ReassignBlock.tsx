@@ -165,14 +165,15 @@ export function ReassignBlock({
           <p className="text-xs text-[#666] mb-3">
             {firstName}&apos;s grade:{' '}
             <span className="font-semibold">{context.kid.gradeLabel}</span>.{' '}
-            {context.replacements.length} eligible candidate
-            {context.replacements.length === 1 ? '' : 's'} (active, no
-            current sponsor). Same-grade kids show first.
+            {context.replacements.length} active kid
+            {context.replacements.length === 1 ? '' : 's'} on the
+            roster — sponsorships pool, so pick anyone. Same-grade
+            kids show first.
           </p>
           {context.replacements.length === 0 ? (
             <p className="text-sm text-red-700">
-              No eligible replacements on the active roster. Add a new
-              kid via the roster, then come back.
+              No active kids on the roster. Add a new kid via the
+              roster, then come back.
             </p>
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
