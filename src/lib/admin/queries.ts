@@ -460,6 +460,15 @@ export async function getRoster(): Promise<RosterKid[]> {
   return kids;
 }
 
+export interface RosterKidAttachment {
+  id: string;
+  url: string;
+  filename: string;
+  size?: number;
+  type?: string;
+  thumbnailUrl?: string | null;
+}
+
 // Single-kid fetch for the editor page — pulls the full field set.
 export interface RosterKidDetail extends RosterKid {
   nameMeaning: string;
@@ -469,6 +478,8 @@ export interface RosterKidDetail extends RosterKid {
   notes: string;
   age: string | null;
   homeVillage: string | null;
+  reportCards: RosterKidAttachment[];
+  letters: RosterKidAttachment[];
 }
 
 export async function getRosterKidByNumber(shirtNumber: number): Promise<RosterKidDetail | null> {
@@ -494,6 +505,30 @@ export async function getRosterKidByNumber(shirtNumber: number): Promise<RosterK
     ageStr = String(Math.max(0, years));
   }
 
+  // Helper to normalize Airtable attachment arrays for the editor.
+  const mapAttachments = (key: string): RosterKidAttachment[] => {
+    const raw = (f[key] as Array<{
+      id: string;
+      url: string;
+      filename: string;
+      size?: number;
+      type?: string;
+      thumbnails?: { large?: { url: string }; small?: { url: string } };
+    }>) || [];
+    // Airtable returns oldest first; reverse for most-recent-first.
+    return raw
+      .slice()
+      .reverse()
+      .map(a => ({
+        id: a.id,
+        url: a.url,
+        filename: a.filename,
+        size: a.size,
+        type: a.type,
+        thumbnailUrl: a.thumbnails?.large?.url || a.thumbnails?.small?.url || null,
+      }));
+  };
+
   return {
     recordId: rec.id,
     childId: (f.ChildID as string) || '',
@@ -518,6 +553,8 @@ export async function getRosterKidByNumber(shirtNumber: number): Promise<RosterK
     notes: (f.Notes as string) || '',
     age: ageStr,
     homeVillage: (f.HomeVillage as string) || null,
+    reportCards: mapAttachments('ReportCards'),
+    letters: mapAttachments('Letters'),
   };
 }
 

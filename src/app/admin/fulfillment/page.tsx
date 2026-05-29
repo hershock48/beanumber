@@ -266,20 +266,18 @@ export default function FulfillmentDashboard() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-baseline justify-between mb-2">
                           <div className="flex items-baseline gap-2 flex-wrap">
-                            {/* Order # is blank under the stockpile model.
-                                Show "STOCKPILE" instead of a misleading "#"
-                                for orders waiting on number assignment. */}
-                            {order.orderNum ? (
+                            {/* Order # is left blank for stockpile orders.
+                                We do not track which number ships to which
+                                buyer — Kevin doesn't need that metric.
+                                Only show #N when the field is set (portal
+                                repeats and legacy assignments). */}
+                            {order.orderNum && (
                               <>
                                 <span className="text-lg font-bold text-gray-900">#{order.orderNum}</span>
                                 {order.childName && (
                                   <span className="text-xs text-gray-500 uppercase tracking-wide">{order.childName}</span>
                                 )}
                               </>
-                            ) : (
-                              <span className="text-xs font-bold text-amber-700 uppercase tracking-wider bg-amber-50 px-2 py-0.5 rounded">
-                                Stockpile · number assigned at ship
-                              </span>
                             )}
                           </div>
                           <span className="text-xs text-gray-400">{order.orderDate}</span>
