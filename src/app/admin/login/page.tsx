@@ -45,7 +45,14 @@ function LoginForm() {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.message || 'Wrong password');
       }
-      router.replace(nextPath);
+      // Simon's only landing surface is the roster — skip the admin
+      // home so he never sees Kevin's UI even for a moment.
+      const data = await res.json().catch(() => ({}));
+      const dest =
+        data.role === 'simon' && nextPath === '/admin'
+          ? '/admin/roster'
+          : nextPath;
+      router.replace(dest);
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed');

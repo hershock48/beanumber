@@ -118,9 +118,6 @@ function RosterCard({ kid, role }: { kid: RosterKid; role: 'admin' | 'simon' }) 
             <p className="text-3xl opacity-30">👤</p>
           </div>
         )}
-        <div className="absolute top-2 right-2 bg-white/95 backdrop-blur-sm px-2 py-1">
-          <span className="text-xs font-bold text-[#D4A843]">#{kid.shirtNumber}</span>
-        </div>
         {role === 'admin' && (kid.hasPendingIntake || !!kid.lastEditedBySimon) && (
           <div className="absolute top-2 left-2 w-3 h-3 rounded-full bg-red-500 ring-2 ring-white" title="Simon edited this kid — review and polish" />
         )}

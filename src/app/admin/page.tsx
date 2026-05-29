@@ -14,7 +14,9 @@
  */
 
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
 import { getAdminHomeData } from '@/lib/admin/queries';
+import { getAdminRole } from '@/lib/admin-session';
 import { AdminShell } from './_components/AdminShell';
 
 export const dynamic = 'force-dynamic';
@@ -31,6 +33,14 @@ function formatDollars(cents: number): string {
 }
 
 export default async function AdminHomePage() {
+  // Simon's view never sees the admin home — bounce him to the
+  // roster server-side so there's no flash of admin UI even if he
+  // (or his session) ends up here.
+  const role = await getAdminRole();
+  if (role === 'simon') {
+    redirect('/admin/roster');
+  }
+
   const data = await getAdminHomeData();
   const today = new Date().toLocaleDateString('en-US', {
     weekday: 'long',

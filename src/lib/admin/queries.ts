@@ -467,10 +467,12 @@ export interface RosterKid {
 export async function getRoster(): Promise<RosterKid[]> {
   const records = await atListAll(CHILDREN_TABLE);
 
-  // First pass — pull every record with a positive shirt number and a
-  // non-empty name. Don't filter on ChildID anymore: a bunch of real
-  // kids (added by the legacy Stripe webhook) have a photo + name but
-  // no explicit ChildID, and they need to appear too.
+  // Pull every record with a positive shirt number and a non-empty
+  // name. The data is messy: most kids exist under multiple shirt
+  // numbers (one canonical record at #1–53 plus extra rows the legacy
+  // Stripe webhook seeded at higher numbers when shirts in those
+  // ranges sold). For Simon's roster Kevin only wants ONE card per
+  // real kid — they all click through to the same editor anyway.
   const raw: Array<{
     rec: { id: string; createdTime: string; fields: Record<string, unknown> };
     n: number;
@@ -487,25 +489,24 @@ export async function getRoster(): Promise<RosterKid[]> {
     const photoArr = (f.ProfilePhoto as Array<unknown>) || [];
     raw.push({ rec, n, displayName, hasPhoto: photoArr.length > 0 });
   }
-  // Sort ascending so the lowest-numbered record claims a given name
-  // first — used by the dedupe logic below.
-  raw.sort((a, b) => a.n - b.n);
 
-  // Second pass — dedupe ghosts. Airtable has phantom records around
-  // certain shirt numbers (#101–113 etc.) that the legacy assignment
-  // system seeded with a name copied from a canonical kid but no
-  // photo of their own. Drop those: if a record has no photo AND we've
-  // already seen its DisplayName from a lower-numbered record, it's a
-  // ghost. Real kids with a photo always survive even if the name
-  // happens to match an earlier entry (Blessing Aloyo at #50 and #52
-  // both have unique photos and should both render).
-  const seen = new Set<string>();
+  // Pick one canonical record per unique name. Photo-bearing records
+  // beat photo-less ghosts; among photo-bearing records the lowest
+  // shirt number wins (the canonical #1-53 entry over a webhook copy
+  // at #54+). The result: each real kid shows once, linked to their
+  // primary record.
+  raw.sort((a, b) => {
+    if (a.hasPhoto !== b.hasPhoto) return a.hasPhoto ? -1 : 1;
+    return a.n - b.n;
+  });
+  const byName = new Map<string, typeof raw[number]>();
+  for (const r of raw) {
+    const key = r.displayName.toLowerCase();
+    if (!byName.has(key)) byName.set(key, r);
+  }
+
   const kids: RosterKid[] = [];
-  for (const { rec, n, displayName, hasPhoto } of raw) {
-    const key = displayName.toLowerCase();
-    if (!hasPhoto && seen.has(key)) continue;
-    seen.add(key);
-
+  for (const { rec, n, displayName, hasPhoto } of byName.values()) {
     const f = rec.fields as Record<string, unknown>;
     const photoArr = (f.ProfilePhoto as Array<{ url: string; thumbnails?: { large?: { url: string } } }>) || [];
     const photoUrl = photoArr[0]?.thumbnails?.large?.url || photoArr[0]?.url || null;
@@ -531,6 +532,8 @@ export async function getRoster(): Promise<RosterKid[]> {
       lastModified: rec.createdTime,
     });
   }
+  // Alphabetical by display name — reads like a class roster.
+  kids.sort((a, b) => a.displayName.localeCompare(b.displayName));
   return kids;
 }
 
