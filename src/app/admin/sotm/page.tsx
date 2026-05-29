@@ -41,12 +41,14 @@ export default async function SOTMPage() {
             className="text-3xl md:text-4xl text-[#0d0d0d] mb-2"
             style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
           >
-            Pick a kid for {month}
+            {role === 'simon'
+              ? `Nominate a kid for ${month}`
+              : `Student of the Month — ${month}`}
           </h1>
           <p className="text-[#666]">
             {role === 'simon'
-              ? "Tap the kid who deserves the award this month. Kevin will approve before it shows up publicly. You can change your pick anytime — only the last one stands."
-              : 'Tap a kid to approve them as Student of the Month — the gold badge goes live on their public profile right away. Simon\'s pending pick (if any) is highlighted in red — click "Approve Simon\'s pick" or pick a different kid yourself.'}
+              ? "Tap the kid who deserves the award this month. You'll add a short reason, Kevin will approve before it shows up publicly. You can change your pick anytime — only the last one stands."
+              : "You don't pick — Simon does, from the campus. When his nomination comes in, it shows up here with his reason and you approve or reject. If you need to override or pick directly, the grid below lets you."}
           </p>
         </div>
 
@@ -56,7 +58,9 @@ export default async function SOTMPage() {
             displayName: k.displayName,
             photoUrl: k.photoUrl,
             studentOfMonth: k.studentOfMonth,
+            studentOfMonthReason: k.studentOfMonthReason,
             pendingSOTMMonth: k.pendingSOTMMonth,
+            pendingSOTMReason: k.pendingSOTMReason,
           }))}
           role={role}
           month={month}

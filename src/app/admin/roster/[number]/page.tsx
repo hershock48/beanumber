@@ -91,6 +91,7 @@ export default async function AdminRosterEditPage({ params }: Props) {
           lastEditedBySimon={kid.lastEditedBySimon}
           pendingFields={kid.pendingFields}
           deletionRequestedAt={kid.deletionRequestedAt}
+          studentOfMonthReason={kid.studentOfMonthReason}
         />
       </div>
     </AdminShell>

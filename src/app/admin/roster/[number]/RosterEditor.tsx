@@ -39,6 +39,7 @@ export function RosterEditor({
   lastEditedBySimon,
   pendingFields,
   deletionRequestedAt,
+  studentOfMonthReason,
 }: {
   shirtNumber: number;
   firstName: string;
@@ -55,6 +56,9 @@ export function RosterEditor({
   /** ISO timestamp set when someone requested this kid be deleted.
    *  Null = no pending request. */
   deletionRequestedAt: string | null;
+  /** Citation text shown alongside the SOTM badge in the inline
+   *  card. Empty when no award is active. */
+  studentOfMonthReason: string;
 }) {
   const router = useRouter();
   const [fields, setFields] = useState<Fields>(initial);
@@ -226,9 +230,9 @@ export function RosterEditor({
           month. Saves with the rest of the form, but the toggle is
           visually distinct so it doesn't get lost. */}
       <StudentOfMonthControl
-        value={fields.studentOfMonth}
+        value={initial.studentOfMonth}
         firstName={firstName}
-        onChange={v => update('studentOfMonth', v)}
+        reason={studentOfMonthReason}
       />
 
       <Field
@@ -832,58 +836,48 @@ function currentMonthLabel(): string {
 function StudentOfMonthControl({
   value,
   firstName,
-  onChange,
+  reason,
 }: {
   value: string;
   firstName: string;
-  onChange: (next: string) => void;
+  reason: string;
+  /** Kept for backward compat with parent — no longer used. */
+  onChange?: (next: string) => void;
 }) {
-  const monthLabel = currentMonthLabel();
   const isAwarded = !!value;
-  const isCurrent = value === monthLabel;
-
   return (
     <div className="border border-[#e8e0d4] bg-[#FFF8F0] p-4">
       <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-1">
         Student of the month
       </p>
-      <p className="text-xs text-[#888] mb-3 leading-relaxed">
-        One-click award. Renders as a small ★ badge on{' '}
-        {firstName || 'this kid'}&apos;s public profile.
-      </p>
-
       {isAwarded ? (
-        <div className="flex items-center gap-3 flex-wrap">
+        <div>
           <span className="inline-flex items-center gap-1.5 bg-[#D4A843] text-[#0d0d0d] text-sm font-bold px-3 py-1.5">
             <span aria-hidden>★</span>
             Student of the Month · {value}
           </span>
-          {!isCurrent && (
-            <button
-              type="button"
-              onClick={() => onChange(monthLabel)}
-              className="text-xs text-[#D4A843] hover:underline"
-            >
-              Update to {monthLabel}
-            </button>
+          {reason && (
+            <p className="text-xs text-[#666] mt-2 italic leading-snug">
+              &ldquo;{reason}&rdquo;
+            </p>
           )}
-          <button
-            type="button"
-            onClick={() => onChange('')}
-            className="text-xs text-[#888] hover:text-red-700 underline"
-          >
-            Remove award
-          </button>
+          <p className="text-xs text-[#888] mt-3 leading-relaxed">
+            Award nominated by Simon, approved by Kevin via{' '}
+            <a href="/admin/sotm" className="underline hover:text-[#0d0d0d]">
+              the SOTM picker
+            </a>
+            . Edit or clear it there.
+          </p>
         </div>
       ) : (
-        <button
-          type="button"
-          onClick={() => onChange(monthLabel)}
-          className="inline-flex items-center gap-1.5 bg-white border border-[#D4A843] text-[#D4A843] hover:bg-[#D4A843] hover:text-[#0d0d0d] text-xs font-bold uppercase tracking-wider px-3 py-2 transition-colors"
-        >
-          <span aria-hidden>★</span>
-          Award for {monthLabel}
-        </button>
+        <p className="text-xs text-[#888] leading-relaxed">
+          {firstName || 'This kid'} has no current Student of the Month
+          award. Nominations live in{' '}
+          <a href="/admin/sotm" className="underline hover:text-[#0d0d0d]">
+            the SOTM picker
+          </a>
+          .
+        </p>
       )}
     </div>
   );

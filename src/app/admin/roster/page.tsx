@@ -163,12 +163,22 @@ function RosterCard({ kid, role }: { kid: RosterKid; role: 'admin' | 'simon' }) 
       </div>
 
       <div className="p-3">
-        <p
-          className="text-base text-[#0d0d0d] leading-snug truncate"
-          style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
-        >
-          {kid.displayName}
-        </p>
+        <div className="flex items-baseline justify-between gap-2">
+          <p
+            className="text-base text-[#0d0d0d] leading-snug truncate min-w-0"
+            style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
+          >
+            {kid.displayName}
+          </p>
+          {role === 'admin' && (
+            <span
+              className="text-xs font-bold text-[#D4A843] tabular-nums flex-shrink-0"
+              title={`Shirt #${kid.shirtNumber}`}
+            >
+              #{kid.shirtNumber}
+            </span>
+          )}
+        </div>
         {kid.gradeClass && (
           <p className="text-xs text-[#888] mt-1 truncate">{kid.gradeClass}</p>
         )}

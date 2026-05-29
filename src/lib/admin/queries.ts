@@ -469,10 +469,12 @@ export interface RosterKid {
   // Empty = no current award. Drives the gold ★ on the roster card
   // and the badge on the public profile.
   studentOfMonth: string;
+  studentOfMonthReason: string;
   // Simon's pending SOTM nomination, waiting for Kevin's approval.
   // Same format as studentOfMonth. Empty = no pending nomination.
   // Drives the red ★ on the roster card (admin view only).
   pendingSOTMMonth: string;
+  pendingSOTMReason: string;
   // ISO timestamp set when someone requests this kid be deleted.
   // Null/empty = no pending request. Admin reviews via the editor
   // banner and either approves (hard delete) or rejects (clears).
@@ -550,7 +552,9 @@ export async function getRoster(): Promise<RosterKid[]> {
       hasReportCards: Array.isArray(f.ReportCards) && (f.ReportCards as unknown[]).length > 0,
       hasLetters: Array.isArray(f.Letters) && (f.Letters as unknown[]).length > 0,
       studentOfMonth: (f.StudentOfMonth as string) || '',
+      studentOfMonthReason: (f.StudentOfMonthReason as string) || '',
       pendingSOTMMonth: (f.PendingSOTMMonth as string) || '',
+      pendingSOTMReason: (f.PendingSOTMReason as string) || '',
       deletionRequestedAt: (f.DeletionRequestedAt as string) || null,
       lastModified: rec.createdTime,
     });
@@ -664,7 +668,9 @@ export async function getRosterKidByNumber(shirtNumber: number): Promise<RosterK
     hasReportCards: Array.isArray(f.ReportCards) && (f.ReportCards as unknown[]).length > 0,
     hasLetters: Array.isArray(f.Letters) && (f.Letters as unknown[]).length > 0,
     studentOfMonth: (f.StudentOfMonth as string) || '',
+    studentOfMonthReason: (f.StudentOfMonthReason as string) || '',
     pendingSOTMMonth: (f.PendingSOTMMonth as string) || '',
+    pendingSOTMReason: (f.PendingSOTMReason as string) || '',
     deletionRequestedAt: (f.DeletionRequestedAt as string) || null,
     lastModified: rec.createdTime,
     nameMeaning: (f.NameMeaning as string) || '',

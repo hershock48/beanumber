@@ -38,7 +38,9 @@ const CHILDREN_TABLE = process.env.AIRTABLE_CHILDREN_TABLE || 'Children';
 const F = {
   shirtNumber: 'fldFLnW4dMCjyKFkO',
   studentOfMonth: 'fldQrcXzw32aOZWZ3',
+  studentOfMonthReason: 'fldT6JM5iRo4AhtBf',
   pendingSOTMMonth: 'fld1RuoP2O5xD1vkl',
+  pendingSOTMReason: 'fldy1HU5aSK8aqJ1K',
 };
 
 function atHeaders() {
@@ -53,15 +55,19 @@ function currentMonthLabel(): string {
   return `${d.toLocaleString('en-US', { month: 'long' })} ${d.getFullYear()}`;
 }
 
-/** Find one Child record by shirt number. */
-async function findChildByShirtNumber(n: number): Promise<{ id: string } | null> {
+/** Find one Child record by shirt number. Returns id + fields so the
+ *  approve flow can read the existing pending reason. */
+async function findChildByShirtNumber(
+  n: number
+): Promise<{ id: string; fields: Record<string, unknown> } | null> {
   const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(
     CHILDREN_TABLE
   )}?filterByFormula=${encodeURIComponent(`{ShirtNumber}=${n}`)}&maxRecords=1`;
   const res = await fetch(url, { headers: atHeaders(), cache: 'no-store' });
   if (!res.ok) return null;
   const data = await res.json();
-  return data.records?.[0] ? { id: data.records[0].id } : null;
+  const rec = data.records?.[0];
+  return rec ? { id: rec.id, fields: rec.fields || {} } : null;
 }
 
 /** Find every Child record where the given fieldName is non-empty. */
@@ -112,7 +118,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  let body: { action?: string; shirtNumber?: number };
+  let body: { action?: string; shirtNumber?: number; reason?: string };
   try {
     body = await request.json();
   } catch {
@@ -143,13 +149,19 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  const reason = typeof body.reason === 'string' ? body.reason.trim() : '';
+
   try {
     if (action === 'clear') {
-      // Clear both fields on every record that has either set.
+      // Clear all four fields on every record that has them set.
       const withPublished = await findKidsWithField('StudentOfMonth');
+      const withPublishedReason = await findKidsWithField('StudentOfMonthReason');
       const withPending = await findKidsWithField('PendingSOTMMonth');
+      const withPendingReason = await findKidsWithField('PendingSOTMReason');
       await clearFieldOnRecords(withPublished, F.studentOfMonth);
+      await clearFieldOnRecords(withPublishedReason, F.studentOfMonthReason);
       await clearFieldOnRecords(withPending, F.pendingSOTMMonth);
+      await clearFieldOnRecords(withPendingReason, F.pendingSOTMReason);
       return NextResponse.json({ ok: true, cleared: true });
     }
 
@@ -162,33 +174,50 @@ export async function POST(request: NextRequest) {
     }
 
     if (action === 'nominate') {
-      // Clear everyone else's pending pick so only one is live.
+      // Clear everyone else's pending pick (and their reasons) so only
+      // one nomination is live at a time.
       const allPending = await findKidsWithField('PendingSOTMMonth');
       const others = allPending.filter(r => r.id !== target.id);
       await clearFieldOnRecords(others, F.pendingSOTMMonth);
-      // Stamp the target.
-      const res = await patchOne(target.id, { [F.pendingSOTMMonth]: month });
+      await clearFieldOnRecords(others, F.pendingSOTMReason);
+      // Stamp the target with the month + Simon's reason text.
+      const stamp: Record<string, unknown> = {
+        [F.pendingSOTMMonth]: month,
+      };
+      stamp[F.pendingSOTMReason] = reason || null;
+      const res = await patchOne(target.id, stamp);
       if (!res.ok) {
         return NextResponse.json(
           { error: `Nominate failed: ${res.status} ${await res.text()}` },
           { status: 502 }
         );
       }
-      return NextResponse.json({ ok: true, action, shirtNumber, month });
+      return NextResponse.json({ ok: true, action, shirtNumber, month, reason });
     }
 
-    // approve — published award goes to the target, pending clears
-    // across the board, and any other kid's published award (likely
-    // last month's winner) also clears so there's only one current
-    // SOTM live.
+    // approve — published award goes to the target. We carry over
+    // whatever pending reason was set (Simon's wording) unless Kevin
+    // supplies an override in the request body. Then every other
+    // kid's published award + every kid's pending state clears so
+    // there's only one current SOTM live.
+    const existingPendingReason =
+      typeof target.fields?.PendingSOTMReason === 'string'
+        ? (target.fields.PendingSOTMReason as string)
+        : '';
+    const reasonToPublish = reason || existingPendingReason;
+
     const allPublished = await findKidsWithField('StudentOfMonth');
     const otherPublished = allPublished.filter(r => r.id !== target.id);
     await clearFieldOnRecords(otherPublished, F.studentOfMonth);
+    await clearFieldOnRecords(otherPublished, F.studentOfMonthReason);
     const allPending = await findKidsWithField('PendingSOTMMonth');
     await clearFieldOnRecords(allPending, F.pendingSOTMMonth);
+    await clearFieldOnRecords(allPending, F.pendingSOTMReason);
     const res = await patchOne(target.id, {
       [F.studentOfMonth]: month,
+      [F.studentOfMonthReason]: reasonToPublish || null,
       [F.pendingSOTMMonth]: null,
+      [F.pendingSOTMReason]: null,
     });
     if (!res.ok) {
       return NextResponse.json(
