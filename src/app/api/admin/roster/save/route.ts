@@ -37,6 +37,18 @@ const F = {
   notes: 'fldbQuWFgNXnlZIVX',
   intakeFromCampus: 'fldZ3A6XK1yVUzhLJ',
   lastEditedBySimon: 'fldHeGgc5op4WpqAq',
+  pendingFields: 'fldHnJHD0jv2lPgyU',
+};
+
+/** Maps a body.fields key → the matching PendingFields multi-select
+ *  option. Fields not in the map (intakeFromCampus) don't participate
+ *  in the per-field pending tracking. */
+const FIELD_TO_PENDING_OPTION: Record<string, string> = {
+  nameMeaning: 'NameMeaning',
+  familyContext: 'FamilyContext',
+  loves: 'Loves',
+  childQuote: 'ChildQuote',
+  notes: 'Notes',
 };
 
 function atHeaders() {
@@ -104,24 +116,88 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Build the patch — only include fields that were sent.
-    const patchFields: Record<string, string | null> = {};
-    if (typeof fields.nameMeaning === 'string') patchFields[F.nameMeaning] = fields.nameMeaning;
-    if (typeof fields.familyContext === 'string') patchFields[F.familyContext] = fields.familyContext;
-    if (typeof fields.loves === 'string') patchFields[F.loves] = fields.loves;
-    if (typeof fields.childQuote === 'string') patchFields[F.childQuote] = fields.childQuote;
-    if (typeof fields.notes === 'string') patchFields[F.notes] = fields.notes;
-    if (typeof fields.intakeFromCampus === 'string') patchFields[F.intakeFromCampus] = fields.intakeFromCampus;
+    // Compare incoming values against the existing record so we know
+    // which fields actually changed (used for per-field pending
+    // tracking below).
+    const existingFields = (record.fields || {}) as Record<string, unknown>;
+    const changedKeys: string[] = [];
+    const fieldKeyToAirtable: Record<string, string> = {
+      nameMeaning: F.nameMeaning,
+      familyContext: F.familyContext,
+      loves: F.loves,
+      childQuote: F.childQuote,
+      notes: F.notes,
+      intakeFromCampus: F.intakeFromCampus,
+    };
 
-    // Simon-edit flag bookkeeping:
-    //   - Simon saving anything → stamp LastEditedBySimon = now.
-    //   - Kevin saving with clearSimonFlag → wipe LastEditedBySimon.
-    //   - Kevin saving without that flag → leave LastEditedBySimon alone.
+    // Build the patch — only include fields that were sent AND differ
+    // from the current value. (Same value = no-op write.)
+    const patchFields: Record<string, unknown> = {};
+    for (const [key, fieldId] of Object.entries(fieldKeyToAirtable)) {
+      const incoming = (fields as Record<string, unknown>)[key];
+      if (typeof incoming !== 'string') continue;
+      const current = (existingFields[
+        // map field ID back to airtable cell name — Airtable returns
+        // fields keyed by name, so we look up by name not id here
+        ({
+          nameMeaning: 'NameMeaning',
+          familyContext: 'FamilyContext',
+          loves: 'Loves',
+          childQuote: 'ChildQuote',
+          notes: 'Notes',
+          intakeFromCampus: 'IntakeFromCampus',
+        } as Record<string, string>)[key]
+      ] as string) || '';
+      if (incoming === current) continue;
+      patchFields[fieldId] = incoming;
+      changedKeys.push(key);
+    }
+
+    // Pending-field bookkeeping:
+    //   - Simon saves a structured field → add its option to PendingFields.
+    //   - Kevin saves a field that's currently pending → remove its option.
+    //   - Kevin sends clearSimonFlag → wipe PendingFields entirely.
+    //   - LastEditedBySimon tracks the most recent Simon save (and clears
+    //     when Kevin reviews).
     const role = await getAdminRole();
-    if (role === 'simon' && Object.keys(patchFields).length > 0) {
-      patchFields[F.lastEditedBySimon] = new Date().toISOString();
-    } else if (role === 'admin' && body.clearSimonFlag) {
-      patchFields[F.lastEditedBySimon] = null;
+    const currentPending = Array.isArray(existingFields.PendingFields)
+      ? (existingFields.PendingFields as Array<string | { name?: string }>).map(
+          v => (typeof v === 'string' ? v : v?.name || '')
+        ).filter(Boolean)
+      : [];
+    let nextPending = new Set(currentPending);
+
+    if (role === 'simon') {
+      for (const key of changedKeys) {
+        const option = FIELD_TO_PENDING_OPTION[key];
+        if (option) nextPending.add(option);
+      }
+      if (changedKeys.length > 0) {
+        patchFields[F.lastEditedBySimon] = new Date().toISOString();
+      }
+    } else if (role === 'admin') {
+      if (body.clearSimonFlag) {
+        nextPending = new Set();
+        patchFields[F.lastEditedBySimon] = null;
+      } else {
+        for (const key of changedKeys) {
+          const option = FIELD_TO_PENDING_OPTION[key];
+          if (option) nextPending.delete(option);
+        }
+        // If Kevin cleared the last pending field by editing it,
+        // the global flag clears too.
+        if (nextPending.size === 0) {
+          patchFields[F.lastEditedBySimon] = null;
+        }
+      }
+    }
+
+    // Only write PendingFields if the set actually changed.
+    const pendingChanged =
+      nextPending.size !== currentPending.length ||
+      Array.from(nextPending).some(v => !currentPending.includes(v));
+    if (pendingChanged) {
+      patchFields[F.pendingFields] = Array.from(nextPending);
     }
 
     if (Object.keys(patchFields).length === 0) {
@@ -134,7 +210,7 @@ export async function POST(request: NextRequest) {
     const patchRes = await fetch(patchUrl, {
       method: 'PATCH',
       headers: atHeaders(),
-      body: JSON.stringify({ fields: patchFields }),
+      body: JSON.stringify({ fields: patchFields, typecast: true }),
     });
     if (!patchRes.ok) {
       const text = await patchRes.text();

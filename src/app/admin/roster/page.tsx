@@ -80,6 +80,22 @@ function RosterCard({ kid, role }: { kid: RosterKid; role: 'admin' | 'simon' }) 
     Number(kid.has.notes);
   const total = 5;
 
+  // Per-field pending status. Photo doesn't go through the pending
+  // tracker — uploads are immediate and don't need polish — so it
+  // can only be empty or published.
+  const isPending = (key: string) =>
+    role === 'admin' && kid.pendingFields.includes(key);
+
+  // "Fully complete and reviewed" — all 5 dots are content-filled AND
+  // none of the four content-tracked fields are pending review. That
+  // earns the kid a celebration badge in place of the dot strip.
+  const allFilledAndReviewed =
+    completeness === total &&
+    !isPending('NameMeaning') &&
+    !isPending('FamilyContext') &&
+    !isPending('Loves') &&
+    !isPending('Notes');
+
   return (
     <Link
       href={`/admin/roster/${kid.shirtNumber}`}
@@ -121,27 +137,61 @@ function RosterCard({ kid, role }: { kid: RosterKid; role: 'admin' | 'simon' }) 
           <p className="text-xs text-[#888] mt-1 truncate">{kid.gradeClass}</p>
         )}
 
-        {/* Five-dot completeness indicator. Filled = field present. */}
-        <div className="flex items-center gap-1 mt-3" aria-label={`${completeness} of ${total} fields complete`}>
-          {[
-            { has: kid.has.photo, label: 'Photo' },
-            { has: kid.has.nameMeaning, label: 'Name meaning' },
-            { has: kid.has.familyContext, label: 'Family' },
-            { has: kid.has.loves, label: 'Loves' },
-            { has: kid.has.notes, label: 'Bio' },
-          ].map((dot, i) => (
+        {/* Completeness indicator. Three dot states:
+             - gray:   field empty
+             - red:    field has unpublished Simon edits (admin only)
+             - orange: field filled and reviewed (published)
+            When all five are filled AND reviewed, the strip collapses
+            into a single green check badge — the celebration state. */}
+        {allFilledAndReviewed ? (
+          <div className="flex items-center gap-2 mt-3">
             <span
-              key={i}
-              title={`${dot.label}: ${dot.has ? '✓' : '—'}`}
-              className={`block w-2 h-2 rounded-full ${
-                dot.has ? 'bg-[#D4A843]' : 'bg-[#e8e0d4]'
-              }`}
-            />
-          ))}
-          <span className="ml-auto text-xs text-[#aaa] tabular-nums">
-            {completeness}/{total}
-          </span>
-        </div>
+              className="inline-flex items-center gap-1.5 bg-green-50 text-green-700 text-xs font-bold uppercase tracking-wider px-2 py-1 border border-green-200"
+              title="All five fields filled and reviewed"
+            >
+              <svg className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor" aria-hidden>
+                <path fillRule="evenodd" d="M16.7 5.3a1 1 0 010 1.4l-7 7a1 1 0 01-1.4 0l-3-3a1 1 0 011.4-1.4L9 11.6l6.3-6.3a1 1 0 011.4 0z" clipRule="evenodd" />
+              </svg>
+              Complete
+            </span>
+            <span className="ml-auto text-xs text-[#aaa] tabular-nums">{completeness}/{total}</span>
+          </div>
+        ) : (
+          <div
+            className="flex items-center gap-1 mt-3"
+            aria-label={`${completeness} of ${total} fields complete`}
+          >
+            {[
+              { has: kid.has.photo, label: 'Photo', pendingKey: null },
+              { has: kid.has.nameMeaning, label: 'Name meaning', pendingKey: 'NameMeaning' },
+              { has: kid.has.familyContext, label: 'Family', pendingKey: 'FamilyContext' },
+              { has: kid.has.loves, label: 'Loves', pendingKey: 'Loves' },
+              { has: kid.has.notes, label: 'Bio', pendingKey: 'Notes' },
+            ].map((dot, i) => {
+              const pending = dot.pendingKey ? isPending(dot.pendingKey) : false;
+              const color = pending
+                ? 'bg-red-500'
+                : dot.has
+                  ? 'bg-[#D4A843]'
+                  : 'bg-[#e8e0d4]';
+              const status = pending
+                ? 'unpublished — Simon edited'
+                : dot.has
+                  ? '✓'
+                  : '—';
+              return (
+                <span
+                  key={i}
+                  title={`${dot.label}: ${status}`}
+                  className={`block w-2 h-2 rounded-full ${color}`}
+                />
+              );
+            })}
+            <span className="ml-auto text-xs text-[#aaa] tabular-nums">
+              {completeness}/{total}
+            </span>
+          </div>
+        )}
       </div>
     </Link>
   );

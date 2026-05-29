@@ -453,6 +453,12 @@ export interface RosterKid {
   // banner click. Null means nothing pending. Drives the red-dot
   // alongside hasPendingIntake.
   lastEditedBySimon: string | null;
+  // Subset of the structured field names that have unreviewed Simon
+  // edits. Allowed entries: "NameMeaning" | "FamilyContext" | "Loves"
+  // | "ChildQuote" | "Notes". Empty when nothing's pending. Used for
+  // per-field red dots on the roster card and red borders in the
+  // editor.
+  pendingFields: string[];
   // Last time any structured field was touched. Best-effort via the
   // Airtable record's createdTime when there's no LastModified field.
   lastModified: string;
@@ -521,10 +527,21 @@ export async function getRoster(): Promise<RosterKid[]> {
       },
       hasPendingIntake: !!(f.IntakeFromCampus as string),
       lastEditedBySimon: (f.LastEditedBySimon as string) || null,
+      pendingFields: parsePendingFields(f.PendingFields),
       lastModified: rec.createdTime,
     });
   }
   return kids;
+}
+
+/** Airtable returns multipleSelects as either an array of strings or
+ *  an array of `{ name }` objects depending on the API call. Normalize
+ *  to a flat string[]. */
+function parsePendingFields(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map(v => (typeof v === 'string' ? v : (v as { name?: string })?.name || ''))
+    .filter(Boolean);
 }
 
 export interface RosterKidAttachment {
@@ -617,6 +634,7 @@ export async function getRosterKidByNumber(shirtNumber: number): Promise<RosterK
     },
     hasPendingIntake: !!(f.IntakeFromCampus as string),
     lastEditedBySimon: (f.LastEditedBySimon as string) || null,
+    pendingFields: parsePendingFields(f.PendingFields),
     lastModified: rec.createdTime,
     nameMeaning: (f.NameMeaning as string) || '',
     familyContext: (f.FamilyContext as string) || '',

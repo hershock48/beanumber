@@ -36,6 +36,7 @@ export function RosterEditor({
   reportCards,
   letters,
   lastEditedBySimon,
+  pendingFields,
 }: {
   shirtNumber: number;
   firstName: string;
@@ -45,6 +46,10 @@ export function RosterEditor({
   letters: RosterKidAttachment[];
   /** ISO timestamp; null means no pending edits from Simon. */
   lastEditedBySimon: string | null;
+  /** Subset of NameMeaning | FamilyContext | Loves | ChildQuote | Notes
+   *  that Simon has touched and Kevin hasn't reviewed. Drives the red
+   *  field borders shown only to admin. */
+  pendingFields: string[];
 }) {
   const router = useRouter();
   const [fields, setFields] = useState<Fields>(initial);
@@ -129,8 +134,8 @@ export function RosterEditor({
       className="space-y-6"
     >
       {/* Review banner — admin only. Shows when Simon edited fields
-          here since the last review. Lists the action (review the
-          fields below, polish into your voice, then clear). */}
+          here since the last review. Lists the specific fields that
+          need attention so Kevin knows where to look. */}
       {role === 'admin' && lastEditedBySimon && (
         <div className="border-2 border-red-300 bg-red-50/50 p-5 rounded-sm">
           <div className="flex items-start justify-between gap-4 mb-2">
@@ -139,9 +144,30 @@ export function RosterEditor({
                 Edits from Simon
               </p>
               <p className="text-sm text-[#444] mt-1">
-                Simon updated this kid on {simonEditedAtLabel}. Review the
-                fields below — polish copy into your voice, then mark
-                reviewed.
+                Simon updated this kid on {simonEditedAtLabel}.{' '}
+                {pendingFields.length > 0 ? (
+                  <>
+                    Unpublished fields:{' '}
+                    <span className="font-semibold">
+                      {pendingFields
+                        .map(f =>
+                          ({
+                            NameMeaning: 'Name meaning',
+                            FamilyContext: 'Family',
+                            Loves: 'About them',
+                            ChildQuote: 'Their quote',
+                            Notes: 'Bio',
+                          })[f] || f
+                        )
+                        .join(', ')}
+                    </span>
+                    . Polish copy into your voice — saving a field
+                    automatically publishes it. Or hit "Mark all
+                    reviewed" if his copy is already good.
+                  </>
+                ) : (
+                  'Review the fields below — polish copy into your voice, then mark reviewed.'
+                )}
               </p>
             </div>
             <button
@@ -150,7 +176,7 @@ export function RosterEditor({
               disabled={clearingReview}
               className="flex-shrink-0 bg-white border border-red-300 text-red-700 hover:bg-red-100 text-xs font-bold uppercase tracking-wider px-3 py-2 transition-colors disabled:opacity-50"
             >
-              {clearingReview ? 'Clearing…' : 'Mark as reviewed'}
+              {clearingReview ? 'Clearing…' : 'Mark all reviewed'}
             </button>
           </div>
         </div>
@@ -193,6 +219,7 @@ export function RosterEditor({
       <Field
         label="Name meaning"
         helper="Cultural meaning of the kid's Acholi/Luo name. Renders as a small italic line right under their name on /[number]. E.g. 'Lagum is a Luo name meaning blessing or favor.'"
+        pending={role === 'admin' && pendingFields.includes('NameMeaning')}
       >
         <input
           type="text"
@@ -206,6 +233,7 @@ export function RosterEditor({
       <Field
         label="Family"
         helper="One specific sentence about who they live with and what the family does for a living. Avoid 'peasant farmer.'"
+        pending={role === 'admin' && pendingFields.includes('FamilyContext')}
       >
         <input
           type="text"
@@ -219,6 +247,7 @@ export function RosterEditor({
       <Field
         label={`About ${firstName || 'this kid'}`}
         helper="One specific thing they're into. Concrete, vivid. Not 'playing' — 'plays goalkeeper at break and argues with anyone who scores on her.'"
+        pending={role === 'admin' && pendingFields.includes('Loves')}
       >
         <input
           type="text"
@@ -232,6 +261,7 @@ export function RosterEditor({
       <Field
         label="Their quote"
         helper="Their own words. 5–15 words. Renders as the big italic pull-quote at the top of the page."
+        pending={role === 'admin' && pendingFields.includes('ChildQuote')}
       >
         <input
           type="text"
@@ -245,6 +275,7 @@ export function RosterEditor({
       <Field
         label="More about them (bio)"
         helper="The longer paragraph(s) that render under the structured fields. Texture the page doesn't already cover: walk to school, classroom moments, family story, what their day looks like."
+        pending={role === 'admin' && pendingFields.includes('Notes')}
       >
         <textarea
           value={fields.notes}
@@ -615,16 +646,37 @@ function Field({
   label,
   helper,
   children,
+  pending = false,
 }: {
   label: string;
   helper?: string;
   children: React.ReactNode;
+  /** When true, the field gets a red border + pending hint — used to
+   *  flag fields with unreviewed Simon edits in the admin view. */
+  pending?: boolean;
 }) {
   return (
-    <div>
-      <label className="block text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-1">
-        {label}
-      </label>
+    <div
+      className={
+        pending
+          ? 'border-2 border-red-300 bg-red-50/40 p-4 -mx-4 rounded-sm'
+          : undefined
+      }
+    >
+      <div className="flex items-center justify-between mb-1">
+        <label
+          className={`block text-xs font-bold uppercase tracking-[0.2em] ${
+            pending ? 'text-red-700' : 'text-[#D4A843]'
+          }`}
+        >
+          {label}
+        </label>
+        {pending && (
+          <span className="text-[10px] uppercase tracking-wider text-red-700 font-bold">
+            Unpublished · edited by Simon
+          </span>
+        )}
+      </div>
       {helper && (
         <p className="text-xs text-[#888] mb-2 leading-relaxed">{helper}</p>
       )}
