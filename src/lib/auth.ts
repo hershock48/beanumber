@@ -10,6 +10,7 @@ import { logger } from './logger';
 import { AuthenticationError } from './errors';
 import { SESSION, ERROR_MESSAGES } from './constants';
 import type { AirtableSponsorshipRecord } from './types/airtable';
+import { ADMIN_SESSION_COOKIE, decodeSessionCookie } from './admin-session';
 
 // ============================================================================
 // SESSION MANAGEMENT
@@ -120,9 +121,24 @@ export async function clearSession(): Promise<void> {
 // ============================================================================
 
 /**
- * Verify admin authentication token
+ * Verify admin authentication. Accepts three credential sources, in order:
+ *   1. The `ban_admin_session` cookie (HMAC-signed by `lib/admin-session.ts`)
+ *      — the path Kevin's browser uses after logging in once.
+ *   2. The `X-Admin-Token` header equal to `ADMIN_API_TOKEN` — for
+ *      programmatic scripts.
+ *   3. The `X-Admin-Token` header equal to `ADMIN_PASSWORD` — legacy
+ *      path the old admin pages used; kept until those pages are
+ *      retired.
  */
 export function verifyAdminToken(request: NextRequest): boolean {
+  // 1. Cookie path — preferred for browser-driven admin requests.
+  const sessionCookie = request.cookies.get(ADMIN_SESSION_COOKIE);
+  if (sessionCookie?.value && decodeSessionCookie(sessionCookie.value)) {
+    logger.auth('admin_auth_cookie', true);
+    return true;
+  }
+
+  // 2 & 3. Header path — scripts, cron, legacy pages.
   const adminToken = process.env.ADMIN_API_TOKEN;
   const adminPassword = process.env.ADMIN_PASSWORD;
 
@@ -138,9 +154,6 @@ export function verifyAdminToken(request: NextRequest): boolean {
     return false;
   }
 
-  // Accept either the API token or the human-friendly admin password.
-  // ADMIN_PASSWORD is a simpler credential for dashboard login;
-  // ADMIN_API_TOKEN stays for programmatic use and token signing.
   const isValid =
     (!!adminToken && requestToken === adminToken) ||
     (!!adminPassword && requestToken === adminPassword);
