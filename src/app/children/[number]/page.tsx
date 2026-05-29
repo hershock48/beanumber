@@ -321,20 +321,6 @@ async function airtableRequest<T>(endpoint: string): Promise<T> {
 }
 
 /**
- * Roster gaps that point back to a real roster kid.
- *
- * When a roster number (1–53) has no real child enrolled, we route
- * its page to a stand-in kid. The cycle record at the gap number
- * stays in Airtable but is left sparse on bio/photo, so the standard
- * cycle-fallback path picks up the stand-in's profile.
- *
- *   47 → 3  (no real #47 enrolled; Asenath stands in)
- */
-const ROSTER_REDIRECTS: Record<number, number> = {
-  47: 3,
-};
-
-/**
  * Cycle-number → canonical-kid resolver.
  *
  * BAN's roster has 53 real children (shirt numbers 1–53). Shirt
@@ -357,11 +343,12 @@ const ROSTER_REDIRECTS: Record<number, number> = {
  *     #1–53. Naume is in from here on. So #151 = #1, #152 = #2, …,
  *     #203 = #53, #204 = #1 (next loop), and so on.
  *
- * Roster gaps (ROSTER_REDIRECTS above) are handled first so a
- * missing roster kid still renders the stand-in's profile.
+ * Roster gap note: #47 has no real child enrolled. We populated its
+ * Children record with a full copy of Asenath (#3) so /47 renders
+ * exactly like /3. If Asenath's data ever changes, re-sync #47 in
+ * Airtable too (cheap one-time copy, no special render path needed).
  */
 function canonicalShirtNumber(n: number): number | null {
-  if (ROSTER_REDIRECTS[n] != null) return ROSTER_REDIRECTS[n];
   if (n <= 53) return null;
   if (n <= 150) return ((n - 54) % 52) + 2;
   return ((n - 151) % 53) + 1;
