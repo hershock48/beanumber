@@ -48,8 +48,8 @@ const PIPELINE_MAX: Record<string, number> = {
 };
 
 export default function FulfillmentDashboard() {
-  const [adminToken, setAdminToken] = useState('');
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  // Auth handled by middleware.ts + admin session cookie. No password
+  // prompt; cookie ships automatically on every fetch.
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
@@ -60,26 +60,23 @@ export default function FulfillmentDashboard() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isShipping, setIsShipping] = useState(false);
 
-  const fetchOrders = useCallback(async (token: string, status: string) => {
-    const res = await fetch(`/api/admin/fulfillment/list?status=${status}`, {
-      headers: { 'X-Admin-Token': token },
-    });
+  const fetchOrders = useCallback(async (status: string) => {
+    const res = await fetch(`/api/admin/fulfillment/list?status=${status}`);
     if (!res.ok) throw new Error('Failed to fetch orders');
     const data = await res.json();
     return data.orders as Order[];
   }, []);
 
-  const loadAll = useCallback(async (token: string) => {
+  const loadAll = useCallback(async () => {
     setIsLoading(true);
     setError('');
     try {
       const [queue, shipped] = await Promise.all([
-        fetchOrders(token, 'unshipped'),
-        fetchOrders(token, 'shipped'),
+        fetchOrders('unshipped'),
+        fetchOrders('shipped'),
       ]);
       setQueueOrders(queue);
       setShippedOrders(shipped);
-      setIsAuthenticated(true);
     } catch (err: any) {
       setError(err.message || 'Failed to load');
     } finally {
@@ -87,9 +84,10 @@ export default function FulfillmentDashboard() {
     }
   }, [fetchOrders]);
 
-  const handleAuth = async () => {
-    await loadAll(adminToken);
-  };
+  // Auto-load on mount.
+  useEffect(() => {
+    loadAll();
+  }, [loadAll]);
 
   const toggleSelect = (id: string) => {
     setSelectedIds(prev => {
@@ -122,7 +120,6 @@ export default function FulfillmentDashboard() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-Admin-Token': adminToken,
         },
         body: JSON.stringify({ recordIds: Array.from(selectedIds) }),
       });
@@ -134,7 +131,7 @@ export default function FulfillmentDashboard() {
       setSelectedIds(new Set());
 
       // Reload data
-      await loadAll(adminToken);
+      await loadAll();
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -152,34 +149,6 @@ export default function FulfillmentDashboard() {
     }
     return groups;
   };
-
-  // ── Login screen ──
-  if (!isAuthenticated) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 w-full max-w-sm">
-          <h1 className="text-xl font-bold text-gray-900 mb-1">Fulfillment</h1>
-          <p className="text-sm text-gray-500 mb-6">Enter your admin token</p>
-          {error && <p className="text-red-600 text-sm mb-4">{error}</p>}
-          <input
-            type="password"
-            value={adminToken}
-            onChange={e => setAdminToken(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && handleAuth()}
-            placeholder="Admin token"
-            className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm mb-4 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
-          />
-          <button
-            onClick={handleAuth}
-            disabled={isLoading || !adminToken}
-            className="w-full bg-gray-900 text-white py-2 px-4 rounded-md text-sm font-semibold hover:bg-gray-800 disabled:bg-gray-400 disabled:cursor-not-allowed"
-          >
-            {isLoading ? 'Loading...' : 'Go'}
-          </button>
-        </div>
-      </div>
-    );
-  }
 
   const sizeGroups = groupBySize(queueOrders);
 

@@ -32,27 +32,22 @@ interface OverdueChild {
 }
 
 export default function AdminDashboard() {
-  const [adminToken, setAdminToken] = useState('');
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  // Auth is handled by middleware.ts + the admin session cookie.
+  // No password prompt here; the cookie ships automatically on every
+  // fetch, so we drop the X-Admin-Token headers too.
   const [updates, setUpdates] = useState<PendingUpdate[]>([]);
   const [overdueChildren, setOverdueChildren] = useState<OverdueChild[]>([]);
   const [overdueStats, setOverdueStats] = useState<{ totalActive: number; overdueCount: number } | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
   const [isLoadingOverdue, setIsLoadingOverdue] = useState(false);
   const [error, setError] = useState('');
   const [publishingId, setPublishingId] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState('');
   const [activeTab, setActiveTab] = useState<'pending' | 'overdue'>('pending');
 
-  const loadOverdueData = async (token: string) => {
+  const loadOverdueData = async () => {
     setIsLoadingOverdue(true);
     try {
-      const response = await fetch('/api/admin/updates/overdue?threshold=90', {
-        headers: {
-          'X-Admin-Token': token,
-        },
-      });
-
+      const response = await fetch('/api/admin/updates/overdue?threshold=90');
       if (response.ok) {
         const data = await response.json();
         setOverdueChildren(data.data.overdueChildren);
@@ -68,11 +63,9 @@ export default function AdminDashboard() {
     }
   };
 
-  const loadUpdates = async (token: string) => {
+  const loadUpdates = async () => {
     try {
-      const response = await fetch('/api/admin/updates/list', {
-        headers: { 'X-Admin-Token': token },
-      });
+      const response = await fetch('/api/admin/updates/list');
       if (response.ok) {
         const data = await response.json();
         setUpdates(data.data.updates);
@@ -85,33 +78,11 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleAuthenticate = async () => {
-    setError('');
-    setIsLoading(true);
-
-    try {
-      // Step 1: verify password (no Airtable dependency)
-      const authResponse = await fetch('/api/admin/auth', {
-        method: 'POST',
-        headers: { 'X-Admin-Token': adminToken },
-      });
-
-      if (!authResponse.ok) {
-        throw new Error('Wrong password');
-      }
-
-      // Step 2: auth passed — let them in
-      setIsAuthenticated(true);
-
-      // Step 3: load data in the background (failures don't block access)
-      loadUpdates(adminToken);
-      loadOverdueData(adminToken);
-    } catch (err: any) {
-      setError(err.message || 'Failed to authenticate');
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  // Auto-load on mount (cookie auth carries through).
+  useEffect(() => {
+    loadUpdates();
+    loadOverdueData();
+  }, []);
 
   const handlePublish = async (updateId: string, title: string, sendNotification: boolean = false) => {
     const action = sendNotification ? 'publish and notify sponsor about' : 'publish';
@@ -129,7 +100,6 @@ export default function AdminDashboard() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-Admin-Token': adminToken,
         },
         body: JSON.stringify({ updateId }),
       });
@@ -150,7 +120,6 @@ export default function AdminDashboard() {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'X-Admin-Token': adminToken,
             },
             body: JSON.stringify({ updateId }),
           });
@@ -190,60 +159,6 @@ export default function AdminDashboard() {
     });
   };
 
-  if (!isAuthenticated) {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        {/* Navigation */}
-        <nav className="bg-white border-b border-gray-200">
-          <div className="max-w-6xl mx-auto px-6 py-4">
-            <Link href="/" className="flex items-center gap-3">
-              <Logo className="h-8 w-8 text-gray-900" />
-              <span className="text-xl font-semibold text-gray-900">Be A Number</span>
-            </Link>
-          </div>
-        </nav>
-
-        <div className="max-w-md mx-auto px-6 py-16">
-          <div className="bg-white rounded-lg shadow-lg p-8">
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">Admin Dashboard</h1>
-            <p className="text-gray-600 mb-6">Enter your password to continue</p>
-
-            {error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md mb-4 text-sm">
-                {error}
-              </div>
-            )}
-
-            <div className="space-y-4">
-              <div>
-                <label htmlFor="adminToken" className="block text-sm font-medium text-gray-700 mb-2">
-                  Password
-                </label>
-                <input
-                  type="password"
-                  id="adminToken"
-                  value={adminToken}
-                  onChange={(e) => setAdminToken(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-                  placeholder="Enter password"
-                  onKeyDown={(e) => e.key === 'Enter' && handleAuthenticate()}
-                />
-              </div>
-
-              <button
-                onClick={handleAuthenticate}
-                disabled={isLoading || !adminToken}
-                className="w-full px-4 py-3 bg-gray-900 text-white rounded-md hover:bg-gray-800 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isLoading ? 'Authenticating...' : 'Access Dashboard'}
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Navigation */}
@@ -262,9 +177,9 @@ export default function AdminDashboard() {
                 Submit Update
               </Link>
               <button
-                onClick={() => {
-                  setIsAuthenticated(false);
-                  setAdminToken('');
+                onClick={async () => {
+                  await fetch('/api/admin/logout', { method: 'POST' });
+                  window.location.href = '/admin/login';
                 }}
                 className="text-gray-600 hover:text-gray-900 text-sm"
               >
