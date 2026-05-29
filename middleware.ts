@@ -1,10 +1,15 @@
 /**
- * Next.js middleware — runs on the edge for every matching request.
+ * Next.js middleware — runs on the Edge runtime for every matching request.
  *
  * Responsibility: protect every `/admin/*` route with a single check
  * against the HMAC-signed admin session cookie. Unauthenticated
  * requests are redirected to `/admin/login`. The `/admin/login` route
  * itself is exempt (otherwise you couldn't reach the login form).
+ *
+ * Uses Web Crypto (via `admin-session-edge.ts`) because Node's
+ * `crypto` module isn't available on the Edge runtime where middleware
+ * runs. The Node-side `admin-session.ts` is used by Server Components
+ * and Route Handlers.
  *
  * API endpoints under `/api/admin/*` are NOT handled here — they're
  * checked individually via `requireAdminAuth()` in their route
@@ -13,23 +18,19 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { ADMIN_SESSION_COOKIE, decodeSessionCookie } from '@/lib/admin-session';
+import { ADMIN_SESSION_COOKIE, isValidSessionCookieEdge } from '@/lib/admin-session-edge';
 
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Only guard /admin/* page routes. The login page itself must be
-  // reachable without a session.
   if (!pathname.startsWith('/admin')) return NextResponse.next();
   if (pathname === '/admin/login') return NextResponse.next();
 
   const cookie = request.cookies.get(ADMIN_SESSION_COOKIE);
-  const session = decodeSessionCookie(cookie?.value);
+  if (await isValidSessionCookieEdge(cookie?.value)) {
+    return NextResponse.next();
+  }
 
-  if (session) return NextResponse.next();
-
-  // Redirect to login, preserving the destination so we can bounce
-  // back after successful auth.
   const loginUrl = new URL('/admin/login', request.url);
   if (pathname !== '/admin') {
     loginUrl.searchParams.set('next', pathname);
@@ -38,8 +39,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  // Match all /admin/* routes but skip Next.js internals and static
-  // files. /api/admin/* is intentionally not matched — those endpoints
-  // do their own auth via requireAdminAuth().
   matcher: ['/admin/:path*'],
 };
