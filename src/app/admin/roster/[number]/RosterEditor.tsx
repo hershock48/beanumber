@@ -21,17 +21,20 @@ interface Fields {
   loves: string;
   childQuote: string;
   notes: string;
+  intakeFromCampus: string;
 }
 
 export function RosterEditor({
   shirtNumber,
   firstName,
+  role,
   initial,
   reportCards,
   letters,
 }: {
   shirtNumber: number;
   firstName: string;
+  role: 'admin' | 'simon';
   initial: Fields;
   reportCards: RosterKidAttachment[];
   letters: RosterKidAttachment[];
@@ -47,7 +50,8 @@ export function RosterEditor({
     fields.familyContext !== initial.familyContext ||
     fields.loves !== initial.loves ||
     fields.childQuote !== initial.childQuote ||
-    fields.notes !== initial.notes;
+    fields.notes !== initial.notes ||
+    fields.intakeFromCampus !== initial.intakeFromCampus;
 
   function update<K extends keyof Fields>(key: K, value: Fields[K]) {
     setFields(prev => ({ ...prev, [key]: value }));
@@ -76,6 +80,45 @@ export function RosterEditor({
     }
   }
 
+  // Simon-only view: just the intake textarea. Save writes only to the
+  // intake field; the public copy stays untouched until Kevin polishes.
+  if (role === 'simon') {
+    return (
+      <form
+        onSubmit={e => {
+          e.preventDefault();
+          save();
+        }}
+        className="space-y-6"
+      >
+        <Field
+          label="Notes about this child"
+          helper={`Anything you can tell Kevin about ${firstName || 'this child'} — family, what they’re like, what they love, their dream, anything specific. Kevin will polish this into the website. Save when you’re done.`}
+        >
+          <textarea
+            value={fields.intakeFromCampus}
+            onChange={e => update('intakeFromCampus', e.target.value)}
+            rows={14}
+            className="w-full px-3 py-2 bg-white border border-[#e8e0d4] focus:outline-none focus:border-[#D4A843] focus:ring-1 focus:ring-[#D4A843] text-base leading-relaxed"
+            placeholder="Type or paste here."
+          />
+        </Field>
+
+        <div className="flex items-center gap-3 pt-2 border-t border-[#e8e0d4]">
+          <button
+            type="submit"
+            disabled={saving || !dirty}
+            className="bg-[#D4A843] text-[#0d0d0d] font-bold text-xs uppercase tracking-wider px-5 py-3 hover:bg-[#c49a3a] transition-colors disabled:opacity-50"
+          >
+            {saving ? 'Saving…' : dirty ? 'Save' : 'Saved'}
+          </button>
+          {status && <span className="text-sm text-[#888]">{status}</span>}
+          {error && <span className="text-sm text-red-600">{error}</span>}
+        </div>
+      </form>
+    );
+  }
+
   return (
     <form
       onSubmit={e => {
@@ -84,6 +127,30 @@ export function RosterEditor({
       }}
       className="space-y-6"
     >
+      {/* Intake banner — shows up at the top of the editor when the
+          campus has dropped raw notes. Kevin reads, polishes into the
+          structured fields below, then clears this field. */}
+      {initial.intakeFromCampus && (
+        <div className="border-2 border-red-300 bg-red-50/50 p-5 rounded-sm">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-red-700">
+              New notes from the campus
+            </p>
+            <button
+              type="button"
+              onClick={() => update('intakeFromCampus', '')}
+              className="text-xs text-red-700 hover:text-red-900 underline"
+              title="Clear the intake once you've incorporated it into the polished fields below"
+            >
+              Mark as polished
+            </button>
+          </div>
+          <div className="text-[#444] leading-relaxed whitespace-pre-wrap text-sm">
+            {fields.intakeFromCampus}
+          </div>
+        </div>
+      )}
+
       <Field
         label="Name meaning"
         helper="Cultural meaning of the kid's Acholi/Luo name. Renders as a small italic line right under their name on /[number]. E.g. 'Lagum is a Luo name meaning blessing or favor.'"

@@ -34,6 +34,7 @@ const F = {
   loves: 'fldwBn2AyXKt4vgi5',
   childQuote: 'flds9uA6MCoEbc2dJ',
   notes: 'fldbQuWFgNXnlZIVX',
+  intakeFromCampus: 'fldZ3A6XK1yVUzhLJ',
 };
 
 function atHeaders() {
@@ -56,6 +57,7 @@ export async function POST(request: NextRequest) {
       loves?: string;
       childQuote?: string;
       notes?: string;
+      intakeFromCampus?: string;
     };
   };
   try {
@@ -102,6 +104,7 @@ export async function POST(request: NextRequest) {
     if (typeof fields.loves === 'string') patchFields[F.loves] = fields.loves;
     if (typeof fields.childQuote === 'string') patchFields[F.childQuote] = fields.childQuote;
     if (typeof fields.notes === 'string') patchFields[F.notes] = fields.notes;
+    if (typeof fields.intakeFromCampus === 'string') patchFields[F.intakeFromCampus] = fields.intakeFromCampus;
 
     if (Object.keys(patchFields).length === 0) {
       return NextResponse.json({ ok: true, updated: 0, note: 'No fields to update' });

@@ -41,7 +41,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     );
   }
 
-  if (!verifyAdminPassword(candidate)) {
+  const role = verifyAdminPassword(candidate);
+  if (!role) {
     logger.apiResponse('POST', '/api/admin/auth', 401);
     return NextResponse.json(
       { ok: false, message: 'Wrong password' },
@@ -49,7 +50,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     );
   }
 
-  await issueSessionCookie();
+  await issueSessionCookie(role);
   logger.apiResponse('POST', '/api/admin/auth', 200);
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, role });
 }

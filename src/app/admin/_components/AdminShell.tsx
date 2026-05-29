@@ -28,21 +28,24 @@ export type AdminTab =
   | 'sponsors'
   | 'retention';
 
-const TABS: Array<{ id: AdminTab; label: string; href: string }> = [
-  { id: 'newsletter', label: 'Newsletter', href: '/admin/newsletter' },
-  { id: 'roster', label: 'Roster', href: '/admin/roster' },
-  { id: 'fulfillment', label: 'Fulfillment', href: '/admin/fulfillment' },
+const ALL_TABS: Array<{ id: AdminTab; label: string; href: string; visibleTo: Array<'admin' | 'simon'> }> = [
+  { id: 'newsletter', label: 'Newsletter', href: '/admin/newsletter', visibleTo: ['admin'] },
+  { id: 'roster', label: 'Roster', href: '/admin/roster', visibleTo: ['admin', 'simon'] },
+  { id: 'fulfillment', label: 'Fulfillment', href: '/admin/fulfillment', visibleTo: ['admin'] },
 ];
 
 export function AdminShell({
   activeTab,
+  role = 'admin',
   children,
 }: {
   activeTab: AdminTab;
+  role?: 'admin' | 'simon';
   children: React.ReactNode;
 }) {
   const router = useRouter();
   const [signingOut, setSigningOut] = useState(false);
+  const tabs = ALL_TABS.filter(t => t.visibleTo.includes(role));
 
   async function signOut() {
     if (signingOut) return;
@@ -60,18 +63,18 @@ export function AdminShell({
     <div className="min-h-screen bg-[#FFF8F0]">
       <header className="bg-white border-b border-[#e8e0d4] sticky top-0 z-10">
         <div className="max-w-6xl mx-auto px-5 py-3 flex items-center justify-between gap-4">
-          {/* Logo → admin home */}
-          <Link href="/admin" className="flex items-center gap-3 shrink-0">
+          {/* Logo → admin home (or roster for Simon) */}
+          <Link href={role === 'simon' ? '/admin/roster' : '/admin'} className="flex items-center gap-3 shrink-0">
             <Logo />
             <span className="hidden sm:inline text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843]">
-              Admin
+              {role === 'simon' ? 'Campus intake' : 'Admin'}
             </span>
           </Link>
 
           {/* Tab nav — horizontally scrollable on small screens */}
           <nav className="flex-1 overflow-x-auto">
             <ul className="flex items-center gap-1 md:gap-2 justify-end md:justify-center">
-              {TABS.map(tab => (
+              {tabs.map(tab => (
                 <li key={tab.id}>
                   <Link
                     href={tab.href}

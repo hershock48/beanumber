@@ -10,6 +10,7 @@ import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { AdminShell } from '../../_components/AdminShell';
 import { getRosterKidByNumber } from '@/lib/admin/queries';
+import { getAdminRole } from '@/lib/admin-session';
 import { RosterEditor } from './RosterEditor';
 
 export const dynamic = 'force-dynamic';
@@ -26,9 +27,10 @@ export default async function AdminRosterEditPage({ params }: Props) {
 
   const kid = await getRosterKidByNumber(shirtNumber);
   if (!kid) notFound();
+  const role = (await getAdminRole()) || 'admin';
 
   return (
-    <AdminShell activeTab="roster">
+    <AdminShell activeTab="roster" role={role}>
       <div className="max-w-4xl mx-auto px-5 py-6 md:py-10">
         <Link
           href="/admin/roster"
@@ -74,12 +76,14 @@ export default async function AdminRosterEditPage({ params }: Props) {
         <RosterEditor
           shirtNumber={kid.shirtNumber}
           firstName={kid.firstName}
+          role={role}
           initial={{
             nameMeaning: kid.nameMeaning,
             familyContext: kid.familyContext,
             loves: kid.loves,
             childQuote: kid.childQuote,
             notes: kid.notes,
+            intakeFromCampus: kid.intakeFromCampus,
           }}
           reportCards={kid.reportCards}
           letters={kid.letters}

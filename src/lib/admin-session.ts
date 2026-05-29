@@ -22,12 +22,18 @@ export const ADMIN_SESSION_COOKIE = 'ban_admin_session';
 const SESSION_TTL_DAYS = 30;
 const SESSION_TTL_MS = SESSION_TTL_DAYS * 24 * 60 * 60 * 1000;
 
+export type AdminRole = 'admin' | 'simon';
+
 interface SessionPayload {
   // Issued-at timestamp (ms). Used to enforce TTL on the server.
   iat: number;
   // Expiry timestamp (ms). Should match the cookie's Max-Age but
   // double-checking server-side guards against a tampered Max-Age.
   exp: number;
+  // Who is logged in. 'admin' = Kevin (full access). 'simon' = YDO
+  // team member (roster intake only, no publish, no other admin
+  // surfaces).
+  role?: AdminRole;
 }
 
 /**
@@ -107,11 +113,12 @@ export function decodeSessionCookie(value: string | undefined): SessionPayload |
  * Must be called from a Server Action or Route Handler (anything with
  * cookies() write access).
  */
-export async function issueSessionCookie(): Promise<void> {
+export async function issueSessionCookie(role: AdminRole = 'admin'): Promise<void> {
   const now = Date.now();
   const payload: SessionPayload = {
     iat: now,
     exp: now + SESSION_TTL_MS,
+    role,
   };
   const value = encode(payload);
   const cookieStore = await cookies();
@@ -122,6 +129,19 @@ export async function issueSessionCookie(): Promise<void> {
     path: '/',
     expires: new Date(payload.exp),
   });
+}
+
+/**
+ * Read the current request's role from the session cookie. Returns
+ * 'admin' by default for backward compatibility with old cookies that
+ * didn't carry a role.
+ */
+export async function getAdminRole(): Promise<AdminRole | null> {
+  const cookieStore = await cookies();
+  const cookie = cookieStore.get(ADMIN_SESSION_COOKIE);
+  const payload = decodeSessionCookie(cookie?.value);
+  if (!payload) return null;
+  return (payload.role as AdminRole) || 'admin';
 }
 
 /**
@@ -144,19 +164,31 @@ export async function hasValidAdminSession(): Promise<boolean> {
 }
 
 /**
- * Verify the given raw password against the ADMIN_PASSWORD env var.
- * Constant-time comparison. Returns true on match.
+ * Verify a raw password against either ADMIN_PASSWORD (Kevin) or
+ * SIMON_PASSWORD (the YDO team member). Returns the matched role or
+ * null if neither matched. Constant-time comparison per candidate.
  */
-export function verifyAdminPassword(rawPassword: string): boolean {
-  const expected = process.env.ADMIN_PASSWORD || '';
-  if (!expected) return false;
-  if (expected.length !== rawPassword.length) return false;
-  try {
-    return timingSafeEqual(
-      Buffer.from(expected, 'utf8'),
-      Buffer.from(rawPassword, 'utf8')
-    );
-  } catch {
-    return false;
+export function verifyAdminPassword(rawPassword: string): AdminRole | null {
+  const candidates: Array<{ env: string; role: AdminRole }> = [
+    { env: 'ADMIN_PASSWORD', role: 'admin' },
+    { env: 'SIMON_PASSWORD', role: 'simon' },
+  ];
+  for (const { env, role } of candidates) {
+    const expected = process.env[env] || '';
+    if (!expected) continue;
+    if (expected.length !== rawPassword.length) continue;
+    try {
+      if (
+        timingSafeEqual(
+          Buffer.from(expected, 'utf8'),
+          Buffer.from(rawPassword, 'utf8')
+        )
+      ) {
+        return role;
+      }
+    } catch {
+      // ignore and try the next candidate
+    }
   }
+  return null;
 }

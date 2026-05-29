@@ -420,6 +420,10 @@ export interface RosterKid {
     childQuote: boolean;
     notes: boolean;
   };
+  // True when Simon (or another YDO team member) has saved raw intake
+  // notes on this kid that Kevin hasn't yet polished into the public
+  // fields. Drives the red-dot indicator on the admin roster grid.
+  hasPendingIntake: boolean;
   // Last time any structured field was touched. Best-effort via the
   // Airtable record's createdTime when there's no LastModified field.
   lastModified: string;
@@ -452,6 +456,7 @@ export async function getRoster(): Promise<RosterKid[]> {
         childQuote: !!(f.ChildQuote as string),
         notes: !!(f.Notes as string),
       },
+      hasPendingIntake: !!(f.IntakeFromCampus as string),
       lastModified: rec.createdTime,
     });
   }
@@ -480,6 +485,9 @@ export interface RosterKidDetail extends RosterKid {
   homeVillage: string | null;
   reportCards: RosterKidAttachment[];
   letters: RosterKidAttachment[];
+  /** Raw intake notes from Simon / YDO team. Kevin polishes these
+   *  into the public fields, then clears the field. */
+  intakeFromCampus: string;
 }
 
 export async function getRosterKidByNumber(shirtNumber: number): Promise<RosterKidDetail | null> {
@@ -545,6 +553,7 @@ export async function getRosterKidByNumber(shirtNumber: number): Promise<RosterK
       childQuote: !!(f.ChildQuote as string),
       notes: !!(f.Notes as string),
     },
+    hasPendingIntake: !!(f.IntakeFromCampus as string),
     lastModified: rec.createdTime,
     nameMeaning: (f.NameMeaning as string) || '',
     familyContext: (f.FamilyContext as string) || '',
@@ -555,6 +564,7 @@ export async function getRosterKidByNumber(shirtNumber: number): Promise<RosterK
     homeVillage: (f.HomeVillage as string) || null,
     reportCards: mapAttachments('ReportCards'),
     letters: mapAttachments('Letters'),
+    intakeFromCampus: (f.IntakeFromCampus as string) || '',
   };
 }
 

@@ -11,19 +11,23 @@
 import Link from 'next/link';
 import { AdminShell } from '../_components/AdminShell';
 import { getRoster, type RosterKid } from '@/lib/admin/queries';
+import { getAdminRole } from '@/lib/admin-session';
+import { AddKidButton } from './AddKidButton';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 export default async function AdminRosterPage() {
   const kids = await getRoster();
+  const role = (await getAdminRole()) || 'admin';
   const totalKids = kids.length;
   const fullyComplete = kids.filter(k =>
     k.has.photo && k.has.nameMeaning && k.has.familyContext && k.has.loves && k.has.notes
   ).length;
+  const pendingIntake = kids.filter(k => k.hasPendingIntake).length;
 
   return (
-    <AdminShell activeTab="roster">
+    <AdminShell activeTab="roster" role={role}>
       <div className="max-w-6xl mx-auto px-5 py-6 md:py-10">
         <div className="mb-8">
           <p className="text-xs uppercase tracking-[0.2em] text-[#aaa] mb-1">
@@ -33,24 +37,32 @@ export default async function AdminRosterPage() {
             className="text-3xl md:text-4xl text-[#0d0d0d] mb-2"
             style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
           >
-            The kids at Hope Bridge.
+            {role === 'simon' ? 'The kids on the campus.' : 'The kids at Hope Bridge.'}
           </h1>
           <p className="text-[#666]">
-            {fullyComplete} of {totalKids} profiles fully written. Tap a card to edit.
+            {role === 'simon'
+              ? 'Tap a kid to add or update notes. Save when you’re done. Use the + tile at the end to add a new child.'
+              : `${fullyComplete} of ${totalKids} profiles fully written. Tap a card to edit.`}
           </p>
+          {role === 'admin' && pendingIntake > 0 && (
+            <p className="text-[#D4A843] text-sm mt-2 font-semibold">
+              {pendingIntake} kid{pendingIntake === 1 ? '' : 's'} have new notes from the campus waiting for you (red dot).
+            </p>
+          )}
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {kids.map(kid => (
-            <RosterCard key={kid.recordId} kid={kid} />
+            <RosterCard key={kid.recordId} kid={kid} role={role} />
           ))}
+          <AddKidButton />
         </div>
       </div>
     </AdminShell>
   );
 }
 
-function RosterCard({ kid }: { kid: RosterKid }) {
+function RosterCard({ kid, role }: { kid: RosterKid; role: 'admin' | 'simon' }) {
   const completeness =
     Number(kid.has.photo) +
     Number(kid.has.nameMeaning) +
@@ -62,7 +74,11 @@ function RosterCard({ kid }: { kid: RosterKid }) {
   return (
     <Link
       href={`/admin/roster/${kid.shirtNumber}`}
-      className="block bg-white border border-[#e8e0d4] hover:border-[#D4A843] transition-colors overflow-hidden"
+      className={`block bg-white border ${
+        role === 'admin' && kid.hasPendingIntake
+          ? 'border-red-400 ring-2 ring-red-100'
+          : 'border-[#e8e0d4]'
+      } hover:border-[#D4A843] transition-colors overflow-hidden relative`}
     >
       <div className="aspect-[4/5] bg-[#f5f0e8] relative">
         {kid.photoUrl ? (
@@ -80,6 +96,9 @@ function RosterCard({ kid }: { kid: RosterKid }) {
         <div className="absolute top-2 right-2 bg-white/95 backdrop-blur-sm px-2 py-1">
           <span className="text-xs font-bold text-[#D4A843]">#{kid.shirtNumber}</span>
         </div>
+        {role === 'admin' && kid.hasPendingIntake && (
+          <div className="absolute top-2 left-2 w-3 h-3 rounded-full bg-red-500 ring-2 ring-white" title="New notes from the campus waiting for you" />
+        )}
       </div>
 
       <div className="p-3">
