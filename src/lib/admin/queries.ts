@@ -459,6 +459,12 @@ export interface RosterKid {
   // per-field red dots on the roster card and red borders in the
   // editor.
   pendingFields: string[];
+  // True when ReportCards attachment field has at least one file.
+  // Used by the deadlines banner on /admin/roster to count kids
+  // missing this quarter's report card.
+  hasReportCards: boolean;
+  // True when Letters attachment field has at least one file.
+  hasLetters: boolean;
   // Last time any structured field was touched. Best-effort via the
   // Airtable record's createdTime when there's no LastModified field.
   lastModified: string;
@@ -529,6 +535,8 @@ export async function getRoster(): Promise<RosterKid[]> {
       hasPendingIntake: !!(f.IntakeFromCampus as string),
       lastEditedBySimon: (f.LastEditedBySimon as string) || null,
       pendingFields: parsePendingFields(f.PendingFields),
+      hasReportCards: Array.isArray(f.ReportCards) && (f.ReportCards as unknown[]).length > 0,
+      hasLetters: Array.isArray(f.Letters) && (f.Letters as unknown[]).length > 0,
       lastModified: rec.createdTime,
     });
   }
@@ -638,6 +646,8 @@ export async function getRosterKidByNumber(shirtNumber: number): Promise<RosterK
     hasPendingIntake: !!(f.IntakeFromCampus as string),
     lastEditedBySimon: (f.LastEditedBySimon as string) || null,
     pendingFields: parsePendingFields(f.PendingFields),
+    hasReportCards: Array.isArray(f.ReportCards) && (f.ReportCards as unknown[]).length > 0,
+    hasLetters: Array.isArray(f.Letters) && (f.Letters as unknown[]).length > 0,
     lastModified: rec.createdTime,
     nameMeaning: (f.NameMeaning as string) || '',
     familyContext: (f.FamilyContext as string) || '',

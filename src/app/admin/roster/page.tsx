@@ -17,6 +17,7 @@ import { AdminShell } from '../_components/AdminShell';
 import { getRoster, type RosterKid } from '@/lib/admin/queries';
 import { getAdminRole } from '@/lib/admin-session';
 import { AddKidButton } from './AddKidButton';
+import { DeadlinesBanner } from './DeadlinesBanner';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -34,6 +35,9 @@ export default async function AdminRosterPage() {
   const pendingReview = kids.filter(
     k => k.hasPendingIntake || !!k.lastEditedBySimon
   ).length;
+  // Counts that drive the top-of-page deadlines banner.
+  const reportCardsPending = kids.filter(k => !k.hasReportCards).length;
+  const lettersPending = kids.filter(k => !k.hasLetters).length;
 
   return (
     <AdminShell activeTab="roster" role={role}>
@@ -59,6 +63,12 @@ export default async function AdminRosterPage() {
             </p>
           )}
         </div>
+
+        <DeadlinesBanner
+          reportCardsPending={reportCardsPending}
+          lettersPending={lettersPending}
+          role={role}
+        />
 
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {kids.map(kid => (
