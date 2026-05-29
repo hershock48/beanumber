@@ -143,31 +143,24 @@ export function ReassignReveal({
         <div className="fixed inset-0 flex items-center justify-center z-10 pointer-events-none px-5">
           <div className="text-center pointer-events-auto max-w-lg w-full">
             <div className="bg-white/95 backdrop-blur-sm border border-[#e8e0d4] py-10 px-8 md:py-14 md:px-12 shadow-xl">
-              <p className="text-xs font-bold uppercase tracking-[0.3em] text-[#D4A843] mb-3">
-                Hey — there&rsquo;s an update for you
+              <p className="text-xs font-bold uppercase tracking-[0.3em] text-[#D4A843] mb-4">
+                An update for #{shirtNumber}
               </p>
               <p
-                className="text-2xl md:text-3xl text-[#0d0d0d] mb-3 leading-tight"
+                className="text-2xl md:text-3xl text-[#0d0d0d] mb-4 leading-tight"
                 style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
               >
-                You&rsquo;ve been assigned a new child.
+                {previousChildName
+                  ? `${previousChildName}'s no longer at Hope Bridge.`
+                  : 'There’s been a change at Hope Bridge.'}
               </p>
-              {previousChildName ? (
-                <p className="text-sm md:text-base text-[#666] mb-6 leading-relaxed">
-                  {previousChildName} is no longer at the campus. Your
-                  shirt #{shirtNumber} now goes to a new kid who needs
-                  exactly what you&rsquo;ve been giving.
-                </p>
-              ) : (
-                <p className="text-sm md:text-base text-[#666] mb-6 leading-relaxed">
-                  The kid you were sponsoring is no longer at the
-                  campus. Your shirt #{shirtNumber} now goes to a new
-                  kid who needs exactly what you&rsquo;ve been giving.
-                </p>
-              )}
+              <p className="text-base md:text-lg text-[#666] mb-7 leading-relaxed">
+                Same shirt, same campus, same hot lunch. Just a new
+                face in the photo.
+              </p>
               <p
-                className="text-4xl md:text-5xl text-[#D4A843] mb-8"
-                style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 700, lineHeight: 1.1 }}
+                className="text-4xl md:text-5xl text-[#D4A843] mb-8 leading-tight"
+                style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 700 }}
               >
                 {newChildName}
               </p>
@@ -175,7 +168,7 @@ export function ReassignReveal({
                 onClick={handleMeet}
                 className="w-full bg-[#D4A843] text-[#0d0d0d] font-bold uppercase tracking-wider py-4 px-10 hover:bg-[#c49a3a] transition-colors text-lg"
               >
-                Meet them
+                Meet {newChildName.split(/\s+/)[0]}
               </button>
             </div>
           </div>
