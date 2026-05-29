@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Logo } from '@/components/Logo';
 import Link from 'next/link';
+import { AdminShell } from '../_components/AdminShell';
 
 interface PendingUpdate {
   id: string;
@@ -160,37 +160,8 @@ export default function AdminDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Navigation */}
-      <nav className="bg-white border-b border-gray-200">
-        <div className="max-w-6xl mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <Link href="/" className="flex items-center gap-3">
-              <Logo className="h-8 w-8 text-gray-900" />
-              <span className="text-xl font-semibold text-gray-900">Be A Number</span>
-            </Link>
-            <div className="flex items-center gap-4">
-              <Link
-                href="/admin/updates/submit"
-                className="text-gray-600 hover:text-gray-900 text-sm"
-              >
-                Submit Update
-              </Link>
-              <button
-                onClick={async () => {
-                  await fetch('/api/admin/logout', { method: 'POST' });
-                  window.location.href = '/admin/login';
-                }}
-                className="text-gray-600 hover:text-gray-900 text-sm"
-              >
-                Logout
-              </button>
-            </div>
-          </div>
-        </div>
-      </nav>
-
-      <div className="max-w-6xl mx-auto px-6 py-8">
+    <AdminShell activeTab="updates">
+      <div className="max-w-6xl mx-auto px-6 py-8 bg-[#FFF8F0] min-h-[calc(100vh-64px)]">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Admin Dashboard</h1>
           <p className="text-gray-600">
@@ -398,6 +369,6 @@ export default function AdminDashboard() {
         </div>
         )}
       </div>
-    </div>
+    </AdminShell>
   );
 }

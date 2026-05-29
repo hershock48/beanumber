@@ -1,8 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
-import { Logo } from '@/components/Logo';
+import { AdminShell } from '../_components/AdminShell';
 
 interface CohortRow {
   cohort: string;
@@ -101,16 +100,15 @@ export default function RetentionDashboard() {
 
   if (!metrics) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <AdminNav />
+      <AdminShell activeTab="retention">
         <div className="max-w-md mx-auto px-6 py-16">
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center">
+          <div className="bg-white rounded-lg shadow-sm border border-[#e8e0d4] p-8 text-center">
             {error ? (
               <>
                 <p className="text-red-600 text-sm mb-3">{error}</p>
                 <button
                   onClick={() => load()}
-                  className="px-4 py-2 bg-gray-900 text-white rounded-md hover:bg-gray-800 transition-colors text-sm font-medium"
+                  className="px-4 py-2 bg-[#0d0d0d] text-white rounded-md hover:bg-[#333] transition-colors text-sm font-medium"
                 >
                   Retry
                 </button>
@@ -120,7 +118,7 @@ export default function RetentionDashboard() {
             )}
           </div>
         </div>
-      </div>
+      </AdminShell>
     );
   }
 
@@ -128,16 +126,8 @@ export default function RetentionDashboard() {
   const mrrPct = runRateCents > 0 ? (metrics.totals.mrrCents / runRateCents) * 100 : 0;
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <AdminNav
-        showLogout
-        onLogout={async () => {
-          await fetch('/api/admin/logout', { method: 'POST' });
-          window.location.href = '/admin/login';
-        }}
-      />
-
-      <div className="max-w-6xl mx-auto px-6 py-8">
+    <AdminShell activeTab="retention">
+      <div className="max-w-6xl mx-auto px-6 py-8 bg-[#FFF8F0] min-h-[calc(100vh-64px)]">
         <div className="flex items-start justify-between mb-8">
           <div>
             <h1 className="text-3xl font-bold text-gray-900 mb-2">Retention</h1>
@@ -257,7 +247,7 @@ export default function RetentionDashboard() {
         </Section>
 
       </div>
-    </div>
+    </AdminShell>
   );
 }
 
@@ -265,20 +255,20 @@ export default function RetentionDashboard() {
 // Sub-components
 // ---------------------------------------------------------------------------
 
-function AdminNav({ showLogout, onLogout }: { showLogout?: boolean; onLogout?: () => void }) {
+// Legacy AdminNav kept inert — left in place to minimize diff. The
+// page now uses the shared AdminShell instead. Safe to delete on a
+// later pass once we confirm nothing else imports it.
+function _LegacyAdminNav({ showLogout, onLogout }: { showLogout?: boolean; onLogout?: () => void }) {
   return (
-    <nav className="bg-white border-b border-gray-200">
-      <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
-        <Link href="/" className="flex items-center gap-3">
-          <Logo className="h-8 w-8 text-gray-900" />
-          <span className="text-xl font-semibold text-gray-900">Be A Number</span>
-        </Link>
-        <div className="flex items-center gap-4 text-sm">
-          <Link href="/admin/dashboard" className="text-gray-600 hover:text-gray-900">Updates</Link>
-          <Link href="/admin/retention" className="text-gray-900 font-medium">Retention</Link>
-          <Link href="/admin/fulfillment" className="text-gray-600 hover:text-gray-900">Fulfillment</Link>
+    <nav>
+      <div>
+        <a href="/" />
+        <div>
+          <a href="/admin/dashboard">Updates</a>
+          <a href="/admin/retention">Retention</a>
+          <a href="/admin/fulfillment">Fulfillment</a>
           {showLogout && (
-            <button onClick={onLogout} className="text-gray-600 hover:text-gray-900">Logout</button>
+            <button onClick={onLogout}>Logout</button>
           )}
         </div>
       </div>

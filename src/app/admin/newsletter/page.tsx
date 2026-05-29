@@ -19,8 +19,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
-import { Logo } from '@/components/Logo';
+import { AdminShell } from '../_components/AdminShell';
 
 interface Newsletter {
   id: string;
@@ -259,31 +258,8 @@ export default function AdminNewsletterPage() {
   // ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <nav className="bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-3">
-            <Logo className="h-8 w-8 text-gray-900" />
-            <span className="text-xl font-semibold text-gray-900">Be A Number</span>
-          </Link>
-          <div className="flex gap-4 text-sm">
-            <Link href="/admin/dashboard" className="text-gray-600 hover:text-gray-900">
-              Updates Dashboard
-            </Link>
-            <Link href="/admin/sponsors" className="text-gray-600 hover:text-gray-900">
-              Sponsors
-            </Link>
-            <Link href="/admin/newsletter" className="text-gray-900 font-semibold">
-              Newsletter
-            </Link>
-            <Link href="/admin/fulfillment" className="text-gray-600 hover:text-gray-900">
-              Fulfillment
-            </Link>
-          </div>
-        </div>
-      </nav>
-
-      <main className="max-w-7xl mx-auto px-6 py-8">
+    <AdminShell activeTab="newsletter">
+      <main className="max-w-7xl mx-auto px-6 py-8 bg-[#FFF8F0] min-h-[calc(100vh-64px)]">
         <div className="mb-6 flex items-center justify-between">
           <h1 className="text-3xl font-bold text-gray-900">Campus Newsletter</h1>
           <button
@@ -503,6 +479,6 @@ export default function AdminNewsletterPage() {
           </section>
         </div>
       </main>
-    </div>
+    </AdminShell>
   );
 }

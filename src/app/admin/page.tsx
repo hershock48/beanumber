@@ -14,9 +14,8 @@
  */
 
 import Link from 'next/link';
-import { Logo } from '@/components/Logo';
 import { getAdminHomeData } from '@/lib/admin/queries';
-import { LogoutButton } from './_components/LogoutButton';
+import { AdminShell } from './_components/AdminShell';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -40,20 +39,7 @@ export default async function AdminHomePage() {
   });
 
   return (
-    <main className="min-h-screen bg-[#FFF8F0]">
-      {/* Top bar */}
-      <header className="bg-white border-b border-[#e8e0d4] sticky top-0 z-10">
-        <div className="max-w-2xl mx-auto px-5 py-4 flex items-center justify-between">
-          <Link href="/admin" className="flex items-center gap-3">
-            <Logo />
-            <span className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843]">
-              Admin
-            </span>
-          </Link>
-          <LogoutButton />
-        </div>
-      </header>
-
+    <AdminShell activeTab="home">
       <div className="max-w-2xl mx-auto px-5 py-6 md:py-10">
         {/* Hello */}
         <p className="text-xs uppercase tracking-[0.2em] text-[#aaa] mb-1">
@@ -236,7 +222,7 @@ export default async function AdminHomePage() {
           One login per device, 30-day session. Logout when you&rsquo;re on a shared computer.
         </footer>
       </div>
-    </main>
+    </AdminShell>
   );
 }
 

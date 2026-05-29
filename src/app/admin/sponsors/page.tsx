@@ -10,8 +10,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
-import { Logo } from '@/components/Logo';
+import { AdminShell } from '../_components/AdminShell';
 
 interface SponsorSummary {
   id: string;
@@ -75,28 +74,8 @@ export default function AdminSponsorsPage() {
   const totals = data?.totals ?? { revealed: 0, waiting: 0, all: 0 };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <nav className="bg-white border-b border-gray-200">
-        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-3">
-            <Logo className="h-8 w-8 text-gray-900" />
-            <span className="text-xl font-semibold text-gray-900">Be A Number</span>
-          </Link>
-          <div className="flex gap-4 text-sm">
-            <Link href="/admin/dashboard" className="text-gray-600 hover:text-gray-900">
-              Updates Dashboard
-            </Link>
-            <Link href="/admin/sponsors" className="text-gray-900 font-semibold">
-              Sponsors
-            </Link>
-            <Link href="/admin/fulfillment" className="text-gray-600 hover:text-gray-900">
-              Fulfillment
-            </Link>
-          </div>
-        </div>
-      </nav>
-
-      <main className="max-w-6xl mx-auto px-6 py-10">
+    <AdminShell activeTab="sponsors">
+      <main className="max-w-6xl mx-auto px-6 py-10 bg-[#FFF8F0] min-h-[calc(100vh-64px)]">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Sponsor Reveal Status</h1>
           <p className="text-gray-600">
@@ -234,6 +213,6 @@ export default function AdminSponsorsPage() {
           Refresh the page to reload data.
         </div>
       </main>
-    </div>
+    </AdminShell>
   );
 }

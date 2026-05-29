@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import Link from 'next/link';
+import { AdminShell } from '../_components/AdminShell';
 
 interface Order {
   id: string;
@@ -153,24 +153,12 @@ export default function FulfillmentDashboard() {
   const sizeGroups = groupBySize(queueOrders);
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b border-gray-200">
-        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
-          <div>
-            <h1 className="text-lg font-bold text-gray-900">Fulfillment</h1>
-            <p className="text-xs text-gray-500">
-              {queueOrders.length} to ship · {shippedOrders.length} shipped
-            </p>
-          </div>
-          <div className="flex items-center gap-3 text-sm">
-            <Link href="/admin/dashboard" className="text-gray-600 hover:text-gray-900">Updates</Link>
-            <Link href="/admin/sponsors" className="text-gray-600 hover:text-gray-900">Sponsors</Link>
-            <Link href="/admin/newsletter" className="text-gray-600 hover:text-gray-900">Newsletter</Link>
-            <Link href="/admin/retention" className="text-gray-600 hover:text-gray-900">Retention</Link>
-            <Link href="/admin/fulfillment" className="text-gray-900 font-semibold">Fulfillment</Link>
-          </div>
-        </div>
+    <AdminShell activeTab="fulfillment">
+      <div className="max-w-6xl mx-auto px-4 py-4">
+        <h1 className="text-lg font-bold text-[#0d0d0d]">Fulfillment</h1>
+        <p className="text-xs text-[#666]">
+          {queueOrders.length} to ship · {shippedOrders.length} shipped
+        </p>
       </div>
 
       {/* Success/error banners */}
@@ -418,6 +406,6 @@ export default function FulfillmentDashboard() {
           table { display: none !important; }
         }
       `}</style>
-    </div>
+    </AdminShell>
   );
 }
