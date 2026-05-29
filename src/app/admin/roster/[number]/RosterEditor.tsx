@@ -291,10 +291,11 @@ export function RosterEditor({
       <div className="pt-8 border-t border-[#e8e0d4] space-y-8">
         <UploadSection
           label="Report cards"
-          helper={`Upload year-end report cards from the campus. PDF, JPG, or PNG. ${firstName}'s sponsors get an email the moment you upload, and the file shows up on their page.`}
+          helper={`Upload report cards from the campus each term. PDF, JPG, or PNG. ${firstName}'s sponsors get an email the moment you upload, and the file shows up on their page.`}
           kind="report_card"
           shirtNumber={shirtNumber}
           existing={reportCards}
+          deadline={nextReportCardDeadline()}
           onUploaded={() => router.refresh()}
         />
 
@@ -304,6 +305,7 @@ export function RosterEditor({
           kind="letter"
           shirtNumber={shirtNumber}
           existing={letters}
+          deadline={nextLetterDeadline()}
           onUploaded={() => router.refresh()}
         />
       </div>
@@ -387,6 +389,80 @@ function PhotoUploadSection({
   );
 }
 
+// ─── Deadline helpers ────────────────────────────────────────────
+
+/** Next quarter-end (Mar 31, Jun 30, Sep 30, Dec 31) on/after today. */
+function nextReportCardDeadline(): Date {
+  const today = new Date();
+  const y = today.getFullYear();
+  const quarterEnds = [
+    new Date(y, 2, 31),  // Mar 31
+    new Date(y, 5, 30),  // Jun 30
+    new Date(y, 8, 30),  // Sep 30
+    new Date(y, 11, 31), // Dec 31
+  ];
+  for (const d of quarterEnds) {
+    if (d.getTime() >= today.setHours(0, 0, 0, 0)) return d;
+  }
+  // Past Dec 31 — wrap to Mar 31 next year.
+  return new Date(y + 1, 2, 31);
+}
+
+/** Next Dec 1 (this year or next). */
+function nextLetterDeadline(): Date {
+  const today = new Date();
+  const y = today.getFullYear();
+  const dec1 = new Date(y, 11, 1);
+  if (dec1.getTime() >= today.setHours(0, 0, 0, 0)) return dec1;
+  return new Date(y + 1, 11, 1);
+}
+
+function DeadlineBadge({ deadline }: { deadline: Date }) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const due = new Date(deadline);
+  due.setHours(0, 0, 0, 0);
+  const days = Math.round((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
+  const dateLabel = deadline.toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: due.getFullYear() !== today.getFullYear() ? 'numeric' : undefined,
+  });
+
+  let tone: 'gray' | 'amber' | 'red';
+  let copy: string;
+  if (days < 0) {
+    tone = 'red';
+    copy = `Overdue by ${Math.abs(days)} day${Math.abs(days) === 1 ? '' : 's'} (was due ${dateLabel})`;
+  } else if (days === 0) {
+    tone = 'red';
+    copy = `Due today (${dateLabel})`;
+  } else if (days <= 7) {
+    tone = 'red';
+    copy = `Due in ${days} day${days === 1 ? '' : 's'} (${dateLabel})`;
+  } else if (days <= 30) {
+    tone = 'amber';
+    copy = `Due in ${days} days (${dateLabel})`;
+  } else {
+    tone = 'gray';
+    copy = `Next due ${dateLabel} · ${days} days out`;
+  }
+
+  const cls =
+    tone === 'red'
+      ? 'bg-red-50 border-red-200 text-red-700'
+      : tone === 'amber'
+        ? 'bg-amber-50 border-amber-200 text-amber-800'
+        : 'bg-[#f5f0e8] border-[#e8e0d4] text-[#666]';
+
+  return (
+    <p className={`inline-block text-xs font-semibold uppercase tracking-wider px-2 py-1 border ${cls} mb-3`}>
+      {copy}
+    </p>
+  );
+}
+
 // ─── Upload section (report cards / letters) ────────────────────
 
 function UploadSection({
@@ -395,6 +471,7 @@ function UploadSection({
   kind,
   shirtNumber,
   existing,
+  deadline,
   onUploaded,
 }: {
   label: string;
@@ -402,6 +479,7 @@ function UploadSection({
   kind: 'report_card' | 'letter';
   shirtNumber: number;
   existing: RosterKidAttachment[];
+  deadline?: Date;
   onUploaded: () => void;
 }) {
   const [uploading, setUploading] = useState(false);
@@ -458,6 +536,8 @@ function UploadSection({
         {label}
       </p>
       <p className="text-xs text-[#888] mb-3 leading-relaxed">{helper}</p>
+
+      {deadline && <DeadlineBadge deadline={deadline} />}
 
       {/* Existing files */}
       {existing.length > 0 ? (
