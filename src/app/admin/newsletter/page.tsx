@@ -382,6 +382,32 @@ export default function AdminNewsletterPage() {
                 />
               </div>
 
+              {/* Hero photo upload — single image at the top of the
+                  newsletter (both email and on-page). Only available
+                  once the newsletter has been saved (so we have an
+                  Airtable record ID to attach to). Replacing uploads
+                  a new image; clearing requires going to Airtable. */}
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1">
+                  Hero photo (optional)
+                </label>
+                <p className="text-xs text-gray-500 mb-2">
+                  One image at the top of the newsletter. JPG or PNG, ideally ~1200px wide. Max ~3.7&nbsp;MB.
+                </p>
+                {selectedId ? (
+                  <HeroPhotoUploader
+                    newsletterId={selectedId}
+                    currentUrl={newsletters.find(n => n.id === selectedId)?.heroPhoto || null}
+                    disabled={isReadOnly}
+                    onUploaded={reloadList}
+                  />
+                ) : (
+                  <p className="text-xs text-gray-400 italic">
+                    Save the draft first, then you can upload a hero photo.
+                  </p>
+                )}
+              </div>
+
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500">
@@ -481,4 +507,113 @@ export default function AdminNewsletterPage() {
       </main>
     </AdminShell>
   );
+}
+
+// ─── Hero photo uploader ─────────────────────────────────────────
+
+function HeroPhotoUploader({
+  newsletterId,
+  currentUrl,
+  disabled,
+  onUploaded,
+}: {
+  newsletterId: string;
+  currentUrl: string | null;
+  disabled?: boolean;
+  onUploaded: () => void | Promise<void>;
+}) {
+  const [uploading, setUploading] = useState(false);
+  const [status, setStatus] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setError(null);
+    setStatus(null);
+
+    if (file.size > 3.7 * 1024 * 1024) {
+      setError('Image too large (max 3.7 MB). Compress and try again.');
+      e.target.value = '';
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const base64 = await fileToBase64(file);
+      const res = await fetch('/api/admin/newsletter/upload-hero', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          newsletterId,
+          filename: file.name,
+          contentType: file.type || 'application/octet-stream',
+          data: base64,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || `Upload failed: ${res.status}`);
+      setStatus('Uploaded.');
+      await onUploaded();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Upload failed.');
+    } finally {
+      setUploading(false);
+      e.target.value = '';
+    }
+  }
+
+  return (
+    <div>
+      {currentUrl ? (
+        <div className="flex items-start gap-4">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={currentUrl}
+            alt="Hero"
+            className="w-32 h-20 object-cover bg-gray-100 border border-gray-200 rounded"
+          />
+          <div>
+            <p className="text-xs text-gray-500 mb-2">Current hero photo.</p>
+            <label className="inline-flex items-center justify-center bg-white text-gray-900 font-semibold text-xs uppercase tracking-wider px-3 py-2 border border-gray-300 rounded hover:border-gray-900 cursor-pointer transition-colors">
+              <input
+                type="file"
+                className="sr-only"
+                accept="image/*"
+                onChange={onFile}
+                disabled={uploading || disabled}
+              />
+              {uploading ? 'Uploading…' : 'Replace'}
+            </label>
+          </div>
+        </div>
+      ) : (
+        <label className="inline-flex items-center justify-center bg-white text-gray-900 font-semibold text-xs uppercase tracking-wider px-3 py-2 border border-gray-300 rounded hover:border-gray-900 cursor-pointer transition-colors">
+          <input
+            type="file"
+            className="sr-only"
+            accept="image/*"
+            onChange={onFile}
+            disabled={uploading || disabled}
+          />
+          {uploading ? 'Uploading…' : 'Upload hero photo'}
+        </label>
+      )}
+      {status && <p className="mt-2 text-sm text-gray-500">{status}</p>}
+      {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
+    </div>
+  );
+}
+
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      const comma = result.indexOf(',');
+      resolve(comma >= 0 ? result.slice(comma + 1) : result);
+    };
+    reader.onerror = () => reject(new Error('Failed to read file'));
+    reader.readAsDataURL(file);
+  });
 }
