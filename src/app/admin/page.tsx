@@ -53,6 +53,29 @@ export default async function AdminHomePage() {
         </h1>
 
         <div className="space-y-4">
+          {/* ── Card: Shirts to ship ─────────────────────────── */}
+          <Card
+            label="Fulfillment"
+            urgent={data.shirtsToShip.count > 0}
+            error={data.shirtsToShip.error}
+          >
+            {data.shirtsToShip.count > 0 ? (
+              <>
+                <Headline>
+                  {data.shirtsToShip.count} order{data.shirtsToShip.count === 1 ? '' : 's'} to ship.
+                </Headline>
+                <p className="mt-2 text-sm text-[#666]">
+                  Print packing slips, mark shipped, send tracking.
+                </p>
+                <Actions>
+                  <PrimaryLink href="/admin/fulfillment">Open shipping queue</PrimaryLink>
+                </Actions>
+              </>
+            ) : (
+              <CalmState>Nothing to ship. The queue is clear.</CalmState>
+            )}
+          </Card>
+
           {/* ── Card: Newsletter due ────────────────────────────── */}
           <Card
             label="Monthly newsletter"

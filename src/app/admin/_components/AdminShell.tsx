@@ -31,6 +31,7 @@ export type AdminTab =
 const TABS: Array<{ id: AdminTab; label: string; href: string }> = [
   { id: 'newsletter', label: 'Newsletter', href: '/admin/newsletter' },
   { id: 'roster', label: 'Roster', href: '/admin/roster' },
+  { id: 'fulfillment', label: 'Fulfillment', href: '/admin/fulfillment' },
 ];
 
 export function AdminShell({

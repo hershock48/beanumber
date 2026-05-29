@@ -264,27 +264,42 @@ export default function FulfillmentDashboard() {
 
                       {/* Order info */}
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-baseline justify-between mb-1">
-                          <div className="flex items-baseline gap-2">
-                            <span className="text-lg font-bold text-gray-900">#{order.orderNum}</span>
-                            <span className="text-xs text-gray-500 uppercase tracking-wide">{order.childName}</span>
+                        <div className="flex items-baseline justify-between mb-2">
+                          <div className="flex items-baseline gap-2 flex-wrap">
+                            {/* Order # is blank under the stockpile model.
+                                Show "STOCKPILE" instead of a misleading "#"
+                                for orders waiting on number assignment. */}
+                            {order.orderNum ? (
+                              <>
+                                <span className="text-lg font-bold text-gray-900">#{order.orderNum}</span>
+                                {order.childName && (
+                                  <span className="text-xs text-gray-500 uppercase tracking-wide">{order.childName}</span>
+                                )}
+                              </>
+                            ) : (
+                              <span className="text-xs font-bold text-amber-700 uppercase tracking-wider bg-amber-50 px-2 py-0.5 rounded">
+                                Stockpile · number assigned at ship
+                              </span>
+                            )}
                           </div>
                           <span className="text-xs text-gray-400">{order.orderDate}</span>
                         </div>
 
                         <div className="flex items-start justify-between gap-6">
-                          {/* Shirt spec */}
+                          {/* Shirt spec — color + size made more prominent */}
                           <div>
-                            <p className="text-sm font-semibold text-gray-900">{order.design}</p>
+                            <p className="text-base font-bold text-gray-900">
+                              {order.shirtColor} · Size {order.size}
+                            </p>
                             <p className="text-xs text-gray-500">
-                              {order.shirtColor} · {order.size} · Ink: {order.vinylFront}/{order.vinylBack}
+                              {order.design} · Ink: {order.vinylFront}/{order.vinylBack}
                             </p>
                           </div>
 
                           {/* Address */}
                           {order.hasAddress ? (
                             <div className="text-right text-xs text-gray-600 leading-snug flex-shrink-0">
-                              <p>{order.shipName}</p>
+                              <p className="font-semibold">{order.shipName}</p>
                               <p>{order.shipStreet1}</p>
                               {order.shipStreet2 && <p>{order.shipStreet2}</p>}
                               <p>{order.shipCity}, {order.shipState} {order.shipZip}</p>
@@ -298,7 +313,7 @@ export default function FulfillmentDashboard() {
                         </div>
 
                         {order.notes && (
-                          <p className="mt-1 text-xs text-amber-700 bg-amber-50 rounded px-2 py-1 inline-block">
+                          <p className="mt-2 text-xs text-amber-700 bg-amber-50 rounded px-2 py-1 inline-block">
                             Note: {order.notes}
                           </p>
                         )}
