@@ -104,25 +104,25 @@ export default async function NewsPage() {
         {/* Bottom CTAs — relationship paths into the rest of BAN */}
         <section className="mt-16 md:mt-20 grid md:grid-cols-2 gap-4 md:gap-5">
           <Link
-            href="/"
+            href="/shirts"
             className="block bg-white border border-[#e8e0d4] p-6 md:p-7 hover:border-[#D4A843] transition-colors group"
           >
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-2">
-              Meet the kids
+              Be a number
             </p>
             <p
               className="text-xl text-[#0d0d0d] leading-snug mb-2"
               style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
             >
-              Every kid has a page. Find yours.
+              Get a shirt. Meet your kid.
             </p>
             <p className="text-sm text-[#666] leading-relaxed mb-3">
-              Browse the roster from the homepage carousel, or type
-              the number on the back of your shirt to meet the kid
-              your shirt belongs to.
+              Every shirt has a number printed on the back. That
+              number belongs to a real kid at the campus. Yours
+              becomes yours when the shirt arrives.
             </p>
             <p className="text-sm font-bold text-[#D4A843] group-hover:text-[#0d0d0d] transition-colors">
-              Go to the homepage →
+              Shop the shirts →
             </p>
           </Link>
 
