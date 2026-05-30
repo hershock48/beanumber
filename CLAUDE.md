@@ -36,6 +36,10 @@ Read **`docs/claude/operations.md`** for the git/Vercel/logs/env-var workflow. I
 
 Read **`docs/claude/known_gotchas.md`** before going off-script. Things Kevin has explicitly told me to stop doing (don't nag him about revoking PATs, don't present numbered options menus, don't pad responses with padding, don't say "just" or "simply"), plus open bugs we know about but haven't fixed yet (signature-failure webhook endpoint, shirt copy overclaims, ChildID migration deferred, etc.).
 
+## Newsletter — how it works, how to author one
+
+Read **`docs/claude/newsletter.md`** before authoring a newsletter, touching the send code, or changing how the body renders on the public kid pages. Covers the May 2026 model rewrite (body is public on every kid page + email is a short notification + two variants), the BodyHTML authoring rules (just use `<p>` and `<h2>` — no inline styles, no merge tags), the recipient lists (sponsors vs opt-out non-sponsors), the test-send flow, and the failure modes already encountered.
+
 ## Reading order when you open a session
 
 1. This file (you're here).
