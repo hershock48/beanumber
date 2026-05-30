@@ -43,6 +43,21 @@ export default async function NewsPage() {
     <div className="min-h-screen bg-[#FFF8F0]">
       <BANNavigation currentPath="/news" />
 
+      {/* Top conversion strip — quick path to the shirt for /news
+          readers who haven't bought yet. Sits above the page
+          header so it catches them before they invest in the read. */}
+      <div className="bg-white border-y border-[#e8e0d4]">
+        <div className="max-w-5xl mx-auto px-5 py-2.5 flex items-center justify-center gap-2 flex-wrap text-sm text-[#444]">
+          <span>Don&rsquo;t have your shirt yet?</span>
+          <Link
+            href="/shirts"
+            className="font-bold text-[#D4A843] hover:text-[#0d0d0d] transition-colors"
+          >
+            Order here →
+          </Link>
+        </div>
+      </div>
+
       <main className="max-w-5xl mx-auto px-5 py-10 md:py-16">
         {/* Header */}
         <Link
