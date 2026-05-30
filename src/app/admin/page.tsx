@@ -161,6 +161,19 @@ export default async function AdminHomePage() {
               <PrimaryLink href="/admin/stripe-sync">Open sync</PrimaryLink>
             </Actions>
           </Card>
+
+          {/* ── Card: Batches (cycle model) ────────────────────── */}
+          <Card label="Batches">
+            <Headline>The shirt number cycle.</Headline>
+            <p className="mt-2 text-sm text-[#666]">
+              Each batch is a block of shirt numbers tied to a locked
+              roster snapshot. Read-only for now; opening a new batch
+              comes next.
+            </p>
+            <Actions>
+              <PrimaryLink href="/admin/batches">Open batches</PrimaryLink>
+            </Actions>
+          </Card>
         </div>
 
         <footer className="mt-10 pb-10 text-center text-xs text-[#aaa]">
