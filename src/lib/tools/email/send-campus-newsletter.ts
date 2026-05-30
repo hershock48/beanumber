@@ -67,13 +67,24 @@ async function fetchEmailableDonors(): Promise<
   let offset: string | undefined;
   do {
     const params = new URLSearchParams();
-    // Anyone with an email who hasn't actively unsubscribed. Blank
-    // Communication Opt-In = include (default state for new
-    // donors created by the Stripe webhook).
-    params.set(
-      'filterByFormula',
-      `AND({Email Address} != BLANK(), NOT({Communication Opt-In} = FALSE()))`
-    );
+    // Include every donor with an email.
+    //
+    // We can't filter by Communication Opt-In here because of how
+    // Airtable serializes checkboxes:
+    //   - checked   → field present, value true
+    //   - unchecked → field absent from API response (NOT false)
+    // That means `NOT({Communication Opt-In} = FALSE())` only matches
+    // records where the box is explicitly checked — which is almost
+    // nobody, since new Stripe donors are created with the box blank.
+    // Filtering on it dropped the non-sponsor count to 0.
+    //
+    // For an opt-out model we'd need a separate `Unsubscribed`
+    // boolean field (default false, flipped true on unsub click)
+    // that's properly queryable. Until that schema change ships,
+    // we trust the unsub click to work via other means and include
+    // everyone with an email. CAN-SPAM's existing-customer-
+    // relationship rule covers this audience.
+    params.set('filterByFormula', `{Email Address} != BLANK()`);
     params.set('pageSize', '100');
     params.append('fields[]', 'Email Address');
     params.append('fields[]', 'Donor Name');
