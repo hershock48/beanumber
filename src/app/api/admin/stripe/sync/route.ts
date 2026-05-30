@@ -132,13 +132,33 @@ async function findSponsorshipBySubscriptionId(
 }
 
 async function findClaimableSponsorshipForDonor(
-  donorId: string
+  donorId: string,
+  sponsorEmail: string
 ): Promise<AirtableRecord | null> {
   // Active or Pending Review row for this donor that has NO Stripe
-  // subscription ID linked yet. Indicates a legacy sponsorship we can
-  // adopt rather than creating a duplicate.
+  // subscription ID linked yet. Indicates a legacy sponsorship we
+  // can adopt rather than creating a duplicate.
+  //
+  // We check TWO matching paths:
+  //   (a) Donor link contains donorId. Standard case for rows the
+  //       webhook wrote.
+  //   (b) SponsorEmail matches AND Donor link is empty. Catches
+  //       manually-created legacy rows (e.g. Kevin staging a
+  //       sponsorship before the buyer subscribed via Stripe) that
+  //       never got their Donor link populated.
+  //
+  // Either path is sufficient; we OR them together. Without (b),
+  // running the sync produces duplicate Sponsorship rows every
+  // time a customer with a manual stub gets a real Stripe sub.
+  const safeEmail = sponsorEmail.replace(/"/g, '\\"');
   const formula = `AND(
-    FIND("${donorId}", ARRAYJOIN({Donor}))>0,
+    OR(
+      FIND("${donorId}", ARRAYJOIN({Donor}))>0,
+      AND(
+        LOWER({SponsorEmail})="${safeEmail.toLowerCase()}",
+        ARRAYJOIN({Donor})=""
+      )
+    ),
     OR({Status}="Active", {Status}="Pending Review"),
     {StripeSubscriptionID}=""
   )`;
@@ -402,7 +422,10 @@ export async function POST(request: NextRequest) {
       await updateSponsorship(sponsorship.id, patch);
     } else {
       // Try to claim an existing legacy sponsorship that has no sub ID.
-      sponsorship = await findClaimableSponsorshipForDonor(donor.id);
+      sponsorship = await findClaimableSponsorshipForDonor(
+        donor.id,
+        customerEmail
+      );
       if (sponsorship) {
         sponsorshipAction = 'claimed';
         report.sponsorships.claimed++;
@@ -414,6 +437,14 @@ export async function POST(request: NextRequest) {
         };
         if (customerName && !sponsorship.fields.SponsorName) {
           patch.SponsorName = customerName;
+        }
+        // Backfill the Donor link when missing — this is the path
+        // (b) claim case (email match, no donor linked yet).
+        // Writing the link here makes future syncs hit path (a)
+        // directly.
+        const existingDonor = (sponsorship.fields.Donor as string[]) || [];
+        if (existingDonor.length === 0) {
+          patch.Donor = [donor.id];
         }
         const existingChildren = (sponsorship.fields.Children as string[]) || [];
         if (childRecordIdFromMeta && existingChildren.length === 0) {
