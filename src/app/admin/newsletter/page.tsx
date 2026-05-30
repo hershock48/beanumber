@@ -474,8 +474,7 @@ export default function AdminNewsletterPage() {
                 </div>
                 {showPreview ? (
                   <div
-                    className="prose prose-sm max-w-none border border-gray-200 rounded-md p-4 min-h-[300px] bg-gray-50"
-                    style={{ fontFamily: 'Georgia, serif' }}
+                    className="ban-newsletter-body max-w-none border border-gray-200 rounded-md p-6 min-h-[300px] bg-white"
                     dangerouslySetInnerHTML={{ __html: renderedPreview }}
                   />
                 ) : (
@@ -484,7 +483,7 @@ export default function AdminNewsletterPage() {
                     disabled={isReadOnly}
                     onChange={(e) => setEditor({ ...editor, bodyHtml: e.target.value })}
                     rows={16}
-                    placeholder="HTML body. Use {{sponsorFirstName}} for personalization."
+                    placeholder="Plain HTML. Use <p> for paragraphs and <h2> for section headers — no inline styles needed."
                     className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm font-mono disabled:bg-gray-50"
                   />
                 )}

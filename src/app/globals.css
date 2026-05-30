@@ -26,3 +26,86 @@ body {
     cursor: pointer;
   }
 }
+
+/* ────────────────────────────────────────────────────────────────────
+   Newsletter body styling — applied to the rendered Newsletter.BodyHTML
+   on every kid's /[number] page (CampusNewsfeed) and inside the
+   admin Preview modal. Kevin authors plain HTML in Airtable using
+   just <p>, <h2>, <h3>, <hr>, <a>, <em>, <strong>, <blockquote>,
+   <ul>, <ol>, <li> — these rules handle all the visual styling.
+   He should NOT need to write style="..." on anything.
+   ──────────────────────────────────────────────────────────────────── */
+
+.ban-newsletter-body {
+  color: #333;
+  line-height: 1.65;
+}
+
+.ban-newsletter-body p {
+  margin: 0;
+}
+
+.ban-newsletter-body p + p {
+  margin-top: 1rem;
+}
+
+.ban-newsletter-body h2 {
+  font-family: var(--font-lora), Georgia, serif;
+  font-weight: 600;
+  font-size: 1.5rem;
+  color: #0d0d0d;
+  margin: 2rem 0 0.75rem 0;
+  line-height: 1.25;
+}
+
+.ban-newsletter-body h2:first-child {
+  margin-top: 0;
+}
+
+.ban-newsletter-body h3 {
+  font-family: var(--font-lora), Georgia, serif;
+  font-weight: 600;
+  font-size: 1.2rem;
+  color: #0d0d0d;
+  margin: 1.5rem 0 0.5rem 0;
+  line-height: 1.3;
+}
+
+.ban-newsletter-body hr {
+  border: none;
+  border-top: 1px solid #e8e0d4;
+  margin: 2rem 0;
+}
+
+.ban-newsletter-body a {
+  color: #D4A843;
+  text-decoration: underline;
+}
+
+.ban-newsletter-body a:hover {
+  color: #0d0d0d;
+}
+
+.ban-newsletter-body blockquote {
+  border-left: 3px solid #D4A843;
+  padding-left: 1rem;
+  margin: 1.25rem 0;
+  font-style: italic;
+  color: #555;
+}
+
+.ban-newsletter-body ul,
+.ban-newsletter-body ol {
+  margin: 0.75rem 0;
+  padding-left: 1.5rem;
+}
+
+.ban-newsletter-body li {
+  margin: 0.35rem 0;
+}
+
+.ban-newsletter-body img {
+  max-width: 100%;
+  height: auto;
+  margin: 1.25rem 0;
+}
