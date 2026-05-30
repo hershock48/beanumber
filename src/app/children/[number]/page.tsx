@@ -11,6 +11,8 @@ import { ReplacementChooser } from './ReplacementChooser';
 import { SponsorButton } from './SponsorButton';
 import { ClaimMatchCard } from './ClaimMatchCard';
 import { SponsorPortalSections } from './SponsorPortalSections';
+import { CampusNewsfeed, type CampusNewsletterEntry } from './CampusNewsfeed';
+import { RelationshipCard } from './RelationshipCard';
 import { SponsorRecoveryForm } from './SponsorRecoveryForm';
 import { SESSION } from '@/lib/constants';
 
@@ -159,19 +161,17 @@ async function resolveBuyerContext(
 }
 
 /**
- * Pull the most recently sent Newsletter. The sponsor view on /[number]
- * surfaces this as "from the campus" — one record applies to all
- * sponsors so Kevin only writes it once a month. Status is the gate:
- * we only show what's been actually sent, not drafts or scheduled
- * future sends.
+ * Pull recent sent Newsletters. Under the May 2026 rewrite, the
+ * campus newsletter is a *public* surface — anyone landing on /[N]
+ * sees the same feed of recent newsletters, regardless of sponsor
+ * state. The relationship card above frames the read differently
+ * for sponsors (acknowledgment) vs non-sponsors (conversion).
+ *
+ * Status is the gate: only Sent records, never drafts or
+ * scheduled future sends. Sorted newest first; we cap at 12 so the
+ * feed has weight without becoming a wall.
  */
-async function getLatestCampusNewsletter(): Promise<{
-  title: string;
-  subject: string;
-  bodyHtml: string;
-  heroPhotoUrl?: string;
-  publishedAt?: string;
-} | null> {
+async function getRecentCampusNewsletters(): Promise<CampusNewsletterEntry[]> {
   const newslettersTable = 'tblqP1zrRsh4mblHq'; // Newsletters
   try {
     // Sent records — Status = "Sent" OR PublishedAt is set. Sorted
@@ -180,21 +180,22 @@ async function getLatestCampusNewsletter(): Promise<{
     const res = await airtableRequest<{
       records: Array<{ id: string; fields: Record<string, any> }>;
     }>(
-      `/${encodeURIComponent(newslettersTable)}?filterByFormula=${formula}&sort%5B0%5D%5Bfield%5D=PublishedAt&sort%5B0%5D%5Bdirection%5D=desc&maxRecords=1`
+      `/${encodeURIComponent(newslettersTable)}?filterByFormula=${formula}&sort%5B0%5D%5Bfield%5D=PublishedAt&sort%5B0%5D%5Bdirection%5D=desc&maxRecords=12`
     );
-    const r = res.records?.[0];
-    if (!r) return null;
-    const f = r.fields;
-    return {
-      title: (f.Title as string) || '',
-      subject: (f.Subject as string) || '',
-      bodyHtml: (f.BodyHTML as string) || '',
-      heroPhotoUrl: (f.HeroPhoto as Array<{ url: string }> | undefined)?.[0]?.url,
-      publishedAt: f.PublishedAt as string | undefined,
-    };
+    return (res.records || []).map(r => {
+      const f = r.fields;
+      return {
+        id: r.id,
+        title: (f.Title as string) || '',
+        subject: (f.Subject as string) || '',
+        bodyHtml: (f.BodyHTML as string) || '',
+        heroPhotoUrl: (f.HeroPhoto as Array<{ url: string }> | undefined)?.[0]?.url,
+        publishedAt: f.PublishedAt as string | undefined,
+      };
+    });
   } catch (err) {
     console.warn('[children/page] Newsletter fetch failed', err);
-    return null;
+    return [];
   }
 }
 
@@ -950,28 +951,32 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
   // came in via /shirts/success but aren't yet sponsors.
   const viewerLooksLikeBuyer = child.shirt_assigned || Boolean(buyerContext);
 
-  // Sponsor portal content. Only fetched when the viewer is verified
-  // as the sponsor of THIS child — these surfaces are the bulk of
-  // what /sponsor used to render, folded onto /[number] so there's
-  // one URL per kid that does double duty as public profile and
-  // authenticated sponsor view. Fetched in parallel to keep latency
-  // off the critical path.
+  // Sponsor-only portal content (stats + latest child update). The
+  // newsletter feed used to live here; it now sits in a public
+  // CampusNewsfeed section below the bio/CTA grid, visible to anyone.
+  // Report cards and letters stay sponsor-gated and continue to
+  // render through SponsorPortalSections.
   let portalData: {
     stats: ReturnType<typeof computeSponsorStats>;
     latestChildUpdate: Awaited<ReturnType<typeof getLatestChildUpdate>>;
-    latestNewsletter: Awaited<ReturnType<typeof getLatestCampusNewsletter>>;
   } | null = null;
   if (child.viewer_is_sponsor && child.record_id) {
-    const [latestChildUpdate, latestNewsletter] = await Promise.all([
-      getLatestChildUpdate(child.record_id),
-      getLatestCampusNewsletter(),
-    ]);
+    const latestChildUpdate = await getLatestChildUpdate(child.record_id);
     portalData = {
       stats: computeSponsorStats(child.sponsorship_start_date, child.monthly_amount ?? 25),
       latestChildUpdate,
-      latestNewsletter,
     };
   }
+
+  // Public newsfeed — fetched for every non-departed kid view. The
+  // newsletter Kevin writes once a month gets published to every
+  // kid's page as a campus-wide feed. Sponsors see an acknowledgment
+  // card above; non-sponsors see a conversion card. Departed kids
+  // skip the feed entirely — the "no longer at the campus" framing
+  // takes precedence over campus-level content.
+  const recentNewsletters: CampusNewsletterEntry[] = child.departed_at
+    ? []
+    : await getRecentCampusNewsletters();
 
   return (
     <div className="min-h-screen bg-[#FFF8F0]">
@@ -1396,19 +1401,43 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
           </div>
         </div>
 
-        {/* ── Sponsor portal content folded onto /[number] ────
-            Stats, latest update from this kid, latest campus
-            newsletter. Renders only when the viewer is verified as
-            the sponsor of this child. The data is fetched server-
-            side in parallel so this adds at most one Airtable
-            round-trip to page load. */}
+        {/* ── Sponsor-only portal content (stats + latest update). The
+            campus newsletter no longer renders here — it lives in
+            the public CampusNewsfeed below. */}
         {child.viewer_is_sponsor && portalData && (
           <SponsorPortalSections
             firstName={firstName}
             stats={portalData.stats}
             latestChildUpdate={portalData.latestChildUpdate}
-            latestNewsletter={portalData.latestNewsletter}
           />
+        )}
+
+        {/* ── Public campus newsfeed ───────────────────────────────
+            Visible to anyone — sponsor or not. The relationship
+            card up top frames the read: sponsors get a quiet
+            acknowledgment, non-sponsors get the conversion ask.
+            Departed kids skip both — their page is a memorial,
+            not a conversion surface. */}
+        {!child.departed_at && recentNewsletters.length > 0 && (
+          <div className="mt-12 md:mt-16">
+            <RelationshipCard
+              firstName={firstName}
+              shirtNumber={Number(number)}
+              viewerIsSponsor={!!child.viewer_is_sponsor}
+              childRecordId={child.record_id || null}
+              childId={child.child_id}
+              displayName={displayName}
+              existingCustomerId={buyerHint?.customerId || undefined}
+              buyerEmail={buyerHint?.email || undefined}
+              viewerLooksLikeBuyer={viewerLooksLikeBuyer}
+              sponsorCode={child.sponsor_code}
+            />
+
+            <CampusNewsfeed
+              firstName={firstName}
+              newsletters={recentNewsletters}
+            />
+          </div>
         )}
 
         </RevealOverlay>

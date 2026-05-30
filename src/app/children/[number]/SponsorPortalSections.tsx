@@ -8,7 +8,11 @@
  *   - Stats strip: days as sponsor, meals supported, school days,
  *     dollars to campus. Computed from sponsorship start date.
  *   - Latest update from this specific child (Child Updates table).
- *   - Latest campus newsletter (Newsletters table, applies to all).
+ *
+ * The campus newsletter used to render here too. It now lives in
+ * the public CampusNewsfeed component below this section — visible
+ * to anyone, not just sponsors. Report cards + letters stay sponsor-
+ * only because they're individual to this kid.
  *
  * Intentionally light. The portal historically had messaging,
  * milestones, request-update flows — we're rebuilding it around real
@@ -30,20 +34,12 @@ interface PortalSectionsProps {
     photos: Array<{ url: string; filename?: string }>;
     updateDate?: string;
   } | null;
-  latestNewsletter: {
-    title: string;
-    subject: string;
-    bodyHtml: string;
-    heroPhotoUrl?: string;
-    publishedAt?: string;
-  } | null;
 }
 
 export function SponsorPortalSections({
   firstName,
   stats,
   latestChildUpdate,
-  latestNewsletter,
 }: PortalSectionsProps) {
   return (
     <div className="mt-10 md:mt-14 space-y-6 md:space-y-8">
@@ -103,43 +99,6 @@ export function SponsorPortalSections({
         </div>
       )}
 
-      {/* ── Latest campus newsletter (applies to all sponsors) ─── */}
-      {latestNewsletter && latestNewsletter.bodyHtml && (
-        <div className="bg-white border border-[#e8e0d4] p-5 md:p-7">
-          <div className="flex items-baseline justify-between mb-2 flex-wrap gap-2">
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843]">
-              From the campus
-            </p>
-            {latestNewsletter.publishedAt && (
-              <p className="text-xs text-[#aaa]">
-                {formatDate(latestNewsletter.publishedAt)}
-              </p>
-            )}
-          </div>
-          <p
-            className="text-lg md:text-xl text-[#0d0d0d] mb-3"
-            style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
-          >
-            {latestNewsletter.subject || latestNewsletter.title}
-          </p>
-          {latestNewsletter.heroPhotoUrl && (
-            <div className="mb-4 aspect-[16/9] bg-[#f5f0e8] border border-[#e8e0d4] overflow-hidden">
-              <img
-                src={latestNewsletter.heroPhotoUrl}
-                alt="Campus update photo"
-                className="w-full h-full object-cover"
-              />
-            </div>
-          )}
-          {/* Newsletter body is authored HTML — Kevin writes inside Airtable
-              and we trust the source. If we ever accept external authors
-              here, swap to a sanitizing renderer. */}
-          <div
-            className="text-[#444] leading-relaxed text-sm md:text-base ban-newsletter-body"
-            dangerouslySetInnerHTML={{ __html: latestNewsletter.bodyHtml }}
-          />
-        </div>
-      )}
     </div>
   );
 }
