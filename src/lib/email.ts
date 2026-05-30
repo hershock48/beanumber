@@ -447,9 +447,7 @@ export async function sendNewsletterNotificationEmailForNonSponsor(params: {
 
     <p style="margin: 24px 0 8px 0;"><strong>To read the rest:</strong></p>
 
-    <p style="margin: 0 0 8px 0;">Go to <a href="${siteUrl}" style="color: #D4A843; font-weight: bold;">beanumber.org</a> and type the number on the back of your shirt. You&rsquo;ll land on the page of the kid your shirt belongs to &mdash; this newsletter sits right under their story.</p>
-
-    <p style="margin: 8px 0 24px 0; font-size: 14px; color: #888;">Don&rsquo;t have a shirt yet? Type any number from 1 to 200 to meet a kid.</p>
+    <p style="margin: 0 0 24px 0;">Go to <a href="${siteUrl}" style="color: #D4A843; font-weight: bold;">beanumber.org</a> and type the number on the back of your shirt. You&rsquo;ll land on the page of the kid your shirt belongs to &mdash; this newsletter sits right under their story.</p>
 
     <p style="margin: 24px 0;">
       <a href="${siteUrl}" style="display: inline-block; background: #D4A843; color: #0d0d0d; font-weight: bold; text-transform: uppercase; letter-spacing: 0.05em; padding: 14px 28px; text-decoration: none; font-size: 13px;">Read the newsletter</a>
