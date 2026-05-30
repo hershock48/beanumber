@@ -215,7 +215,7 @@ export default function AdminNewsletterPage() {
     }
     if (mode === 'real') {
       const ok = window.confirm(
-        'This will email every active sponsor + every opted-in non-sponsor right now. Are you sure?'
+        'This will email every active sponsor + every shirt buyer / past donor who has not unsubscribed. Are you sure?'
       );
       if (!ok) return;
     }
@@ -244,13 +244,13 @@ export default function AdminNewsletterPage() {
         setStatusMessage(
           `Test sent to kevin@beanumber.org. Real send would go to ${
             data.recipientCount ?? 0
-          } sponsor(s) + ${data.nonSponsorRecipientCount ?? 0} opted-in non-sponsor(s).`
+          } sponsor(s) + ${data.nonSponsorRecipientCount ?? 0} non-sponsor(s) (shirt buyers & past donors).`
         );
       } else if (mode === 'dryRun') {
         setStatusMessage(
           `Counts ready: ${data.recipientCount ?? 0} sponsor(s) + ${
             data.nonSponsorRecipientCount ?? 0
-          } opted-in non-sponsor(s).`
+          } non-sponsor(s) (shirt buyers & past donors).`
         );
       } else {
         setStatusMessage(
@@ -526,7 +526,7 @@ export default function AdminNewsletterPage() {
                     onClick={() => triggerSend('real')}
                     disabled={busy || !selectedId}
                     className="bg-emerald-600 text-white px-4 py-2 rounded-md text-sm font-semibold hover:bg-emerald-700 disabled:opacity-50"
-                    title={!selectedId ? 'Save the draft first' : 'Sends to every active sponsor + opted-in non-sponsor'}
+                    title={!selectedId ? 'Save the draft first' : 'Sends to every active sponsor + every shirt buyer / past donor who has not unsubscribed'}
                   >
                     Send to all
                   </button>
