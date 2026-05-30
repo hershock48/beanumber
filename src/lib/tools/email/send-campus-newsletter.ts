@@ -42,13 +42,24 @@ const CHILDREN_TABLE = process.env.AIRTABLE_CHILDREN_TABLE || 'Children';
 const DONORS_TABLE = process.env.AIRTABLE_DONORS_TABLE || 'Donors';
 
 /**
- * Fetch every opted-in Donor (Communication Opt-In = true). Used to
- * extend the newsletter notification to non-sponsors who've engaged
- * with BAN before — shirt buyers who didn't convert, one-time donors,
- * etc. The caller subtracts the sponsor email list so opted-in
- * sponsors don't get the email twice.
+ * Fetch every emailable Donor — anyone with an email address who
+ * hasn't explicitly unsubscribed. Used to extend the newsletter
+ * notification to non-sponsors: shirt buyers who didn't convert,
+ * one-time donors, etc.
+ *
+ * Opt-out model (NOT opt-in). The Stripe webhook creates Donor
+ * records with `Communication Opt-In` blank by default — they're
+ * existing customers who paid for something, so CAN-SPAM's
+ * existing-business-relationship exemption covers them and Gmail
+ * bulk-sender policy is satisfied by the unsubscribe link in
+ * every email. Only people who actively click unsubscribe (which
+ * flips Communication Opt-In to false) get suppressed here.
+ *
+ * The caller subtracts the sponsor email list so emailable
+ * sponsors don't get the non-sponsor variant on top of the
+ * sponsor variant.
  */
-async function fetchOptedInDonors(): Promise<
+async function fetchEmailableDonors(): Promise<
   Array<{ email: string; name: string }>
 > {
   if (!AIRTABLE_BASE_ID || !AIRTABLE_API_KEY) return [];
@@ -56,7 +67,13 @@ async function fetchOptedInDonors(): Promise<
   let offset: string | undefined;
   do {
     const params = new URLSearchParams();
-    params.set('filterByFormula', `{Communication Opt-In} = TRUE()`);
+    // Anyone with an email who hasn't actively unsubscribed. Blank
+    // Communication Opt-In = include (default state for new
+    // donors created by the Stripe webhook).
+    params.set(
+      'filterByFormula',
+      `AND({Email Address} != BLANK(), NOT({Communication Opt-In} = FALSE()))`
+    );
     params.set('pageSize', '100');
     params.append('fields[]', 'Email Address');
     params.append('fields[]', 'Donor Name');
@@ -401,8 +418,8 @@ export async function sendCampusNewsletterTool(
     const sponsorEmailSet = new Set(
       recipients.map(r => r.email.trim().toLowerCase())
     );
-    const optedInDonors = await fetchOptedInDonors();
-    nonSponsorRecipientCount = optedInDonors.filter(
+    const emailableDonors = await fetchEmailableDonors();
+    nonSponsorRecipientCount = emailableDonors.filter(
       d => !sponsorEmailSet.has(d.email.trim().toLowerCase())
     ).length;
   } catch (err) {
@@ -573,19 +590,20 @@ export async function sendCampusNewsletterTool(
     await new Promise((resolve) => setTimeout(resolve, 50));
   }
 
-  // 5b. Extend the send to opted-in NON-sponsors. Shirt buyers who
-  // never converted, one-time donors who went quiet. Same teaser +
-  // hero photo; different CTA (homepage + soft sponsor nudge) since
-  // they don't have a sponsored kid page to land on. We subtract the
-  // sponsor email set so opted-in sponsors don't get two emails.
+  // 5b. Extend the send to NON-sponsors. Shirt buyers who never
+  // converted, one-time donors who went quiet. Same teaser + hero
+  // photo; different CTA ("type your number at beanumber.org")
+  // since they don't have a sponsored kid page to land on. We
+  // subtract the sponsor email set so emailable sponsors don't
+  // get two emails.
   let nonSponsorSent = 0;
   let nonSponsorFailed = 0;
   try {
     const sponsorEmailSet = new Set(
       recipients.map(r => r.email.trim().toLowerCase())
     );
-    const optedInDonors = await fetchOptedInDonors();
-    const nonSponsorRecipients = optedInDonors.filter(
+    const emailableDonors = await fetchEmailableDonors();
+    const nonSponsorRecipients = emailableDonors.filter(
       d => !sponsorEmailSet.has(d.email.trim().toLowerCase())
     );
 
