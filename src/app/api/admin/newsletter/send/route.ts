@@ -43,6 +43,7 @@ async function handler(request: NextRequest): Promise<NextResponse> {
     newsletterId?: string;
     force?: boolean;
     dryRun?: boolean;
+    testTo?: string;
   };
 
   if (!body.newsletterId) {
@@ -53,6 +54,7 @@ async function handler(request: NextRequest): Promise<NextResponse> {
     newsletterId: body.newsletterId,
     force: body.force === true,
     dryRun: body.dryRun === true,
+    testTo: typeof body.testTo === 'string' ? body.testTo.trim() : undefined,
   });
 
   if (!result.success) {
@@ -69,7 +71,11 @@ async function handler(request: NextRequest): Promise<NextResponse> {
   logger.apiResponse(method, path, 200);
   return createSuccessResponse(
     result.data,
-    result.data?.dryRun ? 'Dry run complete' : 'Newsletter sent'
+    result.data?.testSend
+      ? 'Test sent to your inbox'
+      : result.data?.dryRun
+        ? 'Counts ready'
+        : 'Newsletter sent'
   );
 }
 

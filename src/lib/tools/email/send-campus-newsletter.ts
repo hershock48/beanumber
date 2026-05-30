@@ -199,6 +199,18 @@ export interface SendCampusNewsletterInput {
   force?: boolean;
   /** If true, look up the sponsor list but don't actually send. For sanity checks. */
   dryRun?: boolean;
+  /**
+   * If set, send ONE preview of each variant (sponsor + non-sponsor)
+   * to this email address. Useful for Kevin to see exactly what
+   * recipients will receive before pulling the trigger on the real
+   * blast. The newsletter's Status stays as Draft — this is a test,
+   * not the actual send.
+   *
+   * When testTo is supplied, the function returns both the
+   * sponsor-recipient count and the non-sponsor-recipient count so
+   * the UI can show 'will send to X sponsors + Y non-sponsors'.
+   */
+  testTo?: string;
 }
 
 export interface SendCampusNewsletterOutput {
@@ -208,11 +220,15 @@ export interface SendCampusNewsletterOutput {
     title: string;
     subject: string;
     recipientCount: number;
+    /** How many opted-in non-sponsors would receive the teaser. */
+    nonSponsorRecipientCount: number;
     /** How many sponsors we filtered out for being unsubscribed. */
     suppressedCount: number;
     sentCount: number;
     failedCount: number;
     dryRun: boolean;
+    /** True when this run was a test-to-inbox preview. */
+    testSend: boolean;
     failures: Array<{ email: string; error: string }>;
   };
   error?: string;
@@ -222,6 +238,12 @@ export async function sendCampusNewsletterTool(
   input: SendCampusNewsletterInput
 ): Promise<SendCampusNewsletterOutput> {
   const { newsletterId, force = false, dryRun = false } = input;
+  const testTo = (input.testTo || '').trim();
+  const isTestSend = !!testTo;
+  // Test sends never touch Newsletter Status and never run the real
+  // send loop. They surface counts + send one preview of each
+  // variant to the test address.
+  const skipRealSend = dryRun || isTestSend;
 
   if (!newsletterId || typeof newsletterId !== 'string' || !newsletterId.startsWith('rec')) {
     return { success: false, error: 'Invalid newsletterId' };
@@ -264,8 +286,9 @@ export async function sendCampusNewsletterTool(
     };
   }
 
-  // 2. Flip to Sending (skip in dry-run).
-  if (!dryRun) {
+  // 2. Flip to Sending (skip in dry-run / test-send — those don't
+  //    touch the real Status).
+  if (!skipRealSend) {
     try {
       await updateNewsletter(newsletterId, { Status: 'Sending' });
     } catch (err) {
@@ -283,7 +306,7 @@ export async function sendCampusNewsletterTool(
     sponsors = await findAllSponsorsForNewsletter();
   } catch (err) {
     // Attempt to reset to Draft so Kevin can retry.
-    if (!dryRun) {
+    if (!skipRealSend) {
       await updateNewsletter(newsletterId, {
         Status: 'Failed',
         SendNotes: `Failed to load sponsor list: ${err instanceof Error ? err.message : String(err)}`,
@@ -370,16 +393,113 @@ export async function sendCampusNewsletterTool(
   // extracting the first paragraph from the body HTML.
   const teaser = explicitTeaser || extractTeaser(bodyHtml);
 
+  // 3e. Count the non-sponsor recipients upfront. They'd get the
+  // teaser-with-soft-CTA variant; we want the count visible whether
+  // this is a dryRun, a testTo preview, or a real send.
+  let nonSponsorRecipientCount = 0;
+  try {
+    const sponsorEmailSet = new Set(
+      recipients.map(r => r.email.trim().toLowerCase())
+    );
+    const optedInDonors = await fetchOptedInDonors();
+    nonSponsorRecipientCount = optedInDonors.filter(
+      d => !sponsorEmailSet.has(d.email.trim().toLowerCase())
+    ).length;
+  } catch (err) {
+    logger.warn('Non-sponsor recipient count failed (non-fatal)', {
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+
   logger.info('Campus newsletter send starting', {
     newsletterId,
     title,
     candidateCount: candidateRecipients.length,
     suppressedCount,
-    recipientCount: recipients.length,
+    sponsorRecipientCount: recipients.length,
+    nonSponsorRecipientCount,
     dryRun,
+    testSend: isTestSend,
   });
 
-  // 4. Dry run short-circuit.
+  // 4. Test-send branch — fire ONE preview of each variant to the
+  // test address, then return the counts. Doesn't touch Status,
+  // doesn't run the real send loop.
+  if (isTestSend) {
+    const testFailures: Array<{ email: string; error: string }> = [];
+    // Build a sponsor preview using the first recipient's kid list
+    // (so the per-kid page links resolve to real kids). If there are
+    // no sponsors yet, send a generic 'Friend' preview with empty
+    // kids list.
+    const sponsorTemplate = recipients[0];
+    const sponsorKids = sponsorTemplate
+      ? sponsorTemplate.childRecordIds
+          .map(id => childMap.get(id))
+          .filter((k): k is { shirtNumber: number | null; firstName: string } => !!k)
+          .filter(k => typeof k.shirtNumber === 'number')
+          .map(k => ({ firstName: k.firstName, shirtNumber: k.shirtNumber as number }))
+      : [];
+
+    try {
+      const r1 = await sendNewsletterNotificationEmail({
+        sponsorEmail: testTo,
+        sponsorName: sponsorTemplate?.name || 'Friend',
+        subject: `[TEST · sponsor view] ${subject}`,
+        teaser,
+        kids: sponsorKids,
+        heroPhotoUrl: hero,
+      });
+      if (!r1.success) {
+        testFailures.push({
+          email: testTo,
+          error: `(sponsor preview) ${r1.error || 'send failed'}`,
+        });
+      }
+    } catch (err) {
+      testFailures.push({
+        email: testTo,
+        error: `(sponsor preview) ${err instanceof Error ? err.message : String(err)}`,
+      });
+    }
+    try {
+      const r2 = await sendNewsletterNotificationEmailForNonSponsor({
+        recipientEmail: testTo,
+        recipientName: 'Friend',
+        subject: `[TEST · non-sponsor view] ${subject}`,
+        teaser,
+        heroPhotoUrl: hero,
+      });
+      if (!r2.success) {
+        testFailures.push({
+          email: testTo,
+          error: `(non-sponsor preview) ${r2.error || 'send failed'}`,
+        });
+      }
+    } catch (err) {
+      testFailures.push({
+        email: testTo,
+        error: `(non-sponsor preview) ${err instanceof Error ? err.message : String(err)}`,
+      });
+    }
+    return {
+      success: true,
+      data: {
+        newsletterId,
+        title,
+        subject,
+        recipientCount: recipients.length,
+        nonSponsorRecipientCount,
+        suppressedCount,
+        sentCount: 2 - testFailures.length,
+        failedCount: testFailures.length,
+        dryRun: false,
+        testSend: true,
+        failures: testFailures,
+      },
+    };
+  }
+
+  // 4b. Dry run short-circuit (counts only, no sends).
   if (dryRun) {
     return {
       success: true,
@@ -388,10 +508,12 @@ export async function sendCampusNewsletterTool(
         title,
         subject,
         recipientCount: recipients.length,
+        nonSponsorRecipientCount,
         suppressedCount,
         sentCount: 0,
         failedCount: 0,
         dryRun: true,
+        testSend: false,
         failures: [],
       },
     };
@@ -546,10 +668,12 @@ export async function sendCampusNewsletterTool(
       title,
       subject,
       recipientCount: recipients.length,
+      nonSponsorRecipientCount,
       suppressedCount,
       sentCount,
       failedCount,
       dryRun: false,
+      testSend: false,
       failures,
     },
   };

@@ -43,9 +43,11 @@ interface SendResult {
   newsletterId: string;
   status: string;
   recipientCount?: number;
+  nonSponsorRecipientCount?: number;
   sentCount?: number;
   failedCount?: number;
   dryRun?: boolean;
+  testSend?: boolean;
   recipients?: string[];
   errors?: string[];
 }
@@ -204,14 +206,16 @@ export default function AdminNewsletterPage() {
     }
   };
 
-  const triggerSend = async (dryRun: boolean) => {
+  const triggerSend = async (
+    mode: 'dryRun' | 'test' | 'real'
+  ) => {
     if (!selectedId) {
       setErrorMessage('Save the draft first before sending.');
       return;
     }
-    if (!dryRun) {
+    if (mode === 'real') {
       const ok = window.confirm(
-        'This will email every active sponsor right now. Are you sure?'
+        'This will email every active sponsor + every opted-in non-sponsor right now. Are you sure?'
       );
       if (!ok) return;
     }
@@ -220,23 +224,41 @@ export default function AdminNewsletterPage() {
     setErrorMessage('');
     setSendResult(null);
     try {
+      const body: Record<string, unknown> = { newsletterId: selectedId };
+      if (mode === 'dryRun') body.dryRun = true;
+      if (mode === 'test') body.testTo = 'kevin@beanumber.org';
       const res = await fetch('/api/admin/newsletter/send', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ newsletterId: selectedId, dryRun }),
+        body: JSON.stringify(body),
       });
       const payload = await res.json();
       if (!res.ok) {
         throw new Error(payload?.message || `HTTP ${res.status}`);
       }
-      setSendResult(payload.data as SendResult);
-      setStatusMessage(
-        dryRun
-          ? `Dry run: would send to ${payload.data?.recipientCount ?? 0} sponsor(s).`
-          : `Sent to ${payload.data?.sentCount ?? 0} sponsor(s) (${payload.data?.failedCount ?? 0} failed).`
-      );
+      const data = payload.data as SendResult;
+      setSendResult(data);
+      if (mode === 'test') {
+        setStatusMessage(
+          `Test sent to kevin@beanumber.org. Real send would go to ${
+            data.recipientCount ?? 0
+          } sponsor(s) + ${data.nonSponsorRecipientCount ?? 0} opted-in non-sponsor(s).`
+        );
+      } else if (mode === 'dryRun') {
+        setStatusMessage(
+          `Counts ready: ${data.recipientCount ?? 0} sponsor(s) + ${
+            data.nonSponsorRecipientCount ?? 0
+          } opted-in non-sponsor(s).`
+        );
+      } else {
+        setStatusMessage(
+          `Sent to ${data.sentCount ?? 0} recipient(s) (${
+            data.failedCount ?? 0
+          } failed).`
+        );
+      }
       await reloadList();
     } catch (err: unknown) {
       setErrorMessage(err instanceof Error ? err.message : 'Send failed');
@@ -485,20 +507,28 @@ export default function AdminNewsletterPage() {
                     {selectedId ? 'Save changes' : 'Save as draft'}
                   </button>
                   <button
-                    onClick={() => triggerSend(true)}
+                    onClick={() => triggerSend('test')}
+                    disabled={busy || !selectedId}
+                    className="bg-[#D4A843] text-[#0d0d0d] px-4 py-2 rounded-md text-sm font-bold uppercase tracking-wider hover:bg-[#c49a3a] disabled:opacity-50"
+                    title={!selectedId ? 'Save the draft first' : 'Sends both variants (sponsor + non-sponsor) to your inbox'}
+                  >
+                    Send test to my inbox
+                  </button>
+                  <button
+                    onClick={() => triggerSend('dryRun')}
                     disabled={busy || !selectedId}
                     className="bg-white border border-gray-300 text-gray-900 px-4 py-2 rounded-md text-sm font-semibold hover:border-gray-500 disabled:opacity-50"
                     title={!selectedId ? 'Save the draft first' : 'Counts recipients without sending'}
                   >
-                    Dry run
+                    Just count
                   </button>
                   <button
-                    onClick={() => triggerSend(false)}
+                    onClick={() => triggerSend('real')}
                     disabled={busy || !selectedId}
                     className="bg-emerald-600 text-white px-4 py-2 rounded-md text-sm font-semibold hover:bg-emerald-700 disabled:opacity-50"
-                    title={!selectedId ? 'Save the draft first' : 'Sends to every active sponsor'}
+                    title={!selectedId ? 'Save the draft first' : 'Sends to every active sponsor + opted-in non-sponsor'}
                   >
-                    Send now
+                    Send to all
                   </button>
                 </div>
               )}
@@ -506,11 +536,25 @@ export default function AdminNewsletterPage() {
               {sendResult && (
                 <div className="mt-4 border border-gray-200 rounded-md p-4 bg-gray-50 text-sm">
                   <div className="font-semibold text-gray-900 mb-1">
-                    {sendResult.dryRun ? 'Dry run result' : 'Send result'}
+                    {sendResult.testSend
+                      ? 'Test result'
+                      : sendResult.dryRun
+                        ? 'Counts'
+                        : 'Send result'}
                   </div>
                   <div className="text-gray-700">
-                    Recipients: {sendResult.recipientCount ?? 0}
-                    {!sendResult.dryRun && (
+                    Active sponsors: {sendResult.recipientCount ?? 0}
+                    {' · '}Opted-in non-sponsors:{' '}
+                    {sendResult.nonSponsorRecipientCount ?? 0}
+                    {sendResult.testSend && (
+                      <>
+                        {' · '}Test sent: {sendResult.sentCount ?? 0}/2{' '}
+                        {sendResult.failedCount
+                          ? `(${sendResult.failedCount} failed)`
+                          : ''}
+                      </>
+                    )}
+                    {!sendResult.dryRun && !sendResult.testSend && (
                       <>
                         {' · '}Sent: {sendResult.sentCount ?? 0}
                         {' · '}Failed: {sendResult.failedCount ?? 0}
