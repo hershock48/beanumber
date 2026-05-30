@@ -444,10 +444,10 @@ export async function sendNewsletterNotificationEmailForNonSponsor(params: {
 
     ${teaserBlock}
 
-    <p style="margin: 24px 0 16px 0;"><strong>To read the rest:</strong> go to <a href="${siteUrl}" style="color: #D4A843; font-weight: bold;">beanumber.org</a> and type the number on the back of your shirt. You&rsquo;ll land on the page of the kid your shirt belongs to &mdash; the newsletter sits right under their story.</p>
+    <p style="margin: 24px 0 16px 0;"><strong>To read the rest:</strong> go to <a href="${siteUrl}" style="color: #D4A843; font-weight: bold;">beanumber.org</a> and type the number on the back of your shirt. The newsletter sits right under your kid&rsquo;s story.</p>
 
     <p style="margin: 24px 0;">
-      <a href="${siteUrl}" style="display: inline-block; background: #D4A843; color: #0d0d0d; font-weight: bold; text-transform: uppercase; letter-spacing: 0.05em; padding: 14px 28px; text-decoration: none; font-size: 13px;">Meet your kid</a>
+      <a href="${siteUrl}" style="display: inline-block; background: #D4A843; color: #0d0d0d; font-weight: bold; text-transform: uppercase; letter-spacing: 0.05em; padding: 14px 28px; text-decoration: none; font-size: 13px;">Type your number</a>
     </p>
 
     <p style="font-size: 14px; color: #555;">If reading this makes you want to become a monthly sponsor of the kid on your shirt, that&rsquo;s a $25-a-month decision and the sponsor button is right there on their page. No pressure &mdash; the work runs either way. Just wanted you to know the door is open.</p>
