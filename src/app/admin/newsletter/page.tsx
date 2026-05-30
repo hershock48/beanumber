@@ -44,6 +44,8 @@ interface SendResult {
   status: string;
   recipientCount?: number;
   nonSponsorRecipientCount?: number;
+  shirtBuyerRecipientCount?: number;
+  legacyDonorRecipientCount?: number;
   sentCount?: number;
   failedCount?: number;
   dryRun?: boolean;
@@ -242,15 +244,19 @@ export default function AdminNewsletterPage() {
       setSendResult(data);
       if (mode === 'test') {
         setStatusMessage(
-          `Test sent to kevin@beanumber.org. Real send would go to ${
+          `Tests sent to kevin@beanumber.org (sponsor view, shirt-buyer view, legacy-donor view). Real send: ${
             data.recipientCount ?? 0
-          } sponsor(s) + ${data.nonSponsorRecipientCount ?? 0} non-sponsor(s) (shirt buyers & past donors).`
+          } sponsor(s) + ${data.shirtBuyerRecipientCount ?? 0} shirt buyer(s) + ${
+            data.legacyDonorRecipientCount ?? 0
+          } legacy donor(s) = ${(data.recipientCount ?? 0) + (data.nonSponsorRecipientCount ?? 0)} total.`
         );
       } else if (mode === 'dryRun') {
         setStatusMessage(
           `Counts ready: ${data.recipientCount ?? 0} sponsor(s) + ${
-            data.nonSponsorRecipientCount ?? 0
-          } non-sponsor(s) (shirt buyers & past donors).`
+            data.shirtBuyerRecipientCount ?? 0
+          } shirt buyer(s) + ${
+            data.legacyDonorRecipientCount ?? 0
+          } legacy donor(s).`
         );
       } else {
         setStatusMessage(

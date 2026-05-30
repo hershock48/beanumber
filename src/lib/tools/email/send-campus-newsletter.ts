@@ -28,6 +28,7 @@ import {
 import {
   sendNewsletterNotificationEmail,
   sendNewsletterNotificationEmailForNonSponsor,
+  sendNewsletterNotificationEmailForLegacyDonor,
 } from '../../email';
 
 // Notification model: the full newsletter body lives on /[number] for
@@ -40,6 +41,62 @@ const AIRTABLE_API_KEY =
   process.env.AIRTABLE_PAT || process.env.AIRTABLE_API_KEY || '';
 const CHILDREN_TABLE = process.env.AIRTABLE_CHILDREN_TABLE || 'Children';
 const DONORS_TABLE = process.env.AIRTABLE_DONORS_TABLE || 'Donors';
+const DONATIONS_TABLE = process.env.AIRTABLE_DONATIONS_TABLE || 'Donations';
+
+/**
+ * Pull all donor emails that have at least one Stripe-source
+ * Donation in Airtable — meaning they bought a shirt or made a
+ * donation through Stripe Checkout (any path that runs the
+ * webhook). Returned as a lowercased Set for fast membership tests.
+ *
+ * Used by the newsletter send to split the non-sponsor audience:
+ *   - In this set → "shirt buyer" → email points at their kid's page
+ *   - Not in this set → "legacy donor" → email points at /news
+ *
+ * Detection rule: any Donation row whose Stripe Payment Intent ID
+ * starts with 'pi_' OR Stripe Checkout Session ID starts with 'cs_'.
+ * Donorbox-imported donors have neither.
+ */
+async function fetchEmailsWithStripeDonations(): Promise<Set<string>> {
+  const set = new Set<string>();
+  if (!AIRTABLE_BASE_ID || !AIRTABLE_API_KEY) return set;
+  let offset: string | undefined;
+  do {
+    const params = new URLSearchParams();
+    // Either a real PaymentIntent or a Checkout Session ID present.
+    params.set(
+      'filterByFormula',
+      `OR(LEFT({Stripe Payment Intent ID}, 3)="pi_", LEFT({Stripe Checkout Session ID}, 3)="cs_")`
+    );
+    params.set('pageSize', '100');
+    params.append('fields[]', 'Donor Email at Donation');
+    if (offset) params.set('offset', offset);
+    try {
+      const res = await fetch(
+        `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(DONATIONS_TABLE)}?${params}`,
+        {
+          headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` },
+          cache: 'no-store',
+        }
+      );
+      if (!res.ok) break;
+      const data = await res.json();
+      for (const rec of (data.records || []) as Array<{
+        id: string;
+        fields: { 'Donor Email at Donation'?: string };
+      }>) {
+        const email = (rec.fields['Donor Email at Donation'] || '')
+          .trim()
+          .toLowerCase();
+        if (email) set.add(email);
+      }
+      offset = data.offset;
+    } catch {
+      break;
+    }
+  } while (offset);
+  return set;
+}
 
 /**
  * Fetch every emailable Donor — anyone with an email address who
@@ -248,8 +305,12 @@ export interface SendCampusNewsletterOutput {
     title: string;
     subject: string;
     recipientCount: number;
-    /** How many opted-in non-sponsors would receive the teaser. */
+    /** How many non-sponsors total would receive a teaser. */
     nonSponsorRecipientCount: number;
+    /** Of the non-sponsors, how many are shirt buyers (Stripe). */
+    shirtBuyerRecipientCount: number;
+    /** Of the non-sponsors, how many are legacy donors (no Stripe). */
+    legacyDonorRecipientCount: number;
     /** How many sponsors we filtered out for being unsubscribed. */
     suppressedCount: number;
     sentCount: number;
@@ -421,18 +482,33 @@ export async function sendCampusNewsletterTool(
   // extracting the first paragraph from the body HTML.
   const teaser = explicitTeaser || extractTeaser(bodyHtml);
 
-  // 3e. Count the non-sponsor recipients upfront. They'd get the
-  // teaser-with-soft-CTA variant; we want the count visible whether
-  // this is a dryRun, a testTo preview, or a real send.
+  // 3e. Count the non-sponsor recipients upfront, split by variant.
+  // Shirt buyers get the "type your shirt number" copy pointing at
+  // their kid's page. Legacy donors (no Stripe donation on file —
+  // typically Donorbox imports) get the /news copy pointing at the
+  // dedicated campus feed page.
   let nonSponsorRecipientCount = 0;
+  let shirtBuyerRecipientCount = 0;
+  let legacyDonorRecipientCount = 0;
+  const sponsorEmailSet = new Set(
+    recipients.map(r => r.email.trim().toLowerCase())
+  );
+  let emailableDonorsCached: Array<{ email: string; name: string }> = [];
+  let stripeEmailsCached: Set<string> = new Set();
   try {
-    const sponsorEmailSet = new Set(
-      recipients.map(r => r.email.trim().toLowerCase())
-    );
-    const emailableDonors = await fetchEmailableDonors();
-    nonSponsorRecipientCount = emailableDonors.filter(
+    [emailableDonorsCached, stripeEmailsCached] = await Promise.all([
+      fetchEmailableDonors(),
+      fetchEmailsWithStripeDonations(),
+    ]);
+    const nonSponsorList = emailableDonorsCached.filter(
       d => !sponsorEmailSet.has(d.email.trim().toLowerCase())
-    ).length;
+    );
+    nonSponsorRecipientCount = nonSponsorList.length;
+    for (const d of nonSponsorList) {
+      const email = d.email.trim().toLowerCase();
+      if (stripeEmailsCached.has(email)) shirtBuyerRecipientCount += 1;
+      else legacyDonorRecipientCount += 1;
+    }
   } catch (err) {
     logger.warn('Non-sponsor recipient count failed (non-fatal)', {
       error: err instanceof Error ? err.message : String(err),
@@ -446,6 +522,8 @@ export async function sendCampusNewsletterTool(
     suppressedCount,
     sponsorRecipientCount: recipients.length,
     nonSponsorRecipientCount,
+    shirtBuyerRecipientCount,
+    legacyDonorRecipientCount,
     dryRun,
     testSend: isTestSend,
   });
@@ -493,20 +571,40 @@ export async function sendCampusNewsletterTool(
       const r2 = await sendNewsletterNotificationEmailForNonSponsor({
         recipientEmail: testTo,
         recipientName: 'Friend',
-        subject: `[TEST · non-sponsor view] ${subject}`,
+        subject: `[TEST · shirt buyer view] ${subject}`,
         teaser,
         heroPhotoUrl: hero,
       });
       if (!r2.success) {
         testFailures.push({
           email: testTo,
-          error: `(non-sponsor preview) ${r2.error || 'send failed'}`,
+          error: `(shirt buyer preview) ${r2.error || 'send failed'}`,
         });
       }
     } catch (err) {
       testFailures.push({
         email: testTo,
-        error: `(non-sponsor preview) ${err instanceof Error ? err.message : String(err)}`,
+        error: `(shirt buyer preview) ${err instanceof Error ? err.message : String(err)}`,
+      });
+    }
+    try {
+      const r3 = await sendNewsletterNotificationEmailForLegacyDonor({
+        recipientEmail: testTo,
+        recipientName: 'Friend',
+        subject: `[TEST · legacy donor view] ${subject}`,
+        teaser,
+        heroPhotoUrl: hero,
+      });
+      if (!r3.success) {
+        testFailures.push({
+          email: testTo,
+          error: `(legacy donor preview) ${r3.error || 'send failed'}`,
+        });
+      }
+    } catch (err) {
+      testFailures.push({
+        email: testTo,
+        error: `(legacy donor preview) ${err instanceof Error ? err.message : String(err)}`,
       });
     }
     return {
@@ -517,8 +615,10 @@ export async function sendCampusNewsletterTool(
         subject,
         recipientCount: recipients.length,
         nonSponsorRecipientCount,
+        shirtBuyerRecipientCount,
+        legacyDonorRecipientCount,
         suppressedCount,
-        sentCount: 2 - testFailures.length,
+        sentCount: 3 - testFailures.length,
         failedCount: testFailures.length,
         dryRun: false,
         testSend: true,
@@ -537,6 +637,8 @@ export async function sendCampusNewsletterTool(
         subject,
         recipientCount: recipients.length,
         nonSponsorRecipientCount,
+        shirtBuyerRecipientCount,
+        legacyDonorRecipientCount,
         suppressedCount,
         sentCount: 0,
         failedCount: 0,
@@ -601,19 +703,24 @@ export async function sendCampusNewsletterTool(
     await new Promise((resolve) => setTimeout(resolve, 50));
   }
 
-  // 5b. Extend the send to NON-sponsors. Shirt buyers who never
-  // converted, one-time donors who went quiet. Same teaser + hero
-  // photo; different CTA ("type your number at beanumber.org")
-  // since they don't have a sponsored kid page to land on. We
-  // subtract the sponsor email set so emailable sponsors don't
-  // get two emails.
+  // 5b. Extend the send to NON-sponsors, split by audience:
+  //   - Shirt buyers (have any Stripe-source Donation): get the
+  //     "type your shirt number" copy pointing at their kid page.
+  //   - Legacy donors (no Stripe Donations — typically Donorbox
+  //     imports): get the /news copy pointing at the dedicated
+  //     campus feed page.
+  //
+  // We reuse the cached emailable donors + stripe-email set from
+  // step 3e so we're not re-querying Airtable.
   let nonSponsorSent = 0;
   let nonSponsorFailed = 0;
   try {
-    const sponsorEmailSet = new Set(
-      recipients.map(r => r.email.trim().toLowerCase())
-    );
-    const emailableDonors = await fetchEmailableDonors();
+    const emailableDonors = emailableDonorsCached.length > 0
+      ? emailableDonorsCached
+      : await fetchEmailableDonors();
+    const stripeEmails = stripeEmailsCached.size > 0
+      ? stripeEmailsCached
+      : await fetchEmailsWithStripeDonations();
     const nonSponsorRecipients = emailableDonors.filter(
       d => !sponsorEmailSet.has(d.email.trim().toLowerCase())
     );
@@ -621,11 +728,18 @@ export async function sendCampusNewsletterTool(
     logger.info('Newsletter non-sponsor send starting', {
       newsletterId,
       candidateCount: nonSponsorRecipients.length,
+      shirtBuyerCount: shirtBuyerRecipientCount,
+      legacyDonorCount: legacyDonorRecipientCount,
     });
 
     for (const r of nonSponsorRecipients) {
+      const isShirtBuyer = stripeEmails.has(r.email.trim().toLowerCase());
+      const sendFn = isShirtBuyer
+        ? sendNewsletterNotificationEmailForNonSponsor
+        : sendNewsletterNotificationEmailForLegacyDonor;
+      const variantLabel = isShirtBuyer ? 'shirt buyer' : 'legacy donor';
       try {
-        const result = await sendNewsletterNotificationEmailForNonSponsor({
+        const result = await sendFn({
           recipientEmail: r.email,
           recipientName: r.name,
           subject,
@@ -638,13 +752,13 @@ export async function sendCampusNewsletterTool(
           nonSponsorFailed += 1;
           failures.push({
             email: r.email,
-            error: `(non-sponsor) ${result.error || 'Unknown send error'}`,
+            error: `(${variantLabel}) ${result.error || 'Unknown send error'}`,
           });
         }
       } catch (err) {
         nonSponsorFailed += 1;
         const msg = err instanceof Error ? err.message : String(err);
-        failures.push({ email: r.email, error: `(non-sponsor) ${msg}` });
+        failures.push({ email: r.email, error: `(${variantLabel}) ${msg}` });
       }
       await new Promise((resolve) => setTimeout(resolve, 50));
     }
@@ -698,6 +812,8 @@ export async function sendCampusNewsletterTool(
       subject,
       recipientCount: recipients.length,
       nonSponsorRecipientCount,
+      shirtBuyerRecipientCount,
+      legacyDonorRecipientCount,
       suppressedCount,
       sentCount,
       failedCount,

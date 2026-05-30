@@ -11,25 +11,29 @@ The newsletter used to be one long email shipped to every sponsor. That model ha
 The new model:
 
 - **The newsletter body lives on every kid's `/[number]` page**, publicly visible to anyone.
-- **The email is a short notification** — teaser + hero photo + a link. Two variants:
+- **The newsletter body also lives at `/news`** — a dedicated campus feed without kid framing. Same content, different surface.
+- **The email is a short notification** — teaser + hero photo + a link. **Three variants** based on the recipient's relationship to BAN:
   - **Sponsors** get a direct link to *their* kid's page (the body sits below the kid's bio).
-  - **Non-sponsors** get told to "type the number on the back of your shirt at beanumber.org" and land on the kid that matches.
+  - **Shirt buyers** (paid via Stripe but haven't sponsored monthly) get "type the number on the back of your shirt at beanumber.org" — the brand model intact, lands on the kid their shirt belongs to.
+  - **Legacy donors** (gave through Donorbox or another path; no Stripe Donation on file) get pointed at `/news` — the dedicated campus feed. No "type any number" slot-machine ask, no fake-kid pairing. Soft CTA to meet the kids if they want.
 - **Report cards + letters stay sponsor-only.** Those are individual to the kid + their sponsor and don't belong on the public feed.
 
-Pool funding rule applies here too: a newsletter is a campus update, not a per-kid update. It runs once a month, ships to everyone, lives forever on every kid page.
+Pool funding rule applies here too: a newsletter is a campus update, not a per-kid update. It runs once a month, ships to everyone, lives forever on `/news` and on every kid page.
 
 ---
 
 ## What happens when you click "Send to all"
 
-One operation, three effects, in this order:
+One operation, four effects, in this order:
 
 1. Newsletter Status flips `Draft → Sending`. PublishedAt gets stamped with `now`.
 2. Sponsor loop fires `sendNewsletterNotificationEmail` to every Active Sponsorship's SponsorEmail (deduped by email — sponsors with multiple kids get one email listing all their kid links).
-3. Non-sponsor loop fires `sendNewsletterNotificationEmailForNonSponsor` to every Donor with an email who isn't already in the sponsor set and hasn't explicitly unsubscribed.
-4. Newsletter Status flips to `Sent`. From that moment, `getRecentCampusNewsletters` picks it up and renders it on every `/children/[N]` page.
+3. Non-sponsor loop runs through every Donor with an email who isn't a sponsor and hasn't unsubscribed. For each, it checks: do they have any Stripe-source Donation in Airtable (`Stripe Payment Intent ID` starts with `pi_` OR `Stripe Checkout Session ID` starts with `cs_`)?
+   - **Yes** → `sendNewsletterNotificationEmailForNonSponsor` (shirt buyer variant — "type your shirt number").
+   - **No** → `sendNewsletterNotificationEmailForLegacyDonor` (legacy variant — points at `/news`).
+4. Newsletter Status flips to `Sent`. From that moment, `getRecentCampusNewsletters` picks it up and renders it on `/news` and every `/children/[N]` page.
 
-There is **no separate "publish to feed" step**. The Sent state IS the publish event for the feed.
+There is **no separate "publish to feed" step**. The Sent state IS the publish event for both surfaces.
 
 ---
 
@@ -128,13 +132,17 @@ The real send. Hits the confirm dialog first ("This will email every active spon
 
 ## What lives where in the codebase
 
-- `src/lib/tools/email/send-campus-newsletter.ts` — the orchestrator. Loads the newsletter, builds recipient lists, fires the two email loops, updates Status.
-- `src/lib/email.ts` — `sendNewsletterNotificationEmail` (sponsor variant) and `sendNewsletterNotificationEmailForNonSponsor` (non-sponsor variant). Update the email copy here.
+- `src/lib/tools/email/send-campus-newsletter.ts` — the orchestrator. Loads the newsletter, builds recipient lists, runs the shirt-buyer-vs-legacy detection, fires the three email loops, updates Status.
+- `src/lib/newsletter-feed.ts` — `getRecentCampusNewsletters()` + `CampusNewsletterEntry` type. Shared by both `/children/[N]` and `/news`. Edit here when changing the feed fetch logic.
+- `src/lib/email.ts` — Three email variants live here:
+  - `sendNewsletterNotificationEmail` — sponsor variant (direct kid link).
+  - `sendNewsletterNotificationEmailForNonSponsor` — shirt buyer variant ("type your shirt number").
+  - `sendNewsletterNotificationEmailForLegacyDonor` — legacy donor variant (points at `/news`).
 - `src/app/api/admin/newsletter/send/route.ts` — POST endpoint the admin UI calls.
-- `src/app/admin/newsletter/page.tsx` — the editor + Send buttons.
-- `src/app/children/[number]/CampusNewsfeed.tsx` — the public feed component. Most recent newsletter renders in full; older ones collapse into compact cards with `<details>` expanders.
-- `src/app/children/[number]/RelationshipCard.tsx` — the card that sits above the feed. Sponsor variant is a quiet acknowledgment; non-sponsor variant is a $25/mo conversion ask.
-- `src/app/children/[number]/page.tsx` — `getRecentCampusNewsletters()` fetches the last 12 Sent newsletters for the feed.
+- `src/app/admin/newsletter/page.tsx` — the editor + Send buttons. Surfaces the three-way breakdown in test/dry-run output.
+- `src/app/children/[number]/CampusNewsfeed.tsx` — the public feed component. Reused by both `/children/[N]` and `/news`. Most recent newsletter renders in full; older ones collapse into compact cards with `<details>` expanders.
+- `src/app/children/[number]/RelationshipCard.tsx` — the card that sits above the feed on kid pages. Sponsor variant is a quiet acknowledgment; non-sponsor variant is a $25/mo conversion ask.
+- `src/app/news/page.tsx` — dedicated campus newsfeed page. Reuses `CampusNewsfeed`. Bottom CTAs link to the homepage carousel + sponsorship.
 - `src/app/globals.css` — `.ban-newsletter-body` rules. Edit these if you want global styling changes to all newsletters past and future.
 
 ---

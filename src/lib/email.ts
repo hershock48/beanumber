@@ -405,17 +405,16 @@ export async function sendNewsletterNotificationEmail(params: {
 }
 
 /**
- * Same monthly-newsletter notification, but for opted-in non-sponsors
- * (shirt buyers who haven't sponsored, donors who gave once and went
- * quiet, etc). Same teaser + hero photo as the sponsor version.
+ * Newsletter notification for SHIRT BUYERS who haven't sponsored
+ * monthly yet. They have a shirt with a number on the back, so the
+ * ask is direct: type your number at beanumber.org and the
+ * newsletter is there waiting on the kid's page that matches.
  *
- * Under the May 2026 rewrite, the newsletter lives on every kid's
- * /[number] page as a public feed. Sponsors get a direct link to
- * their kid. Non-sponsors don't have an assigned kid yet, but most
- * of them DO have a shirt with a number — so the ask here is: type
- * your number at beanumber.org and read this newsletter on the
- * kid's page who matches your shirt. Same content, with the kid you
- * could meet sitting right next to it.
+ * Under the May 2026 rewrite, the newsletter body lives on every
+ * kid's /[number] page as a public feed. Sponsors get a direct
+ * link to their kid; shirt buyers get the "type your number"
+ * instruction; legacy donors (no shirt) get pointed at /news
+ * instead via a separate variant.
  */
 export async function sendNewsletterNotificationEmailForNonSponsor(params: {
   recipientEmail: string;
@@ -439,25 +438,76 @@ export async function sendNewsletterNotificationEmailForNonSponsor(params: {
   const html = wrapTransactionalEmail(`
     <p style="margin-top: 0;">Hey ${escapeHtml(firstName)},</p>
 
-    <p>The latest campus newsletter just went up &mdash; <strong>${escapeHtml(subject)}</strong>. You&rsquo;re getting this because you bought a shirt or gave at some point this year, and I want you to see what&rsquo;s been happening on the ground.</p>
+    <p>The latest campus newsletter just went up &mdash; <strong>${escapeHtml(subject)}</strong>. You&rsquo;re getting this because you bought a shirt, and I want you to see what&rsquo;s been happening on the ground.</p>
 
     ${heroBlock}
 
     ${teaserBlock}
 
-    <p style="margin: 24px 0 8px 0;"><strong>To read the rest:</strong></p>
-
-    <p style="margin: 0 0 16px 0;">The full newsletter lives on every kid&rsquo;s page at beanumber.org. Two ways in:</p>
-
-    <p style="margin: 0 0 10px 0;"><strong>If you have a shirt:</strong> go to <a href="${siteUrl}" style="color: #D4A843; font-weight: bold;">beanumber.org</a> and type your shirt number. You&rsquo;ll land on the page of the kid your shirt belongs to &mdash; this newsletter sits right under their story.</p>
-
-    <p style="margin: 0 0 24px 0;"><strong>If you don&rsquo;t have a shirt yet:</strong> type any number from 1 to 200 to meet a kid, and read the newsletter under their story.</p>
+    <p style="margin: 24px 0 16px 0;"><strong>To read the rest:</strong> go to <a href="${siteUrl}" style="color: #D4A843; font-weight: bold;">beanumber.org</a> and type the number on the back of your shirt. You&rsquo;ll land on the page of the kid your shirt belongs to &mdash; the newsletter sits right under their story.</p>
 
     <p style="margin: 24px 0;">
-      <a href="${siteUrl}" style="display: inline-block; background: #D4A843; color: #0d0d0d; font-weight: bold; text-transform: uppercase; letter-spacing: 0.05em; padding: 14px 28px; text-decoration: none; font-size: 13px;">Read the newsletter</a>
+      <a href="${siteUrl}" style="display: inline-block; background: #D4A843; color: #0d0d0d; font-weight: bold; text-transform: uppercase; letter-spacing: 0.05em; padding: 14px 28px; text-decoration: none; font-size: 13px;">Meet your kid</a>
     </p>
 
-    <p style="font-size: 14px; color: #555;">If reading this makes you want to become a monthly sponsor of a kid at the campus, that&rsquo;s a $25-a-month decision and the sponsor button is right there on every kid&rsquo;s page. No pressure &mdash; the work runs either way. Just wanted you to know the door is open.</p>
+    <p style="font-size: 14px; color: #555;">If reading this makes you want to become a monthly sponsor of the kid on your shirt, that&rsquo;s a $25-a-month decision and the sponsor button is right there on their page. No pressure &mdash; the work runs either way. Just wanted you to know the door is open.</p>
+
+    <p>Kevin</p>
+  `);
+
+  return sendEmail({
+    to: { email: recipientEmail, name: recipientName },
+    subject,
+    html,
+  });
+}
+
+/**
+ * Newsletter notification for LEGACY DONORS — people who gave
+ * earlier (e.g. through Donorbox) but haven't bought a shirt or
+ * sponsored monthly. They don't have a number-to-kid relationship
+ * yet, so we don't ask them to type a number into beanumber.org's
+ * lookup — that would feel like a slot machine and undermine the
+ * brand. Instead we point them at /news (the dedicated campus
+ * newsfeed without kid framing) and offer a soft path into meeting
+ * the kids if they want.
+ */
+export async function sendNewsletterNotificationEmailForLegacyDonor(params: {
+  recipientEmail: string;
+  recipientName: string;
+  subject: string;
+  teaser: string;
+  heroPhotoUrl?: string;
+}): Promise<EmailSendResult> {
+  const { recipientEmail, recipientName, subject, teaser, heroPhotoUrl } = params;
+  const firstName = (recipientName || 'Friend').trim().split(/\s+/)[0] || 'Friend';
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.beanumber.org';
+  const newsUrl = `${siteUrl}/news`;
+
+  const heroBlock = heroPhotoUrl
+    ? `<img src="${escapeAttr(heroPhotoUrl)}" alt="From the campus" style="display:block;width:100%;max-width:560px;height:auto;border-radius:4px;margin:0 0 24px 0;">`
+    : '';
+
+  const teaserBlock = teaser
+    ? `<p style="color: #555; font-style: italic; border-left: 3px solid #D4A843; padding-left: 16px; margin: 24px 0;">${escapeHtml(teaser)}</p>`
+    : '';
+
+  const html = wrapTransactionalEmail(`
+    <p style="margin-top: 0;">Hey ${escapeHtml(firstName)},</p>
+
+    <p>The latest campus newsletter just went up &mdash; <strong>${escapeHtml(subject)}</strong>. You gave to Be A Number at some point and stayed on the list, and I want you to see what&rsquo;s been happening on the ground.</p>
+
+    ${heroBlock}
+
+    ${teaserBlock}
+
+    <p style="margin: 24px 0 16px 0;"><strong>Read the rest at <a href="${newsUrl}" style="color: #D4A843;">beanumber.org/news</a>.</strong> That&rsquo;s the dedicated campus feed &mdash; everything we&rsquo;ve been sending lives there.</p>
+
+    <p style="margin: 24px 0;">
+      <a href="${newsUrl}" style="display: inline-block; background: #D4A843; color: #0d0d0d; font-weight: bold; text-transform: uppercase; letter-spacing: 0.05em; padding: 14px 28px; text-decoration: none; font-size: 13px;">Read the newsletter</a>
+    </p>
+
+    <p style="font-size: 14px; color: #555;">Curious about the kids the campus runs for? Browse them at <a href="${siteUrl}" style="color: #D4A843;">beanumber.org</a>. Every shirt sold matches its buyer to one of them by number &mdash; and if that&rsquo;s something you want in on, the sponsor button is on every kid&rsquo;s page. $25 a month, cancel anytime, runs the whole campus.</p>
 
     <p>Kevin</p>
   `);

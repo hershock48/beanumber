@@ -21,14 +21,9 @@
  * scanning through past months feels intentional.
  */
 
-export interface CampusNewsletterEntry {
-  id: string;
-  title: string;
-  subject: string;
-  bodyHtml: string;
-  heroPhotoUrl?: string;
-  publishedAt?: string;
-}
+import type { CampusNewsletterEntry } from '@/lib/newsletter-feed';
+
+export type { CampusNewsletterEntry };
 
 interface CampusNewsfeedProps {
   firstName: string;

@@ -11,7 +11,11 @@ import { ReplacementChooser } from './ReplacementChooser';
 import { SponsorButton } from './SponsorButton';
 import { ClaimMatchCard } from './ClaimMatchCard';
 import { SponsorPortalSections } from './SponsorPortalSections';
-import { CampusNewsfeed, type CampusNewsletterEntry } from './CampusNewsfeed';
+import { CampusNewsfeed } from './CampusNewsfeed';
+import {
+  getRecentCampusNewsletters,
+  type CampusNewsletterEntry,
+} from '@/lib/newsletter-feed';
 import { RelationshipCard } from './RelationshipCard';
 import { SponsorRecoveryForm } from './SponsorRecoveryForm';
 import { SESSION } from '@/lib/constants';
@@ -157,45 +161,6 @@ async function resolveBuyerContext(
   } catch (err) {
     console.warn('[children/page] Buyer context lookup failed', err);
     return null;
-  }
-}
-
-/**
- * Pull recent sent Newsletters. Under the May 2026 rewrite, the
- * campus newsletter is a *public* surface — anyone landing on /[N]
- * sees the same feed of recent newsletters, regardless of sponsor
- * state. The relationship card above frames the read differently
- * for sponsors (acknowledgment) vs non-sponsors (conversion).
- *
- * Status is the gate: only Sent records, never drafts or
- * scheduled future sends. Sorted newest first; we cap at 12 so the
- * feed has weight without becoming a wall.
- */
-async function getRecentCampusNewsletters(): Promise<CampusNewsletterEntry[]> {
-  const newslettersTable = 'tblqP1zrRsh4mblHq'; // Newsletters
-  try {
-    // Sent records — Status = "Sent" OR PublishedAt is set. Sorted
-    // newest first.
-    const formula = encodeURIComponent(`OR({Status}="Sent", NOT({PublishedAt}=BLANK()))`);
-    const res = await airtableRequest<{
-      records: Array<{ id: string; fields: Record<string, any> }>;
-    }>(
-      `/${encodeURIComponent(newslettersTable)}?filterByFormula=${formula}&sort%5B0%5D%5Bfield%5D=PublishedAt&sort%5B0%5D%5Bdirection%5D=desc&maxRecords=12`
-    );
-    return (res.records || []).map(r => {
-      const f = r.fields;
-      return {
-        id: r.id,
-        title: (f.Title as string) || '',
-        subject: (f.Subject as string) || '',
-        bodyHtml: (f.BodyHTML as string) || '',
-        heroPhotoUrl: (f.HeroPhoto as Array<{ url: string }> | undefined)?.[0]?.url,
-        publishedAt: f.PublishedAt as string | undefined,
-      };
-    });
-  } catch (err) {
-    console.warn('[children/page] Newsletter fetch failed', err);
-    return [];
   }
 }
 
