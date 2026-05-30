@@ -14,6 +14,7 @@ import { redirect } from 'next/navigation';
 import { AdminShell } from '../_components/AdminShell';
 import { getAdminRole } from '@/lib/admin-session';
 import { StripeSyncClient } from './StripeSyncClient';
+import { StripeCustomerSyncClient } from './StripeCustomerSyncClient';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -39,16 +40,44 @@ export default async function StripeSyncPage() {
           className="text-3xl md:text-4xl text-[#0d0d0d] mb-3"
           style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
         >
-          Sync subscriptions.
+          Sync from Stripe.
         </h1>
-        <p className="text-[#666] text-sm mb-6 leading-relaxed">
-          Pulls every Stripe subscription and ensures Airtable has a
-          matching Donor + Sponsorship row. Safe to re-run — it&apos;s
-          idempotent. Subs that already match get touched up; missing
-          ones get created.
-        </p>
 
-        <StripeSyncClient />
+        {/* ── Customer sync (every shirt buyer + sponsor) ─────────── */}
+        <section className="mt-8 mb-12">
+          <h2
+            className="text-xl md:text-2xl text-[#0d0d0d] mb-2"
+            style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
+          >
+            Every customer who&rsquo;s paid you.
+          </h2>
+          <p className="text-[#666] text-sm mb-5 leading-relaxed">
+            Walks every successful Stripe charge and ensures Airtable
+            has a Donor row for the email behind it. This is what fills
+            in shirt buyers who never converted to monthly &mdash;
+            their checkout completed but the webhook may have missed
+            writing them to Airtable. Run this first when the
+            newsletter recipient count looks too small.
+          </p>
+          <StripeCustomerSyncClient />
+        </section>
+
+        <hr className="border-[#e8e0d4] mb-12" />
+
+        {/* ── Subscription sync (sponsors only) ───────────────────── */}
+        <section>
+          <h2
+            className="text-xl md:text-2xl text-[#0d0d0d] mb-2"
+            style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
+          >
+            Subscriptions.
+          </h2>
+          <p className="text-[#666] text-sm mb-5 leading-relaxed">
+            Pulls every Stripe subscription and ensures Airtable has a
+            matching Donor + Sponsorship row. Safe to re-run.
+          </p>
+          <StripeSyncClient />
+        </section>
       </div>
     </AdminShell>
   );
