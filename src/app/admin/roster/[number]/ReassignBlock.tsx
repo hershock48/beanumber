@@ -55,6 +55,8 @@ export function ReassignBlock({
   const [error, setError] = useState<string | null>(null);
   const [picking, setPicking] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
+  const [staging, setStaging] = useState(false);
+  const [stagedNote, setStagedNote] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -79,6 +81,36 @@ export function ReassignBlock({
       cancelled = true;
     };
   }, [shirtNumber]);
+
+  async function stageForSponsorChoice() {
+    if (staging) return;
+    const ok = confirm(
+      `Stage 3 candidate cards for the sponsor${
+        (context?.sponsorships.length || 0) === 1 ? '' : 's'
+      } to pick from? Next time they visit /${shirtNumber} they'll see a chooser instead of the regular page.`
+    );
+    if (!ok) return;
+    setStaging(true);
+    setError(null);
+    setStagedNote(null);
+    try {
+      const res = await fetch('/api/admin/roster/stage-candidates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fromShirtNumber: shirtNumber }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `Failed: ${res.status}`);
+      setStagedNote(
+        `Staged. ${data.staged} sponsor${data.staged === 1 ? '' : 's'} will see the chooser next visit.`
+      );
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Staging failed.');
+    } finally {
+      setStaging(false);
+    }
+  }
 
   async function reassignTo(replacement: Replacement) {
     if (busy) return;
@@ -153,13 +185,28 @@ export function ReassignBlock({
       </p>
 
       {!picking ? (
-        <button
-          type="button"
-          onClick={() => setPicking(true)}
-          className="bg-[#D4A843] text-[#0d0d0d] hover:bg-[#c49a3a] font-bold text-xs uppercase tracking-wider px-4 py-2 transition-colors"
-        >
-          Pick a replacement…
-        </button>
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            onClick={stageForSponsorChoice}
+            disabled={staging}
+            className="bg-[#D4A843] text-[#0d0d0d] hover:bg-[#c49a3a] font-bold text-xs uppercase tracking-wider px-4 py-2 transition-colors disabled:opacity-50"
+          >
+            {staging ? 'Staging…' : 'Let sponsor pick from 3 cards (recommended)'}
+          </button>
+          <button
+            type="button"
+            onClick={() => setPicking(true)}
+            className="text-xs text-[#888] hover:text-[#0d0d0d] underline"
+          >
+            Or pick the replacement myself
+          </button>
+          {stagedNote && (
+            <span className="text-xs text-green-700 font-semibold">
+              {stagedNote}
+            </span>
+          )}
+        </div>
       ) : (
         <div>
           <p className="text-xs text-[#666] mb-3">
