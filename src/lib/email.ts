@@ -388,7 +388,7 @@ export async function sendNewsletterNotificationEmail(params: {
 
     ${teaserBlock}
 
-    <p>Read the rest on your kid${kids.length === 1 ? "&rsquo;s" : "s&rsquo;"} page:</p>
+    <p>Check out your kid${kids.length === 1 ? "&rsquo;s" : "s&rsquo;"} page${kids.length === 1 ? '' : 's'} to read the update! :)</p>
 
     ${kidLines}
 
