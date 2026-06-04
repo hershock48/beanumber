@@ -1,12 +1,15 @@
 /**
- * Home — number entry, with the additions that make it feel like
- * an app instead of a form:
- *   - Recently met kids strip above the input (AsyncStorage).
- *   - Live campus context line ("9:43 PM in Omoro. Most kids
- *     are asleep.").
- *   - Haptic on input tap, press on the button, success when
- *     navigation fires.
- *   - Subtle entrance animation on first paint.
+ * Home — number entry with identity strip + TodayPanel + recents.
+ *
+ * Identity strip at the top: "Visiting since [Month YYYY] · You've
+ * met N kids" or simpler variant if you haven't met any yet. Builds
+ * a sense of relationship with the org without requiring auth.
+ *
+ * TodayPanel below the strip surfaces a live "Hope Bridge, right
+ * now" line + a deterministic kid-of-the-day so opening the app
+ * always shows something fresh.
+ *
+ * Recents strip persists kids you've met across launches.
  */
 import { useCallback, useEffect, useState } from 'react';
 import {
@@ -24,38 +27,43 @@ import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import { COLORS, FONT, SIZES, SPACING } from '../../lib/theme';
-import { getRecents, type RecentKid } from '../../lib/storage';
-import { getCampusContextLine } from '../../lib/campus';
-import { error as hapticError, press as hapticPress, tap as hapticTap } from '../../lib/haptics';
+import {
+  getRecents,
+  ensureVisitorSince,
+  daysSince,
+  type RecentKid,
+} from '../../lib/storage';
+import {
+  error as hapticError,
+  press as hapticPress,
+  tap as hapticTap,
+} from '../../lib/haptics';
+import { TodayPanel } from '../../components/TodayPanel';
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const [number, setNumber] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
   const [recents, setRecents] = useState<RecentKid[]>([]);
-  const [campusLine, setCampusLine] = useState(getCampusContextLine());
+  const [visitorDays, setVisitorDays] = useState<number | null>(null);
 
-  // Refresh recents + campus context every time the home screen
-  // gets focus (e.g. after returning from a kid profile).
+  useEffect(() => {
+    ensureVisitorSince().then(since => {
+      setVisitorDays(daysSince(since));
+    });
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
       let cancelled = false;
       getRecents().then(r => {
         if (!cancelled) setRecents(r);
       });
-      setCampusLine(getCampusContextLine());
       return () => {
         cancelled = true;
       };
     }, [])
   );
-
-  // Tick the campus context every minute while the screen is
-  // mounted so "9:43" doesn't sit there at 10:15.
-  useEffect(() => {
-    const id = setInterval(() => setCampusLine(getCampusContextLine()), 60_000);
-    return () => clearInterval(id);
-  }, []);
 
   const handleSubmit = () => {
     const n = parseInt(number, 10);
@@ -74,6 +82,11 @@ export default function HomeScreen() {
     router.push(`/children/${k.shirtNumber}`);
   };
 
+  const metCount = recents.length;
+  const identityLine = metCount === 0
+    ? `Visiting Be A Number${visitorDays !== null ? ` · ${visitorDays === 0 ? 'just arrived' : `${visitorDays} day${visitorDays === 1 ? '' : 's'} in`}` : ''}`
+    : `You've met ${metCount} kid${metCount === 1 ? '' : 's'}${visitorDays !== null && visitorDays > 0 ? ` · ${visitorDays} day${visitorDays === 1 ? '' : 's'} in` : ''}`;
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
@@ -82,23 +95,18 @@ export default function HomeScreen() {
       <ScrollView
         contentContainerStyle={[
           styles.scrollContent,
-          { paddingTop: insets.top + SPACING.xl, paddingBottom: insets.bottom + SPACING.xl },
+          { paddingTop: insets.top + SPACING.lg, paddingBottom: insets.bottom + SPACING.xl },
         ]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <Animated.View entering={FadeIn.duration(400)}>
-          <View style={styles.campusLine}>
-            <View style={styles.campusDot} />
-            <Text style={styles.campusLineText}>
-              <Text style={styles.campusLineTime}>{campusLine.time}</Text>
-              {'  ·  '}
-              {campusLine.doing}
-            </Text>
-          </View>
+        <Animated.View entering={FadeIn.duration(400)} style={styles.identityStrip}>
+          <Text style={styles.identityLabel}>{identityLine}</Text>
         </Animated.View>
 
-        <Animated.View entering={FadeInDown.duration(500).delay(80)} style={styles.heroBlock}>
+        <TodayPanel />
+
+        <Animated.View entering={FadeInDown.duration(500).delay(120)} style={styles.heroBlock}>
           <Text style={styles.eyebrow}>Be A Number</Text>
           <Text style={styles.headline}>Type your number.</Text>
           <Text style={styles.subhead}>
@@ -107,11 +115,11 @@ export default function HomeScreen() {
           </Text>
         </Animated.View>
 
-        <Animated.View entering={FadeInDown.duration(500).delay(160)}>
+        <Animated.View entering={FadeInDown.duration(500).delay(200)}>
           <TextInput
             style={styles.input}
             value={number}
-            onChangeText={(t) => {
+            onChangeText={t => {
               setFormError(null);
               setNumber(t.replace(/[^0-9]/g, ''));
             }}
@@ -135,9 +143,13 @@ export default function HomeScreen() {
         </Animated.View>
 
         {recents.length > 0 && (
-          <Animated.View entering={FadeInDown.duration(500).delay(280)} style={styles.recentsBlock}>
+          <Animated.View entering={FadeInDown.duration(500).delay(320)} style={styles.recentsBlock}>
             <Text style={styles.sectionLabel}>Kids you&rsquo;ve met</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.recentsRow}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.recentsRow}
+            >
               {recents.map(k => (
                 <Pressable
                   key={k.shirtNumber}
@@ -151,7 +163,9 @@ export default function HomeScreen() {
                       <View style={[styles.recentPhoto, styles.recentPhotoFallback]} />
                     )}
                   </View>
-                  <Text style={styles.recentName} numberOfLines={1}>{k.firstName}</Text>
+                  <Text style={styles.recentName} numberOfLines={1}>
+                    {k.firstName}
+                  </Text>
                   <Text style={styles.recentNumber}>#{k.shirtNumber}</Text>
                 </Pressable>
               ))}
@@ -169,124 +183,67 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.lg,
     flexGrow: 1,
   },
-  campusLine: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  identityStrip: {
+    paddingBottom: SPACING.md,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.sand,
     marginBottom: SPACING.lg,
   },
-  campusDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: COLORS.gold,
-    marginRight: SPACING.sm,
-  },
-  campusLineText: {
-    fontSize: 12,
+  identityLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 2,
     color: COLORS.midGray,
-    letterSpacing: 0.3,
-  },
-  campusLineTime: {
-    fontWeight: '700',
-    color: COLORS.nearBlack,
-  },
-  heroBlock: {
-    marginTop: SPACING.md,
-  },
-  eyebrow: {
-    fontSize: SIZES.eyebrow,
-    fontWeight: '700',
-    letterSpacing: 3,
-    color: COLORS.gold,
     textTransform: 'uppercase',
-    marginBottom: SPACING.md,
+  },
+  heroBlock: { marginTop: SPACING.md },
+  eyebrow: {
+    fontSize: SIZES.eyebrow, fontWeight: '700', letterSpacing: 3,
+    color: COLORS.gold, textTransform: 'uppercase', marginBottom: SPACING.md,
   },
   headline: {
-    fontSize: SIZES.hero,
-    color: COLORS.nearBlack,
-    lineHeight: 50,
-    marginBottom: SPACING.md,
+    fontSize: SIZES.hero, color: COLORS.nearBlack,
+    lineHeight: 50, marginBottom: SPACING.md,
     fontFamily: FONT.serif,
   },
   subhead: {
-    fontSize: SIZES.bodyLg,
-    color: COLORS.midGray,
-    lineHeight: 26,
-    marginBottom: SPACING.xl,
+    fontSize: SIZES.bodyLg, color: COLORS.midGray,
+    lineHeight: 26, marginBottom: SPACING.xl,
   },
   input: {
-    fontSize: 28,
-    color: COLORS.nearBlack,
+    fontSize: 28, color: COLORS.nearBlack,
     backgroundColor: COLORS.white,
-    borderWidth: 1,
-    borderColor: COLORS.sand,
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: 18,
+    borderWidth: 1, borderColor: COLORS.sand,
+    paddingHorizontal: SPACING.lg, paddingVertical: 18,
     marginBottom: SPACING.md,
     fontVariant: ['tabular-nums'],
   },
-  error: {
-    fontSize: 14,
-    color: COLORS.error,
-    marginBottom: SPACING.md,
-  },
+  error: { fontSize: 14, color: COLORS.error, marginBottom: SPACING.md },
   button: {
     backgroundColor: COLORS.gold,
-    paddingVertical: 18,
-    alignItems: 'center',
+    paddingVertical: 18, alignItems: 'center',
     marginTop: SPACING.sm,
   },
-  buttonPressed: {
-    opacity: 0.85,
-    transform: [{ scale: 0.99 }],
-  },
+  buttonPressed: { opacity: 0.85, transform: [{ scale: 0.99 }] },
   buttonLabel: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: COLORS.nearBlack,
-    textTransform: 'uppercase',
-    letterSpacing: 2,
+    fontSize: 13, fontWeight: '700', color: COLORS.nearBlack,
+    textTransform: 'uppercase', letterSpacing: 2,
   },
-  recentsBlock: {
-    marginTop: SPACING.xxl,
-  },
+  recentsBlock: { marginTop: SPACING.xxl },
   sectionLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: COLORS.gold,
-    textTransform: 'uppercase',
-    letterSpacing: 2,
+    fontSize: 11, fontWeight: '700', color: COLORS.gold,
+    textTransform: 'uppercase', letterSpacing: 2,
     marginBottom: SPACING.md,
   },
-  recentsRow: {
-    gap: SPACING.md,
-    paddingRight: SPACING.lg,
-  },
-  recentCard: {
-    width: 88,
-  },
+  recentsRow: { gap: SPACING.md, paddingRight: SPACING.lg },
+  recentCard: { width: 88 },
   recentPhotoFrame: {
-    width: 88,
-    height: 88,
+    width: 88, height: 88,
     backgroundColor: COLORS.sandLight,
-    marginBottom: SPACING.sm,
-    overflow: 'hidden',
+    marginBottom: SPACING.sm, overflow: 'hidden',
   },
-  recentPhoto: {
-    width: '100%',
-    height: '100%',
-  },
-  recentPhotoFallback: {
-    backgroundColor: COLORS.sand,
-  },
-  recentName: {
-    fontSize: 13,
-    color: COLORS.nearBlack,
-    fontFamily: FONT.serif,
-  },
-  recentNumber: {
-    fontSize: 11,
-    color: COLORS.lightGray,
-    marginTop: 2,
-  },
+  recentPhoto: { width: '100%', height: '100%' },
+  recentPhotoFallback: { backgroundColor: COLORS.sand },
+  recentName: { fontSize: 13, color: COLORS.nearBlack, fontFamily: FONT.serif },
+  recentNumber: { fontSize: 11, color: COLORS.lightGray, marginTop: 2 },
 });

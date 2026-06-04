@@ -1,11 +1,17 @@
 /**
- * Campus newsfeed. Same content model as before, now with
- * pull-to-refresh and entrance animations on cards.
+ * Campus newsfeed — magazine-cover treatment.
+ *
+ * Each newsletter renders as a tall hero card: full-bleed photo
+ * with a soft gradient over the bottom third, serif title floated
+ * over the photo, date in small caps. The featured (latest) gets
+ * the largest cover; earlier newsletters render as smaller covers
+ * in a stack. Tap to expand the body inline.
  */
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Image,
+  Dimensions,
+  ImageBackground,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -17,6 +23,8 @@ import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { COLORS, FONT, SIZES, SPACING } from '../../lib/theme';
 import { getRecentNewsletters, type CampusNewsletter } from '../../lib/api';
 import { tap as hapticTap } from '../../lib/haptics';
+
+const SCREEN_WIDTH = Dimensions.get('window').width;
 
 function stripHtml(html: string): string {
   return html
@@ -45,6 +53,15 @@ function formatDate(iso?: string): string {
     return new Date(iso).toLocaleDateString('en-US', {
       year: 'numeric', month: 'long', day: 'numeric',
     });
+  } catch { return ''; }
+}
+
+function formatMonthShort(iso?: string): string {
+  if (!iso) return '';
+  try {
+    return new Date(iso).toLocaleDateString('en-US', {
+      month: 'short', year: 'numeric',
+    }).toUpperCase();
   } catch { return ''; }
 }
 
@@ -92,7 +109,9 @@ export default function NewsfeedScreen() {
     return (
       <ScrollView
         contentContainerStyle={styles.centerScroll}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.gold} />}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.gold} />
+        }
       >
         <Text style={styles.placeholderHeadline}>The first letter is on the way.</Text>
         <Text style={styles.placeholderBody}>
@@ -103,72 +122,134 @@ export default function NewsfeedScreen() {
   }
 
   const [featured, ...archive] = newsletters;
-  const featuredBody = stripHtml(featured.bodyHtml || '');
 
   return (
     <ScrollView
       contentContainerStyle={styles.scrollContent}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.gold} />}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.gold} />
+      }
     >
       <Animated.View entering={FadeIn.duration(400)}>
-        <View style={styles.headerBlock}>
-          <Text style={styles.eyebrow}>From the campus</Text>
-          <Text style={styles.pageHeadline}>What&rsquo;s happening on the ground.</Text>
-          <Text style={styles.pageSubhead}>
-            One letter a month from Kevin and the YDO team in Omoro District.
-            The school, the clinic, the cooks, the kids.
-          </Text>
-        </View>
+        <Text style={styles.pageHeader}>The campus newsfeed</Text>
       </Animated.View>
 
       <Animated.View entering={FadeInDown.duration(500).delay(80)}>
-        <View style={styles.featuredCard}>
-          {featured.heroPhotoUrl && (
-            <Image source={{ uri: featured.heroPhotoUrl }} style={styles.featuredHero} resizeMode="cover" />
-          )}
-          <View style={styles.featuredContent}>
-            <View style={styles.featuredMeta}>
-              <Text style={styles.featuredEyebrow}>Latest newsletter</Text>
-              {featured.publishedAt && (
-                <Text style={styles.featuredDate}>{formatDate(featured.publishedAt)}</Text>
-              )}
-            </View>
-            <Text style={styles.featuredHeading}>
-              {featured.subject || featured.title || 'From the campus'}
-            </Text>
-            <Text style={styles.featuredBody}>{featuredBody}</Text>
-          </View>
-        </View>
+        <NewsletterCover
+          newsletter={featured}
+          variant="featured"
+          isOpen={expanded.has(featured.id)}
+          onToggle={() => toggle(featured.id)}
+        />
       </Animated.View>
 
       {archive.length > 0 && (
         <View style={styles.archiveSection}>
           <Text style={styles.archiveLabel}>Earlier this year</Text>
-          {archive.map((n, i) => {
-            const isOpen = expanded.has(n.id);
-            const body = stripHtml(n.bodyHtml || '');
-            const teaser = body.slice(0, 180) + (body.length > 180 ? '…' : '');
-            return (
-              <Animated.View
-                key={n.id}
-                entering={FadeInDown.duration(400).delay(160 + i * 40)}
-              >
-                <Pressable style={styles.archiveCard} onPress={() => toggle(n.id)}>
-                  {n.publishedAt && <Text style={styles.archiveDate}>{formatDate(n.publishedAt)}</Text>}
-                  <Text style={styles.archiveHeading}>
-                    {n.subject || n.title || 'From the campus'}
-                  </Text>
-                  <Text style={styles.archiveBody}>{isOpen ? body : teaser}</Text>
-                  <Text style={styles.archiveAction}>
-                    {isOpen ? 'Close ↑' : 'Read this month →'}
-                  </Text>
-                </Pressable>
-              </Animated.View>
-            );
-          })}
+          {archive.map((n, i) => (
+            <Animated.View
+              key={n.id}
+              entering={FadeInDown.duration(400).delay(160 + i * 40)}
+            >
+              <NewsletterCover
+                newsletter={n}
+                variant="archive"
+                isOpen={expanded.has(n.id)}
+                onToggle={() => toggle(n.id)}
+              />
+            </Animated.View>
+          ))}
         </View>
       )}
     </ScrollView>
+  );
+}
+
+function NewsletterCover({
+  newsletter,
+  variant,
+  isOpen,
+  onToggle,
+}: {
+  newsletter: CampusNewsletter;
+  variant: 'featured' | 'archive';
+  isOpen: boolean;
+  onToggle: () => void;
+}) {
+  const heading = newsletter.subject || newsletter.title || 'From the campus';
+  const body = stripHtml(newsletter.bodyHtml || '');
+  const teaser = body.slice(0, 200) + (body.length > 200 ? '…' : '');
+  const heroHeight = variant === 'featured' ? 480 : 280;
+  const titleSize = variant === 'featured' ? 34 : 24;
+  const titleLineHeight = variant === 'featured' ? 40 : 30;
+
+  return (
+    <Pressable
+      onPress={onToggle}
+      style={[
+        styles.cover,
+        variant === 'featured' ? styles.coverFeatured : styles.coverArchive,
+      ]}
+    >
+      {newsletter.heroPhotoUrl ? (
+        <ImageBackground
+          source={{ uri: newsletter.heroPhotoUrl }}
+          style={[styles.coverHero, { height: heroHeight }]}
+          imageStyle={styles.coverHeroImg}
+        >
+          <View style={styles.coverDim} />
+          <View style={styles.coverHeroContent}>
+            <Text style={styles.coverDate}>
+              {formatMonthShort(newsletter.publishedAt)}
+            </Text>
+            <Text
+              style={[
+                styles.coverTitle,
+                { fontSize: titleSize, lineHeight: titleLineHeight },
+              ]}
+            >
+              {heading}
+            </Text>
+            <Text style={styles.coverAction}>
+              {isOpen ? 'Close ↑' : 'Read this issue →'}
+            </Text>
+          </View>
+        </ImageBackground>
+      ) : (
+        <View
+          style={[
+            styles.coverHero,
+            { height: heroHeight, backgroundColor: COLORS.nearBlack },
+          ]}
+        >
+          <View style={styles.coverHeroContent}>
+            <Text style={styles.coverDate}>
+              {formatMonthShort(newsletter.publishedAt)}
+            </Text>
+            <Text
+              style={[
+                styles.coverTitle,
+                { fontSize: titleSize, lineHeight: titleLineHeight },
+              ]}
+            >
+              {heading}
+            </Text>
+            <Text style={styles.coverAction}>
+              {isOpen ? 'Close ↑' : 'Read this issue →'}
+            </Text>
+          </View>
+        </View>
+      )}
+
+      {isOpen && (
+        <Animated.View entering={FadeIn.duration(300)} style={styles.coverBody}>
+          <Text style={styles.coverBodyDate}>
+            {formatDate(newsletter.publishedAt)}
+          </Text>
+          <Text style={styles.coverBodyText}>{body || teaser}</Text>
+        </Animated.View>
+      )}
+    </Pressable>
   );
 }
 
@@ -176,7 +257,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     backgroundColor: COLORS.cream,
     paddingHorizontal: SPACING.lg,
-    paddingTop: SPACING.lg,
+    paddingTop: SPACING.md,
     paddingBottom: SPACING.xxl,
   },
   centerScroll: {
@@ -188,68 +269,69 @@ const styles = StyleSheet.create({
   },
   center: { flex: 1, backgroundColor: COLORS.cream, justifyContent: 'center', alignItems: 'center' },
   placeholderHeadline: {
-    fontSize: SIZES.heading2,
-    fontFamily: FONT.serif,
-    color: COLORS.nearBlack,
-    textAlign: 'center',
-    marginBottom: SPACING.md,
+    fontSize: SIZES.heading2, fontFamily: FONT.serif,
+    color: COLORS.nearBlack, textAlign: 'center', marginBottom: SPACING.md,
   },
   placeholderBody: {
     fontSize: SIZES.bodyLg, color: COLORS.midGray, textAlign: 'center',
     maxWidth: 320, lineHeight: 26,
   },
-  headerBlock: { marginBottom: SPACING.lg },
-  eyebrow: {
-    fontSize: 12, fontWeight: '700', letterSpacing: 3,
-    color: COLORS.gold, textTransform: 'uppercase', marginBottom: SPACING.sm,
+  pageHeader: {
+    fontSize: 11, fontWeight: '700', letterSpacing: 2,
+    color: COLORS.gold, textTransform: 'uppercase',
+    marginBottom: SPACING.md,
   },
-  pageHeadline: {
-    fontSize: SIZES.heading1, color: COLORS.nearBlack,
-    fontFamily: FONT.serif, lineHeight: 42, marginBottom: SPACING.sm,
+  cover: {
+    overflow: 'hidden',
+    marginBottom: SPACING.md,
   },
-  pageSubhead: { fontSize: SIZES.bodyLg, color: COLORS.midGray, lineHeight: 26 },
-  featuredCard: {
+  coverFeatured: {},
+  coverArchive: {},
+  coverHero: {
+    width: '100%',
+    justifyContent: 'flex-end',
+    position: 'relative',
+  },
+  coverHeroImg: { resizeMode: 'cover' },
+  coverDim: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(13, 13, 13, 0.45)',
+  },
+  coverHeroContent: {
+    padding: SPACING.lg,
+    paddingBottom: SPACING.lg,
+  },
+  coverDate: {
+    fontSize: 11, fontWeight: '700', letterSpacing: 3,
+    color: COLORS.gold, textTransform: 'uppercase',
+    marginBottom: SPACING.sm,
+  },
+  coverTitle: {
+    fontFamily: FONT.serif,
+    color: COLORS.white,
+    marginBottom: SPACING.md,
+  },
+  coverAction: {
+    fontSize: 12, fontWeight: '700', letterSpacing: 1.5,
+    color: COLORS.white, textTransform: 'uppercase',
+    opacity: 0.92,
+  },
+  coverBody: {
     backgroundColor: COLORS.white,
-    borderWidth: 1, borderColor: COLORS.sand,
-    marginBottom: SPACING.xl,
+    padding: SPACING.lg,
+    borderWidth: 1, borderColor: COLORS.sand, borderTopWidth: 0,
   },
-  featuredHero: { width: '100%', aspectRatio: 16 / 9, backgroundColor: COLORS.sandLight },
-  featuredContent: { padding: SPACING.lg },
-  featuredMeta: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: SPACING.sm },
-  featuredEyebrow: {
-    fontSize: 11, fontWeight: '700', color: COLORS.gold,
-    textTransform: 'uppercase', letterSpacing: 2,
+  coverBodyDate: {
+    fontSize: 11, color: COLORS.lightGray, letterSpacing: 1.5,
+    marginBottom: SPACING.sm, textTransform: 'uppercase',
   },
-  featuredDate: {
-    fontSize: 11, color: COLORS.lightGray,
-    textTransform: 'uppercase', letterSpacing: 1.5,
+  coverBodyText: {
+    fontSize: SIZES.bodyLg, color: COLORS.bodyText,
+    lineHeight: 28, fontFamily: FONT.serifItalic,
   },
-  featuredHeading: {
-    fontSize: SIZES.heading2, color: COLORS.nearBlack,
-    fontFamily: FONT.serif, lineHeight: 34, marginBottom: SPACING.md,
-  },
-  featuredBody: { fontSize: SIZES.bodyLg, color: COLORS.bodyText, lineHeight: 28 },
   archiveSection: { marginTop: SPACING.lg },
   archiveLabel: {
     fontSize: 11, fontWeight: '700', color: COLORS.lightGray,
     textTransform: 'uppercase', letterSpacing: 2, marginBottom: SPACING.md,
-  },
-  archiveCard: {
-    backgroundColor: COLORS.white,
-    borderWidth: 1, borderColor: COLORS.sand,
-    padding: SPACING.lg, marginBottom: SPACING.md,
-  },
-  archiveDate: {
-    fontSize: 11, color: COLORS.lightGray,
-    textTransform: 'uppercase', letterSpacing: 2, marginBottom: SPACING.xs,
-  },
-  archiveHeading: {
-    fontSize: SIZES.heading3, color: COLORS.nearBlack,
-    fontFamily: FONT.serif, lineHeight: 28, marginBottom: SPACING.sm,
-  },
-  archiveBody: { fontSize: SIZES.body, color: COLORS.bodyTextLighter, lineHeight: 24, marginBottom: SPACING.sm },
-  archiveAction: {
-    fontSize: 12, fontWeight: '700', color: COLORS.gold,
-    textTransform: 'uppercase', letterSpacing: 1.5,
   },
 });
