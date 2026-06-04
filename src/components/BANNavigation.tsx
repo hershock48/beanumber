@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Logo } from '@/components/Logo';
-import { TextSizeToggle } from '@/components/TextSizeToggle';
 
 interface BANNavigationProps {
   currentPath?: string;
@@ -75,7 +74,6 @@ export function BANNavigation({ currentPath = '/', transparent = false }: BANNav
                 {link.label}
               </Link>
             ))}
-            <TextSizeToggle />
             <Link
               href="/donate"
               className="px-5 py-2 bg-[#D4A843] text-[#0d0d0d] text-xs font-bold uppercase tracking-[0.15em] hover:bg-[#c49a3a] transition-colors"
@@ -122,11 +120,10 @@ export function BANNavigation({ currentPath = '/', transparent = false }: BANNav
                 {link.label}
               </Link>
             ))}
-            <div className="px-3 pt-2 flex items-center gap-3">
-              <TextSizeToggle />
+            <div className="px-3 pt-2">
               <Link
                 href="/donate"
-                className="flex-1 text-center py-3 bg-[#D4A843] text-[#0d0d0d] font-bold uppercase tracking-wider text-sm hover:bg-[#c49a3a] transition-colors"
+                className="block w-full text-center py-3 bg-[#D4A843] text-[#0d0d0d] font-bold uppercase tracking-wider text-sm hover:bg-[#c49a3a] transition-colors"
                 onClick={() => setMobileOpen(false)}
               >
                 Donate

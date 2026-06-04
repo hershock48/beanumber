@@ -60,10 +60,11 @@ export function TextSizeToggle() {
           : 'Switch to larger text size'
       }
       title={isLarge ? 'Smaller text' : 'Bigger text'}
-      className="inline-flex items-center gap-1 px-3 py-1.5 border border-[#e8e0d4] text-[#0d0d0d] hover:border-[#D4A843] transition-colors text-xs font-bold"
+      className="inline-flex items-center gap-1 hover:text-[#D4A843] transition-colors"
     >
-      <span aria-hidden className="text-base leading-none">A</span>
+      <span aria-hidden className="text-sm leading-none">A</span>
       <span aria-hidden className="text-xs leading-none">{isLarge ? '−' : '+'}</span>
+      <span>{isLarge ? 'Smaller text' : 'Larger text'}</span>
     </button>
   );
 }

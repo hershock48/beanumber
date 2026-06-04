@@ -39,6 +39,17 @@ html[data-text-size="large"] {
   font-size: 20px;
 }
 
+/* Safari leaves the disclosure triangle visible on <details><summary>
+   even when Tailwind's list-none is applied; the WebKit-specific
+   pseudo-element needs to be killed explicitly. Used in the campus
+   newsfeed archive expanders. */
+summary::-webkit-details-marker {
+  display: none;
+}
+summary::marker {
+  display: none;
+}
+
 /* ────────────────────────────────────────────────────────────────────
    Newsletter body styling — applied to the rendered Newsletter.BodyHTML
    on every kid's /[number] page (CampusNewsfeed) and inside the
@@ -50,7 +61,14 @@ html[data-text-size="large"] {
 
 .ban-newsletter-body {
   color: #333;
-  line-height: 1.65;
+  line-height: 1.7;
+  font-size: 1.0625rem; /* 17px — easier on older eyes than the 16px default */
+}
+
+@media (min-width: 768px) {
+  .ban-newsletter-body {
+    font-size: 1.125rem; /* 18px on desktop */
+  }
 }
 
 .ban-newsletter-body p {
@@ -58,7 +76,7 @@ html[data-text-size="large"] {
 }
 
 .ban-newsletter-body p + p {
-  margin-top: 1rem;
+  margin-top: 1.1rem;
 }
 
 .ban-newsletter-body h2 {

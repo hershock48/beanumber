@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { Logo } from '@/components/Logo';
+import { TextSizeToggle } from '@/components/TextSizeToggle';
 
 export function BANFooter() {
   return (
@@ -59,7 +60,8 @@ export function BANFooter() {
         {/* Bottom bar */}
         <div className="pt-8 border-t border-[#222] flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-[#666]">
           <p>&copy; {new Date().getFullYear()} Be A Number, International.</p>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 flex-wrap justify-center">
+            <TextSizeToggle />
             <Link href="/privacy" className="hover:text-[#D4A843] transition-colors">Privacy</Link>
             <Link href="/terms" className="hover:text-[#D4A843] transition-colors">Terms</Link>
             <span>501(c)(3) &middot; EIN: 93-1948872</span>

@@ -1176,7 +1176,7 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
                     <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-1">
                       Home
                     </p>
-                    <p className="text-[#444] leading-relaxed">{child.home_village}</p>
+                    <p className="text-[17px] md:text-lg text-[#444] leading-relaxed">{child.home_village}</p>
                   </div>
                 )}
                 {child.family_context && (
@@ -1184,7 +1184,7 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
                     <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-1">
                       Family
                     </p>
-                    <p className="text-[#444] leading-relaxed">{child.family_context}</p>
+                    <p className="text-[17px] md:text-lg text-[#444] leading-relaxed">{child.family_context}</p>
                   </div>
                 )}
                 {child.loves && (
@@ -1192,7 +1192,7 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
                     <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-1">
                       About {firstName}
                     </p>
-                    <p className="text-[#444] leading-relaxed">{child.loves}</p>
+                    <p className="text-[17px] md:text-lg text-[#444] leading-relaxed">{child.loves}</p>
                   </div>
                 )}
               </div>
@@ -1213,7 +1213,7 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
                 <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-2">
                   More about {firstName}
                 </p>
-                <div className="text-[#444] leading-relaxed [&_p+p]:mt-4 whitespace-pre-line">
+                <div className="text-[17px] md:text-lg text-[#444] leading-relaxed [&_p+p]:mt-4 whitespace-pre-line">
                   {child.fun_fact}
                 </div>
               </div>
@@ -1225,7 +1225,7 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
                 <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-2">
                   From {firstName}&rsquo;s teacher
                 </p>
-                <p className="text-[#444] leading-relaxed italic">
+                <p className="text-[17px] md:text-lg text-[#444] leading-relaxed italic">
                   &ldquo;{child.teacher_quote}&rdquo;
                 </p>
                 {child.teacher_name && (
