@@ -407,30 +407,39 @@ export async function sendCampusNewsletterTool(
     };
   }
 
-  // Deduplicate by lowercase email AND collect every kid each sponsor
-  // sponsors — we list all their kids' page links in the notification
-  // email, since the notification model wants every relationship
-  // surfaced as a click target.
+  // Deduplicate by lowercase email AND collect every (sponsorCode,
+  // child record id) pair each sponsor has — we list all their
+  // kids' page links in the notification email, and each link needs
+  // that kid's specific SponsorCode embedded in the auto-login
+  // token so the sponsor lands on the page already authenticated.
+  type KidPair = { sponsorCode: string; childRecordId: string };
   type GroupedRecipient = {
     email: string;
     name: string;
-    childRecordIds: string[];
+    kidPairs: KidPair[];
   };
   const byEmail = new Map<string, GroupedRecipient>();
   for (const s of sponsors) {
     const email = (s.fields.SponsorEmail || '').trim().toLowerCase();
     if (!email) continue;
+    const sponsorCode = (s.fields.SponsorCode as string) || '';
+    if (!sponsorCode) continue;
     const childIds = (s.fields.Children as string[] | undefined) || [];
+    const pairs: KidPair[] = childIds.map(id => ({ sponsorCode, childRecordId: id }));
     const existing = byEmail.get(email);
     if (existing) {
-      for (const id of childIds) {
-        if (!existing.childRecordIds.includes(id)) existing.childRecordIds.push(id);
+      for (const p of pairs) {
+        if (!existing.kidPairs.some(
+          q => q.childRecordId === p.childRecordId && q.sponsorCode === p.sponsorCode
+        )) {
+          existing.kidPairs.push(p);
+        }
       }
     } else {
       byEmail.set(email, {
         email: s.fields.SponsorEmail,
         name: s.fields.SponsorName || 'Friend',
-        childRecordIds: [...childIds],
+        kidPairs: pairs,
       });
     }
   }
@@ -447,7 +456,7 @@ export async function sendCampusNewsletterTool(
   type FinalRecipient = {
     email: string;
     name: string;
-    childRecordIds: string[];
+    kidPairs: KidPair[];
   };
   const recipients: FinalRecipient[] = [];
   let suppressedCount = 0;
@@ -473,7 +482,7 @@ export async function sendCampusNewsletterTool(
   // 3c. Resolve every linked child record to (firstName, shirtNumber)
   // so the notification email can include per-kid page links.
   const allChildIds = Array.from(
-    new Set(recipients.flatMap(r => r.childRecordIds))
+    new Set(recipients.flatMap(r => r.kidPairs.map(p => p.childRecordId)))
   );
   const childMap = await fetchChildrenByRecordIds(allChildIds);
 
@@ -539,11 +548,17 @@ export async function sendCampusNewsletterTool(
     // kids list.
     const sponsorTemplate = recipients[0];
     const sponsorKids = sponsorTemplate
-      ? sponsorTemplate.childRecordIds
-          .map(id => childMap.get(id))
-          .filter((k): k is { shirtNumber: number | null; firstName: string } => !!k)
-          .filter(k => typeof k.shirtNumber === 'number')
-          .map(k => ({ firstName: k.firstName, shirtNumber: k.shirtNumber as number }))
+      ? sponsorTemplate.kidPairs
+          .map(p => {
+            const child = childMap.get(p.childRecordId);
+            if (!child || typeof child.shirtNumber !== 'number') return null;
+            return {
+              firstName: child.firstName,
+              shirtNumber: child.shirtNumber as number,
+              sponsorCode: p.sponsorCode,
+            };
+          })
+          .filter((k): k is { firstName: string; shirtNumber: number; sponsorCode: string } => !!k)
       : [];
 
     try {
@@ -657,12 +672,20 @@ export async function sendCampusNewsletterTool(
   const failures: Array<{ email: string; error: string }> = [];
 
   for (const r of recipients) {
-    // Map this sponsor's linked child record IDs to (firstName, shirtNumber).
-    const kids = r.childRecordIds
-      .map(id => childMap.get(id))
-      .filter((k): k is { shirtNumber: number | null; firstName: string } => !!k)
-      .filter(k => typeof k.shirtNumber === 'number')
-      .map(k => ({ firstName: k.firstName, shirtNumber: k.shirtNumber as number }));
+    // Map this sponsor's (sponsorCode, child record id) pairs into
+    // the shape the email builder expects: each kid carries its own
+    // sponsor code so the auto-login token works on click.
+    const kids = r.kidPairs
+      .map(p => {
+        const child = childMap.get(p.childRecordId);
+        if (!child || typeof child.shirtNumber !== 'number') return null;
+        return {
+          firstName: child.firstName,
+          shirtNumber: child.shirtNumber as number,
+          sponsorCode: p.sponsorCode,
+        };
+      })
+      .filter((k): k is { firstName: string; shirtNumber: number; sponsorCode: string } => !!k);
 
     // Sponsor with no resolvable kids: skip. They'd get an email with
     // nothing to click. Rare edge case (sponsorship missing Children

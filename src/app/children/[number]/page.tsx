@@ -16,7 +16,6 @@ import {
   getRecentCampusNewsletters,
   type CampusNewsletterEntry,
 } from '@/lib/newsletter-feed';
-import { RelationshipCard } from './RelationshipCard';
 import { SponsorRecoveryForm } from './SponsorRecoveryForm';
 import { SESSION } from '@/lib/constants';
 
@@ -1378,26 +1377,14 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
         )}
 
         {/* ── Public campus newsfeed ───────────────────────────────
-            Visible to anyone — sponsor or not. The relationship
-            card up top frames the read: sponsors get a quiet
-            acknowledgment, non-sponsors get the conversion ask.
-            Departed kids skip both — their page is a memorial,
-            not a conversion surface. */}
+            Visible to anyone — sponsor or not. The ask block above
+            (right-column CTA: 'Stay with X' for non-sponsors,
+            'You're the sponsor' for sponsors) is the only ask the
+            page makes; the newsfeed stands on its own without a
+            second redundant card above it. Departed kids skip the
+            feed — their page is a memorial. */}
         {!child.departed_at && recentNewsletters.length > 0 && (
           <div className="mt-12 md:mt-16">
-            <RelationshipCard
-              firstName={firstName}
-              shirtNumber={Number(number)}
-              viewerIsSponsor={!!child.viewer_is_sponsor}
-              childRecordId={child.record_id || null}
-              childId={child.child_id}
-              displayName={displayName}
-              existingCustomerId={buyerHint?.customerId || undefined}
-              buyerEmail={buyerHint?.email || undefined}
-              viewerLooksLikeBuyer={viewerLooksLikeBuyer}
-              sponsorCode={child.sponsor_code}
-            />
-
             <CampusNewsfeed
               firstName={firstName}
               newsletters={recentNewsletters}

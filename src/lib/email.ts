@@ -352,19 +352,54 @@ export async function sendNewsletterNotificationEmail(params: {
   sponsorName: string;
   subject: string;            // newsletter subject — used as email subject too
   teaser: string;             // first paragraph of the newsletter body, plain text
-  kids: Array<{ firstName: string; shirtNumber: number }>;
+  /**
+   * Each kid the sponsor sponsors. `sponsorCode` is THIS kid's
+   * specific sponsorship SponsorCode — used to mint an auto-login
+   * token so the link drops them into the kid page in
+   * authenticated sponsor mode (no "stay with X" non-sponsor
+   * framing).
+   */
+  kids: Array<{ firstName: string; shirtNumber: number; sponsorCode?: string }>;
   heroPhotoUrl?: string;
 }): Promise<EmailSendResult> {
   const { sponsorEmail, sponsorName, subject, teaser, kids, heroPhotoUrl } = params;
   const firstName = (sponsorName || 'Friend').trim().split(/\s+/)[0] || 'Friend';
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.beanumber.org';
 
+  // Token TTL — 30 days. People don't always click an email the day
+  // it lands; aligning the auto-login window with the session TTL
+  // keeps it simple. After 30 days a sponsor with a dead link can
+  // still use the magic-link recovery form on the kid page.
+  const TOKEN_TTL_SECONDS = 30 * 24 * 60 * 60;
+
+  // Lazy-import so any environment that can't sign tokens
+  // (CRON_SECRET missing in non-prod) still ships the bare links.
+  let makeRecoveryToken: ((c: string, n: number, ttl?: number) => string) | null = null;
+  try {
+    const mod = await import('./recovery-tokens');
+    makeRecoveryToken = mod.makeRecoveryToken;
+  } catch {
+    makeRecoveryToken = null;
+  }
+
   // Build the per-kid link list. Most sponsors will have one entry.
   // Multi-kid sponsors get the full list — one click per relationship.
+  // Each link runs through /api/sponsor/recover/callback with a
+  // signed token so the sponsor lands on the kid page already
+  // authenticated.
   const kidLines = kids
     .filter(k => typeof k.shirtNumber === 'number')
     .map(k => {
-      const url = `${siteUrl}/children/${k.shirtNumber}`;
+      let url: string;
+      if (makeRecoveryToken && k.sponsorCode) {
+        const token = makeRecoveryToken(k.sponsorCode, k.shirtNumber, TOKEN_TTL_SECONDS);
+        url = `${siteUrl}/api/sponsor/recover/callback?t=${encodeURIComponent(token)}`;
+      } else {
+        // Fallback — bare link if token signing isn't available.
+        // Sponsor will land in non-authenticated state but can
+        // recover via the magic-link form on the page.
+        url = `${siteUrl}/children/${k.shirtNumber}`;
+      }
       const label = `beanumber.org/${k.shirtNumber}`;
       const name = escapeHtml(k.firstName || `kid #${k.shirtNumber}`);
       return `<p style="margin: 8px 0;"><a href="${url}" style="color: #D4A843; font-weight: bold;">Read on ${name}&rsquo;s page &middot; ${label}</a></p>`;
