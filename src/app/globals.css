@@ -28,6 +28,18 @@ body {
 }
 
 /* ────────────────────────────────────────────────────────────────────
+   Accessibility — text size toggle. The TextSizeToggle nav button
+   flips html[data-text-size] between "default" and "large". Because
+   Tailwind's text-* utilities are rem-based, raising the html
+   font-size scales every paragraph, heading, button label, and form
+   input proportionally.
+   ──────────────────────────────────────────────────────────────────── */
+
+html[data-text-size="large"] {
+  font-size: 20px;
+}
+
+/* ────────────────────────────────────────────────────────────────────
    Newsletter body styling — applied to the rendered Newsletter.BodyHTML
    on every kid's /[number] page (CampusNewsfeed) and inside the
    admin Preview modal. Kevin authors plain HTML in Airtable using
