@@ -1,78 +1,68 @@
 /**
- * Root layout. Bootstraps the Lora font, sets the navigation
- * stack chrome, holds the safe area provider.
+ * Root layout. Two layers:
  *
- * No tab bar at this level — the home screen (number entry) is
- * the entry, and tapping anything pushes a screen. We can add a
- * bottom tab navigator once Phase 2 (sponsor portal) lands and
- * we have a "My Kids" tab that competes for attention with Home.
+ *  1. The outer Stack — pushes kid profile screens (with native
+ *     transitions) on top of the tab bar. This is the standard
+ *     iOS pattern: tabs at the root, push detail pages.
+ *
+ *  2. The inner (tabs) folder defines the bottom tab bar (Home,
+ *     Newsfeed, Browse, About).
+ *
+ * Lora font loaded once at root and used everywhere via theme.ts.
  */
 import { Stack } from 'expo-router';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import { useFonts, Lora_600SemiBold, Lora_700Bold, Lora_400Regular_Italic } from '@expo-google-fonts/lora';
-import { useEffect } from 'react';
+import {
+  useFonts,
+  Lora_600SemiBold,
+  Lora_700Bold,
+  Lora_400Regular_Italic,
+  Lora_600SemiBold_Italic,
+} from '@expo-google-fonts/lora';
 import { COLORS } from '../lib/theme';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
     Lora_600SemiBold,
     Lora_700Bold,
     Lora_400Regular_Italic,
+    Lora_600SemiBold_Italic,
   });
 
-  useEffect(() => {
-    if (fontsLoaded) {
-      // Splash auto-hides when first frame paints; nothing to do
-      // here once fonts are ready.
-    }
-  }, [fontsLoaded]);
-
-  if (!fontsLoaded) {
-    return null;
-  }
+  if (!fontsLoaded) return null;
 
   return (
-    <SafeAreaProvider>
-      <StatusBar style="dark" />
-      <Stack
-        screenOptions={{
-          headerStyle: { backgroundColor: COLORS.cream },
-          headerTitleStyle: {
-            color: COLORS.nearBlack,
-            fontFamily: 'Lora_600SemiBold',
-            fontSize: 18,
-          },
-          headerTintColor: COLORS.nearBlack,
-          headerShadowVisible: false,
-          contentStyle: { backgroundColor: COLORS.cream },
-          headerBackTitle: 'Back',
-        }}
-      >
-        <Stack.Screen
-          name="index"
-          options={{ headerShown: false }}
-        />
-        <Stack.Screen
-          name="children/[number]"
-          options={{
-            title: '',
-            headerBackTitle: 'Home',
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider>
+        <StatusBar style="dark" />
+        <Stack
+          screenOptions={{
+            headerStyle: { backgroundColor: COLORS.cream },
+            headerTitleStyle: {
+              color: COLORS.nearBlack,
+              fontFamily: 'Lora_600SemiBold',
+              fontSize: 18,
+            },
+            headerTintColor: COLORS.nearBlack,
+            headerShadowVisible: false,
+            contentStyle: { backgroundColor: COLORS.cream },
+            headerBackTitle: 'Back',
+            animation: 'slide_from_right',
           }}
-        />
-        <Stack.Screen
-          name="news"
-          options={{
-            title: 'From the campus',
-          }}
-        />
-        <Stack.Screen
-          name="about"
-          options={{
-            title: 'About',
-          }}
-        />
-      </Stack>
-    </SafeAreaProvider>
+        >
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen
+            name="children/[number]"
+            options={{
+              title: '',
+              headerBackTitle: 'Back',
+              animation: 'fade',
+            }}
+          />
+        </Stack>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }
