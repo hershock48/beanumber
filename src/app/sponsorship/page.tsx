@@ -192,6 +192,12 @@ function SponsorshipPageContent() {
   const [sponsoringId, setSponsoringId] = useState<string | null>(null);
   const [visibleCount, setVisibleCount] = useState(3);
 
+  // "Your kids" — kids on the back of shirts the visitor has
+  // already bought. Returned by /api/sponsor/my-shirts when the
+  // ban_buyer_session or sponsor_session cookie identifies them.
+  // Empty array = anonymous visitor or no prior shirt purchases.
+  const [myShirtKids, setMyShirtKids] = useState<AvailableChild[]>([]);
+
   const carouselRef = useRef<HTMLDivElement | null>(null);
   const scrollCarousel = (direction: 'left' | 'right') => {
     const el = carouselRef.current;
@@ -199,6 +205,40 @@ function SponsorshipPageContent() {
     const delta = el.clientWidth * 0.8;
     el.scrollBy({ left: direction === 'right' ? delta : -delta, behavior: 'smooth' });
   };
+
+  // Fetch "your kids" alongside the full roster on mount. Failure
+  // is silent — anonymous visitors and people without prior shirts
+  // just get the standard roster.
+  useEffect(() => {
+    async function fetchMyShirts() {
+      try {
+        const res = await fetch('/api/sponsor/my-shirts', {
+          credentials: 'include',
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        interface MyShirtKidApi {
+          recordId: string;
+          childId: string;
+          firstName: string;
+          displayName: string;
+          shirtNumber: number;
+          photoUrl: string | null;
+        }
+        const mapped: AvailableChild[] = ((data.kids as MyShirtKidApi[]) || []).map(k => ({
+          recordId: k.recordId,
+          id: k.childId,
+          displayName: k.displayName || k.firstName || 'Kid',
+          shirtNumber: k.shirtNumber,
+          photo: k.photoUrl ? { url: k.photoUrl, filename: '' } : undefined,
+        }));
+        setMyShirtKids(mapped);
+      } catch {
+        // Quiet — falls back to standard experience.
+      }
+    }
+    fetchMyShirts();
+  }, []);
 
   useEffect(() => {
     async function fetchChildren() {
@@ -407,10 +447,101 @@ function SponsorshipPageContent() {
         </div>
       </section>
 
+      {/* ========== YOUR SHIRTS — defaults the sponsorship to the kid
+            on the back of a shirt this visitor has already bought.
+            Renders only when /api/sponsor/my-shirts returns matches
+            for their session cookie. Standard Fahlo-style mapping:
+            the code on the product IS the relationship. ========== */}
+      {myShirtKids.length > 0 && (
+        <section className="pb-16 px-6">
+          <div className="max-w-6xl mx-auto">
+            <div className="max-w-3xl mx-auto text-center mb-8">
+              <p className="text-xs font-bold uppercase tracking-[0.25em] text-[#D4A843] mb-3">
+                Your shirts
+              </p>
+              <h2
+                className="text-3xl text-[#0d0d0d] mb-3"
+                style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
+              >
+                {myShirtKids.length === 1
+                  ? `Sponsor the kid on the back of your shirt.`
+                  : `Sponsor one of the kids on your shirts.`}
+              </h2>
+              <p className="text-[#666] leading-relaxed">
+                You&rsquo;ve bought {myShirtKids.length === 1 ? 'a shirt' : `${myShirtKids.length} shirts`} already &mdash;{' '}
+                {myShirtKids.length === 1 ? 'this is the kid that came with it.' : 'these are the kids that came with them.'}{' '}
+                Pick which one to stay close to monthly.
+              </p>
+            </div>
+            <div className={`grid gap-4 ${
+              myShirtKids.length === 1
+                ? 'max-w-md mx-auto'
+                : myShirtKids.length === 2
+                  ? 'grid-cols-1 sm:grid-cols-2 max-w-2xl mx-auto'
+                  : 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3'
+            }`}>
+              {myShirtKids.map(kid => (
+                <button
+                  key={kid.recordId}
+                  type="button"
+                  onClick={() => handleSponsor(kid)}
+                  disabled={sponsoringId === kid.recordId}
+                  className="group relative bg-white border-2 border-[#D4A843]/30 hover:border-[#D4A843] transition-colors text-left overflow-hidden disabled:opacity-60"
+                >
+                  <div className="aspect-[4/3] bg-[#f5f0e8] overflow-hidden">
+                    {kid.photo?.url ? (
+                      <img
+                        src={kid.photo.url}
+                        alt={kid.displayName}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-[#aaa] text-sm">
+                        Photo coming
+                      </div>
+                    )}
+                    {typeof kid.shirtNumber === 'number' && (
+                      <div className="absolute top-3 right-3 bg-white/95 backdrop-blur-sm px-3 py-1.5">
+                        <span className="text-sm font-bold text-[#D4A843]">
+                          #{kid.shirtNumber}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="p-5">
+                    <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-1">
+                      Shirt #{kid.shirtNumber}
+                    </p>
+                    <p
+                      className="text-xl text-[#0d0d0d] leading-snug mb-3"
+                      style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
+                    >
+                      {kid.displayName}
+                    </p>
+                    <p className="text-sm font-bold text-[#D4A843] group-hover:text-[#0d0d0d] transition-colors">
+                      {sponsoringId === kid.recordId
+                        ? 'Opening checkout…'
+                        : `Sponsor ${kid.displayName.split(' ')[0]} →`}
+                    </p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* ========== MEET THE KIDS ========== */}
       <section className="pb-16 px-6">
         <div className="max-w-6xl mx-auto">
-          {focusedChild ? (
+          {myShirtKids.length > 0 ? (
+            <h2
+              className="text-2xl md:text-3xl text-[#0d0d0d] mb-2 text-center"
+              style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
+            >
+              Or pick someone new.
+            </h2>
+          ) : focusedChild ? (
             <>
               <h2
                 className="text-3xl text-[#0d0d0d] mb-2 text-center"
