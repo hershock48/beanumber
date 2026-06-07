@@ -69,7 +69,43 @@ Write like Kevin writes: conversational, warm, flowing sentences, natural pauses
 
 Kevin decided on April 18 to remove the 96.7% program efficiency stat from all marketing pages. It's a 2025 number that will shift as the org scales toward 80/20, and proactively advertising it invites people to wonder where the other 3.3% goes instead of focusing on the work. The stat stays on the financial summary report and governance page — where people go looking for it. Don't add it back to marketing copy.
 
+### STOP SAYING "WE'LL MATCH THEM TO A KID"
+
+This came up 2026-06-07. I kept slipping back into the per-kid matching framing — "we can't create the Sponsorship yet because we don't know which kid," "this needs Kevin's manual matching step," etc. Kevin's exact words: *"WE ARE NOT MATCHING PEOPLE TO CHILDREN. WE USED TO DO THAT. WE ARE NOT MATCHING PEOPLE TO CHILDREN UNLESS THEY GO IN AND SPECIFICALLY CHOOSE A CHILD."* See `core_model.md` §0. **Sponsorship records get created at purchase. `Children` link blank. Done.** Any code or copy that implies otherwise is wrong.
+
+### Don't make up "fixes" without reading the code first
+
+Same 2026-06-07 session. I "fixed" Sam Banfield's missing newsletter segment by flipping her `Recurring Supporter` checkbox in Airtable. Wrong premise — the newsletter segmenter doesn't even look at that field. It queries the Sponsorships table by `Status="Active"`. Flipping the checkbox did literally nothing for her segmentation. **Always read the relevant code path before "fixing" a data-state symptom.** A wrong fix burns Kevin's trust and leaves the actual bug in place.
+
+### Don't ship without explicit authorization
+
+2026-06-07 session, repeating a lesson from earlier. Discussion ≠ build directive. Even if Kevin and I are deep in a back-and-forth about a fix, I do not write code or update production data until Kevin says "yes, do it" or "ship it." When in doubt, ask. When not in doubt, ask anyway.
+
 ## Open bugs (known, not yet fixed)
+
+### Cart+monthly checkout silently drops the recurring half — CRITICAL
+
+**Symptom:** Buyers who go through `/checkout` (the cart flow) and tick "+monthly" pay the shirt $25, but no Stripe subscription gets created, no Airtable Sponsorship gets created, and no error alerts reach Kevin. As of 2026-06-07 we know of 4 such buyers in the last week: Jordan Young, Brittany Osborn, Mary Sigler, Jean M Kleppick. Kevin manually created Sponsorship rows for all 4 in Airtable but their Stripe subscription state is still unverified.
+
+**Root cause:** `/src/app/api/create-cart-checkout/route.ts` creates the Stripe Checkout Session in `mode: 'payment'` (one-time). The webhook (`/src/app/api/webhooks/stripe/route.ts` around line 1802) is supposed to retroactively call `stripe.subscriptions.create()` for each `+monthly` cart item using the saved payment method. That call appears to be failing or not running for the recent buyers, with no alert email reaching kevin@beanumber.org.
+
+**Fix:** Switch cart+monthly to `mode: 'subscription'` so Stripe creates the sub natively as part of checkout. Eliminates the retroactive-create path entirely. Then auto-create the Sponsorship row on `checkout.session.completed` with **empty `Children` link** (per `core_model.md` §0). Tracked but not yet shipped.
+
+**Separately:** The webhook's alert-email send path (`sendEmail` to kevin@beanumber.org when deferred sub create fails) appears broken. None of the 4 missing subscriptions triggered an alert. Needs investigation.
+
+### Sponsorship records aren't created at purchase time
+
+Related to the cart bug above but broader. Under current code, the webhook deliberately skips Sponsorship creation for cart+monthly buyers, citing "we can't link to a child we haven't matched yet." That premise is wrong per `core_model.md` §0 — we don't match, ever. The Sponsorship should be created the moment payment clears, with `Children` left blank.
+
+**Fix:** Same as above. Auto-create on `checkout.session.completed` (and `customer.subscription.created` as belt-and-suspenders).
+
+### Newsletter "May 2026 Recap" had non-sponsor variant delivered to actual sponsors
+
+Reported by Sam Lynn (sbanfield2015@gmail.com) and Amanda Sobel Woods on 2026-06-07. Send was 2026-05-30 17:15 UTC; their Sponsorship records existed by then. Segmenter (`findAllSponsorsForNewsletter` in `src/lib/airtable.ts:977`) uses `OR(AuthStatus="Active", Status="Active")` against the Sponsorships table, which should have matched them. Root cause undetermined as of 2026-06-07 — possible: (a) timing race with rollups, (b) case sensitivity in the email dedup against the non-sponsor list, (c) something else. **Do not "fix" the segmenter without first instrumenting a send and confirming the actual exclusion path for a known-good sponsor.**
+
+### Amanda Sobel Woods sponsorship was linked to wrong cycle record
+
+Fixed manually 2026-06-07. Her sponsorship (`BAN-2026-793`) was pointing at cycle record #64 (which maps to Aaron #12 via cycle math) because she had no `Children` link populated at all and someone (or the webhook) auto-grabbed an arbitrary kid. She bought shirt #10 (James). Relinked to #10. **Root cause:** Sponsorships were getting created with arbitrary `Children` links instead of being created blank. Compounds the no-matching rule violation.
 
 ### Stripe webhook 400 signature failure at 20:02:15 on 2026-04-15
 

@@ -38,11 +38,22 @@ beanumber/
 - `/donate` — One-time donation form. POSTs to `/api/create-checkout`.
 - `/founder`, `/impact`, `/governance`, `/contact`, `/privacy`, `/terms`, `/partnerships`, `/reports`, `/ydo` — Content-only.
 
-### Sponsor portal
+### Sponsor surface (NOT a separate portal — it's on the kid page)
 
-- `/sponsor/login` — Magic-link request form. Generates a one-time token, stores in Airtable, emails via SendGrid.
-- `/sponsor/welcome` — Post-login landing inside the portal.
-- `/sponsor/[code]` — Authenticated portal view. Shows child updates, subscription state, billing controls. Respects the reveal gate: lockbox mode (redacted photo, first-initial name) until `ChildRevealedAt` is set on the Sponsorship record. Once revealed, full profile is visible.
+**As of June 2026, there is no separate sponsor portal.** All sponsor-only content (updates, letters, report cards, shop-your-number reorders, subscription management, messaging) renders inline on `/[number]` when the viewer is recognized as that kid's sponsor.
+
+Sponsor recognition mechanism:
+- The `sponsor_session` cookie is a 30-day signed JSON blob: `{ email, sponsorCode, expires }`.
+- `/[number]/page.tsx` reads the cookie via `getViewerSponsorCode()`, fetches the kid's Sponsorship record, and sets `viewerIsSponsor = (viewerCode === sponsorship.SponsorCode)`. That boolean drives every conditional render on the page — the $25/mo CTA hides, the sponsor-only content unhides.
+- The cookie gets set by exactly three endpoints:
+  - `POST /api/sponsor/recover/callback` — HMAC-signed auto-login link in sponsor newsletter emails. This is the primary path.
+  - `POST /api/sponsor/claim-match` — "Claim this match" button on `/[number]`, used when a sponsor's shirt arrives and they visit their assigned number for the first time.
+  - `POST /api/sponsor/verify` — Manual email + sponsorCode form at `/sponsor/login`. **Deprecated surface, kept for fallback only. Do not link to it from new code.**
+
+Deprecated routes (still in code but should not be the primary path):
+- `/sponsor/login` — Manual login form. Deprecated. Kept only as fallback.
+- `/sponsor/[code]` — Old dedicated dashboard page. Deprecated. Functionality is now inlined on `/[number]`.
+- `/sponsor/welcome` — Post-login landing. Deprecated.
 
 ### Admin
 
@@ -86,7 +97,7 @@ beanumber/
 ## Key libraries in `src/lib/`
 
 - `airtable.ts` — The one place the Airtable client is configured. All reads/writes route through here. Table names and field keys are strings; check `airtable_schema.md` before adding new ones — the webhook has 422'd more than once because we wrote to fields that don't exist.
-- `auth.ts` — Magic-link token generation + verification for sponsor portal. Admin auth lives alongside.
+- `auth.ts` — Sponsor session cookie helpers (`getViewerSponsorCode`, `verifySessionForCode`) and admin token verification. The "sponsor portal" comments in here are outdated — sponsor auth now gates content on `/[number]`, not a dedicated portal route.
 - `email.ts` — `sendEmail()` abstraction that tries Gmail OAuth2 first, falls back to SendGrid if Gmail isn't configured. In production, Gmail is active. Contains several template functions (`sendSponsorWelcomeEmail`, `sendDonationReceiptEmail`, etc.) that still use old copy and need a voice.md rewrite. All transactional email routes through this file.
 - `gmail.ts` — Gmail OAuth2 send implementation. Builds raw MIME messages, handles plain-text-only mode, refresh token flow. This is the active email provider in production.
 - `googledrive.ts` — Google Workspace integration for admin workflows (not customer-facing).
@@ -117,7 +128,7 @@ beanumber/
 
 ### The reveal gate
 
-The core brand mechanic is: number on the shirt → name of the child, revealed after purchase. Until `ChildRevealedAt` is set on the Sponsorship record, the sponsor portal renders a "lockbox" state (redacted photo, first initial, no name). Any code that renders child data inside the sponsor portal MUST check reveal status before exposing identifying info. Shortcutting this breaks the brand.
+The core brand mechanic is: number on the shirt → name of the child, revealed after purchase. Until `ChildRevealedAt` is set on the Sponsorship record, sponsor-only views render a "lockbox" state (redacted photo, first initial, no name). Any code that renders child data in a sponsor-recognized view MUST check reveal status before exposing identifying info. Shortcutting this breaks the brand. (Note: as of June 2026 the "sponsor portal" surface is the kid page `/[number]` itself, not a separate `/sponsor/[code]` route — see "Sponsor surface" above.)
 
 ### The four checkout routes are four, not one
 

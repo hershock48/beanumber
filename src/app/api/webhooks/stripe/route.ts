@@ -1391,6 +1391,60 @@ async function createSponsorshipRecord(data: {
   return { recordId: result.id, sponsorCode };
 }
 
+/**
+ * Create a Sponsorship record for a cart+monthly checkout completion,
+ * with NO Children link (per core_model.md §0 — no matching, ever).
+ * The sponsor is a sponsor the second they pay. The kid associated with
+ * any shirt they receive is derived from cycle math at display time,
+ * not from this row.
+ */
+async function createSponsorshipFromCartCheckout(data: {
+  sponsorCode: string;
+  sponsorEmail: string;
+  sponsorName?: string;
+  monthlyAmount: number;
+  stripeSubscriptionId: string;
+  donorRecordId: string;
+  sponsorshipStartDate: string;
+}): Promise<{ recordId: string }> {
+  if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) {
+    throw new Error('Airtable credentials not configured');
+  }
+
+  const fields: Record<string, unknown> = {
+    SponsorCode: data.sponsorCode,
+    SponsorEmail: data.sponsorEmail,
+    AuthStatus: 'Active',
+    Status: 'Active',
+    VisibleToSponsor: true,
+    SponsorshipStartDate: data.sponsorshipStartDate,
+    Donor: [data.donorRecordId],
+    MonthlyAmount: data.monthlyAmount,
+    StripeSubscriptionID: data.stripeSubscriptionId,
+  };
+  if (data.sponsorName) fields.SponsorName = data.sponsorName;
+
+  const response = await airtableAPICall(() =>
+    fetch(
+      `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_SPONSORSHIPS_TABLE}`,
+      {
+        method: 'POST',
+        headers: getAirtableHeaders(),
+        body: JSON.stringify({ fields }),
+      }
+    )
+  );
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Airtable cart Sponsorship create error: ${error}`);
+  }
+
+  const result = await response.json();
+  console.log('[Airtable] Created cart Sponsorship:', result.id, data.sponsorCode);
+  return { recordId: result.id };
+}
+
 // Send sponsor welcome email with sponsor code
 async function sendSponsorWelcomeEmail(data: {
   email: string;
@@ -1778,14 +1832,67 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
       });
 
       // Cart monthly opt-ins — the Shirt + Stay conversion path through
-      // the cart. Under the stockpile model we still create the deferred
-      // Stripe subscription (the buyer wants ongoing sponsorship and
-      // their payment method is saved), but we skip the Sponsorship
-      // record creation since we can't link to a child we haven't
-      // matched yet. Kevin issues the Sponsorship + sponsor code
-      // manually after shipping when he knows which number went out.
+      // the cart.
+      //
+      // Two paths exist here for backwards compatibility:
+      //
+      //   (A) NEW (June 2026 onward): the cart checkout is created in
+      //       `mode: 'subscription'` when +monthly is present. Stripe
+      //       creates the subscription itself during checkout, so
+      //       `session.subscription` is populated on the completed
+      //       session. We skip the retroactive subscriptions.create()
+      //       call entirely (it would create a duplicate) and just
+      //       create the Sponsorship row with the existing sub ID.
+      //
+      //   (B) OLD (pre-June 2026): cart created in `mode: 'payment'`
+      //       with no recurring line items. session.subscription is
+      //       null. We retroactively call subscriptions.create() using
+      //       the saved payment method. This path silently failed for
+      //       4 buyers in June 2026 (see docs/claude/known_gotchas.md).
+      //       Path retained only to handle any in-flight sessions
+      //       created before the cart-checkout fix shipped.
+      //
+      // Per `core_model.md` §0: NO MATCHING. Sponsorship rows are
+      // created with `Children` link blank, regardless of path. The
+      // buyer is a sponsor the second they pay — no waiting on a kid
+      // assignment that never happens.
       const monthlyOptIns = assignments.filter(a => a.continueMonthly);
-      if (monthlyOptIns.length > 0 && !stripeCustomerId) {
+      const existingSubscriptionId =
+        (typeof session.subscription === 'string'
+          ? session.subscription
+          : session.subscription?.id) || null;
+
+      if (monthlyOptIns.length > 0 && existingSubscriptionId) {
+        // PATH A: subscription-mode cart. Stripe already made the sub.
+        // Create the Sponsorship row with the sub ID, blank Children
+        // link. One Sponsorship per cart (even if multiple +monthly
+        // items rolled into one sub in subscription mode).
+        try {
+          const sponsorCode = generateSponsorCode();
+          const monthlyAmount = SHIRT_PRICE * monthlyOptIns.length;
+          await createSponsorshipFromCartCheckout({
+            sponsorCode,
+            sponsorEmail: email,
+            sponsorName: name,
+            monthlyAmount,
+            stripeSubscriptionId: existingSubscriptionId,
+            donorRecordId: donorId,
+            sponsorshipStartDate: donationDate,
+          });
+          console.log('[WH] Created cart Sponsorship row, code=' + sponsorCode + ', sub=' + existingSubscriptionId);
+        } catch (err: any) {
+          console.error('[WH] Cart Sponsorship row create failed:', String(err?.message || err).slice(0, 200));
+          await sendEmail({
+            to: { email: 'kevin@beanumber.org', name: 'Kevin' },
+            subject: 'Cart Sponsorship row failed to create (sub exists in Stripe)',
+            html: `<p>A cart+monthly checkout completed and the Stripe subscription was created (${existingSubscriptionId}), but the Airtable Sponsorship row failed to write.</p>
+<p><strong>Buyer:</strong> ${name || 'unknown'} (${email})<br/>
+<strong>Session:</strong> ${session.id}<br/>
+<strong>Error:</strong> ${err?.message || String(err)}</p>
+<p>Create the Sponsorship row manually with SponsorEmail=${email}, StripeSubscriptionID=${existingSubscriptionId}, Status=Active, MonthlyAmount=${SHIRT_PRICE * monthlyOptIns.length}.</p>`,
+          }).catch(e => console.error('[WH] Failed to send Sponsorship-create alert:', e));
+        }
+      } else if (monthlyOptIns.length > 0 && !stripeCustomerId) {
         // CRITICAL: Cart checkout should have set customer_creation:'always'.
         // If we have monthly items but no customer, the saved-payment-method
         // path fails and we can't create deferred subscriptions.
@@ -1799,7 +1906,12 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
 <p>The shirts paid for went through fine. The monthly subscription(s) are NOT active — create them manually in Stripe.</p>`,
         }).catch(e => console.error('[WH] Failed to send subscription-failure alert:', e));
       }
-      if (monthlyOptIns.length > 0 && stripeCustomerId) {
+      // OLD PATH (B): retroactive subscription creation for pre-June 2026
+      // payment-mode cart sessions. Only fires when there's no
+      // session.subscription (i.e., this was NOT a sub-mode checkout).
+      // Kept for in-flight sessions only. Will not fire for any cart
+      // checkout created after the cart-checkout fix shipped.
+      if (monthlyOptIns.length > 0 && stripeCustomerId && !existingSubscriptionId) {
         const stripe = await getStripe();
         for (const item of monthlyOptIns) {
           try {

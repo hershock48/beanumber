@@ -4,7 +4,25 @@
 
 ---
 
-## The three load-bearing facts
+## The four load-bearing facts
+
+### 0. NO MATCHING. EVER. (the one Kevin keeps having to repeat)
+
+**We do not match buyers to children. We used to. We don't anymore.**
+
+When someone buys a shirt and signs up to sponsor:
+- They do **not** choose a kid.
+- Kevin does **not** assign them to a kid.
+- The system does **not** create a per-buyer kid pairing.
+- The buyer doesn't know what shirt number they'll get until the shirt ships.
+- Kevin doesn't know what shirt number they'll get either — it's whatever's next in the open batch.
+- The "kid" associated with that shirt number is whatever the batch cycle math returns at display time.
+
+A **sponsor** is just a sponsor — a person paying $25/mo into the pool. The Sponsorship record should be created the instant they pay, with **`Children` link blank, forever, by default**.
+
+The only time a Sponsorship gets a `Children` link is if the sponsor explicitly visits a specific `/[number]` page, sees that kid, and we want to remember the visit. Even then it's optional. The kid card displayed on `/[number]` is derived from cycle math against the shirt number, not from the Sponsorship's `Children` link.
+
+**Code consequence:** any code path that says "we can't create the Sponsorship yet because we don't know the kid" is wrong. There is no kid to know. Create the Sponsorship at purchase. Empty `Children`. Move on.
 
 ### 1. Pool funding, not per-kid budgets
 
