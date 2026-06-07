@@ -253,14 +253,57 @@ export async function GET(request: NextRequest) {
             subId = existingSub.id;
             console.log('[Backfill] Found existing subscription:', subId);
           } else if (!dryRun) {
-            // Create a new subscription
-            const paymentMethods = await stripe.paymentMethods.list({
-              customer: customerId,
-              type: 'card',
-            });
-            const pm = paymentMethods.data[0];
+            // Find a saved payment method on the customer. The cart
+            // checkout enables both 'card' and 'link' (Stripe Link
+            // wallet), so the saved PM type may be either. We also fall
+            // back to the original PaymentIntent's payment_method if
+            // the customer has nothing attached directly (sometimes
+            // setup_future_usage saves the PM but doesn't attach it
+            // to the customer until first use).
+            let pmId: string | null = null;
 
-            if (!pm) {
+            // Try every payment method type the cart checkout supports.
+            for (const pmType of ['card', 'link'] as const) {
+              const list = await stripe.paymentMethods.list({
+                customer: customerId,
+                type: pmType,
+              });
+              if (list.data[0]) {
+                pmId = list.data[0].id;
+                console.log('[Backfill] Found PM on customer:', pmId, 'type=' + pmType);
+                break;
+              }
+            }
+
+            // Fallback: pull the PM from the original PaymentIntent.
+            if (!pmId) {
+              const piId = fields['Stripe Payment Intent ID'] || '';
+              if (piId) {
+                try {
+                  const pi = await stripe.paymentIntents.retrieve(piId);
+                  const piPm = typeof pi.payment_method === 'string'
+                    ? pi.payment_method
+                    : pi.payment_method?.id;
+                  if (piPm) {
+                    pmId = piPm;
+                    console.log('[Backfill] Found PM on PI fallback:', pmId);
+                    // Attach to the customer so the subscription can use it.
+                    try {
+                      await stripe.paymentMethods.attach(pmId, { customer: customerId });
+                    } catch (attachErr: any) {
+                      // Already attached → fine. Anything else, surface.
+                      if (!String(attachErr?.message || '').includes('already')) {
+                        console.warn('[Backfill] PM attach warn:', attachErr?.message);
+                      }
+                    }
+                  }
+                } catch (e: any) {
+                  console.log('[Backfill] PI retrieve fallback failed:', piId, e.message);
+                }
+              }
+            }
+
+            if (!pmId) {
               result.error = 'No payment method on file for customer ' + customerId;
               results.push(result);
               continue;
@@ -273,13 +316,13 @@ export async function GET(request: NextRequest) {
                 price_data: {
                   currency: 'usd',
                   product_data: {
-                    name: `Monthly Sponsorship (${childName || 'a child'})`,
+                    name: 'Be A Number monthly sponsorship',
                   },
                   unit_amount: 2500,
                   recurring: { interval: 'month' },
                 } as any,
               }],
-              default_payment_method: pm.id,
+              default_payment_method: pmId,
               billing_cycle_anchor: billingAnchor,
               proration_behavior: 'none',
               metadata: {
@@ -296,6 +339,41 @@ export async function GET(request: NextRequest) {
 
           result.stripeSubscriptionId = subId || null;
           result.subscriptionCreated = !!subId;
+
+          // Per core_model.md §0: NO MATCHING. If we just created a
+          // Stripe sub and there's already a Sponsorship row for this
+          // donor that doesn't yet have a sub ID, link them. This
+          // catches the stockpile case (shirt purchased, sponsorship
+          // exists in Airtable from prior manual fix, sub now exists in
+          // Stripe — they need to be glued together).
+          if (subId && !dryRun) {
+            try {
+              const linkFormula = `AND(LOWER({SponsorEmail})="${email.toLowerCase()}",{StripeSubscriptionID}="")`;
+              const linkRes = await fetch(
+                `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/Sponsorships?filterByFormula=${encodeURIComponent(linkFormula)}&maxRecords=1`,
+                { headers: getAirtableHeaders() }
+              );
+              if (linkRes.ok) {
+                const linkData = await linkRes.json();
+                const candidate = linkData.records?.[0];
+                if (candidate?.id) {
+                  await fetch(
+                    `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/Sponsorships/${candidate.id}`,
+                    {
+                      method: 'PATCH',
+                      headers: getAirtableHeaders(),
+                      body: JSON.stringify({
+                        fields: { StripeSubscriptionID: subId },
+                      }),
+                    }
+                  );
+                  console.log('[Backfill] Linked sub', subId, '→ existing Sponsorship', candidate.id);
+                }
+              }
+            } catch (linkErr: any) {
+              console.warn('[Backfill] Failed to link sub to existing Sponsorship:', linkErr?.message);
+            }
+          }
 
           // Find child record by shirt number
           let childRecordId = '';
