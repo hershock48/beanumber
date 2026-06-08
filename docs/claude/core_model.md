@@ -6,7 +6,36 @@
 
 ## The four load-bearing facts
 
-### 0. NO MATCHING. EVER. (the one Kevin keeps having to repeat)
+### 0a. Vocabulary: Owners, Sponsors, Holders
+
+Three terms that get conflated. The distinction matters because two of them are real categories in the system and one is a behavior, not a category.
+
+- **Owner** — anyone with a Sponsorship row tied to a specific number. The row's `Children` link tells the system which kid that number currently maps to. Owners come from two paths: (a) cart+monthly buyers (auto-created at checkout, Status=Active); (b) shirt-only buyers / gift recipients / found-shirt wearers (created when they CLAIM the number via `/api/sponsor/recover/send-link`, Status=Holder).
+- **Sponsor** — an Owner who pays $25/mo. Their Sponsorship row has Status=Active, MonthlyAmount=25, and a `sub_…` populated. Every Sponsor is an Owner.
+- **Holder** — an Owner who does not pay monthly. Status=Holder, MonthlyAmount=0, no Stripe sub. The shirt is theirs, the number is theirs, the kid is theirs in the relationship sense, but they're not on the recurring billing side.
+
+A Holder can become a Sponsor (status flip + sub created — same row, history preserved). A Sponsor who cancels recurring becomes a Holder (status flip, no row deletion). The pick history, kid relationship, and chooser state all survive both transitions.
+
+"Looking up a number" is a behavior, NOT a category. Kevin can browse every kid page in the roster without ever being recorded as the owner of any of them. Ownership is only created by purchase (auto-Active) or by claim (Holder). Browsing leaves no trace.
+
+### How owners claim their number
+
+A first-time visitor with a shirt whose number was assigned but who has no Sponsorship row yet does this:
+1. Visits `/[their number]`. Sees the kid. Sees a "Is this your number? Claim it or sign in" CTA.
+2. Enters their email. The `/api/sponsor/recover/send-link` endpoint figures out which case applies:
+   - **Existing Sponsorship for this email + child** → send magic-link recovery (sign-in).
+   - **No Sponsorship for this child at all** → create Holder row, send magic link.
+   - **Sponsorship exists for this child from a DIFFERENT email** → privacy-success response, log for admin review (someone else already owns the number).
+3. They click the magic link. The callback drops the `sponsor_session` cookie. They're now signed in as the owner.
+4. From this moment, every visit to /[their number] is authenticated. They see the kid newsletter, the sponsor-only updates (if any), and — if their kid ever departs — they get the chooser + split-flap reveal.
+
+### Why this matters operationally
+
+- **Multi-shirt orders work right.** Chad buys 4 shirts and gives 3 away. Chad claims his own number. Each buddy claims theirs. The system tracks 4 separate Owners, not "Chad owns all 4." Payment record is independent from ownership.
+- **No fulfillment-step bookkeeping by Kevin.** Ownership crystallizes when the wearer comes to the site and types their email, not when Kevin marks a shirt number in `/admin/fulfillment`.
+- **Departures fan out to all owners.** When a kid departs and you click "Stage candidate cards" in admin, the system stages the chooser on every Sponsorship linked to that kid — Active sponsors AND Holders. AND it fires an auto-login email to each one with a one-tap link straight into their chooser. Departures become re-engagement moments, not dead ends.
+
+### 0b. NO MATCHING. EVER. (the rule Kevin keeps having to repeat)
 
 **We do not match buyers to children. We used to. We don't anymore.**
 

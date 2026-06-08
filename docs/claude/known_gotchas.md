@@ -81,6 +81,10 @@ Same 2026-06-07 session. I "fixed" Sam Banfield's missing newsletter segment by 
 
 2026-06-07 session, repeating a lesson from earlier. Discussion ≠ build directive. Even if Kevin and I are deep in a back-and-forth about a fix, I do not write code or update production data until Kevin says "yes, do it" or "ship it." When in doubt, ask. When not in doubt, ask anyway.
 
+### "Holder" must be added to Sponsorships.Status singleSelect in Airtable
+
+Added 2026-06-08 as part of the number-holder claim flow (see `core_model.md` §0a). The `/api/sponsor/recover/send-link` endpoint and downstream code expect `Holder` to be a valid option on the `Sponsorships.Status` singleSelect. The Airtable metadata API cannot add singleSelect options — Kevin has to add it manually in the Airtable UI. Until added, Holder row creation silently 422s with INVALID_MULTIPLE_CHOICE_OPTIONS. The caller logs the failure but returns privacy-success to the user (no error surfaced), so the symptom is "claims silently never work." If a buyer claims and never sees a sponsor view, check this option first.
+
 ## Open bugs (known, not yet fixed)
 
 ### Cart+monthly checkout silently drops the recurring half — CRITICAL
