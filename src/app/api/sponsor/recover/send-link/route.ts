@@ -1,18 +1,29 @@
 /**
- * Request a sponsor-recovery magic link.
+ * Request a sponsor-recovery OR first-time-claim magic link.
  *
- * Use case: a verified sponsor lands on /[number] for the kid they
- * sponsor — but from a new device, an incognito window, or after
- * clearing their cookies. The page can't auto-identify them. They
- * submit their email to this endpoint; if there's a matching active
- * Sponsorship for this child + email, we email them a one-tap link
- * that drops a fresh sponsor_session cookie and bounces them back to
- * /children/[number] in authenticated mode.
+ * Two cases handled by one endpoint:
  *
- * Privacy: the endpoint always returns success, regardless of whether
- * the email matched anything. That keeps it from being usable as an
- * email-enumeration oracle (an attacker can't tell which addresses
- * are sponsors).
+ *   1. SIGN-IN. An existing sponsor (Active or Holder) lands on
+ *      /[number] for a kid they already own — but from a new device,
+ *      an incognito window, or after clearing their cookies. They
+ *      submit their email. If we find a matching Sponsorship for this
+ *      child + email, we send them a one-tap recovery link.
+ *
+ *   2. FIRST-TIME CLAIM. A shirt buyer/wearer with no Sponsorship row
+ *      yet visits /[number] and submits their email to claim the
+ *      number. If no one else has claimed this number's kid yet
+ *      (no existing Sponsorship row linked to this Children record),
+ *      we create a NEW row with Status="Holder" tied to their email,
+ *      then send them the same one-tap link. From that moment they
+ *      own this number — same as if they'd been there from day one.
+ *
+ *      If someone else has already claimed this number, the response
+ *      is identical (privacy + no info leak); the claim attempt is
+ *      logged for admin review.
+ *
+ * Privacy: the endpoint always returns `{ success: true }` regardless
+ * of which branch fired (sign-in vs claim vs blocked). That keeps it
+ * from being usable as an email-enumeration or claim-status oracle.
  *
  * Rate limiting: not implemented yet. Volume is low enough that any
  * abuse will surface in Vercel logs; add real rate limiting once we
@@ -41,13 +52,27 @@ function atHeaders() {
   };
 }
 
-async function lookupSponsorshipForRecovery(
-  email: string,
-  shirtNumber: number
-): Promise<{ sponsorCode: string; childDisplayName: string; firstName: string } | null> {
+// Generate a unique sponsor code (e.g. BAN-2026-427). Same shape used
+// by the webhook + admin sync paths.
+function generateSponsorCode(): string {
+  const year = new Date().getFullYear();
+  const randomNum = Math.floor(Math.random() * 900) + 100;
+  return `BAN-${year}-${randomNum}`;
+}
+
+interface ChildContext {
+  recordId: string;
+  displayName: string;
+  firstName: string;
+}
+
+/**
+ * Resolve the Children record for a given shirt number, plus its
+ * display fields. Returns null if the number doesn't resolve.
+ */
+async function lookupChild(shirtNumber: number): Promise<ChildContext | null> {
   if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) return null;
   try {
-    // First find the child by shirt number so we have their record ID.
     const childFormula = encodeURIComponent(`{ShirtNumber}=${shirtNumber}`);
     const childRes = await fetch(
       `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(
@@ -59,36 +84,135 @@ async function lookupSponsorshipForRecovery(
     const childData = await childRes.json();
     const child = childData.records?.[0];
     if (!child) return null;
-    const childRecordId = child.id as string;
-    const childDisplayName: string =
+    const displayName: string =
       child.fields?.DisplayName ||
       `${child.fields?.FirstName || 'Child'} ${child.fields?.LastInitial || ''}`.trim();
-    const firstName: string = child.fields?.FirstName || childDisplayName.split(' ')[0] || 'them';
+    const firstName: string = child.fields?.FirstName || displayName.split(' ')[0] || 'them';
+    return {
+      recordId: child.id as string,
+      displayName,
+      firstName,
+    };
+  } catch (err) {
+    console.warn('[Recovery] Child lookup failed', err);
+    return null;
+  }
+}
 
-    // Find an Active Sponsorship for this email that links to this child.
-    const sponsorshipFormula = encodeURIComponent(
-      `AND(LOWER({SponsorEmail})="${email.toLowerCase().replace(/"/g, '\\"')}", {Status}="Active", FIND("${childRecordId}", ARRAYJOIN({Children}, ",")))`
+/**
+ * Find an existing Sponsorship (Active or Holder) for this email that
+ * links to this child. Returns the SponsorCode if matched.
+ */
+async function findExistingSponsorship(
+  email: string,
+  childRecordId: string
+): Promise<string | null> {
+  if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) return null;
+  try {
+    const formula = encodeURIComponent(
+      `AND(LOWER({SponsorEmail})="${email.toLowerCase().replace(/"/g, '\\"')}", OR({Status}="Active",{Status}="Holder"), FIND("${childRecordId}", ARRAYJOIN({Children}, ",")))`
     );
-    const spRes = await fetch(
+    const res = await fetch(
       `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(
         SPONSORSHIPS_TABLE
-      )}?filterByFormula=${sponsorshipFormula}&maxRecords=1`,
+      )}?filterByFormula=${formula}&maxRecords=1`,
       { headers: atHeaders(), cache: 'no-store' }
     );
-    if (!spRes.ok) return null;
-    const spData = await spRes.json();
-    const sponsorship = spData.records?.[0];
+    if (!res.ok) return null;
+    const data = await res.json();
+    const sponsorship = data.records?.[0];
     if (!sponsorship) return null;
-    const sponsorCode = sponsorship.fields?.SponsorCode as string | undefined;
-    if (!sponsorCode) return null;
-    return { sponsorCode, childDisplayName, firstName };
+    return (sponsorship.fields?.SponsorCode as string) || null;
   } catch (err) {
     console.warn('[Recovery] Sponsorship lookup failed', err);
     return null;
   }
 }
 
+/**
+ * Check whether ANY active claim (Active or Holder) already exists on
+ * this child record from a DIFFERENT email. Used to block fraudulent
+ * second-claim attempts on a number that's already been spoken for.
+ */
+async function isChildAlreadyClaimedByOther(
+  childRecordId: string,
+  excludingEmail: string
+): Promise<boolean> {
+  if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) return false;
+  try {
+    const formula = encodeURIComponent(
+      `AND(LOWER({SponsorEmail})!="${excludingEmail.toLowerCase().replace(/"/g, '\\"')}", OR({Status}="Active",{Status}="Holder"), FIND("${childRecordId}", ARRAYJOIN({Children}, ",")))`
+    );
+    const res = await fetch(
+      `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(
+        SPONSORSHIPS_TABLE
+      )}?filterByFormula=${formula}&maxRecords=1`,
+      { headers: atHeaders(), cache: 'no-store' }
+    );
+    if (!res.ok) return false;
+    const data = await res.json();
+    return (data.records?.length || 0) > 0;
+  } catch (err) {
+    console.warn('[Recovery] Other-claim lookup failed', err);
+    return false;
+  }
+}
+
+/**
+ * Create a new Holder Sponsorship row for a first-time claim. Returns
+ * the generated SponsorCode, or null if Airtable rejected the write.
+ *
+ * Status="Holder" must exist as an option on Sponsorships.Status in
+ * Airtable. If it doesn't, this returns null and the caller falls back
+ * to a privacy success (the user sees "check your email," but no email
+ * is sent — Kevin gets a log line to add the option).
+ */
+async function createHolderSponsorship(
+  email: string,
+  childRecordId: string
+): Promise<string | null> {
+  if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) return null;
+  const sponsorCode = generateSponsorCode();
+  const today = new Date().toISOString().split('T')[0];
+  const fields: Record<string, unknown> = {
+    SponsorCode: sponsorCode,
+    SponsorEmail: email,
+    Status: 'Holder',
+    AuthStatus: 'Active',
+    VisibleToSponsor: true,
+    SponsorshipStartDate: today,
+    Children: [childRecordId],
+    MonthlyAmount: 0,
+  };
+  try {
+    const res = await fetch(
+      `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(
+        SPONSORSHIPS_TABLE
+      )}`,
+      {
+        method: 'POST',
+        headers: atHeaders(),
+        body: JSON.stringify({ fields }),
+      }
+    );
+    if (!res.ok) {
+      const txt = await res.text();
+      console.error('[Recovery] Holder create failed:', txt.slice(0, 300));
+      return null;
+    }
+    console.log('[Recovery] Created Holder sponsorship:', sponsorCode, 'for', email);
+    return sponsorCode;
+  } catch (err) {
+    console.error('[Recovery] Holder create exception:', err);
+    return null;
+  }
+}
+
 export async function POST(request: NextRequest) {
+  // Always return this same shape, regardless of which path fires.
+  // The page UI shows "Check your email" either way. Privacy first.
+  const responseShape = { success: true };
+
   try {
     const parsed = schema.safeParse(await request.json().catch(() => null));
     if (!parsed.success) {
@@ -96,22 +220,49 @@ export async function POST(request: NextRequest) {
     }
     const { email, shirtNumber } = parsed.data;
 
-    // Always return success regardless of match — privacy first.
-    const responseShape = { success: true };
-
-    const match = await lookupSponsorshipForRecovery(email, shirtNumber);
-    if (!match) {
-      // No match — don't tell the requester. Just return success.
-      console.log(
-        `[Recovery] No active sponsorship match for ${email} on #${shirtNumber}; skipping email send.`
-      );
+    // 1. Resolve the kid for this shirt number.
+    const child = await lookupChild(shirtNumber);
+    if (!child) {
+      console.log(`[Recovery] No child for #${shirtNumber}; nothing to send.`);
       return NextResponse.json(responseShape);
     }
 
-    // Build + send the recovery email.
+    // 2. SIGN-IN PATH: do they already own this number?
+    let sponsorCode = await findExistingSponsorship(email, child.recordId);
+    let isFreshClaim = false;
+
+    // 3. FIRST-TIME CLAIM PATH: no existing row. Make sure nobody else
+    //    has claimed this number first, then create a Holder row.
+    if (!sponsorCode) {
+      const alreadyTaken = await isChildAlreadyClaimedByOther(
+        child.recordId,
+        email
+      );
+      if (alreadyTaken) {
+        console.log(
+          `[Recovery] #${shirtNumber} is already claimed by someone else; ` +
+            `silent block on claim attempt by ${email}.`
+        );
+        return NextResponse.json(responseShape);
+      }
+      sponsorCode = await createHolderSponsorship(email, child.recordId);
+      if (!sponsorCode) {
+        // Holder creation failed (likely "Holder" not yet added to
+        // Sponsorships.Status singleSelect). Return privacy success and
+        // log so Kevin can add it in Airtable.
+        console.error(
+          `[Recovery] Could not create Holder row for ${email} on #${shirtNumber}. ` +
+            `Check that "Holder" is a valid Sponsorships.Status option.`
+        );
+        return NextResponse.json(responseShape);
+      }
+      isFreshClaim = true;
+    }
+
+    // 4. Build + send the magic-link email.
     let token: string;
     try {
-      token = makeRecoveryToken(match.sponsorCode, shirtNumber);
+      token = makeRecoveryToken(sponsorCode, shirtNumber);
     } catch (err) {
       console.error('[Recovery] Token generation failed', err);
       return NextResponse.json(responseShape);
@@ -119,7 +270,27 @@ export async function POST(request: NextRequest) {
     const callbackUrl = `${SITE_URL}/api/sponsor/recover/callback?t=${encodeURIComponent(token)}`;
 
     const fromEmail = process.env.SENDGRID_FROM_EMAIL || 'Kevin@beanumber.org';
-    const firstName = match.firstName;
+    const firstName = child.firstName;
+    const subject = isFreshClaim
+      ? `#${shirtNumber} is yours — open ${firstName}'s page`
+      : `Your link back to ${firstName}'s page`;
+    const headline = isFreshClaim
+      ? `#${shirtNumber} is yours now.`
+      : `Hey there,`;
+    const body = isFreshClaim
+      ? `<p>You just claimed #${shirtNumber} on
+          <a href="https://www.beanumber.org" style="color: #D4A843; font-weight: bold;">beanumber.org</a>.
+          The kid behind that number is ${firstName}. Tap the button
+          below to open their page — you&rsquo;ll be signed in, and
+          this device will remember you for 30 days.</p>
+        <p>From here on, whenever ${firstName}&rsquo;s situation
+          changes (a new update, a moment to step in, a chance to pick
+          a new kid if they leave the campus), this is your way back
+          to them.</p>`
+      : `<p>You asked to get back into ${firstName}&rsquo;s page on
+          <a href="https://www.beanumber.org" style="color: #D4A843; font-weight: bold;">beanumber.org</a>.
+          Tap the button below to land back in your sponsor view.</p>`;
+
     const html = `
       <!DOCTYPE html>
       <html>
@@ -128,19 +299,15 @@ export async function POST(request: NextRequest) {
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
         </head>
         <body style="font-family: Georgia, 'Times New Roman', serif; line-height: 1.7; color: #333; max-width: 560px; margin: 0 auto; padding: 30px 20px;">
-          <p style="margin-top: 0;">Hey there,</p>
-          <p>
-            You asked to get back into ${firstName}&rsquo;s page on
-            <a href="https://www.beanumber.org" style="color: #D4A843; font-weight: bold;">beanumber.org</a>.
-            Tap the button below to land back in your sponsor view.
-          </p>
+          <p style="margin-top: 0;">${headline}</p>
+          ${body}
           <p style="text-align: center; margin: 28px 0;">
             <a href="${callbackUrl}" style="display: inline-block; background: #D4A843; color: #0d0d0d; font-weight: bold; text-decoration: none; padding: 14px 32px; font-size: 15px; letter-spacing: 0.05em; text-transform: uppercase;">
               Open ${firstName}&rsquo;s page
             </a>
           </p>
           <p style="color: #888; font-size: 13px;">
-            This link expires in 30 minutes. If you didn&rsquo;t request it, you can ignore this email &mdash; your portal stays exactly where it was.
+            This link expires in 30 minutes. If you didn&rsquo;t request it, you can ignore this email.
           </p>
           <hr style="border: none; border-top: 1px solid #e8e0d4; margin: 24px 0;">
           <p style="font-size: 12px; color: #999; line-height: 1.5;">
@@ -154,18 +321,16 @@ export async function POST(request: NextRequest) {
     const result = await sendEmail({
       to: { email, name: '' },
       from: { email: fromEmail, name: 'Be A Number' },
-      subject: `Your link back to ${firstName}'s page`,
+      subject,
       html,
     });
     if (!result.success) {
       console.error('[Recovery] Failed to send link email:', result.error);
-      // Still return success to the client to preserve privacy.
     }
 
     return NextResponse.json(responseShape);
   } catch (err: any) {
     console.error('[Recovery] send-link error:', err);
-    // Privacy-first response — never reveal what went wrong.
-    return NextResponse.json({ success: true });
+    return NextResponse.json(responseShape);
   }
 }
