@@ -10,9 +10,13 @@
  * Visual sequence:
  *   1. Header + 3 cards slide in from below, staggered (0/120/240ms).
  *   2. Hover: card lifts, soft shadow expands, gold border highlights.
- *   3. Click: card scales up + rises to center, others fade out, big
- *      kid name reveals in Lora gold serif, confetti bursts.
- *   4. ~2.5s beat, then navigate to /[N] (their new kid's page).
+ *   3. Click: card scales up + rises to center, others fade out,
+ *      confetti bursts.
+ *   4. A split-flap board (Vestaboard style) materializes in the
+ *      center and scrambles through random characters, with each
+ *      character locking left-to-right in a staggered cascade,
+ *      revealing the new kid's name + grade.
+ *   5. ~3s beat, then navigate to /[N] (their new kid's page).
  *
  * The chooser doubles as the reveal — the post-reassign overlay
  * suppresses itself when ChildRevealedAt is set (we set it in the
@@ -20,8 +24,114 @@
  */
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+
+/**
+ * Split-flap tile board — scrambles through random characters per
+ * tile, then locks each tile in sequence revealing `text`.
+ *
+ * Each character is a stacked tile (top half / bottom half) with a
+ * dark brown background and gold serif character, like the
+ * Vestaboard / airport boards of the 70s. Spaces render as blank
+ * tiles. Non-alpha characters render as-is and lock immediately.
+ *
+ * Lock cadence: characters lock left-to-right, evenly spaced across
+ * `lockDuration` ms after `startDelay`. Each tile keeps tumbling
+ * through scramble chars until it locks.
+ */
+function SplitFlapBoard({
+  text,
+  startDelay = 0,
+  lockDuration = 1400,
+}: {
+  text: string;
+  startDelay?: number;
+  lockDuration?: number;
+}) {
+  // Tick drives the "scramble" character cycle.
+  const [tick, setTick] = useState(0);
+  // Per-character lock state: false while tumbling, true once final.
+  const [locked, setLocked] = useState<boolean[]>(
+    () => text.split('').map(c => !/[A-Za-z]/.test(c))
+  );
+
+  useEffect(() => {
+    // Reset locks for new text.
+    setLocked(text.split('').map(c => !/[A-Za-z]/.test(c)));
+
+    const tickInterval = setInterval(() => setTick(t => t + 1), 70);
+
+    const alphaIndices = text
+      .split('')
+      .map((c, i) => (/[A-Za-z]/.test(c) ? i : -1))
+      .filter(i => i >= 0);
+
+    const lockTimers = alphaIndices.map((idx, order) => {
+      const lockAt =
+        startDelay +
+        (alphaIndices.length <= 1
+          ? lockDuration
+          : (order / (alphaIndices.length - 1)) * lockDuration);
+      return window.setTimeout(() => {
+        setLocked(prev => {
+          const next = prev.slice();
+          next[idx] = true;
+          return next;
+        });
+      }, lockAt);
+    });
+
+    // Stop the tumble loop once everything is locked.
+    const stopTumble = window.setTimeout(
+      () => clearInterval(tickInterval),
+      startDelay + lockDuration + 500
+    );
+
+    return () => {
+      clearInterval(tickInterval);
+      lockTimers.forEach(t => clearTimeout(t));
+      clearTimeout(stopTumble);
+    };
+  }, [text, startDelay, lockDuration]);
+
+  const SCRAMBLE_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+
+  return (
+    <div className="split-flap-board flex flex-wrap items-center justify-center gap-1 md:gap-1.5 max-w-3xl">
+      {text.split('').map((char, i) => {
+        const isAlpha = /[A-Za-z]/.test(char);
+        const isLocked = locked[i];
+        const showChar =
+          !isAlpha
+            ? char === ' '
+              ? ''
+              : char
+            : isLocked
+              ? char.toUpperCase()
+              : SCRAMBLE_CHARS[(tick + i * 7) % SCRAMBLE_CHARS.length];
+        const isSpace = char === ' ';
+        return (
+          <span
+            key={i}
+            className={`split-flap-tile${isSpace ? ' split-flap-tile-space' : ''}${
+              isLocked ? ' split-flap-tile-locked' : ' split-flap-tile-tumbling'
+            }`}
+            aria-hidden={!isLocked}
+          >
+            <span className="split-flap-tile-half split-flap-tile-top">
+              {showChar}
+            </span>
+            <span className="split-flap-tile-half split-flap-tile-bottom">
+              {showChar}
+            </span>
+            <span className="split-flap-tile-divider" />
+          </span>
+        );
+      })}
+    </div>
+  );
+}
 
 export interface CandidateKid {
   recordId: string;
@@ -102,7 +212,7 @@ function fireConfetti(originY: number = 0.4): void {
   requestAnimationFrame(animate);
 }
 
-type Stage = 'choose' | 'celebrate' | 'committing';
+type Stage = 'choose' | 'celebrate' | 'boarding' | 'committing';
 
 export function ReplacementChooser({
   shirtNumber,
@@ -121,6 +231,10 @@ export function ReplacementChooser({
       setStage('celebrate');
       // Fire confetti after the card has begun centering.
       setTimeout(() => fireConfetti(0.42), 400);
+      // Transition into the split-flap board reveal once the picked
+      // card has fully centered. The board scrambles for ~1.4s then
+      // settles, so we hold the celebration through ~2.8s total.
+      setTimeout(() => setStage('boarding'), 950);
 
       // Kick the API in parallel with the animation. The animation
       // is the experience; the POST is the bookkeeping.
@@ -132,13 +246,15 @@ export function ReplacementChooser({
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(data.error || `Failed: ${res.status}`);
-        setStage('committing');
-        // Hold the celebration on screen for the full ~2.5s, then
-        // refresh into the new kid's page.
+        // Hold the board on screen long enough to scramble + settle +
+        // breathe, then refresh into the new kid's page.
         setTimeout(() => {
-          router.refresh();
-          router.replace(`/children/${shirtNumber}`);
-        }, 1600);
+          setStage('committing');
+          setTimeout(() => {
+            router.refresh();
+            router.replace(`/children/${shirtNumber}`);
+          }, 400);
+        }, 2800);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Choice failed.');
         setStage('choose');
@@ -170,9 +286,82 @@ export function ReplacementChooser({
           0% { opacity: 1; transform: scale(1); }
           100% { opacity: 0; transform: scale(0.94) translateY(20px); }
         }
-        @keyframes chooseNameIn {
-          0% { opacity: 0; transform: translateY(20px) scale(0.96); }
+        @keyframes chooseBoardIn {
+          0% { opacity: 0; transform: translateY(28px) scale(0.94); }
           100% { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        @keyframes splitFlapTumble {
+          0% { transform: translateY(0); }
+          50% { transform: translateY(-2px); }
+          100% { transform: translateY(0); }
+        }
+        @keyframes splitFlapLock {
+          0% { transform: scale(1); box-shadow: 0 4px 14px rgba(0,0,0,0.35) inset, 0 1px 0 rgba(255,255,255,0.04); }
+          40% { transform: scale(1.06); box-shadow: 0 6px 22px rgba(212,168,67,0.5) inset, 0 0 18px rgba(212,168,67,0.3); }
+          100% { transform: scale(1); box-shadow: 0 4px 14px rgba(0,0,0,0.35) inset, 0 1px 0 rgba(255,255,255,0.04); }
+        }
+
+        /* ─── Split-flap board (Vestaboard / airport board) ─── */
+        .split-flap-board {
+          font-family: 'Courier New', ui-monospace, monospace;
+          line-height: 1;
+        }
+        .split-flap-tile {
+          position: relative;
+          display: inline-block;
+          width: 0.7em;
+          height: 1.05em;
+          background: #1f1812;
+          color: #D4A843;
+          font-weight: 700;
+          text-align: center;
+          border-radius: 3px;
+          box-shadow:
+            0 4px 14px rgba(0,0,0,0.35) inset,
+            0 1px 0 rgba(255,255,255,0.04);
+          overflow: hidden;
+          vertical-align: middle;
+        }
+        .split-flap-tile-space {
+          background: transparent;
+          box-shadow: none;
+          width: 0.32em;
+        }
+        .split-flap-tile-half {
+          position: absolute;
+          left: 0;
+          width: 100%;
+          height: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          overflow: hidden;
+        }
+        .split-flap-tile-top {
+          top: 0;
+          align-items: flex-end;
+          padding-bottom: 0.04em;
+        }
+        .split-flap-tile-bottom {
+          bottom: 0;
+          align-items: flex-start;
+          padding-top: 0.04em;
+          background: linear-gradient(180deg, rgba(0,0,0,0.18) 0%, rgba(0,0,0,0) 35%);
+        }
+        .split-flap-tile-divider {
+          position: absolute;
+          left: 6%;
+          right: 6%;
+          top: 50%;
+          height: 1px;
+          background: rgba(0,0,0,0.55);
+          box-shadow: 0 1px 0 rgba(255,255,255,0.05);
+        }
+        .split-flap-tile-tumbling {
+          animation: splitFlapTumble 70ms ease-in-out infinite;
+        }
+        .split-flap-tile-locked {
+          animation: splitFlapLock 380ms ease-out 1 both;
         }
       `}</style>
 
@@ -200,7 +389,7 @@ export function ReplacementChooser({
 
       {/* Cards or celebration */}
       <div className="w-full max-w-5xl">
-        {stage !== 'committing' ? (
+        {stage === 'choose' || stage === 'celebrate' ? (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 md:gap-7 items-stretch">
             {candidates.map((kid, idx) => {
               const isPicked = pickedId === kid.recordId;
@@ -277,39 +466,38 @@ export function ReplacementChooser({
           </div>
         ) : null}
 
-        {/* Centered name reveal during 'celebrate' + 'committing' */}
-        {(stage === 'celebrate' || stage === 'committing') && pickedKid && (
+        {/* Split-flap board reveal — takes over during 'boarding' and
+            'committing'. Centered over the page so the picked card
+            (still animating) reads as the source of the reveal. */}
+        {(stage === 'boarding' || stage === 'committing') && pickedKid && (
           <div
-            className="fixed inset-0 flex items-center justify-center pointer-events-none z-20"
-            style={{
-              animation:
-                stage === 'committing'
-                  ? 'chooseNameIn 400ms ease-out both'
-                  : 'chooseNameIn 900ms ease-out 450ms both',
-            }}
+            className="fixed inset-0 flex items-center justify-center pointer-events-none z-20 px-5"
+            style={{ animation: 'chooseBoardIn 500ms ease-out both' }}
           >
-            <div className="text-center px-6">
+            <div className="text-center w-full max-w-3xl">
               <p
-                className="text-xs font-bold uppercase tracking-[0.3em] text-[#D4A843] mb-3"
+                className="text-xs font-bold uppercase tracking-[0.3em] text-[#D4A843] mb-5"
                 style={{ textShadow: '0 2px 14px rgba(255,248,240,1)' }}
               >
                 #{shirtNumber} is now
               </p>
-              <p
-                className="text-5xl md:text-7xl text-[#0d0d0d] leading-tight mb-2"
-                style={{
-                  fontFamily: 'var(--font-lora), serif',
-                  fontWeight: 600,
-                  textShadow:
-                    '0 2px 30px rgba(255,248,240,1), 0 0 60px rgba(255,248,240,0.8)',
-                }}
+              <div
+                className="flex items-center justify-center mb-4"
+                style={{ fontSize: 'clamp(1.6rem, 6.5vw, 3.6rem)' }}
               >
-                {pickedKid.displayName}
-              </p>
+                <SplitFlapBoard
+                  text={pickedKid.displayName.toUpperCase()}
+                  startDelay={150}
+                  lockDuration={1400}
+                />
+              </div>
               {pickedKid.gradeClass && (
                 <p
-                  className="text-base md:text-lg text-[#D4A843] font-bold uppercase tracking-wider"
-                  style={{ textShadow: '0 2px 20px rgba(255,248,240,1)' }}
+                  className="text-base md:text-lg text-[#D4A843] font-bold uppercase tracking-wider mt-4"
+                  style={{
+                    textShadow: '0 2px 20px rgba(255,248,240,1)',
+                    animation: 'chooseBoardIn 600ms ease-out 1700ms both',
+                  }}
                 >
                   {pickedKid.gradeClass}
                 </p>

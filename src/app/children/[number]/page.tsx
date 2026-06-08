@@ -1075,34 +1075,42 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
           {/* Details */}
           <div className="flex flex-col justify-center py-0 md:py-4">
             {/* Departure banner — when the kid is no longer at the
-                campus. Renders above the name with the polite note +
-                a soft sponsor-another-kid link. Replaces (visually
-                supplants) the bio/CTA later in the page; existing
-                photos + name stay because the shirt is forever tied
-                to this kid. */}
+                campus. Reframed June 2026 to read as an invitation,
+                not an obituary: the headline focuses on the OPEN
+                NUMBER (forward-looking), the polite departure note
+                sits below as small italic context, and the primary
+                CTA points the visitor to meeting another kid. The
+                photo + name above stay because the shirt is forever
+                tied to this kid. */}
             {child.departed_at && (
-              <div className="mb-4 p-4 border-2 border-[#888] bg-[#f5f0e8]">
-                <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#666] mb-1">
-                  No longer at Hope Bridge
+              <div className="mb-4 p-5 border border-[#D4A843] bg-[#fffaf0]">
+                <p className="text-xs font-bold uppercase tracking-[0.3em] text-[#D4A843] mb-2">
+                  #{number} is open
                 </p>
-                {child.departure_note ? (
-                  <p
-                    className="text-base text-[#444] leading-relaxed whitespace-pre-wrap"
-                    style={{ fontFamily: 'var(--font-lora), serif' }}
-                  >
-                    {child.departure_note}
-                  </p>
-                ) : (
-                  <p className="text-sm text-[#666] italic">
-                    {displayName} has moved on from the campus.
-                  </p>
-                )}
+                <p
+                  className="text-xl md:text-2xl text-[#0d0d0d] leading-snug mb-2"
+                  style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
+                >
+                  Pick a kid to take this number forward.
+                </p>
+                <p className="text-sm text-[#666] leading-relaxed mb-3">
+                  Every kid on the campus has a story you can step into. Your
+                  number can land on any of them.
+                </p>
                 <a
                   href="/"
-                  className="mt-3 inline-block text-sm text-[#D4A843] hover:text-[#0d0d0d] underline"
+                  className="inline-flex items-center gap-2 bg-[#D4A843] hover:bg-[#c49a3a] text-[#0d0d0d] text-sm font-bold uppercase tracking-wider px-5 py-2.5 transition-colors"
                 >
-                  Meet another kid at the campus →
+                  Browse the kids →
                 </a>
+                {child.departure_note && (
+                  <p
+                    className="mt-4 pt-3 border-t border-[#e8e0d4] text-xs text-[#888] leading-relaxed italic whitespace-pre-wrap"
+                    style={{ fontFamily: 'var(--font-lora), serif' }}
+                  >
+                    A note about {firstName}: {child.departure_note}
+                  </p>
+                )}
               </div>
             )}
             {/* Student of the month badge — set when Simon nominates
