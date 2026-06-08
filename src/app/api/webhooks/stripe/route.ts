@@ -1906,67 +1906,36 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
 <p>The shirts paid for went through fine. The monthly subscription(s) are NOT active — create them manually in Stripe.</p>`,
         }).catch(e => console.error('[WH] Failed to send subscription-failure alert:', e));
       }
-      // OLD PATH (B): retroactive subscription creation for pre-June 2026
-      // payment-mode cart sessions. Only fires when there's no
-      // session.subscription (i.e., this was NOT a sub-mode checkout).
-      // Kept for in-flight sessions only. Will not fire for any cart
-      // checkout created after the cart-checkout fix shipped.
-      if (monthlyOptIns.length > 0 && stripeCustomerId && !existingSubscriptionId) {
-        const stripe = await getStripe();
-        for (const item of monthlyOptIns) {
-          try {
-            const paymentMethods = await stripe.paymentMethods.list({
-              customer: stripeCustomerId,
-              type: 'card',
-            });
-            const pm = paymentMethods.data[0];
-            if (!pm) {
-              console.error('[WH] No saved payment method for cart subscription, item ' + item.itemIndex);
-              continue;
-            }
-            // Month 1 already paid as part of the cart lump sum; billing
-            // anchor 30 days out so the next charge lands on day 30.
-            const billingAnchor = Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60;
-            const sub = await stripe.subscriptions.create({
-              customer: stripeCustomerId,
-              items: [
-                {
-                  price_data: {
-                    currency: 'usd',
-                    product_data: {
-                      name: 'Be A Number monthly sponsorship',
-                    },
-                    unit_amount: SHIRT_PRICE * 100,
-                    recurring: { interval: 'month' },
-                  } as any,
-                },
-              ],
-              default_payment_method: pm.id,
-              billing_cycle_anchor: billingAnchor,
-              proration_behavior: 'none',
-              metadata: {
-                order_type: 'cart_monthly',
-                shirt_name: item.shirtName,
-                shirt_color: item.shirtColor,
-                shirt_size: item.shirtSize,
-                referring_cart_session_id: session.id,
-                pending_child_match: 'true',
-              },
-            });
-            console.log('[WH] Created deferred cart subscription (match pending):', sub.id);
-          } catch (err: any) {
-            console.error('[WH] Failed to create cart deferred subscription:', String(err?.message || err).slice(0, 200));
-            await sendEmail({
-              to: { email: 'kevin@beanumber.org', name: 'Kevin' },
-              subject: 'Cart monthly subscription failed',
-              html: `<p>A cart checkout completed and the shirt order(s) went through, but creating one of the monthly subscriptions failed.</p>
+      // OLD PATH (B) — DELETED June 2026.
+      //
+      // The retroactive subscriptions.create() block that used to live
+      // here is gone. It had a quiet bug: it passed `price_data.product_data`
+      // to stripe.subscriptions.create(), which that endpoint does not
+      // accept (Checkout sessions do; subscriptions do not — they need
+      // an existing product ID). The call always errored with
+      // "Received unknown parameter: items[0][price_data][product_data]"
+      // and the catch block fired sendEmail() to kevin@beanumber.org —
+      // which also silently failed, so we got zero visible alerts for
+      // four broken cart+monthly checkouts in June 2026.
+      //
+      // The fix at the architecture level is in /api/create-cart-checkout —
+      // any +monthly cart now creates the checkout session in
+      // mode:'subscription', so Stripe natively creates the sub during
+      // checkout and `session.subscription` is set on completion. PATH A
+      // above handles that case. There is no longer any "deferred"
+      // subscription creation. If a future cart somehow lands here with
+      // monthly items but no session.subscription, the alert below
+      // surfaces it so we can fix manually.
+      if (monthlyOptIns.length > 0 && !existingSubscriptionId) {
+        console.error('[WH] Cart has ' + monthlyOptIns.length + ' monthly items but session.subscription is missing. Session: ' + session.id + ', email: ' + email);
+        await sendEmail({
+          to: { email: 'kevin@beanumber.org', name: 'Kevin' },
+          subject: 'Cart +monthly checkout missing Stripe subscription',
+          html: `<p>A cart checkout completed with ${monthlyOptIns.length} monthly opt-in(s), but session.subscription was not populated on completion. The Stripe subscription was not created automatically.</p>
 <p><strong>Buyer:</strong> ${name || 'unknown'} (${email})<br/>
-<strong>Error:</strong> ${err?.message || String(err)}<br/>
 <strong>Session:</strong> ${session.id}</p>
-<p>The buyer's $25/mo for this item is NOT active. Create it manually in Stripe.</p>`,
-            }).catch(e => console.error('[WH] Failed to send subscription-failure alert:', e));
-          }
-        }
+<p>Action: hit /api/admin/backfill-subscriptions to create the sub from the saved payment method, or restart the buyer's subscription manually.</p>`,
+        }).catch(e => console.error('[WH] Failed to send missing-sub alert:', e));
       }
 
       // Send one combined confirmation email

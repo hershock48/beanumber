@@ -84,6 +84,26 @@ export async function GET(request: NextRequest) {
   try {
     const stripe = await getStripe();
 
+    // Create (or reuse) a Stripe Product for the monthly sponsorship.
+    // subscriptions.create's items[].price_data requires an existing
+    // `product` ID — it does NOT accept inline `product_data` like
+    // Checkout sessions do. Without this we hit:
+    //   "Received unknown parameter: items[0][price_data][product_data]."
+    let sponsorshipProductId: string;
+    try {
+      const product = await stripe.products.create({
+        name: 'Be A Number monthly sponsorship',
+        metadata: { source: 'backfill' },
+      });
+      sponsorshipProductId = product.id;
+    } catch (productErr: any) {
+      console.error('[Backfill] Failed to create Stripe Product:', productErr?.message);
+      return NextResponse.json(
+        { error: 'Failed to create Stripe Product for sponsorship: ' + productErr?.message },
+        { status: 500 }
+      );
+    }
+
     // Step 1: Find all donations with "+monthly" in the note
     const formula = `FIND("+monthly", {Donation Note})`;
     const donationsRes = await fetch(
@@ -315,9 +335,7 @@ export async function GET(request: NextRequest) {
               items: [{
                 price_data: {
                   currency: 'usd',
-                  product_data: {
-                    name: 'Be A Number monthly sponsorship',
-                  },
+                  product: sponsorshipProductId,
                   unit_amount: 2500,
                   recurring: { interval: 'month' },
                 } as any,
