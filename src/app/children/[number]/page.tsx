@@ -2,6 +2,7 @@ import { cache } from 'react';
 import { notFound } from 'next/navigation';
 import { cookies } from 'next/headers';
 import Link from 'next/link';
+import Image from 'next/image';
 import { BANNavigation } from '@/components/BANNavigation';
 import { BANFooter } from '@/components/BANFooter';
 import { RevealBeacon } from './RevealBeacon';
@@ -1165,20 +1166,30 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
             {child.photo_urls && child.photo_urls.length > 1 ? (
               <div className="w-full h-full overflow-x-auto snap-x snap-mandatory flex">
                 {child.photo_urls.map((url, i) => (
-                  <img
+                  <div
                     key={url + i}
-                    src={url}
-                    alt={`${displayName} — photo ${i + 1}`}
-                    className="w-full h-full object-cover flex-shrink-0 snap-center"
+                    className="w-full h-full flex-shrink-0 snap-center relative"
                     style={{ scrollSnapAlign: 'center' }}
-                  />
+                  >
+                    <Image
+                      src={url}
+                      alt={`${displayName} — photo ${i + 1}`}
+                      fill
+                      sizes="(max-width: 768px) 100vw, 50vw"
+                      className="object-cover"
+                      priority={i === 0}
+                    />
+                  </div>
                 ))}
               </div>
             ) : photoUrl.startsWith('http') ? (
-              <img
+              <Image
                 src={photoUrl}
                 alt={displayName}
-                className="w-full h-full object-cover"
+                fill
+                sizes="(max-width: 768px) 100vw, 50vw"
+                className="object-cover"
+                priority
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center">

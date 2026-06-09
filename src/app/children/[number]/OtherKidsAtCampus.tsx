@@ -221,13 +221,14 @@ export async function OtherKidsAtCampus({
               href={`/meet/${kid.recordId}${backQuery}`}
               className="group block bg-white border border-[#e8e0d4] hover:border-[#D4A843] transition-colors"
             >
-              <div className="aspect-[4/5] bg-[#f5f0e8] overflow-hidden">
+              <div className="aspect-[4/5] bg-[#f5f0e8] overflow-hidden relative">
                 {kid.photoUrl && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
+                  <Image
                     src={kid.photoUrl}
                     alt={kid.displayName}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    fill
+                    sizes="(max-width: 768px) 50vw, 25vw"
+                    className="object-cover group-hover:scale-105 transition-transform duration-500"
                   />
                 )}
               </div>

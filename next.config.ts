@@ -53,6 +53,20 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+  // next/image optimization. We use this for every Airtable-hosted
+  // photo (kid hero, OtherKidsAtCampus strip, CampusNewsfeed covers)
+  // so the browser receives a device-sized WebP/AVIF instead of the
+  // raw 1.5–2 MB source JPEG, and so the edge cache keeps serving
+  // those variants long after Airtable's signed URL expires.
+  images: {
+    remotePatterns: [
+      { protocol: 'https', hostname: 'v5.airtableusercontent.com' },
+      { protocol: 'https', hostname: 'dl.airtable.com' },
+    ],
+    // Modern formats first; Next.js will fall back to the original
+    // if the browser doesn't accept these.
+    formats: ['image/avif', 'image/webp'],
+  },
   poweredByHeader: false,
 };
 

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 
 interface RecentKid {
   shirtNumber: number;
@@ -65,13 +66,14 @@ export function RecentKidsStrip({
             href={`/children/${kid.shirtNumber}`}
             className="flex-shrink-0 group block w-20 text-center"
           >
-            <div className="w-20 h-20 bg-[#f5f0e8] overflow-hidden mb-2 group-hover:ring-2 group-hover:ring-[#D4A843] transition-all">
+            <div className="w-20 h-20 bg-[#f5f0e8] overflow-hidden mb-2 group-hover:ring-2 group-hover:ring-[#D4A843] transition-all relative">
               {kid.photoUrl && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
+                <Image
                   src={kid.photoUrl}
                   alt={kid.displayName}
-                  className="w-full h-full object-cover"
+                  fill
+                  sizes="80px"
+                  className="object-cover"
                 />
               )}
             </div>
@@ -107,13 +109,14 @@ export function RecentKidsStrip({
               href={`/children/${kid.shirtNumber}`}
               className="flex-shrink-0 group block w-28 md:w-32 text-center"
             >
-              <div className="w-28 h-28 md:w-32 md:h-32 bg-[#f5f0e8] overflow-hidden mb-2 group-hover:ring-2 group-hover:ring-[#D4A843] transition-all">
+              <div className="w-28 h-28 md:w-32 md:h-32 bg-[#f5f0e8] overflow-hidden mb-2 group-hover:ring-2 group-hover:ring-[#D4A843] transition-all relative">
                 {kid.photoUrl && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
+                  <Image
                     src={kid.photoUrl}
                     alt={kid.displayName}
-                    className="w-full h-full object-cover"
+                    fill
+                    sizes="(max-width: 768px) 112px, 128px"
+                    className="object-cover"
                   />
                 )}
               </div>

@@ -28,6 +28,7 @@
 
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import { BANNavigation } from '@/components/BANNavigation';
 import { BANFooter } from '@/components/BANFooter';
 import { RecentKidsStrip } from '@/components/RecentKidsStrip';
@@ -149,13 +150,15 @@ export default async function MeetKidPage({
 
           {/* Hero: photo + name + facts */}
           <div className="grid md:grid-cols-2 gap-8 md:gap-12 items-start">
-            <div className="aspect-[4/5] bg-[#f5f0e8] overflow-hidden">
+            <div className="aspect-[4/5] bg-[#f5f0e8] overflow-hidden relative">
               {photo ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
+                <Image
                   src={photo}
                   alt={displayName}
-                  className="w-full h-full object-cover"
+                  fill
+                  sizes="(max-width: 768px) 100vw, 50vw"
+                  className="object-cover"
+                  priority
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-7xl opacity-25">
