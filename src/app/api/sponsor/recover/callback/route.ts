@@ -30,8 +30,12 @@ function atHeaders() {
 async function resolveSponsorshipEmail(sponsorCode: string): Promise<string | null> {
   if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) return null;
   try {
+    // Look up the email for an Active sponsor OR a Holder (shirt-only
+    // owner). Previously this only checked Status=Active, which meant
+    // first-time claimers (Status=Holder) failed verification and got
+    // bounced to /sponsor/login with no error visible to them.
     const formula = encodeURIComponent(
-      `AND({SponsorCode}="${sponsorCode.replace(/"/g, '\\"')}", {Status}="Active")`
+      `AND({SponsorCode}="${sponsorCode.replace(/"/g, '\\"')}", OR({Status}="Active",{Status}="Holder"))`
     );
     const res = await fetch(
       `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(
@@ -56,7 +60,7 @@ export async function GET(request: NextRequest) {
   const verified = verifyRecoveryToken(token);
   if (!verified) {
     return NextResponse.redirect(
-      `${SITE_URL}/sponsor/login?recover=expired`
+      `${SITE_URL}/signin?error=expired`
     );
   }
   const { sponsorCode, shirtNumber } = verified;
@@ -65,8 +69,8 @@ export async function GET(request: NextRequest) {
   if (!email) {
     // Token was valid but the underlying Sponsorship has gone away —
     // canceled, archived, or the sponsor code rotated. Bounce to
-    // /sponsor/login with a generic message rather than 500'ing.
-    return NextResponse.redirect(`${SITE_URL}/sponsor/login?recover=unavailable`);
+    // /signin with a generic message rather than 500'ing.
+    return NextResponse.redirect(`${SITE_URL}/signin?error=unavailable`);
   }
 
   // Drop the sponsor_session cookie in the same JSON shape that

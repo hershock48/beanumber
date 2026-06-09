@@ -320,9 +320,10 @@ export async function POST(request: NextRequest) {
             <body style="font-family: Georgia, 'Times New Roman', serif; line-height: 1.7; color: #333; max-width: 560px; margin: 0 auto; padding: 30px 20px;">
               <p style="margin-top: 0;">Hey there,</p>
               <p>
-                You asked to sign in to your view on
-                <a href="https://www.beanumber.org" style="color: #D4A843; font-weight: bold;">beanumber.org</a>.
-                Tap the button below and you&rsquo;re in — landing on ${found.firstName}&rsquo;s page (your most recent sponsorship). From there you can hop to any of your kids via the &ldquo;Your kids&rdquo; link in the nav.
+                Tap the button below to sign in. You&rsquo;ll land on
+                ${found.firstName}&rsquo;s page. From there, the
+                &ldquo;Your kids&rdquo; link in the nav has every kid
+                you sponsor or hold.
               </p>
               <p style="text-align: center; margin: 28px 0;">
                 <a href="${callbackUrl}" style="display: inline-block; background: #D4A843; color: #0d0d0d; font-weight: bold; text-decoration: none; padding: 14px 32px; font-size: 15px; letter-spacing: 0.05em; text-transform: uppercase;">
@@ -330,7 +331,9 @@ export async function POST(request: NextRequest) {
                 </a>
               </p>
               <p style="color: #888; font-size: 13px;">
-                Link expires in 30 minutes. Nothing about your sponsorship changes.
+                This device will remember you for 30 days &mdash; no
+                need to use this link again unless you change devices
+                or clear cookies. Link expires in 30 minutes.
               </p>
               <hr style="border: none; border-top: 1px solid #e8e0d4; margin: 24px 0;">
               <p style="font-size: 12px; color: #999; line-height: 1.5;">
@@ -405,7 +408,7 @@ export async function POST(request: NextRequest) {
     const firstName = child.firstName;
     const subject = isFreshClaim
       ? `#${shirtNumber} is yours — open ${firstName}'s page`
-      : `Your link back to ${firstName}'s page`;
+      : `Sign in to ${firstName}'s page`;
     const headline = isFreshClaim
       ? `#${shirtNumber} is yours now.`
       : `Hey there,`;
@@ -413,15 +416,14 @@ export async function POST(request: NextRequest) {
       ? `<p>You just claimed #${shirtNumber} on
           <a href="https://www.beanumber.org" style="color: #D4A843; font-weight: bold;">beanumber.org</a>.
           The kid behind that number is ${firstName}. Tap the button
-          below to open their page — you&rsquo;ll be signed in, and
-          this device will remember you for 30 days.</p>
-        <p>From here on, whenever ${firstName}&rsquo;s situation
-          changes (a new update, a moment to step in, a chance to pick
-          a new kid if they leave the campus), this is your way back
-          to them.</p>`
-      : `<p>You asked to get back into ${firstName}&rsquo;s page on
+          below to open their page. You&rsquo;ll be signed in, and
+          this device will remember you for 30 days.</p>`
+      : `<p>Tap the button below to sign in and open
+          ${firstName}&rsquo;s page on
           <a href="https://www.beanumber.org" style="color: #D4A843; font-weight: bold;">beanumber.org</a>.
-          Tap the button below to land back in your sponsor view.</p>`;
+          This device will remember you for 30 days &mdash; you
+          won&rsquo;t need the link again unless you change devices
+          or clear your cookies.</p>`;
 
     const html = `
       <!DOCTYPE html>

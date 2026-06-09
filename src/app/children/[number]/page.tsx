@@ -543,21 +543,38 @@ const getChildByShirtNumber = cache(async function getChildByShirtNumber(shirtNu
       (sponsorship?.ChildPhoto?.map(p => p.url).filter(Boolean) as string[]) ||
       [];
 
-    // Sponsor recognition has two paths:
-    //   1. Single-kid legacy: the cookie's sponsorCode matches this
-    //      kid's Sponsorship. Original mechanism. Still works.
-    //   2. Multi-kid email-based: the cookie's email owns an Active or
-    //      Holder Sponsorship that links to this kid (different row
-    //      than the cookie's sponsorCode). This is what makes a sponsor
-    //      who owns #38 AND #99 recognized on BOTH pages, instead of
-    //      only on the one their cookie was minted for.
-    const viewerIsSponsor = Boolean(
-      (viewerCode &&
+    // Three recognition outcomes for a signed-in visitor on /[N]:
+    //
+    //   viewerIsSponsor — they own this number AND pay monthly. Show
+    //     the full sponsor view (acknowledgment + portal content).
+    //   viewerIsHolder  — they own this number but DON'T pay monthly.
+    //     Show a welcome-back view with a soft "go monthly" upsell,
+    //     NOT the same anonymous "Stay with X for $25/mo" wall the
+    //     stranger gets.
+    //   neither         — public visitor or signed in but doesn't own
+    //     THIS number. Standard public view + claim card + monthly
+    //     ask.
+    //
+    // Identity matching has two paths: cookie's sponsorCode (legacy
+    // single-kid path) and cookie's email (multi-kid path — one email
+    // can own many numbers).
+    const matchedStatus = emailMatchedSponsorship?.Status as string | undefined;
+    const sponsorCodeMatches = Boolean(
+      viewerCode &&
         sponsorship?.SponsorCode &&
-        sponsorship.Status === 'Active' &&
-        viewerCode === sponsorship.SponsorCode) ||
-      emailMatchedSponsorship
+        viewerCode === sponsorship.SponsorCode
     );
+    const sponsorCodeMatchActive =
+      sponsorCodeMatches && sponsorship?.Status === 'Active';
+    const sponsorCodeMatchHolder =
+      sponsorCodeMatches && sponsorship?.Status === 'Holder';
+
+    const viewerIsSponsor = Boolean(
+      sponsorCodeMatchActive || matchedStatus === 'Active'
+    );
+    const viewerIsHolder =
+      !viewerIsSponsor &&
+      Boolean(sponsorCodeMatchHolder || matchedStatus === 'Holder');
 
     // If recognition came via the email path, use THAT sponsorship's
     // details for the rest of the render — sponsor code, kid display
@@ -703,6 +720,7 @@ const getChildByShirtNumber = cache(async function getChildByShirtNumber(shirtNu
       // Determined by matching the sponsor_session cookie against the
       // sponsorship record's SponsorCode.
       viewer_is_sponsor: viewerIsSponsor,
+      viewer_is_holder: viewerIsHolder,
       sponsor_code: viewerIsSponsor ? sponsorship!.SponsorCode : undefined,
       // Surfaced for the impact stats strip in the unified sponsor view.
       // Only populated when this viewer is the verified sponsor, since
@@ -1385,10 +1403,14 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
                 </Link>
               </div>
             ) : child.viewer_is_sponsor ? (
-              /* Verified sponsor: acknowledge, link to portal */
-              <div className="bg-white border-2 border-[#D4A843]/30 p-7 text-center">
+              /* Active monthly sponsor: acknowledgment, no $25/mo ask
+                 because they're already paying it. */
+              <div className="bg-white border-2 border-[#D4A843]/30 p-7">
+                <p className="text-xs font-bold uppercase tracking-[0.25em] text-[#D4A843] mb-3">
+                  Signed in
+                </p>
                 <p
-                  className="text-xl text-[#0d0d0d] mb-3"
+                  className="text-2xl md:text-[28px] text-[#0d0d0d] mb-3 leading-tight"
                   style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
                 >
                   You&rsquo;re {firstName}&rsquo;s sponsor.
@@ -1399,15 +1421,52 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
                   the on-site medical center, and a classroom where teachers know{' '}
                   {firstName}&rsquo;s name.
                 </p>
-                <Link
-                  href={`/sponsor/${child.sponsor_code}`}
-                  className="inline-block bg-[#D4A843] text-[#0d0d0d] font-bold uppercase tracking-wider py-4 px-10 hover:bg-[#c49a3a] transition-colors"
-                >
-                  Go to your portal
-                </Link>
-                <p className="text-center text-xs text-[#bbb] mt-4">
+                <p className="text-xs text-[#888] leading-relaxed">
+                  Need to manage your subscription, see updates, or
+                  download a giving statement? Tap{' '}
+                  <Link href="/me" className="text-[#D4A843] hover:underline font-bold">
+                    Your kids
+                  </Link>{' '}
+                  in the nav.
+                </p>
+                <p className="text-center text-xs text-[#bbb] mt-5">
                   On behalf of our entire team &mdash; thank you.
                 </p>
+              </div>
+            ) : child.viewer_is_holder ? (
+              /* Holder: they own this number but aren't paying monthly.
+                 Acknowledge them by name, no aggressive ask, soft
+                 upsell to monthly. */
+              <div className="bg-white border-2 border-[#D4A843]/30 p-7">
+                <p className="text-xs font-bold uppercase tracking-[0.25em] text-[#D4A843] mb-3">
+                  Signed in
+                </p>
+                <p
+                  className="text-2xl md:text-[28px] text-[#0d0d0d] mb-3 leading-tight"
+                  style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
+                >
+                  Welcome back. {firstName} is yours.
+                </p>
+                <p className="text-[#555] leading-relaxed mb-5">
+                  You own this number. Every update from the campus,
+                  every change in {firstName}&rsquo;s story, comes back
+                  to this page for you.
+                </p>
+                <p className="text-[#555] leading-relaxed mb-5">
+                  Whenever you&rsquo;re ready, $25/month keeps the
+                  campus running for {firstName} &mdash; school, meals,
+                  the clinic, teachers&rsquo; salaries. No pressure to
+                  decide today.
+                </p>
+                <SponsorButton
+                  childRecordId={child.record_id}
+                  childId={child.child_id}
+                  childDisplayName={displayName}
+                  firstName={firstName}
+                  shirtAssigned={viewerLooksLikeBuyer}
+                  existingCustomerId={buyerHint?.customerId || undefined}
+                  buyerEmail={buyerHint?.email || undefined}
+                />
               </div>
             ) : (
               /* Not authenticated for this kid.
