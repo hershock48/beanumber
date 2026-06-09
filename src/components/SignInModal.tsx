@@ -122,24 +122,30 @@ export function SignInModal({
 
   return (
     <div
-      className="fixed inset-0 z-[1000] flex items-center justify-center p-4"
+      className="fixed inset-0 z-[1000] overflow-y-auto"
       role="dialog"
       aria-modal="true"
       aria-labelledby="signin-modal-title"
     >
-      {/* Scrim */}
+      {/* Scrim — full-viewport, sticky to scroll container */}
       <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        className="fixed inset-0 bg-black/75 backdrop-blur-sm"
         onClick={onClose}
         aria-hidden="true"
       />
 
-      {/* Dialog */}
-      <div
-        ref={dialogRef}
-        className="relative bg-[#1a1208] text-white w-full max-w-md p-6 md:p-8 shadow-2xl"
-        style={{ animation: 'signInIn 280ms cubic-bezier(0.22, 1, 0.36, 1) both' }}
-      >
+      {/* Centering wrapper — flex on desktop (centered), top-anchored
+          on mobile so the modal sits at the top of the viewport even
+          when the keyboard opens. min-h-full forces the inner box to
+          fit the scroll container so scrolling works when content
+          exceeds viewport height. */}
+      <div className="relative min-h-full flex items-start md:items-center justify-center p-4 md:p-6">
+        {/* Dialog */}
+        <div
+          ref={dialogRef}
+          className="relative bg-[#1a1208] text-white w-full max-w-md p-6 md:p-8 shadow-2xl my-4 md:my-0"
+          style={{ animation: 'signInIn 280ms cubic-bezier(0.22, 1, 0.36, 1) both' }}
+        >
         <style>{`
           @keyframes signInIn {
             0% { opacity: 0; transform: translateY(20px) scale(0.97); }
@@ -264,7 +270,7 @@ export function SignInModal({
             )}
 
             <p className="text-xs text-[#a89e8d] mt-5 leading-relaxed">
-              New here? Same form. If #{shirtNumber || 'your number'} is still
+              New here? Same form. If {shirtNumber ? `#${shirtNumber}` : 'your number'} is still
               open when you sign in, this is how you take it.
             </p>
             <p className="text-xs text-[#a89e8d] mt-2 leading-relaxed">
@@ -279,6 +285,7 @@ export function SignInModal({
             </p>
           </form>
         )}
+        </div>
       </div>
     </div>
   );
