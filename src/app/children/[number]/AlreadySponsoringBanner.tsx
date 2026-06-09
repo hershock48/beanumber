@@ -16,18 +16,55 @@ export function AlreadySponsoringBanner({
   shirtNumber: number;
 }) {
   const [dismissed, setDismissed] = useState(false);
-  const [hydrated, setHydrated] = useState(false);
+  const [revealDone, setRevealDone] = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
+
     try {
       const wasDismissed =
         localStorage.getItem(`ban-banner-dismissed-${shirtNumber}`) === 'yes';
-      if (wasDismissed) setDismissed(true);
+      if (wasDismissed) {
+        setDismissed(true);
+        return;
+      }
     } catch {}
-    setHydrated(true);
+
+    // If this kid's reveal has already happened on a prior visit, the
+    // RevealOverlay skips itself and we never get a 'ban-reveal-done'
+    // event — show the banner straight away with a brief settle delay.
+    let alreadyRevealed = false;
+    try {
+      alreadyRevealed =
+        localStorage.getItem(`ban-revealed-${shirtNumber}`) === 'yes';
+    } catch {}
+
+    if (alreadyRevealed) {
+      const t = window.setTimeout(() => {
+        if (!cancelled) setRevealDone(true);
+      }, 250);
+      return () => {
+        cancelled = true;
+        clearTimeout(t);
+      };
+    }
+
+    // First-time visit: wait for the reveal to finish broadcasting
+    // 'ban-reveal-done'. That fires after the hold completes, the
+    // split-flap board exits, and the page underneath unblurs
+    // (~3.8s after the hold).
+    function onRevealDone() {
+      if (cancelled) return;
+      setRevealDone(true);
+    }
+    window.addEventListener('ban-reveal-done', onRevealDone);
+    return () => {
+      cancelled = true;
+      window.removeEventListener('ban-reveal-done', onRevealDone);
+    };
   }, [shirtNumber]);
 
-  if (!hydrated || dismissed) return null;
+  if (dismissed || !revealDone) return null;
 
   return (
     <div className="relative bg-[#1a1208] text-white border-b border-[#D4A843]/40 overflow-hidden ban-banner-shimmer-host">

@@ -177,7 +177,15 @@ export function RevealOverlay({ shirtNumber, childName, children }: RevealOverla
     // Board scrambles + locks (~1.8s), holds locked for ~0.8s, then
     // we trigger the unblur. Total board screen time ~2.6s.
     setTimeout(() => setStage('unblur'), 2600);
-    setTimeout(() => setStage('done'), 3800);
+    setTimeout(() => {
+      setStage('done');
+      // Broadcast that the reveal sequence has fully completed. Any
+      // page-level UI that should wait for the reveal (e.g. the
+      // AlreadySponsoringBanner) listens for this event.
+      try {
+        window.dispatchEvent(new CustomEvent('ban-reveal-done'));
+      } catch {}
+    }, 3800);
   }, [storageKey]);
 
   if (!checked) return <div className="min-h-[60vh]" />;
