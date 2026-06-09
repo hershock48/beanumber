@@ -136,16 +136,24 @@ async function getViewerEmail(): Promise<string | null> {
  */
 async function findSponsorshipByEmailForChild(
   email: string,
-  childRecordId: string
+  childId: string
 ): Promise<AirtableSponsorshipRecord['fields'] | null> {
   const apiKey = process.env.AIRTABLE_API_KEY;
   const baseId = process.env.AIRTABLE_BASE_ID;
   const sponsorshipsTable =
     process.env.AIRTABLE_SPONSORSHIPS_TABLE || 'Sponsorships';
   if (!apiKey || !baseId) return null;
+  if (!childId) return null;
   const safeEmail = email.toLowerCase().replace(/"/g, '\\"');
+  const safeChildId = childId.replace(/"/g, '\\"');
+  // Match on Sponsorships.ChildID equality rather than FIND on
+  // ARRAYJOIN({Children}, ","). Airtable's ARRAYJOIN of a linked-
+  // record field joins the linked record's PRIMARY FIELD values
+  // (ChildID strings like "HSP/BAN-002"), NOT record IDs — so the
+  // old `FIND(recordId, ...)` pattern never matched, and legitimate
+  // sponsors were misread as strangers on their own kid's page.
   const formula = encodeURIComponent(
-    `AND(LOWER({SponsorEmail})="${safeEmail}", OR({Status}="Active",{Status}="Holder"), FIND("${childRecordId}", ARRAYJOIN({Children}, ",")))`
+    `AND(LOWER({SponsorEmail})="${safeEmail}", OR({Status}="Active",{Status}="Holder"), {ChildID}="${safeChildId}")`
   );
   try {
     const res = await fetch(
@@ -525,7 +533,7 @@ const getChildByShirtNumber = cache(async function getChildByShirtNumber(shirtNu
     if (viewerEmail) {
       emailMatchedSponsorship = await findSponsorshipByEmailForChild(
         viewerEmail,
-        recordId
+        childId || ''
       );
     }
 

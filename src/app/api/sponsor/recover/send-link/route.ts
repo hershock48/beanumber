@@ -67,6 +67,7 @@ function generateSponsorCode(): string {
 
 interface ChildContext {
   recordId: string;
+  childId: string;
   displayName: string;
   firstName: string;
 }
@@ -95,6 +96,13 @@ async function lookupChild(shirtNumber: number): Promise<ChildContext | null> {
     const firstName: string = child.fields?.FirstName || displayName.split(' ')[0] || 'them';
     return {
       recordId: child.id as string,
+      // ChildID (the human-readable HSP/BAN-NNN identifier) is what
+      // the Sponsorships table stores in its ChildID field. We use
+      // it for cross-table lookups rather than Airtable record IDs,
+      // because ARRAYJOIN({Children}, ",") on a linked field returns
+      // the linked record's PRIMARY FIELD values (i.e. ChildIDs),
+      // not record IDs — so FIND(recordId, ...) always missed.
+      childId: (child.fields?.ChildID as string) || '',
       displayName,
       firstName,
     };
@@ -107,15 +115,24 @@ async function lookupChild(shirtNumber: number): Promise<ChildContext | null> {
 /**
  * Find an existing Sponsorship (Active or Holder) for this email that
  * links to this child. Returns the SponsorCode if matched.
+ *
+ * Match by Sponsorships.ChildID (a text/lookup field that holds the
+ * HSP/BAN-NNN identifier) rather than by the Children linked-record
+ * field. ARRAYJOIN on a linked field joins primary field values, not
+ * record IDs, so the old `FIND(recordId, ARRAYJOIN({Children}, ","))`
+ * pattern always missed — which created a duplicate Holder row on
+ * every sign-in, and made /[N] fail to recognize the legitimate
+ * sponsor.
  */
 async function findExistingSponsorship(
   email: string,
-  childRecordId: string
+  childId: string
 ): Promise<string | null> {
   if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) return null;
+  if (!childId) return null;
   try {
     const formula = encodeURIComponent(
-      `AND(LOWER({SponsorEmail})="${email.toLowerCase().replace(/"/g, '\\"')}", OR({Status}="Active",{Status}="Holder"), FIND("${childRecordId}", ARRAYJOIN({Children}, ",")))`
+      `AND(LOWER({SponsorEmail})="${email.toLowerCase().replace(/"/g, '\\"')}", OR({Status}="Active",{Status}="Holder"), {ChildID}="${childId.replace(/"/g, '\\"')}")`
     );
     const res = await fetch(
       `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(
@@ -136,17 +153,19 @@ async function findExistingSponsorship(
 
 /**
  * Check whether ANY active claim (Active or Holder) already exists on
- * this child record from a DIFFERENT email. Used to block fraudulent
- * second-claim attempts on a number that's already been spoken for.
+ * this child from a DIFFERENT email. Used to block fraudulent second-
+ * claim attempts on a number that's already been spoken for. Same
+ * ChildID-equality fix as findExistingSponsorship.
  */
 async function isChildAlreadyClaimedByOther(
-  childRecordId: string,
+  childId: string,
   excludingEmail: string
 ): Promise<boolean> {
   if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) return false;
+  if (!childId) return false;
   try {
     const formula = encodeURIComponent(
-      `AND(LOWER({SponsorEmail})!="${excludingEmail.toLowerCase().replace(/"/g, '\\"')}", OR({Status}="Active",{Status}="Holder"), FIND("${childRecordId}", ARRAYJOIN({Children}, ",")))`
+      `AND(LOWER({SponsorEmail})!="${excludingEmail.toLowerCase().replace(/"/g, '\\"')}", OR({Status}="Active",{Status}="Holder"), {ChildID}="${childId.replace(/"/g, '\\"')}")`
     );
     const res = await fetch(
       `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(
@@ -363,14 +382,14 @@ export async function POST(request: NextRequest) {
     }
 
     // 2. SIGN-IN PATH: do they already own this number?
-    let sponsorCode = await findExistingSponsorship(email, child.recordId);
+    let sponsorCode = await findExistingSponsorship(email, child.childId);
     let isFreshClaim = false;
 
     // 3. FIRST-TIME CLAIM PATH: no existing row. Make sure nobody else
     //    has claimed this number first, then create a Holder row.
     if (!sponsorCode) {
       const alreadyTaken = await isChildAlreadyClaimedByOther(
-        child.recordId,
+        child.childId,
         email
       );
       if (alreadyTaken) {
