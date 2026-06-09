@@ -141,8 +141,12 @@ async function fetchSponsorshipsForEmail(email: string): Promise<SponsorshipRow[
 export default async function MePage() {
   const email = await getViewerEmail();
   if (!email) {
-    // No session — bounce to home. The Sign in nav button lives there.
-    redirect('/?signin=needed');
+    // No session — route to the sign-in page with context. The
+    // ?next=/me param tells /signin what they were trying to reach
+    // so it can frame the page accordingly. Previously we redirected
+    // to home with ?signin=needed which silently dropped them on
+    // the homepage with no indication of why.
+    redirect('/signin?next=/me&reason=your-kids');
   }
 
   const rows = await fetchSponsorshipsForEmail(email);

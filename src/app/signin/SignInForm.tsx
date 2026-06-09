@@ -19,6 +19,13 @@ export function SignInForm() {
   const [state, setState] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState('');
 
+  // Contextual headline. /me bounces here with reason=your-kids when
+  // someone taps 'Your kids' in the nav without a session. Other
+  // redirects can pass their own reason. Magic-link callback failures
+  // pass error=expired or error=unavailable.
+  const reason = params.get('reason') || undefined;
+  const errorParam = params.get('error') || undefined;
+
   // Pre-fill shirt number from ?n= if the page was opened from /[N].
   useEffect(() => {
     const n = params.get('n');
@@ -91,6 +98,27 @@ export function SignInForm() {
     );
   }
 
+  // Headline + body adapt to context. /me bounces here for unsigned
+  // users → make it obvious why they're here. Magic-link callback
+  // failures → acknowledge the failure.
+  let headline = 'Sign in to your view.';
+  let body =
+    "Enter your email. We'll send a one-tap link. Tap it and you're in.";
+
+  if (reason === 'your-kids') {
+    headline = 'Sign in to see your kids.';
+    body =
+      "Enter your email. We'll send a one-tap link. Once you tap it, every kid you sponsor or hold shows up in one place.";
+  } else if (errorParam === 'expired') {
+    headline = 'That link expired.';
+    body =
+      "Magic links last 30 minutes. Enter your email below and we'll send a fresh one.";
+  } else if (errorParam === 'unavailable') {
+    headline = 'We couldn’t find that sponsorship.';
+    body =
+      "Enter your email below — we'll send a one-tap link. If you're stuck, email Kevin.";
+  }
+
   return (
     <div className="bg-white border border-[#e8e0d4] p-7 md:p-9">
       <p className="text-xs font-bold uppercase tracking-[0.25em] text-[#D4A843] mb-2">
@@ -100,11 +128,10 @@ export function SignInForm() {
         className="text-3xl md:text-4xl text-[#0d0d0d] mb-3 leading-tight"
         style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
       >
-        Sign in to your view.
+        {headline}
       </h1>
       <p className="text-[#555] text-base leading-relaxed mb-6">
-        Enter your email. We&rsquo;ll send a one-tap link. Tap it and
-        you&rsquo;re in.
+        {body}
       </p>
 
       <form onSubmit={submit}>
