@@ -165,13 +165,14 @@ export function ClaimGate({
       <div
         className="pointer-events-none select-none transition-all duration-500"
         style={{
-          // Inline filter rather than Tailwind's blur-* class so the
-          // exact intensity is unambiguous across browsers and the
-          // Tailwind version. blur-md (12px) read as too subtle in
-          // testing; 18px makes the gate's purpose visually obvious
-          // without rendering the content unrecognizable.
-          filter: 'blur(18px)',
-          opacity: 0.45,
+          // Softer than the earlier 18 px attempt. The goal is to
+          // tell the viewer "there's a story here, claim it to
+          // read" — shapes and paragraph rhythm need to show
+          // through. Too heavy reads as "broken" rather than
+          // "locked." 8 px lets the eye recognize structure
+          // without parsing the words.
+          filter: 'blur(8px)',
+          opacity: 0.55,
         }}
       >
         {children}
@@ -189,9 +190,9 @@ export function ClaimGate({
             You bought #{shirtNumber}. Claim it.
           </p>
           <p className="text-[#d8cfc1] text-sm md:text-base leading-relaxed mb-5">
-            Lock #{shirtNumber} in as yours. Every update from{' '}
-            {firstName}&rsquo;s campus comes back to this page &mdash;
-            no payment, no password.
+            Read who {firstName} is. Lock #{shirtNumber} in as yours
+            and every update from their campus comes back to this
+            page &mdash; no payment, no password.
           </p>
           <div className="flex flex-col sm:flex-row sm:items-center gap-3">
             <Link
