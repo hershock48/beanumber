@@ -112,7 +112,23 @@ export async function POST(request: NextRequest) {
     shippedIds.push(...batch);
   }
 
-  // 3. Start drip timers for unique buyer emails
+  // 3. Reschedule drip timers for unique buyer emails.
+  //
+  // Every shirt buyer who came through the Stripe webhook already has
+  // DripPipeline + DripNextSend set. The webhook seeds DripNextSend to
+  // (purchase + 10 days) as a fallback in case shipment isn't marked
+  // here in the admin UI. THIS endpoint replaces that fallback with
+  // the real (ship + 3 days) date — that's the whole point of marking
+  // an order shipped. Previously we skipped any donor with
+  // DripNextSend already populated, which meant we skipped every
+  // buyer the webhook had ever touched — i.e. all of them — and the
+  // drip never actually got the "real ship date" handoff. Fixed.
+  //
+  // For Donorbox-imported donors who never went through the webhook:
+  // DripPipeline is empty. We assign shirt_nurture as the default
+  // (every Fulfillment row is by definition a shirt buyer) and kick
+  // them off at ship + 3.
+
   const uniqueEmails = new Set<string>();
   for (const rec of fetchedRecords) {
     const email = fieldVal(rec, F.email).toLowerCase().trim();
@@ -123,7 +139,8 @@ export async function POST(request: NextRequest) {
   dripDate.setUTCDate(dripDate.getUTCDate() + 3);
   const dripNextSend = dripDate.toISOString().split('T')[0];
 
-  const dripsStarted: string[] = [];
+  const dripsRescheduled: string[] = [];
+  const dripsNewlyEnrolled: string[] = [];
 
   for (const email of uniqueEmails) {
     try {
@@ -133,7 +150,7 @@ export async function POST(request: NextRequest) {
       lookupParams.set('maxRecords', '1');
       lookupParams.set('fields[]', 'Email Address');
       lookupParams.append('fields[]', 'DripPipeline');
-      lookupParams.append('fields[]', 'DripNextSend');
+      lookupParams.append('fields[]', 'DripStage');
 
       const lookupRes = await fetch(
         `https://api.airtable.com/v0/${env.AIRTABLE_BASE_ID}/${DONORS_TABLE_ID}?${lookupParams}`,
@@ -147,22 +164,39 @@ export async function POST(request: NextRequest) {
       if (!donor) continue;
 
       const pipeline = donor.fields?.DripPipeline || '';
-      const existingNextSend = donor.fields?.DripNextSend || '';
+      const stage = donor.fields?.DripStage;
 
-      if (!pipeline || existingNextSend) continue;
+      // Build the patch. Always reset DripNextSend. If they're already
+      // mid-sequence (Stage > 0) we don't reset Stage — they keep
+      // making forward progress, just on the post-ship timeline. If
+      // they're not enrolled at all, assign the default pipeline and
+      // start them at Stage 0.
+      const patchFields: Record<string, unknown> = {
+        DripNextSend: dripNextSend,
+      };
+
+      let isNew = false;
+      if (!pipeline) {
+        patchFields.DripPipeline = 'shirt_nurture';
+        patchFields.DripStage = 0;
+        isNew = true;
+      } else if (stage == null) {
+        patchFields.DripStage = 0;
+      }
 
       const updateRes = await fetch(
         `https://api.airtable.com/v0/${env.AIRTABLE_BASE_ID}/${DONORS_TABLE_ID}/${donor.id}`,
         {
           method: 'PATCH',
           headers,
-          body: JSON.stringify({
-            fields: { DripNextSend: dripNextSend },
-          }),
+          body: JSON.stringify({ fields: patchFields }),
         }
       );
 
-      if (updateRes.ok) dripsStarted.push(email);
+      if (updateRes.ok) {
+        if (isNew) dripsNewlyEnrolled.push(email);
+        else dripsRescheduled.push(email);
+      }
     } catch {
       // Non-fatal
     }
@@ -170,12 +204,21 @@ export async function POST(request: NextRequest) {
 
   // 4. Build summary
   const orderNums = fetchedRecords.map(r => fieldVal(r, F.orderNum)).filter(Boolean);
+  const totalDripsTouched = dripsRescheduled.length + dripsNewlyEnrolled.length;
 
   return NextResponse.json({
-    message: `Shipped ${shippedIds.length} order${shippedIds.length === 1 ? '' : 's'}. Drip emails started for ${dripsStarted.length} buyer${dripsStarted.length === 1 ? '' : 's'}.`,
+    message:
+      `Shipped ${shippedIds.length} order${shippedIds.length === 1 ? '' : 's'}. ` +
+      `Drip timer set to ship + 3 days for ${totalDripsTouched} buyer${totalDripsTouched === 1 ? '' : 's'}` +
+      (dripsNewlyEnrolled.length
+        ? ` (${dripsNewlyEnrolled.length} newly enrolled)`
+        : '') +
+      `.`,
     shipped: shippedIds.length,
     orderNumbers: orderNums,
-    dripsStarted: dripsStarted.length,
+    dripsTouched: totalDripsTouched,
+    dripsRescheduled: dripsRescheduled.length,
+    dripsNewlyEnrolled: dripsNewlyEnrolled.length,
     dripNextSend,
   });
 }
