@@ -28,6 +28,7 @@ export function BANNavigation({ currentPath = '/', transparent = false }: BANNav
     { href: '/sponsorship', label: 'Sponsor' },
     { href: '/founder', label: 'Story' },
     { href: '/impact', label: 'Impact' },
+    { href: '/me', label: 'Your kids' },
   ];
 
   return (

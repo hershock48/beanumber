@@ -17,6 +17,9 @@ import {
   type CampusNewsletterEntry,
 } from '@/lib/newsletter-feed';
 import { SponsorRecoveryForm } from './SponsorRecoveryForm';
+import { OtherKidsAtCampus } from './OtherKidsAtCampus';
+import { RecentKidsTracker } from '@/components/RecentKidsTracker';
+import { RecentKidsStrip } from '@/components/RecentKidsStrip';
 import { SESSION } from '@/lib/constants';
 
 // Never statically optimize or cache this page. Sponsorship status and child
@@ -92,6 +95,68 @@ async function getViewerSponsorCode(): Promise<string | null> {
     const session = JSON.parse(raw.value);
     if (new Date(session.expires) < new Date()) return null;
     return session.sponsorCode || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Read the sponsor_session cookie and return the signed-in email.
+ * This is the multi-kid identity primitive: one email may own many
+ * Sponsorships across many kids. Pages should check identity via
+ * email + "Sponsorship for this specific child exists?" rather than
+ * via the cookie's single sponsorCode (which is single-kid-bound).
+ */
+async function getViewerEmail(): Promise<string | null> {
+  try {
+    const cookieStore = await cookies();
+    const raw = cookieStore.get(SESSION.COOKIE_NAME);
+    if (!raw) return null;
+    const session = JSON.parse(raw.value);
+    if (new Date(session.expires) < new Date()) return null;
+    const email = (session.email as string | undefined)?.trim().toLowerCase();
+    return email && email.length > 0 ? email : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Multi-kid sponsor recognition. Given a signed-in email and a
+ * child's Airtable record ID, return the matching Sponsorship if
+ * the email owns this kid (any Active or Holder relationship). Used
+ * to flip the kid page into sponsor view for someone whose cookie
+ * doesn't carry the sponsorCode of THIS specific kid (e.g., they
+ * signed in via a different kid's magic link, or they have multiple
+ * Sponsorships).
+ */
+async function findSponsorshipByEmailForChild(
+  email: string,
+  childRecordId: string
+): Promise<AirtableSponsorshipRecord['fields'] | null> {
+  const apiKey = process.env.AIRTABLE_API_KEY;
+  const baseId = process.env.AIRTABLE_BASE_ID;
+  const sponsorshipsTable =
+    process.env.AIRTABLE_SPONSORSHIPS_TABLE || 'Sponsorships';
+  if (!apiKey || !baseId) return null;
+  const safeEmail = email.toLowerCase().replace(/"/g, '\\"');
+  const formula = encodeURIComponent(
+    `AND(LOWER({SponsorEmail})="${safeEmail}", OR({Status}="Active",{Status}="Holder"), FIND("${childRecordId}", ARRAYJOIN({Children}, ",")))`
+  );
+  try {
+    const res = await fetch(
+      `https://api.airtable.com/v0/${baseId}/${encodeURIComponent(
+        sponsorshipsTable
+      )}?filterByFormula=${formula}&maxRecords=1`,
+      {
+        headers: { Authorization: `Bearer ${apiKey}` },
+        cache: 'no-store',
+      }
+    );
+    if (!res.ok) return null;
+    const data = await res.json();
+    const record = data.records?.[0];
+    return record?.fields || null;
   } catch {
     return null;
   }
@@ -440,11 +505,25 @@ const getChildByShirtNumber = cache(async function getChildByShirtNumber(shirtNu
         })()
       : Promise.resolve(null);
 
-    const [sponsorshipResult, viewerCode] = await Promise.all([
+    const [sponsorshipResult, viewerCode, viewerEmail] = await Promise.all([
       sponsorshipPromise,
       getViewerSponsorCode(),
+      getViewerEmail(),
     ]);
     sponsorship = sponsorshipResult;
+
+    // Multi-kid identity. If the signed-in email owns ANY Active or
+    // Holder sponsorship that links to this kid's record, treat them
+    // as the sponsor — even if the cookie's sponsorCode points to a
+    // different kid. This is what makes the "family of sponsorships"
+    // pattern work: one email, many kids, recognized everywhere.
+    let emailMatchedSponsorship: AirtableSponsorshipRecord['fields'] | null = null;
+    if (viewerEmail) {
+      emailMatchedSponsorship = await findSponsorshipByEmailForChild(
+        viewerEmail,
+        recordId
+      );
+    }
 
     let age: string | undefined = sponsorship?.ChildAge;
     if (!age && child.DateOfBirth) {
@@ -463,12 +542,28 @@ const getChildByShirtNumber = cache(async function getChildByShirtNumber(shirtNu
       (sponsorship?.ChildPhoto?.map(p => p.url).filter(Boolean) as string[]) ||
       [];
 
+    // Sponsor recognition has two paths:
+    //   1. Single-kid legacy: the cookie's sponsorCode matches this
+    //      kid's Sponsorship. Original mechanism. Still works.
+    //   2. Multi-kid email-based: the cookie's email owns an Active or
+    //      Holder Sponsorship that links to this kid (different row
+    //      than the cookie's sponsorCode). This is what makes a sponsor
+    //      who owns #38 AND #99 recognized on BOTH pages, instead of
+    //      only on the one their cookie was minted for.
     const viewerIsSponsor = Boolean(
-      viewerCode &&
-      sponsorship?.SponsorCode &&
-      sponsorship.Status === 'Active' &&
-      viewerCode === sponsorship.SponsorCode
+      (viewerCode &&
+        sponsorship?.SponsorCode &&
+        sponsorship.Status === 'Active' &&
+        viewerCode === sponsorship.SponsorCode) ||
+      emailMatchedSponsorship
     );
+
+    // If recognition came via the email path, use THAT sponsorship's
+    // details for the rest of the render — sponsor code, kid display
+    // name, monthly amount, sub start date, reveal timestamp.
+    if (emailMatchedSponsorship && !sponsorship) {
+      sponsorship = emailMatchedSponsorship;
+    }
 
     // Chooser detection. When this sponsor's sponsorship has
     // PendingCandidateChildIDs set, the original kid departed and
@@ -1407,6 +1502,32 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
             />
           </div>
         )}
+
+        {/* ── Other kids at the campus ──
+            Pool model rendered as a feature. Below the newsfeed for
+            every kid page. Surfaces well-profiled, well-loved kids
+            so the visitor sees the campus as populated, not a single
+            file. Departed kids skip this too — their page is about
+            them, not a directory. */}
+        {!child.departed_at && (
+          <OtherKidsAtCampus currentRecordId={child.record_id} />
+        )}
+
+        {/* ── Kids you've met ──
+            Client-side localStorage history. Renders nothing until
+            the visitor has met at least 2 kids. Excludes the current
+            one. Builds a sense of accumulating relationships across
+            the campus. */}
+        <RecentKidsStrip excludeShirtNumber={Number(number)} />
+
+        {/* Track this visit in the client's local history. Renders
+            nothing — pure mount side-effect. */}
+        <RecentKidsTracker
+          shirtNumber={Number(number)}
+          displayName={displayName}
+          firstName={firstName}
+          photoUrl={child.photo_url}
+        />
 
         </RevealOverlay>
         </ReassignReveal>
