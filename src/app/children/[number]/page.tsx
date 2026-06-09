@@ -1314,8 +1314,20 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
                 </p>
               </div>
             ) : (
-              /* Not the sponsor: single-decision CTA */
-              <div className="bg-[#FFF8F0] border-2 border-[#D4A843] p-7 shadow-sm">
+              /* Not authenticated for this kid. Two clearly-distinct
+                 decisions, in this order:
+                   1. Sign-in card (dark charcoal, identity, free)
+                   2. Sponsor CTA (gold-bordered cream, $25/mo, optional)
+                 The visual distance + treatment makes it obvious these
+                 are separate things, not steps of one funnel. */
+              <>
+                {/* ── 1) Identity: are you the owner? ── */}
+                <div className="mb-4">
+                  <SponsorRecoveryForm shirtNumber={Number(number)} />
+                </div>
+
+                {/* ── 2) The monthly commitment ── */}
+                <div className="bg-[#FFF8F0] border-2 border-[#D4A843] p-7 shadow-sm">
                 {viewerLooksLikeBuyer ? (
                   <p
                     className="text-2xl text-[#0d0d0d] mb-4"
@@ -1359,16 +1371,11 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
                   buyerEmail={buyerHint?.email || undefined}
                 />
 
-                <p className="text-center text-xs text-[#bbb] mt-3 mb-6">
+                <p className="text-center text-xs text-[#bbb] mt-3">
                   Continuing is your choice. No pressure if not now.
                 </p>
-
-                {/* Magic-link recovery for sponsors who lost their cookie
-                    or are on a new device. */}
-                <div className="border-t border-[#e8e0d4] pt-5">
-                  <SponsorRecoveryForm shirtNumber={Number(number)} />
                 </div>
-              </div>
+              </>
             )}
           </div>
         </div>
