@@ -181,7 +181,7 @@ export function ClaimGate({
       <div className="absolute inset-x-0 top-0 z-10 px-4 pt-6 md:pt-8 pointer-events-none">
         <div className="bg-[#1a1208] text-white p-6 md:p-7 shadow-2xl max-w-2xl mx-auto pointer-events-auto">
           <p className="text-xs font-bold uppercase tracking-[0.25em] text-[#D4A843] mb-3">
-            Welcome back
+            The next step
           </p>
           <p
             className="text-2xl md:text-[28px] mb-3 leading-tight"
@@ -190,9 +190,9 @@ export function ClaimGate({
             You bought #{shirtNumber}. Claim it.
           </p>
           <p className="text-[#d8cfc1] text-sm md:text-base leading-relaxed mb-5">
-            Read who {firstName} is. Lock #{shirtNumber} in as yours
-            and every update from their campus comes back to this
-            page &mdash; no payment, no password.
+            Claiming #{shirtNumber} opens up the rest of {firstName}
+            &rsquo;s story: their family, what they love, what their
+            teacher says about them.
           </p>
           <div className="flex flex-col sm:flex-row sm:items-center gap-3">
             <Link
