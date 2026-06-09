@@ -67,10 +67,17 @@ export function AlreadySponsoringBanner({
   if (dismissed || !revealDone) return null;
 
   return (
-    <div className="relative bg-[#1a1208] text-white border-b border-[#D4A843]/40 overflow-hidden ban-banner-shimmer-host">
-      {/* Diagonal gold shimmer that sweeps across once on load (1s
-          delay) and again at 6s, then stops. Pure-CSS pseudo-element
-          via the .ban-banner-shimmer-host::after rule below. */}
+    <div
+      /* Sticky just below the nav so the banner follows the user
+         down the page. nav height is ~72px on both mobile and
+         desktop with the current layout; tuned to sit flush against
+         its bottom edge. z-40 sits below the nav's z-50 but above
+         page content. */
+      className="sticky top-[72px] z-40 relative bg-[#1a1208] text-white border-b border-[#D4A843]/40 overflow-hidden ban-banner-shimmer-host shadow-md"
+    >
+      {/* Diagonal gold shimmer. Fires shortly after mount (which is
+          gated on the reveal completing) and again 5s later, then
+          stops. Pure-CSS pseudo-element via .ban-banner-shimmer-host::after. */}
       <style>{`
         @keyframes banBannerShimmer {
           0% {
@@ -101,8 +108,8 @@ export function AlreadySponsoringBanner({
           );
           pointer-events: none;
           animation:
-            banBannerShimmer 1.6s ease-out 0.9s,
-            banBannerShimmer 1.6s ease-out 6.5s;
+            banBannerShimmer 1.6s ease-out 0.25s,
+            banBannerShimmer 1.6s ease-out 5s;
           animation-fill-mode: both;
           mix-blend-mode: screen;
         }
