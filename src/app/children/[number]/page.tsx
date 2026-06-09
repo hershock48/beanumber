@@ -1283,58 +1283,6 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
               </p>
             )}
 
-            <div className="flex items-center gap-3 text-[#777] mb-6">
-              {child.age && <span className="text-lg">Age {child.age}</span>}
-              {child.age && child.grade_class && <span className="text-[#ccc]">&middot;</span>}
-              {child.grade_class && <span className="text-lg">{child.grade_class}</span>}
-            </div>
-
-            {/* Pull quote from the child — in their own voice. This is the
-                single strongest element on the page when it's present. */}
-            {child.child_quote && (
-              <div className="mb-8">
-                <p
-                  className="text-2xl md:text-[1.65rem] text-[#0d0d0d] leading-snug"
-                  style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 500, fontStyle: 'italic' }}
-                >
-                  &ldquo;{child.child_quote}&rdquo;
-                </p>
-                <p className="mt-3 text-xs uppercase tracking-[0.2em] text-[#aaa]">
-                  — {firstName}
-                </p>
-              </div>
-            )}
-
-            {/* Structured fact lines. Each is its own tiny block so an
-                empty field just disappears instead of leaving dead scaffold. */}
-            {hasStructured && (
-              <div className="mb-8 space-y-4">
-                {child.home_village && (
-                  <div>
-                    <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-1">
-                      Home
-                    </p>
-                    <p className="text-[17px] md:text-lg text-[#444] leading-relaxed">{child.home_village}</p>
-                  </div>
-                )}
-                {child.family_context && (
-                  <div>
-                    <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-1">
-                      Family
-                    </p>
-                    <p className="text-[17px] md:text-lg text-[#444] leading-relaxed">{child.family_context}</p>
-                  </div>
-                )}
-                {child.loves && (
-                  <div>
-                    <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-1">
-                      About {firstName}
-                    </p>
-                    <p className="text-[17px] md:text-lg text-[#444] leading-relaxed">{child.loves}</p>
-                  </div>
-                )}
-              </div>
-            )}
           </div>
         </div>
 
@@ -1358,6 +1306,68 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
             child.viewer_is_sponsor || child.viewer_is_holder
           )}
         >
+        {/* ── Personal details block. Lives inside ClaimGate so a
+            buyer who hasn't claimed sees only the photo + name above
+            the gate; everything personal about the kid (age, grade,
+            their own quote, family context, what they love) stays
+            blurred until they claim or hit Maybe later. The blur is
+            the conversion lever — the gate says "you bought this
+            kid, claim them to read who they are." */}
+        <div className="mt-8 md:mt-10 max-w-2xl">
+          <div className="flex items-center gap-3 text-[#777] mb-6">
+            {child.age && <span className="text-lg">Age {child.age}</span>}
+            {child.age && child.grade_class && <span className="text-[#ccc]">&middot;</span>}
+            {child.grade_class && <span className="text-lg">{child.grade_class}</span>}
+          </div>
+
+          {/* Pull quote from the child — in their own voice. The
+              single strongest element on the page when it's present. */}
+          {child.child_quote && (
+            <div className="mb-8">
+              <p
+                className="text-2xl md:text-[1.65rem] text-[#0d0d0d] leading-snug"
+                style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 500, fontStyle: 'italic' }}
+              >
+                &ldquo;{child.child_quote}&rdquo;
+              </p>
+              <p className="mt-3 text-xs uppercase tracking-[0.2em] text-[#aaa]">
+                — {firstName}
+              </p>
+            </div>
+          )}
+
+          {/* Structured fact lines. Each is its own tiny block so an
+              empty field just disappears instead of leaving dead scaffold. */}
+          {hasStructured && (
+            <div className="mb-8 space-y-4">
+              {child.home_village && (
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-1">
+                    Home
+                  </p>
+                  <p className="text-[17px] md:text-lg text-[#444] leading-relaxed">{child.home_village}</p>
+                </div>
+              )}
+              {child.family_context && (
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-1">
+                    Family
+                  </p>
+                  <p className="text-[17px] md:text-lg text-[#444] leading-relaxed">{child.family_context}</p>
+                </div>
+              )}
+              {child.loves && (
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-1">
+                    About {firstName}
+                  </p>
+                  <p className="text-[17px] md:text-lg text-[#444] leading-relaxed">{child.loves}</p>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
         <div className="grid md:grid-cols-2 gap-5 md:gap-14 mt-10 md:mt-12 items-start">
           {/* LEFT — bio + teacher + story placeholder */}
           <div>
