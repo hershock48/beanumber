@@ -162,7 +162,18 @@ export function ClaimGate({
   // completely outside our render tree and cannot be affected.
   return (
     <div className="relative">
-      <div className="blur-md opacity-60 pointer-events-none select-none transition-all duration-500">
+      <div
+        className="pointer-events-none select-none transition-all duration-500"
+        style={{
+          // Inline filter rather than Tailwind's blur-* class so the
+          // exact intensity is unambiguous across browsers and the
+          // Tailwind version. blur-md (12px) read as too subtle in
+          // testing; 18px makes the gate's purpose visually obvious
+          // without rendering the content unrecognizable.
+          filter: 'blur(18px)',
+          opacity: 0.45,
+        }}
+      >
         {children}
       </div>
 
