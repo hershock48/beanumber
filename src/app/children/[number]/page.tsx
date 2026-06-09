@@ -1314,20 +1314,13 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
                 </p>
               </div>
             ) : (
-              /* Not authenticated for this kid. Two clearly-distinct
-                 decisions, in this order:
-                   1. Sign-in card (dark charcoal, identity, free)
-                   2. Sponsor CTA (gold-bordered cream, $25/mo, optional)
-                 The visual distance + treatment makes it obvious these
-                 are separate things, not steps of one funnel. */
-              <>
-                {/* ── 1) Identity: are you the owner? ── */}
-                <div className="mb-4">
-                  <SponsorRecoveryForm shirtNumber={Number(number)} />
-                </div>
-
-                {/* ── 2) The monthly commitment ── */}
-                <div className="bg-[#FFF8F0] border-2 border-[#D4A843] p-7 shadow-sm">
+              /* Not authenticated for this kid.
+                 Sign-in lives in the top nav now ("Sign in" button →
+                 modal). The kid page is about the kid. We surface a
+                 tiny reminder below the sponsor CTA for existing
+                 sponsors who land here on a new device, so they know
+                 where to go without scaring them with a competing card. */
+              <div className="bg-[#FFF8F0] border-2 border-[#D4A843] p-7 shadow-sm">
                 {viewerLooksLikeBuyer ? (
                   <p
                     className="text-2xl text-[#0d0d0d] mb-4"
@@ -1371,11 +1364,19 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
                   buyerEmail={buyerHint?.email || undefined}
                 />
 
-                <p className="text-center text-xs text-[#bbb] mt-3">
+                <p className="text-center text-xs text-[#bbb] mt-3 mb-5">
                   Continuing is your choice. No pressure if not now.
                 </p>
-                </div>
-              </>
+
+                {/* Tiny contextual nudge for existing sponsors on a
+                    new device. Quiet, not pushy — points them to the
+                    Sign in button in the top nav. */}
+                <p className="text-center text-xs text-[#666] border-t border-[#e8e0d4] pt-4">
+                  Already sponsoring? Your sponsorship is intact —
+                  tap <span className="font-bold">Sign in</span> at the top
+                  of the page to see your view.
+                </p>
+              </div>
             )}
           </div>
         </div>

@@ -30,7 +30,14 @@ import { useState } from 'react';
  * Privacy: the success message is identical whether the email was
  * matched, claimable, or already taken. No info leaked.
  */
-export function SponsorRecoveryForm({ shirtNumber }: { shirtNumber: number }) {
+export function SponsorRecoveryForm({
+  shirtNumber,
+  firstName,
+}: {
+  shirtNumber: number;
+  firstName?: string;
+}) {
+  const kidRef = firstName || 'this kid';
   const [expanded, setExpanded] = useState(false);
   const [email, setEmail] = useState('');
   const [state, setState] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
@@ -65,17 +72,18 @@ export function SponsorRecoveryForm({ shirtNumber }: { shirtNumber: number }) {
     return (
       <div className="bg-[#1a1208] text-white p-6 md:p-7">
         <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-3">
-          Sign in
+          Already sponsoring?
         </p>
         <p
-          className="text-2xl md:text-3xl mb-2 leading-tight"
+          className="text-2xl md:text-3xl mb-3 leading-tight"
           style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
         >
-          Is this your number?
+          Sign in to your view.
         </p>
         <p className="text-[#d8cfc1] text-sm md:text-base leading-relaxed mb-5">
-          Sign in so we recognize you here. It&rsquo;s free &mdash; no
-          payment, no password. Just confirms #{shirtNumber} is yours.
+          Your card, your monthly, and your sponsorship of {kidRef} stay
+          exactly as they are. This just signs you in &mdash; no new
+          charges, nothing to enter again.
         </p>
         <button
           type="button"
@@ -84,6 +92,10 @@ export function SponsorRecoveryForm({ shirtNumber }: { shirtNumber: number }) {
         >
           Email me a sign-in link &rarr;
         </button>
+        <p className="text-xs text-[#a89e8d] mt-4 leading-relaxed">
+          New here? Same form &mdash; if #{shirtNumber} is still open
+          when you sign in, it becomes yours.
+        </p>
       </div>
     );
   }
@@ -134,7 +146,7 @@ export function SponsorRecoveryForm({ shirtNumber }: { shirtNumber: number }) {
       className="bg-[#1a1208] text-white p-6 md:p-7"
     >
       <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-3">
-        Sign in to #{shirtNumber}
+        Sign in to your view of {kidRef}
       </p>
       <p
         className="text-2xl md:text-3xl mb-3 leading-tight"
@@ -144,9 +156,9 @@ export function SponsorRecoveryForm({ shirtNumber }: { shirtNumber: number }) {
       </p>
       <p className="text-[#d8cfc1] text-sm leading-relaxed mb-5">
         We&rsquo;ll send a one-tap link. Click it and you&rsquo;re signed
-        in. No payment, no password. If the number&rsquo;s open, you claim
-        it; if it&rsquo;s already yours, you sign in. Same link either
-        way.
+        in. If you&rsquo;re already sponsoring, nothing about your
+        sponsorship changes &mdash; same card, same monthly, same kid.
+        If #{shirtNumber} is still open, signing in is how you take it.
       </p>
       <div className="flex flex-col sm:flex-row gap-2 mb-3">
         <input
