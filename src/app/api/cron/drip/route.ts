@@ -155,17 +155,23 @@ function shirtNurtureEmail(
   const sponsorUrl = `${SITE_URL}/sponsorship`;
 
   switch (stage) {
-    // ── Email 1: Did it arrive? (Day ~10) ───────────────────────────────
+    // ── Email 1: Did it arrive + how to claim (ship + 3 days) ─────────────
+    // Lands as a check-in but introduces the full mechanic: number on
+    // the back → site → claim. The claim concept is what unlocks the
+    // rest of the relationship, so we name it explicitly on the first
+    // touch.
     case 0:
       return {
         subject: multi ? "Did your shirts arrive?" : "Did your shirt arrive?",
         html: wrapEmail(`
           <p style="margin-top: 0;">Hey ${firstName},</p>
           ${multi
-            ? `<p>You ordered ${numbers.length} shirts, and I wanted to check if they made it. I make each one by hand (screen press, ink, the whole thing), so they were all made specifically for you.</p>
-               <p>Each shirt has a different number pressed on the back, and each number belongs to a different child at our campus in Northern Uganda. Flip each shirt over, read the number, and visit <a href="${SITE_URL}" style="color: #D4A843; font-weight: bold;">beanumber.org</a> to meet the kid behind it.</p>`
-            : `<p>I wanted to check in and see if your shirt made it. I make each one by hand (screen press, ink, the whole thing), so it was made specifically for you.</p>
-               <p>When you get it, look at the back. There&rsquo;s a number pressed below the main design, and that number belongs to a real child at our campus in Northern Uganda. Go to <a href="${SITE_URL}" style="color: #D4A843; font-weight: bold;">beanumber.org</a>, enter the number from the back of your shirt, and meet them.</p>`
+            ? `<p>You ordered ${numbers.length} shirts and I wanted to check if they made it. I screen-print every one by hand, so they were made specifically for you.</p>
+               <p>When they arrive, flip each one over. Every shirt has a different number pressed below the main design, and every number belongs to a different kid at our campus in Northern Uganda. Enter each number at <a href="${SITE_URL}" style="color: #D4A843; font-weight: bold;">beanumber.org</a> to meet the kid behind it.</p>
+               <p>You&rsquo;ll have an option to claim each number as yours. When you do, that kid&rsquo;s page becomes your page. Updates from the campus, photos, letters &mdash; all of it comes back to that page. Your browser remembers you on this device, so there&rsquo;s no password to keep track of.</p>`
+            : `<p>I wanted to check in and see if your shirt made it. I screen-print every one by hand, so it was made specifically for you.</p>
+               <p>When it arrives, flip it over. There&rsquo;s a number pressed below the main design, and that number belongs to a real kid at our campus in Northern Uganda. Go to <a href="${SITE_URL}" style="color: #D4A843; font-weight: bold;">beanumber.org</a>, enter your number, and meet them.</p>
+               <p>You&rsquo;ll have an option to claim that number as yours. When you do, that kid&rsquo;s page becomes your page. Updates from the campus, photos, letters &mdash; all of it comes back to that page. Your browser remembers you on this device, so there&rsquo;s no password to keep track of.</p>`
           }
           <p style="text-align: center; margin: 24px 0;">
             <a href="${SITE_URL}" style="display: inline-block; background: #D4A843; color: #0d0d0d; font-weight: bold; text-decoration: none; padding: 14px 32px; font-size: 15px; letter-spacing: 0.05em;">ENTER YOUR ${multi ? 'NUMBERS' : 'NUMBER'}</a>
@@ -174,41 +180,42 @@ function shirtNurtureEmail(
         `),
       };
 
-    // ── Email 2: Nudge to enter number (Day ~16) ─────────────────────────
+    // ── Email 2: A real campus moment (ship + 9 days) ─────────────────────
+    // Previously a generic re-nudge. Now a real story from the school —
+    // Teacher Susan's class learning to write — that ties the abstract
+    // "your shirt is connected to a kid" to a concrete campus reality.
+    // Specific over vague, per voice.md.
     case 1:
       return {
-        subject: multi
-          ? "Have you met your kids yet?"
-          : "Have you met your child yet?",
+        subject: "Something I want to tell you about",
         html: wrapEmail(`
           <p style="margin-top: 0;">Hey ${firstName},</p>
-          ${multi
-            ? `<p>Each of your ${numbers.length} shirts is connected to a different child at the campus. The number on the back of each shirt is the key — enter it at <a href="${SITE_URL}" style="color: #D4A843; font-weight: bold;">beanumber.org</a> and you meet the kid it belongs to.</p>
-               <p style="text-align: center; margin: 24px 0;">
-                 <a href="${SITE_URL}" style="display: inline-block; background: #D4A843; color: #0d0d0d; font-weight: bold; text-decoration: none; padding: 14px 32px; font-size: 15px; letter-spacing: 0.05em;">ENTER YOUR NUMBERS</a>
-               </p>`
-            : `<p>If you&rsquo;ve had a chance to read the number off the back of your shirt, you already know who your shirt is connected to. If not, no rush at all, but when you&rsquo;re ready:</p>
-               <p style="text-align: center; margin: 24px 0;">
-                 <a href="${SITE_URL}" style="display: inline-block; background: #D4A843; color: #0d0d0d; font-weight: bold; text-decoration: none; padding: 14px 32px; font-size: 15px; letter-spacing: 0.05em;">ENTER YOUR NUMBER</a>
-               </p>`
-          }
+          <p>We have 65 kids enrolled at our school in Northern Uganda right now, from Nursery up through Primary Five. ${multi ? `The kids your shirts are connected to are` : `The kid your shirt is connected to is`} in there.</p>
+          <p>In Teacher Susan&rsquo;s class this past term, every kid in the room started the year unable to write. By the time the term closed, every one of them was writing on their own. That happened because three things stayed in place: fed kids walking in every morning, a teacher who knew her stuff at the front of the room, and chalk and notebooks that didn&rsquo;t run out before the term ended.</p>
+          <p>The chalk doesn&rsquo;t show up by itself. Shirt buyers and sponsors here keep it stocked.</p>
+          <p>If you haven&rsquo;t yet, this is a good moment to flip ${multi ? `your shirts` : `your shirt`} over, read the ${multi ? `numbers` : `number`} off the back, and go meet ${multi ? `the kids` : `the kid`} at <a href="${SITE_URL}" style="color: #D4A843; font-weight: bold;">beanumber.org</a>.</p>
+          <p style="text-align: center; margin: 24px 0;">
+            <a href="${SITE_URL}" style="display: inline-block; background: #D4A843; color: #0d0d0d; font-weight: bold; text-decoration: none; padding: 14px 32px; font-size: 15px; letter-spacing: 0.05em;">ENTER YOUR ${multi ? 'NUMBERS' : 'NUMBER'}</a>
+          </p>
           <p>Kevin</p>
         `),
       };
 
-    // ── Email 3: How sponsorship works (Day ~22) ─────────────────────────
+    // ── Email 3: Conversion ask, tied to the claim (ship + 17 days) ───────
+    // Assumes by now they&rsquo;ve seen the kid&rsquo;s page. Frames sponsorship
+    // as the next step ON TOP of having claimed, not as a standalone ask.
     case 2:
       return {
-        subject: multi
-          ? "About the kids behind your shirts"
-          : "About the kid behind your shirt",
+        subject: multi ? "About the kids behind your shirts" : "About the kid behind your shirt",
         html: wrapEmail(`
           <p style="margin-top: 0;">Hey ${firstName},</p>
           ${multi
-            ? `<p>Your shirts are connected to ${numbers.length} different children at the campus. Each one has a name, a classroom, and a teacher who knows them by it.</p>`
-            : `<p>The number on the back of your shirt is connected to a real kid at our campus in Northern Uganda. They have a name, a classroom, and a teacher who knows them by it.</p>`
+            ? `<p>If you&rsquo;ve claimed your numbers by now, you&rsquo;ve seen the kids&rsquo; pages. You know their names, their grades, and what makes each one of them themselves. They&rsquo;re real people.</p>
+               <p>Owning the numbers connects you to them. Sponsoring at $25 a month per kid turns that into school fees, two meals a day, and medical care at the campus. The sponsor gets letters, photos, and report cards. The kid knows their sponsor&rsquo;s name.</p>`
+            : `<p>If you&rsquo;ve claimed your number by now, you&rsquo;ve seen your kid&rsquo;s page. You know their name, their grade, their family, and what they said when their teacher asked what they want to do. They&rsquo;re a real person.</p>
+               <p>Owning the number connects you to them. Sponsoring at $25 a month turns that into school fees, two meals a day, and medical care at the campus. The sponsor gets letters, photos, and report cards. The kid knows their sponsor&rsquo;s name.</p>`
           }
-          <p>Right now, $25 a month supports school fees, two meals a day, and medical care at the campus. That&rsquo;s what sponsorship supports, and it starts the day you sign up. If you sponsor, you get a direct connection to ${multi ? 'the kid you pick' : 'the kid your shirt&rsquo;s number belongs to'}: letters, photos, report cards, and a place to write to them whenever you want.</p>
+          <p>This is the part where the relationship goes from a number on a shirt to ${multi ? `kids` : `a kid`} you actually know.</p>
           <p style="text-align: center; margin: 24px 0;">
             <a href="${sponsorUrl}" style="display: inline-block; background: #D4A843; color: #0d0d0d; font-weight: bold; text-decoration: none; padding: 14px 32px; font-size: 15px; letter-spacing: 0.05em;">SPONSOR FOR $25/MO</a>
           </p>
@@ -216,15 +223,24 @@ function shirtNurtureEmail(
         `),
       };
 
-    // ── Email 4: Last email (Day ~30) ────────────────────────────────────
+    // ── Email 4: Warm close — door stays open (ship + 27 days) ────────────
+    // Previously "Last email from me about this" with a flat exit.
+    // Reframed: I&rsquo;ll stop showing up, but the relationship continues
+    // through the campus newsletter, and once they claim, those updates
+    // are about their kid specifically. Future contact has substance,
+    // not nudges.
     case 3:
       return {
-        subject: "Last email from me about this",
+        subject: "I'll stop showing up after this one",
         html: wrapEmail(`
           <p style="margin-top: 0;">Hey ${firstName},</p>
-          <p>This is the last email I&rsquo;ll send you about this, and I&rsquo;ll keep it short.</p>
-          <p>The shirts are how most people find us, and sponsorship is how we keep the campus running. $25 a month supports school fees, two meals a day, and medical care at the campus, and the sponsor gets letters, photos, and a real relationship with the kid their shirt&rsquo;s number belongs to.</p>
-          <p>If you want in, you can <a href="${sponsorUrl}" style="color: #D4A843; font-weight: bold;">start a sponsorship here</a>. And if not, wear that shirt with pride. You can always come back later.</p>
+          <p>I&rsquo;ll stop showing up in your inbox after this one.</p>
+          <p>The shirt is how you found us. The number is how you met ${multi ? `your kids` : `your kid`}. Sponsorship, if you go that route, is how you stay in their life: school fees, meals, the clinic, plus letters and photos coming back to you. $25 a month, cancel anytime, and you&rsquo;d be welcome.</p>
+          <p style="text-align: center; margin: 24px 0;">
+            <a href="${sponsorUrl}" style="display: inline-block; background: #D4A843; color: #0d0d0d; font-weight: bold; text-decoration: none; padding: 14px 32px; font-size: 15px; letter-spacing: 0.05em;">START A SPONSORSHIP</a>
+          </p>
+          <p>From here on out, when you hear from me it&rsquo;ll be the monthly newsletter from the campus. Once you&rsquo;ve claimed ${multi ? `your numbers` : `your number`}, those updates have ${multi ? `your kids` : `your kid`} in them specifically. No more nudges.</p>
+          <p>Wear ${multi ? `the shirts` : `the shirt`} with pride.</p>
           <p>Kevin</p>
         `),
       };
@@ -342,15 +358,19 @@ function donorConvertEmail(
         `),
       };
 
-    // ── Email 3: Last email (Day ~25) ────────────────────────────────────
+    // ── Email 3: Warm close — door stays open (Day ~25) ──────────────────
     case 2:
       return {
-        subject: "Last email from me about this",
+        subject: "I'll stop showing up after this one",
         html: wrapEmail(`
           <p style="margin-top: 0;">Hey ${firstName},</p>
-          <p>This is the last email I&rsquo;ll send you about this.</p>
-          <p>What you gave went to real kids. It supported meals and kept them in school. If you ever want to go deeper, whether that&rsquo;s sponsoring a child for $25 a month or picking up a shirt that matches you to one by number, <a href="${SITE_URL}" style="color: #D4A843; font-weight: bold;">we&rsquo;re always here</a>.</p>
-          <p>Thank you again.</p>
+          <p>I&rsquo;ll stop showing up in your inbox after this one.</p>
+          <p>What you gave went to real kids. It supported meals, kept them in school, paid for a nurse on the days they needed one. That&rsquo;s where it landed. No overhead games, no admin layer between your gift and the kids who got fed.</p>
+          <p>If you ever want to go deeper, sponsoring a child for $25 a month connects you to one specific kid at the campus by name. You get letters, photos, and report cards from them. Or grab a shirt at <a href="${SITE_URL}/shirts" style="color: #D4A843; font-weight: bold;">beanumber.org/shirts</a> and the number on the back is your match.</p>
+          <p style="text-align: center; margin: 24px 0;">
+            <a href="${sponsorUrl}" style="display: inline-block; background: #D4A843; color: #0d0d0d; font-weight: bold; text-decoration: none; padding: 14px 32px; font-size: 15px; letter-spacing: 0.05em;">BROWSE THE KIDS</a>
+          </p>
+          <p>From here on out, when you hear from me it&rsquo;ll be the monthly newsletter from the campus. Thank you again.</p>
           <p>Kevin</p>
         `),
       };
@@ -485,16 +505,24 @@ function monthlyDonorEmail(
         `),
       };
 
-    // ── Email 3: Spread the word (Day ~22) ─────────────────────────────
+    // ── Email 3: Soft upgrade ask + warm close (Day ~22) ─────────────────
+    // Previously a pure word-of-mouth ask, which is a fine sentiment
+    // but the wrong final beat for a monthly donor we&rsquo;d ideally
+    // upgrade to a named sponsorship. Reframed as an invitation to
+    // add the relationship piece, with a graceful out if monthly is
+    // already the right shape.
     case 2:
       return {
-        subject: "One thing that would really help",
+        subject: "One more thing I want to put in front of you",
         html: wrapEmail(`
           <p style="margin-top: 0;">Hey ${firstName},</p>
-          <p>Your monthly gift keeps the campus running, and I wanted to ask you for one more thing that doesn&rsquo;t cost anything.</p>
-          <p>If you know someone who&rsquo;d be into what we do, send them our way. A text, an Instagram share, a conversation over coffee. Most of the people who support us found out because someone they trust told them about it. That&rsquo;s it. No ad campaign, no viral post. One person telling another person about a six-acre campus in Uganda where real things are happening for real kids.</p>
-          <p>Here&rsquo;s the link if you want to share it: <a href="${SITE_URL}" style="color: #D4A843; font-weight: bold;">beanumber.org</a></p>
-          <p>Thank you for being part of this.</p>
+          <p>Your monthly gift keeps the campus running, and I&rsquo;m thankful for it. One more thing I want to mention, then I&rsquo;ll let you go.</p>
+          <p>Sponsorship is the other side of how people give to us. $25 a month connects you to one specific kid at the campus by name. The kid knows yours. You get letters, photos, and report cards from them. Same campus, same kids, plus a real relationship with one of them by name.</p>
+          <p>If you ever want to add that piece, you can browse the kids at <a href="${SITE_URL}/sponsorship" style="color: #D4A843; font-weight: bold;">beanumber.org/sponsorship</a>. No pressure if monthly giving is the right shape for you &mdash; what you&rsquo;re already giving keeps a lot of lights on.</p>
+          <p style="text-align: center; margin: 24px 0;">
+            <a href="${SITE_URL}/sponsorship" style="display: inline-block; background: #D4A843; color: #0d0d0d; font-weight: bold; text-decoration: none; padding: 14px 32px; font-size: 15px; letter-spacing: 0.05em;">MEET THE KIDS</a>
+          </p>
+          <p>From here on out, when you hear from me it&rsquo;ll be the monthly newsletter from the campus. Thank you for being part of this.</p>
           <p>God bless,<br>Kevin</p>
         `),
       };
