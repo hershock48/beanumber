@@ -6,15 +6,17 @@ import { useEffect, useState } from 'react';
  * Split-flap tile board — Vestaboard / airport-board style.
  *
  * Scrambles through random characters per tile, then locks each tile
- * in sequence to spell out `text`. Each character is a stacked tile
- * (top half / bottom half) with a dark brown background and gold
- * serif character. Spaces render as blank gaps. Non-alpha characters
+ * in sequence to spell out `text`. Each tile is a dark stacked plate
+ * with a horizontal divider through the middle (the "fold line") and
+ * a gold serif character. On lock, the tile flips its color palette —
+ * dark turns gold, character snaps to its final form — with a brief
+ * scale-bounce. Spaces render as blank gaps. Non-alpha characters
  * (numbers, punctuation) render as-is and lock immediately without
  * scrambling.
  *
  * Lock cadence: characters lock left-to-right, evenly spaced across
- * `lockDuration` ms after `startDelay`. Each tile keeps tumbling
- * through scramble chars until it locks.
+ * `lockDuration` ms after `startDelay`. The locked text stays on
+ * screen until the parent unmounts the board.
  *
  * Used by:
  *   - ReplacementChooser (post-pick reveal of new kid's name)
@@ -27,7 +29,7 @@ import { useEffect, useState } from 'react';
 export function SplitFlapBoard({
   text,
   startDelay = 0,
-  lockDuration = 1400,
+  lockDuration = 1800,
 }: {
   text: string;
   startDelay?: number;
@@ -44,7 +46,7 @@ export function SplitFlapBoard({
     // Reset locks for new text.
     setLocked(text.split('').map(c => !/[A-Za-z]/.test(c)));
 
-    const tickInterval = setInterval(() => setTick(t => t + 1), 70);
+    const tickInterval = setInterval(() => setTick(t => t + 1), 60);
 
     const alphaIndices = text
       .split('')
@@ -69,7 +71,7 @@ export function SplitFlapBoard({
     // Stop the tumble loop once everything is locked.
     const stopTumble = window.setTimeout(
       () => clearInterval(tickInterval),
-      startDelay + lockDuration + 500
+      startDelay + lockDuration + 600
     );
 
     return () => {
@@ -84,79 +86,70 @@ export function SplitFlapBoard({
   return (
     <>
       <style>{`
-        @keyframes splitFlapTumble {
-          0% { transform: translateY(0); }
-          50% { transform: translateY(-2px); }
-          100% { transform: translateY(0); }
-        }
         @keyframes splitFlapLock {
-          0% { transform: scale(1); box-shadow: 0 4px 14px rgba(0,0,0,0.35) inset, 0 1px 0 rgba(255,255,255,0.04); }
-          40% { transform: scale(1.06); box-shadow: 0 6px 22px rgba(212,168,67,0.5) inset, 0 0 18px rgba(212,168,67,0.3); }
-          100% { transform: scale(1); box-shadow: 0 4px 14px rgba(0,0,0,0.35) inset, 0 1px 0 rgba(255,255,255,0.04); }
+          0% {
+            transform: scale(1);
+            background: linear-gradient(180deg, #1f1812 0%, #0d0905 100%);
+            color: #D4A843;
+          }
+          30% {
+            transform: scale(1.18);
+            background: linear-gradient(180deg, #f5d77a 0%, #D4A843 100%);
+            color: #0d0905;
+            box-shadow:
+              0 8px 30px rgba(212,168,67,0.7),
+              0 0 50px rgba(212,168,67,0.45);
+          }
+          100% {
+            transform: scale(1);
+            background: linear-gradient(180deg, #D4A843 0%, #a07a25 100%);
+            color: #0d0905;
+            box-shadow:
+              0 8px 24px rgba(0,0,0,0.5) inset,
+              0 4px 12px rgba(0,0,0,0.25);
+          }
         }
         .split-flap-board {
-          font-family: 'Courier New', ui-monospace, monospace;
+          font-family: 'Helvetica Neue', 'Arial Black', sans-serif;
           line-height: 1;
         }
         .split-flap-tile {
           position: relative;
           display: inline-block;
-          width: 0.7em;
-          height: 1.05em;
-          background: #1f1812;
+          width: 1em;
+          height: 1.5em;
+          background: linear-gradient(180deg, #1f1812 0%, #0d0905 100%);
           color: #D4A843;
-          font-weight: 700;
+          font-weight: 900;
           text-align: center;
-          border-radius: 3px;
+          line-height: 1.5em;
+          border-radius: 5px;
           box-shadow:
-            0 4px 14px rgba(0,0,0,0.35) inset,
-            0 1px 0 rgba(255,255,255,0.04);
-          overflow: hidden;
+            0 8px 24px rgba(0,0,0,0.5) inset,
+            0 4px 12px rgba(0,0,0,0.25);
           vertical-align: middle;
         }
         .split-flap-tile-space {
           background: transparent;
           box-shadow: none;
-          width: 0.32em;
-        }
-        .split-flap-tile-half {
-          position: absolute;
-          left: 0;
-          width: 100%;
-          height: 50%;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          overflow: hidden;
-        }
-        .split-flap-tile-top {
-          top: 0;
-          align-items: flex-end;
-          padding-bottom: 0.04em;
-        }
-        .split-flap-tile-bottom {
-          bottom: 0;
-          align-items: flex-start;
-          padding-top: 0.04em;
-          background: linear-gradient(180deg, rgba(0,0,0,0.18) 0%, rgba(0,0,0,0) 35%);
+          width: 0.5em;
         }
         .split-flap-tile-divider {
           position: absolute;
-          left: 6%;
-          right: 6%;
+          left: 7%;
+          right: 7%;
           top: 50%;
-          height: 1px;
+          height: 2px;
           background: rgba(0,0,0,0.55);
-          box-shadow: 0 1px 0 rgba(255,255,255,0.05);
-        }
-        .split-flap-tile-tumbling {
-          animation: splitFlapTumble 70ms ease-in-out infinite;
+          box-shadow: 0 1px 0 rgba(255,255,255,0.06);
+          z-index: 2;
+          pointer-events: none;
         }
         .split-flap-tile-locked {
-          animation: splitFlapLock 380ms ease-out 1 both;
+          animation: splitFlapLock 420ms cubic-bezier(0.22, 1, 0.36, 1) 1 forwards;
         }
       `}</style>
-      <div className="split-flap-board flex flex-wrap items-center justify-center gap-1 md:gap-1.5">
+      <div className="split-flap-board flex flex-wrap items-center justify-center gap-1.5 md:gap-2.5">
         {text.split('').map((char, i) => {
           const isAlpha = /[A-Za-z]/.test(char);
           const isLocked = locked[i];
@@ -173,16 +166,11 @@ export function SplitFlapBoard({
             <span
               key={i}
               className={`split-flap-tile${isSpace ? ' split-flap-tile-space' : ''}${
-                isLocked ? ' split-flap-tile-locked' : ' split-flap-tile-tumbling'
+                isLocked ? ' split-flap-tile-locked' : ''
               }`}
               aria-hidden={!isLocked}
             >
-              <span className="split-flap-tile-half split-flap-tile-top">
-                {showChar}
-              </span>
-              <span className="split-flap-tile-half split-flap-tile-bottom">
-                {showChar}
-              </span>
+              {showChar}
               <span className="split-flap-tile-divider" />
             </span>
           );
