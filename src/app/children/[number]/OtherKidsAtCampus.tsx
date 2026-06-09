@@ -164,11 +164,31 @@ async function pickFeaturedKids(excludeRecordId: string, count: number = 4): Pro
 
 export async function OtherKidsAtCampus({
   currentRecordId,
+  currentShirtNumber,
+  currentFirstName,
 }: {
   currentRecordId: string;
+  /** The shirt number the viewer is currently on. Passed through to
+      /meet/[id] as ?from=N so the viewer can hop back to their own
+      kid's page after exploring. Without this they'd be stranded on
+      the explored kid's page with only "Back to home" as an exit. */
+  currentShirtNumber?: number;
+  /** First name of the kid the viewer is currently on. Surfaced in
+      the back link as "Back to Marvin" rather than "Back to #38". */
+  currentFirstName?: string;
 }) {
   const kids = await pickFeaturedKids(currentRecordId, 4);
   if (kids.length === 0) return null;
+
+  // Build the back-link query params once so each card link has the
+  // same context appended.
+  const backQuery = currentShirtNumber
+    ? `?from=${currentShirtNumber}${
+        currentFirstName
+          ? `&fromname=${encodeURIComponent(currentFirstName)}`
+          : ''
+      }`
+    : '';
 
   return (
     <section className="max-w-5xl mx-auto px-5 py-12 md:py-16">
@@ -195,8 +215,10 @@ export async function OtherKidsAtCampus({
                  framing only applies when someone enters via their
                  own number. In exploration, the kid IS the kid; no
                  shirt number prominently displayed, no reveal ritual
-                 they didn't earn. See src/app/meet/[childId]/page.tsx. */
-              href={`/meet/${kid.recordId}`}
+                 they didn't earn. ?from=N&fromname=Marvin lets the
+                 explorer return to their own kid's page. See
+                 src/app/meet/[childId]/page.tsx. */
+              href={`/meet/${kid.recordId}${backQuery}`}
               className="group block bg-white border border-[#e8e0d4] hover:border-[#D4A843] transition-colors"
             >
               <div className="aspect-[4/5] bg-[#f5f0e8] overflow-hidden">

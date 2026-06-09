@@ -99,12 +99,25 @@ function computeAge(dob?: string): string | undefined {
 
 export default async function MeetKidPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ childId: string }>;
+  searchParams?: Promise<{ from?: string; fromname?: string }>;
 }) {
   const { childId } = await params;
   const record = await fetchChild(childId);
   if (!record) notFound();
+
+  // Back-link context. When the user lands here from another kid's
+  // page (via OtherKidsAtCampus), the source shirt number + first
+  // name come in as ?from=N&fromname=Marvin so we can offer a return
+  // path. Without them, we fall back to "Back to home."
+  const sp = searchParams ? await searchParams : undefined;
+  const fromShirt = sp?.from && /^\d+$/.test(sp.from) ? sp.from : null;
+  const fromName =
+    sp?.fromname && sp.fromname.length > 0 && sp.fromname.length < 80
+      ? sp.fromname.replace(/[<>]/g, '')
+      : null;
 
   const f = record.fields;
   const firstName = f.FirstName || f.DisplayName?.split(' ')[0] || 'Them';
@@ -118,12 +131,21 @@ export default async function MeetKidPage({
       <BANNavigation />
       <main className="flex-1">
         <div className="max-w-5xl mx-auto px-5 py-8 md:py-14">
-          <Link
-            href="/"
-            className="inline-flex items-center gap-2 text-xs text-[#888] hover:text-[#0d0d0d] uppercase tracking-[0.15em] font-bold mb-6"
-          >
-            &larr; Back to home
-          </Link>
+          {fromShirt ? (
+            <Link
+              href={`/children/${fromShirt}`}
+              className="inline-flex items-center gap-2 text-xs text-[#888] hover:text-[#0d0d0d] uppercase tracking-[0.15em] font-bold mb-6"
+            >
+              &larr; Back to {fromName ? fromName : `#${fromShirt}`}
+            </Link>
+          ) : (
+            <Link
+              href="/"
+              className="inline-flex items-center gap-2 text-xs text-[#888] hover:text-[#0d0d0d] uppercase tracking-[0.15em] font-bold mb-6"
+            >
+              &larr; Back to home
+            </Link>
+          )}
 
           {/* Hero: photo + name + facts */}
           <div className="grid md:grid-cols-2 gap-8 md:gap-12 items-start">

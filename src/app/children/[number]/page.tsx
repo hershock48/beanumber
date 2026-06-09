@@ -1598,7 +1598,11 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
             file. Departed kids skip this too — their page is about
             them, not a directory. */}
         {!child.departed_at && (
-          <OtherKidsAtCampus currentRecordId={child.record_id} />
+          <OtherKidsAtCampus
+            currentRecordId={child.record_id}
+            currentShirtNumber={Number(number)}
+            currentFirstName={firstName}
+          />
         )}
 
         {/* ── Kids you've met ──
