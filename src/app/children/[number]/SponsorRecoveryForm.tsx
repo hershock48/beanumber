@@ -72,7 +72,7 @@ export function SponsorRecoveryForm({
     return (
       <div className="bg-[#1a1208] text-white p-6 md:p-7">
         <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-3">
-          Already sponsoring?
+          Sponsoring monthly?
         </p>
         <p
           className="text-2xl md:text-3xl mb-3 leading-tight"
@@ -156,7 +156,7 @@ export function SponsorRecoveryForm({
       </p>
       <p className="text-[#d8cfc1] text-sm leading-relaxed mb-5">
         We&rsquo;ll send a one-tap link. Click it and you&rsquo;re signed
-        in. If you&rsquo;re already sponsoring, nothing about your
+        in. If you already sponsor monthly, nothing about your
         sponsorship changes &mdash; same card, same monthly, same kid.
         If #{shirtNumber} is still open, signing in is how you take it.
       </p>

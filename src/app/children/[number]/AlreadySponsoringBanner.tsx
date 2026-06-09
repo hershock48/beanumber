@@ -117,7 +117,7 @@ export function AlreadySponsoringBanner({
       <div className="relative max-w-5xl mx-auto px-5 py-2.5 flex items-center justify-between gap-3 z-10">
         <p className="text-sm leading-tight flex-1 min-w-0">
           <span className="text-[#D4A843] font-bold uppercase tracking-wider text-xs mr-2">
-            Already sponsoring?
+            Sponsoring monthly?
           </span>
           <Link
             href={`/signin?n=${shirtNumber}`}

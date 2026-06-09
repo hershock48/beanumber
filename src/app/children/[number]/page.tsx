@@ -1554,7 +1554,7 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
                     new device. Quiet, not pushy — points them to the
                     Sign in button in the top nav. */}
                 <p className="text-center text-xs text-[#666] border-t border-[#e8e0d4] pt-4">
-                  Already sponsoring? Your sponsorship is intact —
+                  Sponsoring monthly? Your sponsorship is intact —
                   tap <span className="font-bold">Sign in</span> at the top
                   of the page to see your view.
                 </p>
