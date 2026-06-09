@@ -122,30 +122,28 @@ export function SignInModal({
 
   return (
     <div
-      className="fixed inset-0 z-[1000] overflow-y-auto"
+      className="fixed inset-0 z-[1000] flex items-end md:items-center justify-center"
       role="dialog"
       aria-modal="true"
       aria-labelledby="signin-modal-title"
     >
-      {/* Scrim — full-viewport, sticky to scroll container */}
+      {/* Scrim — covers everything behind the dialog */}
       <div
-        className="fixed inset-0 bg-black/75 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/75 backdrop-blur-sm"
         onClick={onClose}
         aria-hidden="true"
       />
 
-      {/* Centering wrapper — flex on desktop (centered), top-anchored
-          on mobile so the modal sits at the top of the viewport even
-          when the keyboard opens. min-h-full forces the inner box to
-          fit the scroll container so scrolling works when content
-          exceeds viewport height. */}
-      <div className="relative min-h-full flex items-start md:items-center justify-center p-4 md:p-6">
-        {/* Dialog */}
-        <div
-          ref={dialogRef}
-          className="relative bg-[#1a1208] text-white w-full max-w-md p-6 md:p-8 shadow-2xl my-4 md:my-0"
-          style={{ animation: 'signInIn 280ms cubic-bezier(0.22, 1, 0.36, 1) both' }}
-        >
+      {/* Dialog — bottom sheet on mobile (slides up from the bottom,
+          like a native iOS sheet so the keyboard interacts cleanly),
+          centered modal on desktop. Internal scrolling for tall
+          content. The outer flex centers/aligns; this is the actual
+          surface the user reads from. */}
+      <div
+        ref={dialogRef}
+        className="relative z-10 bg-[#1a1208] text-white w-full md:max-w-md md:mx-4 p-6 md:p-8 shadow-2xl max-h-[92vh] overflow-y-auto"
+        style={{ animation: 'signInIn 280ms cubic-bezier(0.22, 1, 0.36, 1) both' }}
+      >
         <style>{`
           @keyframes signInIn {
             0% { opacity: 0; transform: translateY(20px) scale(0.97); }
@@ -285,7 +283,6 @@ export function SignInModal({
             </p>
           </form>
         )}
-        </div>
       </div>
     </div>
   );
