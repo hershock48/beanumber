@@ -26,7 +26,7 @@ export const metadata: Metadata = {
     shortcut: '/favicon.ico',
     apple: '/apple-icon.png',
   },
-  description: "Every Be A Number shirt carries a unique number connected to a real child in Africa. Find your number, meet your child, become their sponsor.",
+  description: "Every Be A Number Shirt carries a unique Number connected to a real Child in Africa. Find your Number, meet your Child, become their sponsor.",
   keywords: ["child sponsorship", "Africa", "Northern Uganda", "nonprofit", "Be A Number", "sponsor a child", "education", "community development"],
   authors: [{ name: "Be A Number, International" }],
   creator: "Be A Number, International",
@@ -37,7 +37,7 @@ export const metadata: Metadata = {
     url: "https://www.beanumber.org",
     siteName: "Be A Number",
     title: "Be A Number | Every Number Is a Child",
-    description: "Every Be A Number shirt carries a unique number connected to a real child in Africa. Find your number, meet your child, become their sponsor.",
+    description: "Every Be A Number Shirt carries a unique Number connected to a real Child in Africa. Find your Number, meet your Child, become their sponsor.",
     images: [
       {
         url: "/images/homepage/hero-community-group.jpg",

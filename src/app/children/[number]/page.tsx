@@ -781,18 +781,18 @@ export async function generateMetadata({ params }: ChildPageProps) {
   return {
     title: 'Be A Number · Meet your child',
     description:
-      'A real child at YDO in Gulu, Uganda. Enter your shirt number to meet them and keep their story going for $25/month.',
+      'A real Child at YDO in Gulu, Uganda. Enter your Shirt Number to meet them and keep their story going for $25/month.',
     openGraph: {
       title: 'Be A Number',
       description:
-        'A real child at YDO in Gulu, Uganda. Enter your shirt number to meet them.',
+        'A real Child at YDO in Gulu, Uganda. Enter your Shirt Number to meet them.',
       images: undefined,
     },
     twitter: {
       card: 'summary',
       title: 'Be A Number',
       description:
-        'A real child at YDO in Gulu, Uganda. Enter your shirt number to meet them.',
+        'A real Child at YDO in Gulu, Uganda. Enter your Shirt Number to meet them.',
     },
   };
 }
@@ -839,7 +839,7 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
             </h1>
 
             <p className="text-lg text-[#666] leading-relaxed max-w-xl mx-auto mb-4">
-              Double-check your shirt tag &mdash; the number is printed on the inside label.
+              Double-check your Shirt tag &mdash; the Number is printed on the back.
               If you&rsquo;re sure it&rsquo;s #{number}, reach out and we&rsquo;ll sort it out.
             </p>
 

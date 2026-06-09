@@ -92,7 +92,7 @@ export default function Founder() {
             </p>
 
             <p className="text-[#555] leading-relaxed text-lg">
-              The model was simple. Each shirt was numbered, and each number was linked to a place where he&rsquo;d given a shirt away: a homeless shelter in Detroit, Pine Ridge, the Dominican Republic. You could look up your number and see who was on the other side of it. He spent those years traveling, handing shirts out, meeting people in the poorest parts of the hemisphere. It was joyful work, and it worked. But he wanted the connection to go deeper still.
+              The model was simple. Each Shirt was numbered, and each Number was linked to a place where he&rsquo;d given a Shirt away: a homeless shelter in Detroit, Pine Ridge, the Dominican Republic. You could look up your Number and see who was on the other side of it. He spent those years traveling, handing Shirts out, meeting people in the poorest parts of the hemisphere. It was joyful work, and it worked. But he wanted the connection to go deeper still.
             </p>
 
             <p className="text-[#555] leading-relaxed text-lg">
@@ -100,7 +100,7 @@ export default function Founder() {
             </p>
 
             <p className="text-[#555] leading-relaxed text-lg">
-              In 2011 he flew to Northern Uganda alone, following an invitation from two Kenyan missionaries opening a school in the post-war zone. The plan was to extend the shirt model: numbers linked to children in their school, a shirt sold in America sending a child to class in Uganda. A month in, the American partner pulled out of the arrangement. Kevin fasted for the first time in his life, prayed, and stayed.
+              In 2011 he flew to Northern Uganda alone, following an invitation from two Kenyan missionaries opening a school in the post-war zone. The plan was to extend the Shirt model: Numbers linked to Children in their school, a Shirt sold in America sending a Child to class in Uganda. A month in, the American partner pulled out of the arrangement. Kevin fasted for the first time in his life, prayed, and stayed.
             </p>
 
             <p className="text-[#555] leading-relaxed text-lg">
@@ -120,7 +120,7 @@ export default function Founder() {
             </p>
 
             <p className="text-[#555] leading-relaxed text-lg">
-              Fifteen years after that first arrangement fell through, Be A Number runs its own school on its own campus, and the original idea, a numbered shirt linked to a specific child&rsquo;s tuition, is finally what it was meant to be. Kevin came back to the plan he arrived with in 2011. The ground is Simon&rsquo;s.
+              Fifteen years after that first arrangement fell through, Be A Number runs its own school on its own campus, and the original idea, a numbered Shirt linked to a specific Child&rsquo;s tuition, is finally what it was meant to be. Kevin came back to the plan he arrived with in 2011. The ground is Simon&rsquo;s.
             </p>
 
             <p className="text-[#555] leading-relaxed text-lg">
@@ -206,7 +206,7 @@ export default function Founder() {
             </p>
 
             <p className="text-[#555] leading-relaxed text-lg">
-              The shirts, the numbers, the sponsorship model: all of it exists to keep that bridge open and give people in the U.S. a tangible, personal connection to a child whose community is still recovering from a war most Americans have never heard of.
+              The Shirts, the Numbers, the sponsorship model: all of it exists to keep that bridge open and give people in the U.S. a tangible, personal connection to a Child whose community is still recovering from a war most Americans have never heard of.
             </p>
           </div>
 

@@ -290,11 +290,11 @@ function SponsorshipPageContent() {
           >
             {focusedChild
               ? `Stay in ${focusedChild.displayName.split(' ')[0]}\u2019s life.`
-              : 'Pick a number. Stay in their life.'}
+              : 'Pick a Number. Stay in their life.'}
           </h1>
           <p className="text-lg text-[#777] max-w-2xl mx-auto leading-relaxed">
             {focusedChild && referringShirtSessionId
-              ? `Your shirt started ${focusedChild.displayName.split(' ')[0]}\u2019s year at the campus. $25/month finishes it. Cancel anytime.`
+              ? `Your Shirt started ${focusedChild.displayName.split(' ')[0]}\u2019s year at the campus. $25/month finishes it. Cancel anytime.`
               : '$25 a month supports school, daily meals, medical care, and a personal mentor at the YDO campus in Northern Uganda. You\u2019ll know your matched child by name, see their face, and follow their year.'}
           </p>
         </div>
@@ -748,8 +748,8 @@ function SponsorshipPageContent() {
                 a: 'That\u2019s the model. It costs more than $25/month to fully support a child\u2019s education, meals, and medical care at the campus. We set the price at $25 because it\u2019s accessible, and we match multiple sponsors per child until the campus is fully funded. Every child at the campus is enrolled and cared for regardless of how many sponsors they have on paper. Your $25 isn\u2019t the difference between a child going to school or not. It\u2019s part of the team that makes it possible.',
               },
               {
-                q: 'Do I need to buy a shirt first?',
-                a: 'No. The shirt is one way in. You can also sponsor directly from this page. If you did buy a shirt, it started your matched child\u2019s year at the campus and the number on the tag connects you to them. If you didn\u2019t, pick a child above and you\u2019re in the same place.',
+                q: 'Do I need to buy a Shirt first?',
+                a: 'No. The Shirt is one way in. You can also sponsor directly from this page. If you did buy a Shirt, it started your matched Child\u2019s year at the campus and the Number on the tag connects you to them. If you didn\u2019t, pick a Child above and you\u2019re in the same place.',
               },
               {
                 q: 'What makes this different from other child sponsorship programs?',

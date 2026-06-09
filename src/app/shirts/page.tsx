@@ -3,7 +3,7 @@ import ShirtsPageContent from './ShirtsPageContent';
 
 export const metadata = {
   title: 'Shirts | Be A Number',
-  description: 'Every shirt has a number. Heavyweight blanks. Handmade to order. Your number belongs to a real child.',
+  description: 'Every Shirt has a Number. Heavyweight blanks. Handmade to order. Your Number belongs to a real Child.',
 };
 
 const faqJsonLd = {
@@ -12,10 +12,10 @@ const faqJsonLd = {
   mainEntity: [
     {
       '@type': 'Question',
-      name: 'What actually happens when I buy a shirt?',
+      name: 'What actually happens when I buy a Shirt?',
       acceptedAnswer: {
         '@type': 'Answer',
-        text: 'Your order number becomes your shirt number, and that number belongs to a real child enrolled in our program in Northern Uganda. When your shirt arrives, you\'ll come back to the site, enter your number, and meet them. $25 starts their year at the YDO campus — school, meals, medical care. $25/month finishes it.',
+        text: 'Your order number becomes your Shirt Number, and that Number belongs to a real Child enrolled in our program in Northern Uganda. When your Shirt arrives, you\'ll come back to the site, enter your Number, and meet them. $25 starts their year at the YDO campus — school, meals, medical care. $25/month finishes it.',
       },
     },
     {
@@ -28,10 +28,10 @@ const faqJsonLd = {
     },
     {
       '@type': 'Question',
-      name: 'Can I pick my number?',
+      name: 'Can I pick my Number?',
       acceptedAnswer: {
         '@type': 'Answer',
-        text: 'No. Numbers are assigned in order so every child gets matched, not just the ones with the best photos. Your number isn\'t random — it\'s someone\'s name waiting to be learned.',
+        text: 'No. Numbers are assigned in order so every Child gets matched, not just the ones with the best photos. Your Number isn\'t random — it\'s someone\'s name waiting to be learned.',
       },
     },
     {

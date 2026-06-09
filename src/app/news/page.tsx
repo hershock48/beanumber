@@ -48,7 +48,7 @@ export default async function NewsPage() {
           header so it catches them before they invest in the read. */}
       <div className="bg-white border-y border-[#e8e0d4]">
         <div className="max-w-5xl mx-auto px-5 py-2.5 flex items-center justify-center gap-2 flex-wrap text-sm text-[#444]">
-          <span>Don&rsquo;t have your shirt yet?</span>
+          <span>Don&rsquo;t have your Shirt yet?</span>
           <Link
             href="/shirts"
             className="font-bold text-[#D4A843] hover:text-[#0d0d0d] transition-colors"
@@ -123,21 +123,21 @@ export default async function NewsPage() {
             className="block bg-white border border-[#e8e0d4] p-6 md:p-7 hover:border-[#D4A843] transition-colors group"
           >
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-2">
-              Be a number
+              Be a Number
             </p>
             <p
               className="text-xl text-[#0d0d0d] leading-snug mb-2"
               style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
             >
-              Get a shirt. Meet your kid.
+              Get a Shirt. Meet your kid.
             </p>
             <p className="text-sm text-[#666] leading-relaxed mb-3">
-              Every shirt has a number printed on the back. That
-              number belongs to a real kid at the campus. Yours
-              becomes yours when the shirt arrives.
+              Every Shirt has a Number printed on the back. That
+              Number belongs to a real kid at the campus. Yours
+              becomes yours when the Shirt arrives.
             </p>
             <p className="text-sm font-bold text-[#D4A843] group-hover:text-[#0d0d0d] transition-colors">
-              Shop the shirts →
+              Shop the Shirts →
             </p>
           </Link>
 

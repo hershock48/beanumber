@@ -86,9 +86,9 @@ export default function DonateSuccess() {
                   I
                 </span>
                 <p className="text-[#666] text-sm leading-relaxed">
-                  <a href="/shirts" className="text-[#0d0d0d] font-semibold underline hover:text-[#D4A843] transition-colors">Buy a shirt.</a>{' '}
-                  Every shirt is tied to a specific child. When yours arrives,
-                  enter the number at beanumber.org and meet them.
+                  <a href="/shirts" className="text-[#0d0d0d] font-semibold underline hover:text-[#D4A843] transition-colors">Buy a Shirt.</a>{' '}
+                  Every Shirt is tied to a specific Child. When yours arrives,
+                  enter the Number at beanumber.org and meet them.
                 </p>
               </div>
               <div className="flex gap-4 items-start">

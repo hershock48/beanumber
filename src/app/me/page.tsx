@@ -204,18 +204,18 @@ export default async function MePage() {
               style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
             >
               You&rsquo;re signed in, but you don&rsquo;t own any
-              numbers yet.
+              Numbers yet.
             </p>
             <p className="text-[#666] mb-6 max-w-md mx-auto">
-              Get a shirt, and the number on the back becomes yours.
-              Or sponsor a kid directly without a shirt.
+              Get a Shirt, and the Number on the back becomes yours.
+              Or sponsor a kid directly without a Shirt.
             </p>
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
               <Link
                 href="/shirts"
                 className="px-6 py-3 bg-[#D4A843] hover:bg-[#c49a3a] text-[#0d0d0d] text-xs font-bold uppercase tracking-wider transition-colors"
               >
-                Shop the shirts
+                Shop the Shirts
               </Link>
               <Link
                 href="/sponsorship"

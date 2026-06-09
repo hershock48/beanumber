@@ -82,12 +82,12 @@ export function ClaimThisNumberCard({
         >
           {viewerLooksLikeBuyer
             ? `You bought #${shirtNumber}. Claim it.`
-            : `Got a shirt with #${shirtNumber}?`}
+            : `Got a Shirt with #${shirtNumber}?`}
         </p>
         <p className="text-[#d8cfc1] text-sm md:text-base leading-relaxed mb-5">
           {viewerLooksLikeBuyer
             ? `Sign in to lock #${shirtNumber} in as yours. Every update from ${firstName}'s campus comes back to this page — no payment, no password.`
-            : `If you got a shirt with this number on the back, sign in and #${shirtNumber} is yours. We'll remember you on this device for 30 days. No payment, no password.`}
+            : `If you got a Shirt with this Number on the back, sign in and #${shirtNumber} is yours. We'll remember you on this device for 30 days. No payment, no password.`}
         </p>
         <div className="flex flex-col sm:flex-row sm:items-center gap-3">
           <Link

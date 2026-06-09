@@ -203,7 +203,7 @@ export async function OtherKidsAtCampus({
           Meet someone else.
         </h2>
         <p className="text-center text-sm text-[#666] mb-8 md:mb-10 max-w-md mx-auto">
-          Your shirt put you in this campus. The relationships are real,
+          Your Shirt put you in this campus. The relationships are real,
           and they aren&rsquo;t locked to one kid.
         </p>
 

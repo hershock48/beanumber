@@ -41,7 +41,7 @@ export function SignInForm() {
     const n = trimmed ? parseInt(trimmed, 10) : undefined;
     if (trimmed && (!Number.isFinite(n) || (n as number) < 1)) {
       setState('error');
-      setErrorMessage('That doesn’t look like a shirt number.');
+      setErrorMessage('That doesn’t look like a Shirt Number.');
       return;
     }
     setState('sending');
@@ -154,7 +154,7 @@ export function SignInForm() {
 
         <label className="block mb-6">
           <span className="text-xs font-bold uppercase tracking-wider text-[#0d0d0d] mb-1.5 block">
-            Shirt number{' '}
+            Shirt Number{' '}
             <span className="text-[#888] font-normal normal-case tracking-normal">
               (optional)
             </span>

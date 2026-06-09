@@ -17,8 +17,8 @@ export function BANFooter() {
               </span>
             </div>
             <p className="text-sm leading-relaxed">
-              Every number is a child.<br />
-              Every shirt starts a story.
+              Every Number is a Child.<br />
+              Every Shirt starts a story.
             </p>
           </div>
 
