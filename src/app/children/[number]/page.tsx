@@ -19,6 +19,7 @@ import {
 import { SponsorRecoveryForm } from './SponsorRecoveryForm';
 import { OtherKidsAtCampus } from './OtherKidsAtCampus';
 import { ClaimThisNumberCard } from './ClaimThisNumberCard';
+import { AlreadySponsoringBanner } from './AlreadySponsoringBanner';
 import { RecentKidsTracker } from '@/components/RecentKidsTracker';
 import { RecentKidsStrip } from '@/components/RecentKidsStrip';
 import { SESSION } from '@/lib/constants';
@@ -31,7 +32,7 @@ export const revalidate = 0;
 
 interface ChildPageProps {
   params: Promise<{ number: string }>;
-  searchParams?: Promise<{ gift?: string; from?: string }>;
+  searchParams?: Promise<{ gift?: string; from?: string; just_signed_in?: string }>;
 }
 
 interface AirtableChildRecord {
@@ -801,6 +802,11 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
   const sp = searchParams ? await searchParams : {};
   const isGiftReveal = sp?.gift === 'true' || sp?.gift === '1';
   const gifterFromQuery = (sp?.from || '').toString().trim().slice(0, 80);
+  /** True for the redirect from the magic-link callback — used to
+      switch the Holder/Sponsor view copy from "Welcome back" to
+      "You own #N now" on the first sign-in. The flag only lasts for
+      this single render; subsequent navigations don't carry it. */
+  const justSignedIn = sp?.just_signed_in === '1';
   const num = parseInt(number, 10);
   // Treat non-numeric input the same as "not found" — show the friendly page,
   // not a hard 404 that makes people think the site is broken.
@@ -1063,6 +1069,15 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
       <RevealBeacon number={Number(number)} />
 
       <BANNavigation currentPath={'/children/' + number} />
+
+      {/* Already-sponsoring banner — slim, dismissible, only shown to
+          unsigned visitors (sponsors and holders already see their
+          acknowledgment further down; this is the off-ramp for the
+          existing-sponsor-on-new-device case who would otherwise
+          panic at the public view). */}
+      {!child.viewer_is_sponsor && !child.viewer_is_holder && (
+        <AlreadySponsoringBanner shirtNumber={Number(number)} />
+      )}
 
       {/* Replacement chooser short-circuit. When the sponsor's
           original kid has departed and we've staged 3 candidates,
@@ -1407,7 +1422,7 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
                  because they're already paying it. */
               <div className="bg-white border-2 border-[#D4A843]/30 p-7">
                 <p className="text-xs font-bold uppercase tracking-[0.25em] text-[#D4A843] mb-3">
-                  Signed in
+                  {justSignedIn ? 'Welcome' : 'Signed in'}
                 </p>
                 <p
                   className="text-2xl md:text-[28px] text-[#0d0d0d] mb-3 leading-tight"
@@ -1436,16 +1451,19 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
             ) : child.viewer_is_holder ? (
               /* Holder: they own this number but aren't paying monthly.
                  Acknowledge them by name, no aggressive ask, soft
-                 upsell to monthly. */
+                 upsell to monthly. Copy switches between first-time
+                 ("you own #N now") and returning ("welcome back"). */
               <div className="bg-white border-2 border-[#D4A843]/30 p-7">
                 <p className="text-xs font-bold uppercase tracking-[0.25em] text-[#D4A843] mb-3">
-                  Signed in
+                  {justSignedIn ? 'You own this number' : 'Signed in'}
                 </p>
                 <p
                   className="text-2xl md:text-[28px] text-[#0d0d0d] mb-3 leading-tight"
                   style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
                 >
-                  Welcome back. {firstName} is yours.
+                  {justSignedIn
+                    ? `#${number} is yours. ${firstName} too.`
+                    : `Welcome back. ${firstName} is yours.`}
                 </p>
                 <p className="text-[#555] leading-relaxed mb-5">
                   You own this number. Every update from the campus,
@@ -1481,6 +1499,7 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
                   <ClaimThisNumberCard
                     shirtNumber={Number(number)}
                     firstName={firstName}
+                    viewerLooksLikeBuyer={viewerLooksLikeBuyer}
                   />
                 </div>
                 <div className="bg-[#FFF8F0] border-2 border-[#D4A843] p-7 shadow-sm">

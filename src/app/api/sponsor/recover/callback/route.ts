@@ -94,5 +94,11 @@ export async function GET(request: NextRequest) {
     }
   );
 
-  return NextResponse.redirect(`${SITE_URL}/children/${shirtNumber}`);
+  // ?just_signed_in=1 lets the kid page distinguish "first sign-in"
+  // from "returning visit." First-time claimers see "You own #N now";
+  // returning sponsors see "Welcome back." The kid page reads the
+  // param and renders accordingly.
+  return NextResponse.redirect(
+    `${SITE_URL}/children/${shirtNumber}?just_signed_in=1`
+  );
 }

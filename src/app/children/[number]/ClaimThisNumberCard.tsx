@@ -33,9 +33,14 @@ import Link from 'next/link';
 export function ClaimThisNumberCard({
   shirtNumber,
   firstName,
+  viewerLooksLikeBuyer,
 }: {
   shirtNumber: number;
   firstName: string;
+  /** True when we detect a ban_buyer_session cookie matching a recent
+      shirt purchase. Raises the confidence of the prompt — instead of
+      asking "is this yours?" we tell them "you bought this." */
+  viewerLooksLikeBuyer?: boolean;
 }) {
   const [dismissed, setDismissed] = useState(false);
   const [visible, setVisible] = useState(false);
@@ -69,25 +74,29 @@ export function ClaimThisNumberCard({
         aria-hidden={!visible}
       >
         <p className="text-xs font-bold uppercase tracking-[0.25em] text-[#D4A843] mb-3">
-          Make it yours
+          {viewerLooksLikeBuyer ? 'Welcome back' : 'Make it yours'}
         </p>
         <p
           className="text-2xl md:text-[28px] mb-3 leading-tight"
           style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
         >
-          You just met {firstName}. Make #{shirtNumber} yours.
+          {viewerLooksLikeBuyer
+            ? `You bought #${shirtNumber}. Claim it.`
+            : `Got a shirt with #${shirtNumber}?`}
         </p>
         <p className="text-[#d8cfc1] text-sm md:text-base leading-relaxed mb-5">
-          Save your spot in {firstName}&rsquo;s story. We&rsquo;ll email
-          you a one-tap link. No payment, no password &mdash; a place
-          to come back to.
+          {viewerLooksLikeBuyer
+            ? `Sign in to lock #${shirtNumber} in as yours. Every update from ${firstName}'s campus comes back to this page — no payment, no password.`
+            : `If you got a shirt with this number on the back, sign in and #${shirtNumber} is yours. We'll remember you on this device for 30 days. No payment, no password.`}
         </p>
         <div className="flex flex-col sm:flex-row sm:items-center gap-3">
           <Link
             href={`/signin?n=${shirtNumber}`}
             className="inline-flex items-center justify-center bg-white hover:bg-[#f5f0e8] text-[#1a1208] text-xs font-bold uppercase tracking-wider px-5 py-3 transition-colors"
           >
-            Claim #{shirtNumber} &rarr;
+            {viewerLooksLikeBuyer
+              ? `Claim #${shirtNumber}`
+              : `Yes, claim #${shirtNumber}`} &rarr;
           </Link>
           <button
             type="button"
