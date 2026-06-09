@@ -127,13 +127,13 @@ export function HomePageContent() {
             className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl text-[#FFF8F0] mb-6 leading-tight tracking-tight"
             style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
           >
-            This number has a name.
+            This Number has a Name.
           </h1>
           <div className="mb-10" />
           <p className="text-lg md:text-xl text-[#FFF8F0]/70 mb-12 max-w-lg mx-auto leading-snug">
-            Every shirt has a number.<br />
-            Every number is a child.<br />
-            Find yours.
+            Every Shirt has a Number.<br />
+            Every Number is a Child.<br />
+            Find Yours.
           </p>
 
           <form onSubmit={handleSearch} className="flex max-w-md mx-auto shadow-2xl rounded-sm overflow-hidden">
@@ -141,7 +141,7 @@ export function HomePageContent() {
               type="text"
               value={searchNumber}
               onChange={e => setSearchNumber(e.target.value)}
-              placeholder="Your shirt number"
+              placeholder="Your Shirt Number"
               className="flex-1 px-6 py-4 text-base text-[#0d0d0d] bg-white placeholder-[#999] focus:outline-none"
             />
             <button
@@ -153,9 +153,9 @@ export function HomePageContent() {
           </form>
 
           <p className="text-sm text-[#FFF8F0]/40 mt-8">
-            {"Don't have a number yet? "}
+            {"Don't have a Number yet? "}
             <Link href="/shirts" className="text-[#D4A843]/80 underline underline-offset-2 hover:text-[#D4A843]">
-              Get a shirt
+              Get a Shirt
             </Link>
           </p>
         </div>
@@ -192,7 +192,7 @@ export function HomePageContent() {
             They have names and stories.
           </h2>
           <p className="text-[#777] max-w-lg mx-auto leading-relaxed text-lg">
-            Every number on every shirt belongs to a child like the ones below. Your shirt starts their year
+            Every Number on every Shirt belongs to a Child like the ones below. Your Shirt starts their year
             at the campus. Stay with them for $25/month to finish it &mdash; a monthly newsletter from the campus,
             photos of your matched child through the year, and a handwritten letter from them once a year.
           </p>
@@ -317,7 +317,7 @@ export function HomePageContent() {
               </div>
               <h3 className="text-lg font-semibold text-[#0d0d0d] mb-3">Get a Shirt</h3>
               <p className="text-[#777] text-sm leading-relaxed">
-                Every shirt has a number, and every number belongs to a child. $25 gets you the shirt and starts their year at the campus. Your number is assigned when you order.
+                Every Shirt has a Number, and every Number belongs to a Child. $25 gets you the Shirt and starts their year at the campus. Your Number is assigned when you order.
               </p>
             </div>
 
@@ -327,7 +327,7 @@ export function HomePageContent() {
               </div>
               <h3 className="text-lg font-semibold text-[#0d0d0d] mb-3">Meet Them</h3>
               <p className="text-[#777] text-sm leading-relaxed">
-                Come back here and enter your number. You&rsquo;ll see their face, learn their name, and read about who they are and what they dream about.
+                Come back here and enter your Number. You&rsquo;ll see their face, learn their name, and read about who they are and what they dream about.
               </p>
             </div>
 

@@ -40,21 +40,15 @@ export function BANNavigation({ currentPath = '/', transparent = false }: BANNav
       <div className="max-w-6xl mx-auto px-5 py-4">
         <div className="flex items-center justify-between">
           <Link href="/" className="flex items-center gap-3 group">
-            {/* Before scroll: full # mark. After scroll: extracted cross in gold */}
-            <div className="relative h-10 w-10">
-              <Logo
-                variant="micro"
-                className={`absolute inset-0 h-10 w-10 transition-all duration-500 ${
-                  scrolled ? 'opacity-0 scale-90' : 'opacity-100 scale-100'
-                } text-[#0d0d0d]`}
-              />
-              <Logo
-                variant="cross"
-                className={`absolute inset-0 h-10 w-10 transition-all duration-500 ${
-                  scrolled ? 'opacity-100 scale-100' : 'opacity-0 scale-110'
-                } text-[#D4A843]`}
-              />
-            </div>
+            {/* Primary # mark, near-black at rest, gold once scrolled.
+                Color transitions with the scroll state — same logo,
+                different tint. */}
+            <Logo
+              variant="micro"
+              className={`h-10 w-10 transition-colors duration-500 ${
+                scrolled ? 'text-[#D4A843]' : 'text-[#0d0d0d]'
+              }`}
+            />
             <span className="text-sm font-bold uppercase tracking-[0.2em] text-[#0d0d0d]">
               Be A Number
             </span>
