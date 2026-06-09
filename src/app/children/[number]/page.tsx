@@ -18,6 +18,7 @@ import {
 } from '@/lib/newsletter-feed';
 import { SponsorRecoveryForm } from './SponsorRecoveryForm';
 import { OtherKidsAtCampus } from './OtherKidsAtCampus';
+import { ClaimThisNumberCard } from './ClaimThisNumberCard';
 import { RecentKidsTracker } from '@/components/RecentKidsTracker';
 import { RecentKidsStrip } from '@/components/RecentKidsStrip';
 import { SESSION } from '@/lib/constants';
@@ -1410,12 +1411,20 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
               </div>
             ) : (
               /* Not authenticated for this kid.
-                 Sign-in lives in the top nav now ("Sign in" button →
-                 modal). The kid page is about the kid. We surface a
-                 tiny reminder below the sponsor CTA for existing
-                 sponsors who land here on a new device, so they know
-                 where to go without scaring them with a competing card. */
-              <div className="bg-[#FFF8F0] border-2 border-[#D4A843] p-7 shadow-sm">
+                 Conversion ladder: meet → know → CLAIM → stay. The
+                 claim card sits above the monthly sponsor card so
+                 the smallest commitment (sign in, save your spot) is
+                 the rung between meeting and sponsoring. Existing
+                 sponsors never see either card — their cookie matches
+                 and they're routed to the sponsor view above. */
+              <>
+                <div className="mb-4">
+                  <ClaimThisNumberCard
+                    shirtNumber={Number(number)}
+                    firstName={firstName}
+                  />
+                </div>
+                <div className="bg-[#FFF8F0] border-2 border-[#D4A843] p-7 shadow-sm">
                 {viewerLooksLikeBuyer ? (
                   <p
                     className="text-2xl text-[#0d0d0d] mb-4"
@@ -1472,6 +1481,7 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
                   of the page to see your view.
                 </p>
               </div>
+              </>
             )}
           </div>
         </div>
