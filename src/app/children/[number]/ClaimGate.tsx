@@ -148,58 +148,66 @@ export function ClaimGate({
   };
 
   return (
-    <>
-      {/* Claim panel sits as a normal block element ABOVE the blurred
-          bio. No absolute / sticky / fixed — keeps the gate strictly
-          section-scoped so nothing can ever overlay or push around
-          the hero photo + name above it. */}
-      {gateVisible && (
-        <div className="mt-8 md:mt-10 bg-[#1a1208] text-white p-6 md:p-7 shadow-xl">
-          <p className="text-xs font-bold uppercase tracking-[0.25em] text-[#D4A843] mb-3">
-            Welcome back
-          </p>
-          <p
-            className="text-2xl md:text-[28px] mb-3 leading-tight"
-            style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
-          >
-            You bought #{shirtNumber}. Claim it.
-          </p>
-          <p className="text-[#d8cfc1] text-sm md:text-base leading-relaxed mb-5 max-w-xl">
-            Lock #{shirtNumber} in as yours. Every update from{' '}
-            {firstName}&rsquo;s campus comes back to this page &mdash;
-            no payment, no password.
-          </p>
-          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-            <Link
-              href={`/signin?n=${shirtNumber}`}
-              className="inline-flex items-center justify-center bg-white hover:bg-[#f5f0e8] text-[#1a1208] text-xs font-bold uppercase tracking-wider px-5 py-3 transition-colors"
-            >
-              Claim #{shirtNumber} &rarr;
-            </Link>
-            <button
-              type="button"
-              onClick={handleDismiss}
-              className="text-xs text-[#d8cfc1]/80 hover:text-white underline px-3 py-2"
-            >
-              Maybe later
-            </button>
-          </div>
-        </div>
-      )}
-
+    <div className="relative">
       <div
         className="transition-[filter,opacity] duration-500"
         style={{
           filter: gateVisible ? 'blur(10px)' : 'none',
           opacity: gateVisible ? 0.55 : 1,
           pointerEvents: gateVisible ? 'none' : 'auto',
-          // Hide blurred content from assistive tech / selection.
+          // Hide content from assistive tech while the gate is up.
           ...(gateVisible ? { userSelect: 'none' as const } : {}),
         }}
         aria-hidden={gateVisible}
       >
         {children}
       </div>
-    </>
+
+      {gateVisible && (
+        <div className="absolute inset-x-0 top-0 z-30 flex justify-center px-5 pt-2 md:pt-4">
+          <div
+            className="relative bg-[#1a1208] text-white max-w-md w-full p-6 md:p-7 shadow-2xl"
+            style={{
+              // Stays visible as the user tries to scroll past it;
+              // the blurred content scrolls underneath, but the
+              // gate hangs around at the top of the viewport until
+              // they make a choice.
+              position: 'sticky',
+              top: 96,
+            }}
+          >
+            <p className="text-xs font-bold uppercase tracking-[0.25em] text-[#D4A843] mb-3">
+              Welcome back
+            </p>
+            <p
+              className="text-2xl md:text-[28px] mb-3 leading-tight"
+              style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
+            >
+              You bought #{shirtNumber}. Claim it.
+            </p>
+            <p className="text-[#d8cfc1] text-sm md:text-base leading-relaxed mb-5">
+              Lock #{shirtNumber} in as yours. Every update from{' '}
+              {firstName}&rsquo;s campus comes back to this page &mdash;
+              no payment, no password.
+            </p>
+            <div className="flex flex-col gap-2">
+              <Link
+                href={`/signin?n=${shirtNumber}`}
+                className="inline-flex items-center justify-center bg-white hover:bg-[#f5f0e8] text-[#1a1208] text-xs font-bold uppercase tracking-wider px-5 py-3 transition-colors"
+              >
+                Claim #{shirtNumber} &rarr;
+              </Link>
+              <button
+                type="button"
+                onClick={handleDismiss}
+                className="text-xs text-[#d8cfc1]/70 hover:text-white underline px-3 py-2 mt-1"
+              >
+                Maybe later
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
