@@ -165,29 +165,29 @@ export function SignInModal({
 
         {state === 'sent' ? (
           <>
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-2">
+            <p className="text-xs font-bold uppercase tracking-[0.25em] text-[#D4A843] mb-2">
               Check your email
             </p>
             <p
               id="signin-modal-title"
-              className="text-2xl md:text-3xl mb-3 leading-tight"
+              className="text-2xl md:text-[28px] mb-3 leading-tight"
               style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
             >
-              A one-tap link is on its way.
+              Link sent.
             </p>
-            <p className="text-[#d8cfc1] text-sm leading-relaxed">
-              Click it from any device to open your view of #{shirtNumber || 'your number'}.
-              The link expires in 30 minutes.
+            <p className="text-[#d8cfc1] text-sm md:text-base leading-relaxed">
+              Open the email and tap the button. You&rsquo;ll be signed in
+              on this device for 30 days. Link expires in 30 minutes.
             </p>
-            <p className="text-xs text-[#a89e8d] mt-4 leading-relaxed">
-              Nothing showing up after a minute? Email{' '}
+            <p className="text-xs text-[#a89e8d] mt-5 leading-relaxed">
+              Not showing up? Email{' '}
               <a
                 href="mailto:Kevin@beanumber.org"
                 className="text-[#D4A843] hover:underline"
               >
                 Kevin@beanumber.org
-              </a>{' '}
-              and I&rsquo;ll get you in.
+              </a>
+              .
             </p>
             <button
               type="button"
@@ -199,20 +199,19 @@ export function SignInModal({
           </>
         ) : (
           <form onSubmit={submit}>
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-2">
+            <p className="text-xs font-bold uppercase tracking-[0.25em] text-[#D4A843] mb-2">
               Sign in
             </p>
             <p
               id="signin-modal-title"
-              className="text-2xl md:text-3xl mb-3 leading-tight"
+              className="text-2xl md:text-[28px] mb-3 leading-tight"
               style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
             >
-              Welcome back.
+              Sign in to your view.
             </p>
-            <p className="text-[#d8cfc1] text-sm md:text-base leading-relaxed mb-5">
-              Already sponsoring? Your card, your monthly, and your
-              sponsorship stay exactly as they are. This just signs you in
-              &mdash; nothing changes, nothing to enter again.
+            <p className="text-[#d8cfc1] text-sm md:text-base leading-relaxed mb-6">
+              Enter your email. We&rsquo;ll send a one-tap link. Tap it
+              and you&rsquo;re in.
             </p>
 
             <label className="block mb-4">
@@ -234,7 +233,7 @@ export function SignInModal({
 
             <label className="block mb-5">
               <span className="text-xs font-bold uppercase tracking-wider text-[#d8cfc1] mb-1.5 block">
-                Your shirt number{' '}
+                Shirt number{' '}
                 <span className="text-[#a89e8d] font-normal normal-case tracking-normal">
                   (optional)
                 </span>
@@ -250,8 +249,8 @@ export function SignInModal({
                 disabled={state === 'sending'}
               />
               <span className="text-xs text-[#a89e8d] mt-1.5 block">
-                Leave blank if you don&rsquo;t remember &mdash; we&rsquo;ll
-                find your sponsorship by email and sign you in.
+                Skip it if you&rsquo;re a returning sponsor &mdash;
+                we&rsquo;ll find you by email.
               </span>
             </label>
 
@@ -260,7 +259,7 @@ export function SignInModal({
               disabled={!email || state === 'sending'}
               className="w-full px-5 py-3 bg-[#D4A843] hover:bg-[#c49a3a] text-[#0d0d0d] font-bold text-sm uppercase tracking-wider transition-colors disabled:opacity-50"
             >
-              {state === 'sending' ? 'Sending…' : 'Email me a sign-in link'}
+              {state === 'sending' ? 'Sending…' : 'Send link'}
             </button>
 
             {state === 'error' && (
@@ -268,18 +267,14 @@ export function SignInModal({
             )}
 
             <p className="text-xs text-[#a89e8d] mt-5 leading-relaxed">
-              New here? Same form. If {shirtNumber ? `#${shirtNumber}` : 'your number'} is still
-              open when you sign in, this is how you take it.
-            </p>
-            <p className="text-xs text-[#a89e8d] mt-2 leading-relaxed">
               Stuck? Email{' '}
               <a
                 href="mailto:Kevin@beanumber.org"
                 className="text-[#D4A843] hover:underline"
               >
                 Kevin@beanumber.org
-              </a>{' '}
-              and I&rsquo;ll sort it out.
+              </a>
+              .
             </p>
           </form>
         )}
