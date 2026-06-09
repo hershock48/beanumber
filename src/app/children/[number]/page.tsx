@@ -19,6 +19,7 @@ import {
 import { SponsorRecoveryForm } from './SponsorRecoveryForm';
 import { OtherKidsAtCampus } from './OtherKidsAtCampus';
 import { ClaimThisNumberCard } from './ClaimThisNumberCard';
+import { ClaimGate } from './ClaimGate';
 import { AlreadySponsoringBanner } from './AlreadySponsoringBanner';
 import { RecentKidsTracker } from '@/components/RecentKidsTracker';
 import { RecentKidsStrip } from '@/components/RecentKidsStrip';
@@ -1340,7 +1341,23 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
         {/* ── Below the photo+intro grid: bio on the left, CTA on the right.
             Same 2-column rhythm as the intro grid above it. Deep read
             and conversion ask sit side-by-side on desktop; stacks on
-            mobile. */}
+            mobile.
+
+            ClaimGate wraps this whole section. For buyers who haven't
+            claimed yet, after the reveal animation completes, the
+            gate blurs everything inside and overlays a "Claim it"
+            panel. For everyone else (recognized sponsors/holders,
+            cold visitors, claimed-or-dismissed buyers) the gate
+            short-circuits to passthrough — children render with no
+            wrapping element at all. */}
+        <ClaimGate
+          shirtNumber={Number(number)}
+          firstName={firstName}
+          viewerLooksLikeBuyer={viewerLooksLikeBuyer}
+          viewerIsRecognized={Boolean(
+            child.viewer_is_sponsor || child.viewer_is_holder
+          )}
+        >
         <div className="grid md:grid-cols-2 gap-5 md:gap-14 mt-10 md:mt-12 items-start">
           {/* LEFT — bio + teacher + story placeholder */}
           <div>
@@ -1488,20 +1505,15 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
               </div>
             ) : (
               /* Not authenticated for this kid.
-                 Conversion ladder: meet → know → CLAIM → stay. The
-                 claim card sits above the monthly sponsor card so
-                 the smallest commitment (sign in, save your spot) is
-                 the rung between meeting and sponsoring. Existing
-                 sponsors never see either card — their cookie matches
-                 and they're routed to the sponsor view above. */
+                 Conversion ladder: meet → know → CLAIM → stay.
+                 Buyers see a ClaimGate over the bio + this card
+                 (see ClaimGate wrapper around the parent grid). The
+                 ask below is the "stay with X" rung — buyers reach
+                 it after claiming or dismissing the gate; cold
+                 visitors reach it directly. The inline
+                 ClaimThisNumberCard used to sit above this card; the
+                 gate replaces it. */
               <>
-                <div className="mb-4">
-                  <ClaimThisNumberCard
-                    shirtNumber={Number(number)}
-                    firstName={firstName}
-                    viewerLooksLikeBuyer={viewerLooksLikeBuyer}
-                  />
-                </div>
                 <div className="bg-[#FFF8F0] border-2 border-[#D4A843] p-7 shadow-sm">
                 {viewerLooksLikeBuyer ? (
                   <p
@@ -1563,6 +1575,7 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
             )}
           </div>
         </div>
+        </ClaimGate>
 
         {/* ── Sponsor-only portal content (stats + latest update). The
             campus newsletter no longer renders here — it lives in
