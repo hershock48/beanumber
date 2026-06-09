@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Logo } from '@/components/Logo';
-import { SignInModal } from '@/components/SignInModal';
 
 interface BANNavigationProps {
   currentPath?: string;
@@ -13,7 +12,6 @@ interface BANNavigationProps {
 export function BANNavigation({ currentPath = '/', transparent = false }: BANNavigationProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
-  const [signInOpen, setSignInOpen] = useState(false);
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 20);
@@ -77,13 +75,16 @@ export function BANNavigation({ currentPath = '/', transparent = false }: BANNav
                 {link.label}
               </Link>
             ))}
-            <button
-              type="button"
-              onClick={() => setSignInOpen(true)}
-              className="text-xs font-bold uppercase tracking-[0.15em] text-[#888] hover:text-[#0d0d0d] transition-colors"
+            <Link
+              href="/signin"
+              className={`text-xs font-bold uppercase tracking-[0.15em] transition-colors ${
+                currentPath === '/signin'
+                  ? 'text-[#D4A843]'
+                  : 'text-[#888] hover:text-[#0d0d0d]'
+              }`}
             >
               Sign in
-            </button>
+            </Link>
             <Link
               href="/donate"
               className="px-5 py-2 bg-[#D4A843] text-[#0d0d0d] text-xs font-bold uppercase tracking-[0.15em] hover:bg-[#c49a3a] transition-colors"
@@ -130,16 +131,13 @@ export function BANNavigation({ currentPath = '/', transparent = false }: BANNav
                 {link.label}
               </Link>
             ))}
-            <button
-              type="button"
-              onClick={() => {
-                setMobileOpen(false);
-                setSignInOpen(true);
-              }}
-              className="block w-full text-left px-3 py-2.5 text-sm font-bold uppercase tracking-wider text-[#888] hover:text-[#0d0d0d] transition-colors"
+            <Link
+              href="/signin"
+              onClick={() => setMobileOpen(false)}
+              className="block px-3 py-2.5 text-sm font-bold uppercase tracking-wider text-[#888] hover:text-[#0d0d0d] transition-colors"
             >
               Sign in
-            </button>
+            </Link>
             <div className="px-3 pt-2">
               <Link
                 href="/donate"
@@ -152,7 +150,6 @@ export function BANNavigation({ currentPath = '/', transparent = false }: BANNav
           </div>
         )}
       </div>
-      <SignInModal open={signInOpen} onClose={() => setSignInOpen(false)} />
     </nav>
   );
 }

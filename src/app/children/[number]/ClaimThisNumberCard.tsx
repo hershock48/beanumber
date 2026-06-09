@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { SignInModal } from '@/components/SignInModal';
+import Link from 'next/link';
 
 /**
  * Post-reveal claim prompt on /[N].
@@ -37,7 +37,6 @@ export function ClaimThisNumberCard({
   shirtNumber: number;
   firstName: string;
 }) {
-  const [signInOpen, setSignInOpen] = useState(false);
   const [dismissed, setDismissed] = useState(false);
   const [visible, setVisible] = useState(false);
 
@@ -84,13 +83,12 @@ export function ClaimThisNumberCard({
           to come back to.
         </p>
         <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-          <button
-            type="button"
-            onClick={() => setSignInOpen(true)}
+          <Link
+            href={`/signin?n=${shirtNumber}`}
             className="inline-flex items-center justify-center bg-white hover:bg-[#f5f0e8] text-[#1a1208] text-xs font-bold uppercase tracking-wider px-5 py-3 transition-colors"
           >
             Claim #{shirtNumber} &rarr;
-          </button>
+          </Link>
           <button
             type="button"
             onClick={() => {
@@ -108,7 +106,6 @@ export function ClaimThisNumberCard({
           </button>
         </div>
       </div>
-      <SignInModal open={signInOpen} onClose={() => setSignInOpen(false)} />
     </>
   );
 }
