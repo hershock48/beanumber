@@ -30,8 +30,47 @@ export function AlreadySponsoringBanner({
   if (!hydrated || dismissed) return null;
 
   return (
-    <div className="bg-[#1a1208] text-white border-b border-[#D4A843]/40">
-      <div className="max-w-5xl mx-auto px-5 py-2.5 flex items-center justify-between gap-3">
+    <div className="relative bg-[#1a1208] text-white border-b border-[#D4A843]/40 overflow-hidden ban-banner-shimmer-host">
+      {/* Diagonal gold shimmer that sweeps across once on load (1s
+          delay) and again at 6s, then stops. Pure-CSS pseudo-element
+          via the .ban-banner-shimmer-host::after rule below. */}
+      <style>{`
+        @keyframes banBannerShimmer {
+          0% {
+            transform: translateX(-120%) skewX(-18deg);
+            opacity: 0;
+          }
+          15% { opacity: 1; }
+          85% { opacity: 1; }
+          100% {
+            transform: translateX(120%) skewX(-18deg);
+            opacity: 0;
+          }
+        }
+        .ban-banner-shimmer-host::after {
+          content: '';
+          position: absolute;
+          top: 0;
+          bottom: 0;
+          left: 0;
+          width: 35%;
+          background: linear-gradient(
+            90deg,
+            transparent 0%,
+            rgba(255, 230, 150, 0.0) 20%,
+            rgba(255, 230, 150, 0.55) 50%,
+            rgba(255, 230, 150, 0.0) 80%,
+            transparent 100%
+          );
+          pointer-events: none;
+          animation:
+            banBannerShimmer 1.6s ease-out 0.9s,
+            banBannerShimmer 1.6s ease-out 6.5s;
+          animation-fill-mode: both;
+          mix-blend-mode: screen;
+        }
+      `}</style>
+      <div className="relative max-w-5xl mx-auto px-5 py-2.5 flex items-center justify-between gap-3 z-10">
         <p className="text-sm leading-tight flex-1 min-w-0">
           <span className="text-[#D4A843] font-bold uppercase tracking-wider text-xs mr-2">
             Already sponsoring?
@@ -55,7 +94,7 @@ export function AlreadySponsoringBanner({
             setDismissed(true);
           }}
           aria-label="Dismiss"
-          className="text-[#a89e8d] hover:text-white transition-colors flex-shrink-0"
+          className="text-[#a89e8d] hover:text-white transition-colors flex-shrink-0 z-10 relative"
         >
           <svg
             width="16"
