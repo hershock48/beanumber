@@ -191,7 +191,12 @@ export async function OtherKidsAtCampus({
           {kids.map(kid => (
             <Link
               key={kid.recordId}
-              href={`/children/${kid.shirtNumber}`}
+              /* /meet/[childId] — numberless route. The shirt-number
+                 framing only applies when someone enters via their
+                 own number. In exploration, the kid IS the kid; no
+                 shirt number prominently displayed, no reveal ritual
+                 they didn't earn. See src/app/meet/[childId]/page.tsx. */
+              href={`/meet/${kid.recordId}`}
               className="group block bg-white border border-[#e8e0d4] hover:border-[#D4A843] transition-colors"
             >
               <div className="aspect-[4/5] bg-[#f5f0e8] overflow-hidden">
@@ -205,9 +210,6 @@ export async function OtherKidsAtCampus({
                 )}
               </div>
               <div className="p-3 md:p-4">
-                <p className="text-xs font-bold uppercase tracking-wider text-[#D4A843] mb-0.5">
-                  #{kid.shirtNumber}
-                </p>
                 <p
                   className="text-base md:text-lg text-[#0d0d0d] leading-tight mb-1"
                   style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
@@ -215,7 +217,7 @@ export async function OtherKidsAtCampus({
                   {kid.firstName}
                 </p>
                 {kid.gradeClass && (
-                  <p className="text-xs text-[#888] mb-2">
+                  <p className="text-xs text-[#888] mb-3">
                     {kid.gradeClass}
                   </p>
                 )}

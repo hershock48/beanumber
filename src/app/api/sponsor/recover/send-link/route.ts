@@ -42,7 +42,12 @@ const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.beanumber.org'
 
 const schema = z.object({
   email: z.string().email(),
-  shirtNumber: z.number().int().positive(),
+  // shirtNumber is now OPTIONAL. If supplied, we sign in / claim for
+  // that specific number. If not, we look up the email's most recent
+  // active Sponsorship and send the magic link for that one — making
+  // sign-in frictionless for returning sponsors who don't have their
+  // shirt number handy on a new device.
+  shirtNumber: z.number().int().positive().optional(),
 });
 
 function atHeaders() {
@@ -159,6 +164,71 @@ async function isChildAlreadyClaimedByOther(
 }
 
 /**
+ * Email-only sign-in fallback. Given a verified email with no shirt
+ * number, look up the most recent Active or Holder Sponsorship and
+ * return its sponsorCode + the shirt number of its linked child. This
+ * is what powers returning sponsors who don't have their number handy
+ * on a new device. Returns null if no matching sponsorship.
+ */
+async function findMostRecentSponsorshipByEmail(email: string): Promise<{
+  sponsorCode: string;
+  shirtNumber: number;
+  firstName: string;
+} | null> {
+  if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) return null;
+  const safe = email.toLowerCase().replace(/"/g, '\\"');
+  const formula = encodeURIComponent(
+    `AND(LOWER({SponsorEmail})="${safe}", OR({Status}="Active",{Status}="Holder"))`
+  );
+  try {
+    // Sort by SponsorshipStartDate descending so the most recently
+    // started sponsorship surfaces first. Tied dates: Airtable's
+    // record order tiebreaks.
+    const res = await fetch(
+      `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(
+        SPONSORSHIPS_TABLE
+      )}?filterByFormula=${formula}&sort[0][field]=SponsorshipStartDate&sort[0][direction]=desc&maxRecords=10`,
+      { headers: atHeaders(), cache: 'no-store' }
+    );
+    if (!res.ok) return null;
+    const data = await res.json();
+    const records: Array<{
+      id: string;
+      fields: {
+        SponsorCode?: string;
+        Children?: string[];
+      };
+    }> = data.records || [];
+    for (const sp of records) {
+      const sponsorCode = sp.fields?.SponsorCode;
+      const childRecordId = sp.fields?.Children?.[0];
+      if (!sponsorCode || !childRecordId) continue;
+      // Resolve the linked Child to its shirt number + first name.
+      const childRes = await fetch(
+        `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(
+          CHILDREN_TABLE
+        )}/${childRecordId}`,
+        { headers: atHeaders(), cache: 'no-store' }
+      );
+      if (!childRes.ok) continue;
+      const child = await childRes.json();
+      const cf = child.fields || {};
+      const shirtNumber = typeof cf.ShirtNumber === 'number' ? cf.ShirtNumber : null;
+      if (!shirtNumber) continue;
+      const firstName: string =
+        cf.FirstName ||
+        cf.DisplayName?.split(' ')[0] ||
+        'them';
+      return { sponsorCode, shirtNumber, firstName };
+    }
+    return null;
+  } catch (err) {
+    console.warn('[Recovery] Email-only lookup failed', err);
+    return null;
+  }
+}
+
+/**
  * Create a new Holder Sponsorship row for a first-time claim. Returns
  * the generated SponsorCode, or null if Airtable rejected the write.
  *
@@ -218,7 +288,69 @@ export async function POST(request: NextRequest) {
     if (!parsed.success) {
       return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
     }
-    const { email, shirtNumber } = parsed.data;
+    const { email } = parsed.data;
+    let shirtNumber = parsed.data.shirtNumber;
+
+    // EMAIL-ONLY SIGN-IN: no shirt number supplied. Look up the
+    // email's most recent active Sponsorship and mint a link for it.
+    // This is the returning-sponsor-on-a-new-device path — they don't
+    // need to remember which number is theirs.
+    if (!shirtNumber) {
+      const found = await findMostRecentSponsorshipByEmail(email);
+      if (!found) {
+        // No existing sponsorship found, and we have no shirt number
+        // to claim with. Return privacy success.
+        console.log(`[Recovery] No existing sponsorship for ${email} (email-only); nothing to send.`);
+        return NextResponse.json(responseShape);
+      }
+      // We have a valid sponsor — build the link directly. Skip the
+      // child-lookup + create-Holder paths below since we already have
+      // sponsorCode + shirtNumber.
+      try {
+        const token = makeRecoveryToken(found.sponsorCode, found.shirtNumber);
+        const callbackUrl = `${SITE_URL}/api/sponsor/recover/callback?t=${encodeURIComponent(token)}`;
+        const fromEmail = process.env.SENDGRID_FROM_EMAIL || 'Kevin@beanumber.org';
+        const html = `
+          <!DOCTYPE html>
+          <html>
+            <head>
+              <meta charset="utf-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            </head>
+            <body style="font-family: Georgia, 'Times New Roman', serif; line-height: 1.7; color: #333; max-width: 560px; margin: 0 auto; padding: 30px 20px;">
+              <p style="margin-top: 0;">Hey there,</p>
+              <p>
+                You asked to sign in to your view on
+                <a href="https://www.beanumber.org" style="color: #D4A843; font-weight: bold;">beanumber.org</a>.
+                Tap the button below and you&rsquo;re in — landing on ${found.firstName}&rsquo;s page (your most recent sponsorship). From there you can hop to any of your kids via the &ldquo;Your kids&rdquo; link in the nav.
+              </p>
+              <p style="text-align: center; margin: 28px 0;">
+                <a href="${callbackUrl}" style="display: inline-block; background: #D4A843; color: #0d0d0d; font-weight: bold; text-decoration: none; padding: 14px 32px; font-size: 15px; letter-spacing: 0.05em; text-transform: uppercase;">
+                  Sign in
+                </a>
+              </p>
+              <p style="color: #888; font-size: 13px;">
+                Link expires in 30 minutes. Nothing about your sponsorship changes.
+              </p>
+              <hr style="border: none; border-top: 1px solid #e8e0d4; margin: 24px 0;">
+              <p style="font-size: 12px; color: #999; line-height: 1.5;">
+                Be A Number, International<br>
+                <a href="https://www.beanumber.org" style="color: #D4A843;">beanumber.org</a>
+              </p>
+            </body>
+          </html>
+        `;
+        await sendEmail({
+          to: { email, name: '' },
+          from: { email: fromEmail, name: 'Be A Number' },
+          subject: `Your sign-in link`,
+          html,
+        });
+      } catch (err) {
+        console.error('[Recovery] Email-only path failed to send', err);
+      }
+      return NextResponse.json(responseShape);
+    }
 
     // 1. Resolve the kid for this shirt number.
     const child = await lookupChild(shirtNumber);

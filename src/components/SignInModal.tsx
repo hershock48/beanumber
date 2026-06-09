@@ -83,10 +83,16 @@ export function SignInModal({
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!email || state === 'sending') return;
-    const n = parseInt(shirtNumber, 10);
-    if (!Number.isFinite(n) || n < 1) {
+    // Shirt number is now OPTIONAL. If supplied, we sign in for that
+    // number (or claim it if open). If blank, the server looks up the
+    // email's most recent active sponsorship and lands them on that
+    // kid's page. Returning sponsors don't need to remember their
+    // number on a new device.
+    const trimmed = shirtNumber.trim();
+    const n = trimmed ? parseInt(trimmed, 10) : undefined;
+    if (trimmed && (!Number.isFinite(n) || (n as number) < 1)) {
       setState('error');
-      setErrorMessage('Type the number on the back of your shirt.');
+      setErrorMessage('That doesn’t look like a shirt number.');
       return;
     }
     setState('sending');
@@ -95,7 +101,9 @@ export function SignInModal({
       const res = await fetch('/api/sponsor/recover/send-link', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, shirtNumber: n }),
+        body: JSON.stringify(
+          n ? { email, shirtNumber: n } : { email }
+        ),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => null);
@@ -222,12 +230,14 @@ export function SignInModal({
 
             <label className="block mb-5">
               <span className="text-xs font-bold uppercase tracking-wider text-[#d8cfc1] mb-1.5 block">
-                Your shirt number
+                Your shirt number{' '}
+                <span className="text-[#a89e8d] font-normal normal-case tracking-normal">
+                  (optional)
+                </span>
               </span>
               <input
                 type="number"
                 inputMode="numeric"
-                required
                 value={shirtNumber}
                 onChange={e => setShirtNumber(e.target.value.replace(/[^0-9]/g, ''))}
                 placeholder="e.g. 38"
@@ -236,13 +246,14 @@ export function SignInModal({
                 disabled={state === 'sending'}
               />
               <span className="text-xs text-[#a89e8d] mt-1.5 block">
-                The number printed on the back of your shirt.
+                Leave blank if you don&rsquo;t remember &mdash; we&rsquo;ll
+                find your sponsorship by email and sign you in.
               </span>
             </label>
 
             <button
               type="submit"
-              disabled={!email || !shirtNumber || state === 'sending'}
+              disabled={!email || state === 'sending'}
               className="w-full px-5 py-3 bg-[#D4A843] hover:bg-[#c49a3a] text-[#0d0d0d] font-bold text-sm uppercase tracking-wider transition-colors disabled:opacity-50"
             >
               {state === 'sending' ? 'Sending…' : 'Email me a sign-in link'}
