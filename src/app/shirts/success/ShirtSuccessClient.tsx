@@ -194,13 +194,15 @@ function ShippingConfirmation({
             in Northern Uganda.
           </p>
           <p className="text-[#666] text-sm leading-relaxed mb-3">
-            Once your shirt ships and you&rsquo;ve met the child on the
-            back, I&rsquo;ll send you a <strong>sponsor code</strong> for
-            the sponsor portal &mdash; that&rsquo;s where updates, photos,
-            and letters from that specific child will live going forward.
+            Once your shirt ships and you&rsquo;ve met the kid on the
+            back, every update, photo, and letter from the campus comes
+            back to <strong>your kid&rsquo;s page</strong> on the site.
+            Your browser remembers you on this device, so there&rsquo;s no
+            password to keep track of.
           </p>
           <p className="text-[#888] text-xs leading-relaxed">
-            Cancel anytime from the sponsor portal, no questions asked.
+            Cancel anytime &mdash; just email Kevin@beanumber.org, no
+            questions asked.
           </p>
         </div>
       )}

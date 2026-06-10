@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Image from 'next/image';
-import { BANNavigation } from '@/components/BANNavigation';
+import { BANNavigationClient as BANNavigation } from '@/components/BANNavigationClient';
 import { BANFooter } from '@/components/BANFooter';
 
 const TRIP_COST = 3000;

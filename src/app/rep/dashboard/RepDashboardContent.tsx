@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { BANNavigation } from '@/components/BANNavigation';
+import { BANNavigationClient as BANNavigation } from '@/components/BANNavigationClient';
 
 const TRIP_COST = 3000;
 const DEPOSIT = 500;

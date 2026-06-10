@@ -29,7 +29,7 @@ export function BANFooter() {
               <Link href="/shirts" className="block hover:text-[#D4A843] transition-colors">Shirts</Link>
               <Link href="/sponsorship" className="block hover:text-[#D4A843] transition-colors">Sponsor a Child</Link>
               <Link href="/donate" className="block hover:text-[#D4A843] transition-colors">Donate</Link>
-              <Link href="/sponsor/login" className="block hover:text-[#D4A843] transition-colors">Sponsor Login</Link>
+              <Link href="/signin" className="block hover:text-[#D4A843] transition-colors">Sign in</Link>
             </div>
           </div>
 

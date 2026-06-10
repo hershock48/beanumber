@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { BANNavigation } from '@/components/BANNavigation';
+import { BANNavigationClient as BANNavigation } from '@/components/BANNavigationClient';
 import { BANFooter } from '@/components/BANFooter';
 import { Logo } from '@/components/Logo';
 import { CartProvider, useCart } from '@/components/CartContext';
@@ -589,7 +589,7 @@ function ShirtCard({ shirt, reversed }: { shirt: Shirt; reversed: boolean }) {
             </div>
 
             <p className="text-xs text-[#bbb]">
-              Cancel anytime from your sponsor portal. Continuing is your choice.
+              Cancel anytime. Continuing is your choice.
             </p>
           </div>
         </div>

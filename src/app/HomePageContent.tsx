@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
-import { BANNavigation } from '@/components/BANNavigation';
+import { BANNavigationClient as BANNavigation } from '@/components/BANNavigationClient';
 import { BANFooter } from '@/components/BANFooter';
 import { Logo } from '@/components/Logo';
 

@@ -1,149 +1,41 @@
-'use client';
+/**
+ * BANNavigation — server wrapper around BANNavigationClient.
+ *
+ * Reads the sponsor_session cookie on the server and passes a
+ * `signedIn` boolean down to the client component so the auth slot
+ * in the nav can render the correct CTA. Signed in → "Sign out"
+ * form that POSTs to /api/sponsor/logout. Signed out → "Sign in"
+ * link to /signin.
+ *
+ * Doing this server-side avoids a flicker between "no auth" and
+ * "auth detected" on initial render, and avoids exposing whether
+ * the user is signed in via a non-httpOnly client cookie.
+ */
 
-import { useState, useEffect } from 'react';
-import Link from 'next/link';
-import { Logo } from '@/components/Logo';
+import { cookies } from 'next/headers';
+import { SESSION } from '@/lib/constants';
+import { BANNavigationClient } from './BANNavigationClient';
 
 interface BANNavigationProps {
   currentPath?: string;
   transparent?: boolean;
 }
 
-export function BANNavigation({ currentPath = '/', transparent = false }: BANNavigationProps) {
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const [scrolled, setScrolled] = useState(false);
+async function readSignedIn(): Promise<boolean> {
+  try {
+    const cookieStore = await cookies();
+    const raw = cookieStore.get(SESSION.COOKIE_NAME);
+    if (!raw) return false;
+    const session = JSON.parse(raw.value);
+    if (!session?.email) return false;
+    if (new Date(session.expires) < new Date()) return false;
+    return true;
+  } catch {
+    return false;
+  }
+}
 
-  useEffect(() => {
-    const handleScroll = () => setScrolled(window.scrollY > 20);
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
-
-  const showSolid = !transparent || scrolled;
-
-  const navLinks = [
-    { href: '/shirts', label: 'Shirts' },
-    { href: '/sponsorship', label: 'Sponsor' },
-    { href: '/founder', label: 'Story' },
-    { href: '/impact', label: 'Impact' },
-    { href: '/me', label: 'Your kids' },
-  ];
-
-  return (
-    <nav
-      className={`sticky top-0 z-50 transition-all duration-300 ${
-        showSolid
-          ? 'bg-[#FFF8F0]/95 backdrop-blur-md border-b border-[#e8e0d4]'
-          : 'bg-transparent'
-      }`}
-    >
-      <div className="max-w-6xl mx-auto px-5 py-4">
-        <div className="flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-3 group">
-            {/* Primary # mark, near-black at rest, gold once scrolled.
-                Color transitions with the scroll state — same logo,
-                different tint. */}
-            <Logo
-              variant="micro"
-              className={`h-10 w-10 transition-colors duration-500 ${
-                scrolled ? 'text-[#D4A843]' : 'text-[#0d0d0d]'
-              }`}
-            />
-            <span className="text-sm font-bold uppercase tracking-[0.2em] text-[#0d0d0d]">
-              Be A Number
-            </span>
-          </Link>
-
-          {/* Desktop Nav */}
-          <div className="hidden md:flex items-center gap-7">
-            {navLinks.map(link => (
-              <Link
-                key={link.href}
-                href={link.href}
-                className={`text-xs font-bold uppercase tracking-[0.15em] transition-colors ${
-                  currentPath === link.href
-                    ? 'text-[#D4A843]'
-                    : 'text-[#888] hover:text-[#0d0d0d]'
-                }`}
-              >
-                {link.label}
-              </Link>
-            ))}
-            <Link
-              href="/signin"
-              className={`text-xs font-bold uppercase tracking-[0.15em] transition-colors ${
-                currentPath === '/signin'
-                  ? 'text-[#D4A843]'
-                  : 'text-[#888] hover:text-[#0d0d0d]'
-              }`}
-            >
-              Sign in
-            </Link>
-            <Link
-              href="/donate"
-              className="px-5 py-2 bg-[#D4A843] text-[#0d0d0d] text-xs font-bold uppercase tracking-[0.15em] hover:bg-[#c49a3a] transition-colors"
-            >
-              Donate
-            </Link>
-          </div>
-
-          {/* Mobile Hamburger */}
-          <button
-            onClick={() => setMobileOpen(!mobileOpen)}
-            className="md:hidden p-2"
-            aria-label="Toggle menu"
-          >
-            <svg
-              className="w-6 h-6 text-[#0d0d0d]"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              {mobileOpen ? (
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              ) : (
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-              )}
-            </svg>
-          </button>
-        </div>
-
-        {/* Mobile Menu */}
-        {mobileOpen && (
-          <div className="md:hidden mt-4 pb-4 border-t border-[#e8e0d4] pt-4 space-y-1 overflow-hidden">
-            {navLinks.map(link => (
-              <Link
-                key={link.href}
-                href={link.href}
-                className={`block px-3 py-2.5 text-sm font-bold uppercase tracking-wider transition-colors ${
-                  currentPath === link.href
-                    ? 'text-[#D4A843]'
-                    : 'text-[#888] hover:text-[#0d0d0d]'
-                }`}
-                onClick={() => setMobileOpen(false)}
-              >
-                {link.label}
-              </Link>
-            ))}
-            <Link
-              href="/signin"
-              onClick={() => setMobileOpen(false)}
-              className="block px-3 py-2.5 text-sm font-bold uppercase tracking-wider text-[#888] hover:text-[#0d0d0d] transition-colors"
-            >
-              Sign in
-            </Link>
-            <div className="px-3 pt-2">
-              <Link
-                href="/donate"
-                className="block w-full text-center py-3 bg-[#D4A843] text-[#0d0d0d] font-bold uppercase tracking-wider text-sm hover:bg-[#c49a3a] transition-colors"
-                onClick={() => setMobileOpen(false)}
-              >
-                Donate
-              </Link>
-            </div>
-          </div>
-        )}
-      </div>
-    </nav>
-  );
+export async function BANNavigation(props: BANNavigationProps) {
+  const signedIn = await readSignedIn();
+  return <BANNavigationClient {...props} signedIn={signedIn} />;
 }

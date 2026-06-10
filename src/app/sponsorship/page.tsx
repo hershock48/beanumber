@@ -394,8 +394,8 @@ function SponsorshipPageContent() {
                   },
                   {
                     icon: <IconLaptop className="w-5 h-5 text-[#D4A843]" />,
-                    title: 'Online sponsor portal',
-                    desc: 'Log in with your sponsor code to see every update, photo, and letter in one place.',
+                    title: 'Your kid&rsquo;s page',
+                    desc: 'Every update, photo, and letter lands on your kid&rsquo;s own page on the site. Your browser remembers you, no password required.',
                   },
                 ].map(item => (
                   <div key={item.title} className="flex gap-4 items-start">
@@ -707,8 +707,8 @@ function SponsorshipPageContent() {
               },
               {
                 step: 'III',
-                title: 'Get your sponsor portal',
-                desc: 'A sponsor code arrives by email. Log in anytime to see updates, photos, and letters from your child.',
+                title: 'Meet your kid on their page',
+                desc: 'After checkout, you land on your kid&rsquo;s page. Every update, photo, and letter from the campus comes back to that page. Your browser remembers you, no password to keep track of.',
               },
               {
                 step: 'IV',
@@ -766,15 +766,15 @@ function SponsorshipPageContent() {
               },
               {
                 q: 'How often will I hear about my child?',
-                a: 'Roughly one touchpoint a month. A campus newsletter from the team in Gulu every month. Photos of your specific child every few months. A handwritten letter from them once a year. A year-end report card with grades, attendance, and teacher comments. Everything lands in your sponsor portal, accessible anytime.',
+                a: 'Roughly one touchpoint a month. A campus newsletter from the team in Gulu every month. Photos of your specific child every few months. A handwritten letter from them once a year. A year-end report card with grades, attendance, and teacher comments. Everything lands on your kid&rsquo;s page on the site, accessible anytime.',
               },
               {
                 q: 'Can I write to my child?',
-                a: 'Yes. Send letters and messages through the sponsor portal. Our field team in Uganda prints and delivers them. Your child writes back, and we scan the original for you.',
+                a: 'Yes. Reply to any campus email from us and the message gets routed to your kid. Our field team in Uganda prints and delivers it, and your kid writes back. We scan the original and post it on their page.',
               },
               {
                 q: 'What if I need to cancel?',
-                a: 'Cancel anytime from your sponsor portal. No penalty, no guilt, no questions. If you cancel, we work to find your child additional sponsors so their education continues uninterrupted. Nobody loses their seat because one sponsor left.',
+                a: 'Cancel anytime — email Kevin@beanumber.org or use the cancel link in any of our emails. No penalty, no guilt, no questions. If you cancel, we work to find your child additional sponsors so their education continues uninterrupted. Nobody loses their seat because one sponsor left.',
               },
               {
                 q: 'Can I actually visit?',
