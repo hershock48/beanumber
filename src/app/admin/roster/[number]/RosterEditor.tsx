@@ -111,7 +111,13 @@ export function RosterEditor({
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.error || `Save failed: ${res.status}`);
-      setStatus('Saved.');
+      // Different status message by role so Simon understands his
+      // structured-field edits aren&rsquo;t live yet &mdash; they&rsquo;re queued for
+      // Kevin&rsquo;s review. Without this, Simon would think his changes
+      // went out to sponsors immediately.
+      setStatus(role === 'simon'
+        ? 'Saved. Your edits are queued for Kevin to review.'
+        : 'Saved.');
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Save failed.');

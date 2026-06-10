@@ -40,10 +40,18 @@ export async function POST(request: NextRequest) {
       // back on the kid they were about to sponsor instead of the
       // generic browse grid). Must be a same-origin path — we
       // validate before using.
+      //
+      // Regex rejects:
+      //   - protocol-relative paths like "//evil.com/x" (would be
+      //     safe after origin prepending but defensive belt-and-
+      //     suspenders against future code changes that drop the
+      //     origin)
+      //   - paths with whitespace (URL injection cleanup)
+      //   - non-/ start
       returnPath: z
         .string()
         .max(200)
-        .regex(/^\/[^\s]*$/, 'returnPath must be an absolute same-origin path')
+        .regex(/^\/[^/\s][^\s]*$|^\/$/, 'returnPath must be an absolute same-origin path')
         .optional(),
     });
 

@@ -20,6 +20,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdminToken } from '@/lib/auth';
 import { getAdminRole } from '@/lib/admin-session';
+import {
+  parsePendingDraft,
+  GATED_FIELDS,
+  FIELD_TO_PENDING_OPTION,
+  type PendingDraft,
+} from '@/lib/admin/pending-draft';
 
 const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID || '';
 const AIRTABLE_API_KEY =
@@ -46,40 +52,12 @@ const F = {
  *  JSON — the gating store that holds his changes out of the public
  *  fields until Kevin approves. Used as a name rather than an ID so
  *  this code keeps working before Kevin has had a chance to add the
- *  field in Airtable; once added, no code change needed. */
+ *  field in Airtable; once added, no code change needed.
+ *
+ *  Parser and constants live in @/lib/admin/pending-draft so the save
+ *  endpoint, approve endpoint, and queries all share one definition.
+ */
 const PENDING_DRAFT_FIELD = 'PendingDraft';
-
-/** Maps a body.fields key → the matching PendingFields multi-select
- *  option. Fields not in the map (intakeFromCampus) don't participate
- *  in the per-field pending tracking. Same set of keys also defines
- *  which fields go through the gated-draft workflow when Simon edits
- *  them. intakeFromCampus stays direct-write because it's already
- *  non-public by design (Kevin polishes it into structured fields). */
-const FIELD_TO_PENDING_OPTION: Record<string, string> = {
-  nameMeaning: 'NameMeaning',
-  familyContext: 'FamilyContext',
-  loves: 'Loves',
-  childQuote: 'ChildQuote',
-  notes: 'Notes',
-};
-const GATED_FIELDS = new Set(Object.keys(FIELD_TO_PENDING_OPTION));
-
-interface PendingDraft {
-  nameMeaning?: string;
-  familyContext?: string;
-  loves?: string;
-  childQuote?: string;
-  notes?: string;
-}
-
-function parsePendingDraft(raw: unknown): PendingDraft {
-  if (typeof raw !== 'string' || !raw) return {};
-  try {
-    const parsed = JSON.parse(raw);
-    if (parsed && typeof parsed === 'object') return parsed as PendingDraft;
-  } catch {}
-  return {};
-}
 
 function atHeaders() {
   return {
@@ -214,7 +192,7 @@ export async function POST(request: NextRequest) {
       let draftChanged = false;
 
       for (const key of changedKeys) {
-        if (!GATED_FIELDS.has(key)) continue;
+        if (!GATED_FIELDS.has(key as keyof PendingDraft)) continue;
         const fieldId = fieldKeyToAirtable[key];
         const value = patchFields[fieldId];
         // Pull this field out of the public-field patch — Simon's
@@ -224,7 +202,7 @@ export async function POST(request: NextRequest) {
           (nextDraft as Record<string, string>)[key] = value;
           draftChanged = true;
         }
-        const option = FIELD_TO_PENDING_OPTION[key];
+        const option = FIELD_TO_PENDING_OPTION[key as keyof PendingDraft];
         if (option) nextPending.add(option);
       }
 
@@ -256,7 +234,7 @@ export async function POST(request: NextRequest) {
         const nextDraft: PendingDraft = { ...currentDraft };
         let draftChanged = false;
         for (const key of changedKeys) {
-          const option = FIELD_TO_PENDING_OPTION[key];
+          const option = FIELD_TO_PENDING_OPTION[key as keyof PendingDraft];
           if (option) nextPending.delete(option);
           if ((nextDraft as Record<string, string>)[key] !== undefined) {
             delete (nextDraft as Record<string, unknown>)[key];

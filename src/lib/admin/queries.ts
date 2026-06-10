@@ -10,6 +10,8 @@
  * codebase. No caching beyond the server's request scope.
  */
 
+import { parsePendingDraft } from './pending-draft';
+
 const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID || '';
 const AIRTABLE_API_KEY =
   process.env.AIRTABLE_PAT || process.env.AIRTABLE_API_KEY || '';
@@ -616,24 +618,9 @@ function parsePendingFields(raw: unknown): string[] {
     .filter(Boolean);
 }
 
-/** PendingDraft is a JSON-encoded multilineText field on the Children
- *  table holding Simon's per-field structured edits before Kevin
- *  approves. Returns an empty object when the field is missing, blank,
- *  or unparseable. */
-function parsePendingDraft(raw: unknown): {
-  nameMeaning?: string;
-  familyContext?: string;
-  loves?: string;
-  childQuote?: string;
-  notes?: string;
-} {
-  if (typeof raw !== 'string' || !raw) return {};
-  try {
-    const parsed = JSON.parse(raw);
-    if (parsed && typeof parsed === 'object') return parsed;
-  } catch {}
-  return {};
-}
+// parsePendingDraft is imported at the top of the file from
+// ./pending-draft so the save endpoint, approve endpoint, and this
+// queries module all read PendingDraft through one definition.
 
 export interface RosterKidAttachment {
   id: string;

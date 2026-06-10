@@ -25,6 +25,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdminToken } from '@/lib/auth';
 import { getAdminRole } from '@/lib/admin-session';
+import { parsePendingDraft } from '@/lib/admin/pending-draft';
 
 const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID || '';
 const AIRTABLE_API_KEY =
@@ -58,23 +59,6 @@ const KEY_TO_PENDING_OPTION: Record<string, string> = {
   childQuote: 'ChildQuote',
   notes: 'Notes',
 };
-
-interface PendingDraft {
-  nameMeaning?: string;
-  familyContext?: string;
-  loves?: string;
-  childQuote?: string;
-  notes?: string;
-}
-
-function parsePendingDraft(raw: unknown): PendingDraft {
-  if (typeof raw !== 'string' || !raw) return {};
-  try {
-    const parsed = JSON.parse(raw);
-    if (parsed && typeof parsed === 'object') return parsed as PendingDraft;
-  } catch {}
-  return {};
-}
 
 function atHeaders() {
   return {

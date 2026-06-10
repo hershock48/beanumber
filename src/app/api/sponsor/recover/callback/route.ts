@@ -3,7 +3,8 @@
  *
  * Validates the signed token, resolves the sponsor's email from
  * Airtable (so the cookie we drop matches the format the rest of the
- * app expects), sets a 30-day sponsor_session cookie, and redirects
+ * app expects), sets a 365-day sponsor_session cookie (length lives in
+ * SESSION.MAX_AGE_DAYS), and redirects
  * the user back to /children/[number] in authenticated mode.
  *
  * Failure modes — bad signature, expired token, missing sponsorship —

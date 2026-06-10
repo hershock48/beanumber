@@ -22,15 +22,18 @@ export function BANNavigationClient({
   const [scrolled, setScrolled] = useState(false);
   const navRef = useRef<HTMLElement | null>(null);
 
-  // For server-rendered pages, the BANNavigation server wrapper passes
-  // the correct signedIn value as a prop and there&rsquo;s no flicker. For
-  // pages that render this component directly from a client tree
-  // (HomePageContent, ShirtsPageContent, the rep pages) the prop is
-  // undefined; we fall back to a one-shot fetch against
-  // /api/session/status so the auth slot still reflects reality.
-  const [resolvedSignedIn, setResolvedSignedIn] = useState<boolean>(
-    signedInProp ?? false
-  );
+  // signedIn is single-sourced from local state. We initialize from
+  // the prop (server-rendered pages pass true/false; client-rendered
+  // pages leave it undefined and we initialize to false). After mount,
+  // updates flow through here: the one-shot fetch for client pages,
+  // BroadcastChannel sync from other tabs, and visibilitychange
+  // re-checks.
+  //
+  // Previous version computed `signedIn = signedInProp ?? resolvedSignedIn`
+  // which froze any page rendered server-side at the SSR-time prop value
+  // forever &mdash; if the user signed in elsewhere, this tab couldn't catch
+  // up until it was reloaded.
+  const [signedIn, setSignedIn] = useState<boolean>(signedInProp ?? false);
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 20);
@@ -68,7 +71,7 @@ export function BANNavigationClient({
       .then(r => r.ok ? r.json() : null)
       .then(data => {
         if (!cancelled && data && typeof data.signedIn === 'boolean') {
-          setResolvedSignedIn(data.signedIn);
+          setSignedIn(data.signedIn);
         }
       })
       .catch(() => {});
@@ -90,8 +93,8 @@ export function BANNavigationClient({
       return;
     }
     channel.onmessage = event => {
-      if (event.data?.type === 'signout') setResolvedSignedIn(false);
-      else if (event.data?.type === 'signin') setResolvedSignedIn(true);
+      if (event.data?.type === 'signout') setSignedIn(false);
+      else if (event.data?.type === 'signin') setSignedIn(true);
     };
     return () => {
       try { channel.close(); } catch {}
@@ -109,7 +112,7 @@ export function BANNavigationClient({
         .then(r => r.ok ? r.json() : null)
         .then(data => {
           if (data && typeof data.signedIn === 'boolean') {
-            setResolvedSignedIn(data.signedIn);
+            setSignedIn(data.signedIn);
           }
         })
         .catch(() => {});
@@ -140,11 +143,16 @@ export function BANNavigationClient({
       // BroadcastChannel unsupported; other tabs catch up on
       // visibilitychange or next navigation.
     }
-    setResolvedSignedIn(false);
+    setSignedIn(false);
     window.location.href = '/';
   }, []);
 
-  const signedIn = signedInProp ?? resolvedSignedIn;
+  // Keep state in sync with the prop when the parent re-renders with a
+  // new server-side value (e.g., navigating between server pages).
+  useEffect(() => {
+    if (signedInProp !== undefined) setSignedIn(signedInProp);
+  }, [signedInProp]);
+
   const showSolid = !transparent || scrolled;
 
   // Nav order is intentional. Conversion path first (Shirts,
