@@ -157,7 +157,7 @@ export async function GET(request: NextRequest) {
   // /api/sponsor/verify uses, so all existing reads continue to work.
   const cookieStore = await cookies();
   const expires = new Date();
-  expires.setDate(expires.getDate() + 30);
+  expires.setDate(expires.getDate() + SESSION.MAX_AGE_DAYS);
   cookieStore.set(
     SESSION.COOKIE_NAME,
     JSON.stringify({

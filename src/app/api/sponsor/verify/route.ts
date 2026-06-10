@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
+import { SESSION } from '@/lib/constants';
 
 const AIRTABLE_API_KEY = process.env.AIRTABLE_API_KEY;
 const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID;
@@ -98,10 +99,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create session cookie (30 days)
+    // Create session cookie (lifetime from SESSION.MAX_AGE_DAYS — 365)
     const cookieStore = await cookies();
     const expires = new Date();
-    expires.setDate(expires.getDate() + 30);
+    expires.setDate(expires.getDate() + SESSION.MAX_AGE_DAYS);
 
     const cookieValue = JSON.stringify({
       email: sponsor.email,
@@ -110,7 +111,7 @@ export async function POST(request: NextRequest) {
     });
 
     // Cookie settings that work reliably
-    cookieStore.set('sponsor_session', cookieValue, {
+    cookieStore.set(SESSION.COOKIE_NAME, cookieValue, {
       httpOnly: true,
       secure: true, // Always true for HTTPS (beanumber.org)
       sameSite: 'lax',

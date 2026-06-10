@@ -32,12 +32,94 @@ interface SponsorshipRow {
   startDate?: string;
   child: {
     recordId: string;
+    childId: string;
     shirtNumber?: number;
     displayName: string;
     firstName: string;
     photoUrl?: string;
     departed: boolean;
   };
+  /**
+   * Most recent published, sponsor-visible Child Update for this
+   * kid. Surfaced on the kid card so /me reads as a digest &mdash; what&rsquo;s
+   * new with each of my kids &mdash; instead of a static roster.
+   */
+  latestUpdate?: ChildUpdateSnapshot | null;
+}
+
+const CHILD_UPDATES_TABLE =
+  process.env.AIRTABLE_CHILD_UPDATES_TABLE || 'Child Updates';
+
+interface ChildUpdateSnapshot {
+  title: string;
+  publishedAt: string;
+  photoUrl?: string;
+}
+
+/**
+ * Fetch the most recent published, sponsor-visible Child Update for
+ * a given kid. Used by the /me digest so each kid card surfaces
+ * something fresh from the campus instead of being a static roster.
+ *
+ * Matches on the Child Updates table&rsquo;s own ChildID text field rather
+ * than on the Child linked-record field. Same gotcha as the
+ * sponsorship recognition formula we fixed in 2df11df:
+ * ARRAYJOIN({Child}, ",") joins the linked records&rsquo; primary-field
+ * values (the kid&rsquo;s ChildID strings, e.g. "HSP/BAN-002"), not
+ * record IDs &mdash; so FIND(recordId, ...) silently misses every
+ * legitimate update. ChildID equality on the Child Updates row is
+ * direct and reliable.
+ *
+ * Returns null when there are no eligible updates yet &mdash; the kid
+ * card renders without the digest row, no "nothing yet" placeholder.
+ */
+async function fetchLatestUpdateForChild(
+  childId: string
+): Promise<ChildUpdateSnapshot | null> {
+  if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) return null;
+  if (!childId) return null;
+  try {
+    const safeChildId = childId.replace(/"/g, '\\"');
+    const formula = encodeURIComponent(
+      `AND({VisibleToSponsor}=TRUE(), NOT({PublishedAt}=BLANK()), {ChildID}="${safeChildId}")`
+    );
+    const url =
+      `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(
+        CHILD_UPDATES_TABLE
+      )}` +
+      `?filterByFormula=${formula}` +
+      `&sort%5B0%5D%5Bfield%5D=PublishedAt&sort%5B0%5D%5Bdirection%5D=desc` +
+      `&maxRecords=1`;
+    const res = await fetch(url, {
+      headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` },
+      cache: 'no-store',
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const record = data.records?.[0];
+    if (!record) return null;
+    const f = record.fields || {};
+    // Prefer the explicit Title; fall back to PositiveHighlight or
+    // Summary so kid cards still get a useful one-liner from older
+    // updates that didn't fill in Title.
+    const title =
+      (f.Title as string | undefined) ||
+      (f.PositiveHighlight as string | undefined) ||
+      (f.Summary as string | undefined) ||
+      'A note from the campus';
+    const publishedAt = f.PublishedAt as string | undefined;
+    if (!publishedAt) return null;
+    const photo = Array.isArray(f.Photos)
+      ? (f.Photos as Array<{ url: string }>)
+      : undefined;
+    return {
+      title,
+      publishedAt,
+      photoUrl: photo?.[0]?.url,
+    };
+  } catch {
+    return null;
+  }
 }
 
 async function getViewerEmail(): Promise<string | null> {
@@ -94,6 +176,10 @@ async function fetchSponsorshipsForEmail(email: string): Promise<SponsorshipRow[
       const childRecordId = f.Children?.[0];
       let childInfo = {
         recordId: childRecordId || '',
+        // Falls back to the Sponsorship row's ChildID for cases where
+        // we can't fetch the linked Children record; the row stores
+        // a copy via a denormalized lookup.
+        childId: (f as { ChildID?: string }).ChildID || '',
         shirtNumber: undefined as number | undefined,
         displayName: f.ChildDisplayName || 'A kid at the campus',
         firstName: (f.ChildDisplayName || '').split(' ')[0] || 'them',
@@ -113,6 +199,7 @@ async function fetchSponsorshipsForEmail(email: string): Promise<SponsorshipRow[
             const cf = c.fields || {};
             childInfo = {
               recordId: c.id,
+              childId: (cf.ChildID as string) || childInfo.childId,
               shirtNumber: typeof cf.ShirtNumber === 'number' ? cf.ShirtNumber : undefined,
               displayName: cf.DisplayName || cf.FirstName || childInfo.displayName,
               firstName: cf.FirstName || childInfo.firstName,
@@ -155,6 +242,16 @@ export default async function MePage() {
     fetchSponsorshipsForEmail(email),
     getRecentCampusNewsletters(1),
   ]);
+
+  // Hydrate each row with the latest published Child Update for its
+  // kid. Done in parallel so a sponsor with 6 kids doesn&rsquo;t pay 6×
+  // serial round-trips. Each lookup is independent; one failure
+  // leaves that card without a digest line and renders normally.
+  await Promise.all(
+    rows.map(async r => {
+      r.latestUpdate = await fetchLatestUpdateForChild(r.child.childId);
+    })
+  );
 
   const monthlyTotal = rows
     .filter(r => r.monthlyOrHolder === 'monthly')
@@ -346,7 +443,8 @@ export default async function MePage() {
 }
 
 function KidCard({ row }: { row: SponsorshipRow }) {
-  const { child, monthlyOrHolder, monthlyAmount, startDate } = row;
+  const { child, monthlyOrHolder, monthlyAmount, startDate, latestUpdate } =
+    row;
   const monthsActive = startDate ? monthsBetween(new Date(startDate), new Date()) : null;
   const href = child.shirtNumber ? `/children/${child.shirtNumber}` : '#';
 
@@ -355,13 +453,14 @@ function KidCard({ row }: { row: SponsorshipRow }) {
       href={href}
       className="block bg-white border border-[#e8e0d4] hover:border-[#D4A843] transition-colors"
     >
-      <div className="aspect-[4/5] bg-[#f5f0e8] overflow-hidden">
+      <div className="aspect-[4/5] bg-[#f5f0e8] overflow-hidden relative">
         {child.photoUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
+          <Image
             src={child.photoUrl}
             alt={child.displayName}
-            className="w-full h-full object-cover"
+            fill
+            sizes="(max-width: 768px) 100vw, 33vw"
+            className="object-cover"
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-5xl opacity-25">
@@ -402,6 +501,21 @@ function KidCard({ row }: { row: SponsorshipRow }) {
             </span>
           )}
         </div>
+
+        {/* Latest from the campus &mdash; surfaces the most recent published
+            update for THIS kid so /me reads as a digest. Quiet when
+            we don't have one yet. */}
+        {latestUpdate && !child.departed && (
+          <div className="mt-3 pt-3 border-t border-[#e8e0d4]">
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-1">
+              Latest &middot; {formatRelativeDate(latestUpdate.publishedAt)}
+            </p>
+            <p className="text-sm text-[#333] leading-snug line-clamp-2">
+              {latestUpdate.title}
+            </p>
+          </div>
+        )}
+
         <p className="text-xs font-bold uppercase tracking-wider text-[#0d0d0d] hover:text-[#D4A843] transition-colors mt-3">
           Open page &rarr;
         </p>
@@ -419,6 +533,29 @@ function formatRelativeMonth(iso: string): string {
   try {
     const d = new Date(iso);
     return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * Compact date label for the kid-card digest. "3 days ago" / "Last
+ * week" / "Apr 14" — switches to absolute month + day once the update
+ * is far enough back that the relative phrasing stops being useful.
+ */
+function formatRelativeDate(iso: string): string {
+  try {
+    const d = new Date(iso);
+    const now = new Date();
+    const ms = now.getTime() - d.getTime();
+    const days = Math.floor(ms / (1000 * 60 * 60 * 24));
+    if (days < 0) return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    if (days === 0) return 'Today';
+    if (days === 1) return 'Yesterday';
+    if (days < 7) return `${days} days ago`;
+    if (days < 14) return 'Last week';
+    if (days < 30) return `${Math.floor(days / 7)} weeks ago`;
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   } catch {
     return '';
   }

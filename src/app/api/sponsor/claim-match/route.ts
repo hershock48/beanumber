@@ -374,7 +374,7 @@ async function setSponsorSessionCookie(
   sponsorCode: string
 ) {
   const expires = new Date();
-  expires.setDate(expires.getDate() + 30);
+  expires.setDate(expires.getDate() + SESSION.MAX_AGE_DAYS);
   const value = JSON.stringify({
     email,
     sponsorCode,

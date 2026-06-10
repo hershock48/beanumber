@@ -136,17 +136,61 @@ export function HomePageContent() {
             Find Yours.
           </p>
 
-          <form onSubmit={handleSearch} className="flex max-w-md mx-auto shadow-2xl rounded-sm overflow-hidden">
+          {/* Search box wrapped in a relative shimmer host. A single
+              diagonal gold sweep fires ~1.2s after mount so the user
+              has time to read the headline before the affordance
+              announces itself. One pass, no loop — a marketing hero
+              shouldn't feel like a banner ad. Same shimmer language
+              we use on the in-page "Sponsoring monthly?" banner, so
+              the visual gesture stays consistent across the site. */}
+          <form
+            onSubmit={handleSearch}
+            className="ban-search-shimmer-host flex max-w-md mx-auto shadow-2xl rounded-sm overflow-hidden relative"
+          >
+            <style>{`
+              @keyframes banSearchShimmer {
+                0% {
+                  transform: translateX(-120%) skewX(-18deg);
+                  opacity: 0;
+                }
+                15% { opacity: 1; }
+                85% { opacity: 1; }
+                100% {
+                  transform: translateX(120%) skewX(-18deg);
+                  opacity: 0;
+                }
+              }
+              .ban-search-shimmer-host::after {
+                content: '';
+                position: absolute;
+                top: 0;
+                bottom: 0;
+                left: 0;
+                width: 40%;
+                background: linear-gradient(
+                  90deg,
+                  transparent 0%,
+                  rgba(255, 230, 150, 0.0) 20%,
+                  rgba(255, 230, 150, 0.65) 50%,
+                  rgba(255, 230, 150, 0.0) 80%,
+                  transparent 100%
+                );
+                pointer-events: none;
+                animation: banSearchShimmer 1.8s ease-out 1.2s both;
+                mix-blend-mode: screen;
+                z-index: 5;
+              }
+            `}</style>
             <input
               type="text"
               value={searchNumber}
               onChange={e => setSearchNumber(e.target.value)}
               placeholder="Your Shirt Number"
-              className="flex-1 px-6 py-4 text-base text-[#0d0d0d] bg-white placeholder-[#999] focus:outline-none"
+              className="relative z-10 flex-1 px-6 py-4 text-base text-[#0d0d0d] bg-white placeholder-[#999] focus:outline-none"
             />
             <button
               type="submit"
-              className="px-8 py-4 bg-[#D4A843] text-[#0d0d0d] font-bold uppercase tracking-wider text-sm hover:bg-[#c49a3a] transition-colors"
+              className="relative z-10 px-8 py-4 bg-[#D4A843] text-[#0d0d0d] font-bold uppercase tracking-wider text-sm hover:bg-[#c49a3a] transition-colors"
             >
               Find
             </button>

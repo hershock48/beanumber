@@ -206,7 +206,15 @@ export const PAYMENT_STATUS = {
 
 export const SESSION = {
   COOKIE_NAME: 'sponsor_session',
-  MAX_AGE: 30 * 24 * 60 * 60, // 30 days in seconds
+  /**
+   * Cookie lifetime — 365 days. Returning sponsors get a year of
+   * friction-free recognition on a given device before they need to
+   * sign in again. Same value used everywhere we write the cookie
+   * (callback, claim-match, verify); use this constant rather than
+   * inlining the number so a future tweak only touches one place.
+   */
+  MAX_AGE_DAYS: 365,
+  MAX_AGE_SECONDS: 365 * 24 * 60 * 60,
   PATH: '/',
 } as const;
 
