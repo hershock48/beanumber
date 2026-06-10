@@ -41,9 +41,20 @@ const F = {
   studentOfMonth: 'fldQrcXzw32aOZWZ3',
 };
 
+/** Field name (not ID) for the PendingDraft text field on the
+ *  Children table. Stores Simon's pending structured-field edits as
+ *  JSON — the gating store that holds his changes out of the public
+ *  fields until Kevin approves. Used as a name rather than an ID so
+ *  this code keeps working before Kevin has had a chance to add the
+ *  field in Airtable; once added, no code change needed. */
+const PENDING_DRAFT_FIELD = 'PendingDraft';
+
 /** Maps a body.fields key → the matching PendingFields multi-select
  *  option. Fields not in the map (intakeFromCampus) don't participate
- *  in the per-field pending tracking. */
+ *  in the per-field pending tracking. Same set of keys also defines
+ *  which fields go through the gated-draft workflow when Simon edits
+ *  them. intakeFromCampus stays direct-write because it's already
+ *  non-public by design (Kevin polishes it into structured fields). */
 const FIELD_TO_PENDING_OPTION: Record<string, string> = {
   nameMeaning: 'NameMeaning',
   familyContext: 'FamilyContext',
@@ -51,6 +62,24 @@ const FIELD_TO_PENDING_OPTION: Record<string, string> = {
   childQuote: 'ChildQuote',
   notes: 'Notes',
 };
+const GATED_FIELDS = new Set(Object.keys(FIELD_TO_PENDING_OPTION));
+
+interface PendingDraft {
+  nameMeaning?: string;
+  familyContext?: string;
+  loves?: string;
+  childQuote?: string;
+  notes?: string;
+}
+
+function parsePendingDraft(raw: unknown): PendingDraft {
+  if (typeof raw !== 'string' || !raw) return {};
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === 'object') return parsed as PendingDraft;
+  } catch {}
+  return {};
+}
 
 function atHeaders() {
   return {
@@ -172,21 +201,73 @@ export async function POST(request: NextRequest) {
     let nextPending = new Set(currentPending);
 
     if (role === 'simon') {
+      // Simon's structured-field edits go into PendingDraft JSON
+      // rather than the public fields, so they stay invisible to
+      // sponsors until Kevin approves via /admin/review or the
+      // editor. Per Kevin: "Simon's updates shouldn't go live
+      // before I approve them." intakeFromCampus and studentOfMonth
+      // remain direct-write — the first is already non-public by
+      // design, the second has its own pending pattern via
+      // PendingSOTMMonth.
+      const currentDraft = parsePendingDraft(existingFields[PENDING_DRAFT_FIELD]);
+      const nextDraft: PendingDraft = { ...currentDraft };
+      let draftChanged = false;
+
       for (const key of changedKeys) {
+        if (!GATED_FIELDS.has(key)) continue;
+        const fieldId = fieldKeyToAirtable[key];
+        const value = patchFields[fieldId];
+        // Pull this field out of the public-field patch — Simon's
+        // value is NOT going live in this write.
+        delete patchFields[fieldId];
+        if (typeof value === 'string') {
+          (nextDraft as Record<string, string>)[key] = value;
+          draftChanged = true;
+        }
         const option = FIELD_TO_PENDING_OPTION[key];
         if (option) nextPending.add(option);
+      }
+
+      if (draftChanged) {
+        const hasAnyDraft = Object.keys(nextDraft).length > 0;
+        patchFields[PENDING_DRAFT_FIELD] = hasAnyDraft
+          ? JSON.stringify(nextDraft)
+          : null;
       }
       if (changedKeys.length > 0) {
         patchFields[F.lastEditedBySimon] = new Date().toISOString();
       }
     } else if (role === 'admin') {
       if (body.clearSimonFlag) {
+        // Kevin hit "Mark all reviewed" — wipe the pending state
+        // entirely. Public fields are NOT touched; any unapproved
+        // drafts in PendingDraft get discarded as a side effect.
         nextPending = new Set();
         patchFields[F.lastEditedBySimon] = null;
+        if (existingFields[PENDING_DRAFT_FIELD]) {
+          patchFields[PENDING_DRAFT_FIELD] = null;
+        }
       } else {
+        // Kevin edited fields directly. Any field he changes counts
+        // as his decision — remove it from PendingFields AND from
+        // PendingDraft so we don't keep showing Simon's stale
+        // proposal next to Kevin's now-live value.
+        const currentDraft = parsePendingDraft(existingFields[PENDING_DRAFT_FIELD]);
+        const nextDraft: PendingDraft = { ...currentDraft };
+        let draftChanged = false;
         for (const key of changedKeys) {
           const option = FIELD_TO_PENDING_OPTION[key];
           if (option) nextPending.delete(option);
+          if ((nextDraft as Record<string, string>)[key] !== undefined) {
+            delete (nextDraft as Record<string, unknown>)[key];
+            draftChanged = true;
+          }
+        }
+        if (draftChanged) {
+          const hasAnyDraft = Object.keys(nextDraft).length > 0;
+          patchFields[PENDING_DRAFT_FIELD] = hasAnyDraft
+            ? JSON.stringify(nextDraft)
+            : null;
         }
         // If Kevin cleared the last pending field by editing it,
         // the global flag clears too.

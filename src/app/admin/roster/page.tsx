@@ -58,9 +58,12 @@ export default async function AdminRosterPage() {
               : `${fullyComplete} of ${totalKids} profiles fully written. Tap a card to edit.`}
           </p>
           {role === 'admin' && pendingReview > 0 && (
-            <p className="text-[#D4A843] text-sm mt-2 font-semibold">
-              {pendingReview} kid{pendingReview === 1 ? '' : 's'} have edits from Simon waiting for your review (red dot).
-            </p>
+            <Link
+              href="/admin/review"
+              className="inline-flex items-center gap-2 mt-3 px-4 py-2 bg-[#D4A843] hover:bg-[#c49a3a] text-[#0d0d0d] text-xs font-bold uppercase tracking-wider transition-colors"
+            >
+              {pendingReview} kid{pendingReview === 1 ? '' : 's'} waiting on you &mdash; open review queue &rarr;
+            </Link>
           )}
         </div>
 

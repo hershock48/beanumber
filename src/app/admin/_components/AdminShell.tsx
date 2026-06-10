@@ -21,6 +21,7 @@ export type AdminTab =
   | 'home'
   | 'newsletter'
   | 'roster'
+  | 'review'
   | 'campus-update'
   | 'sotm'
   // Legacy tabs — kept in the type so existing pages compile, but no
@@ -33,6 +34,7 @@ export type AdminTab =
 const ALL_TABS: Array<{ id: AdminTab; label: string; href: string; visibleTo: Array<'admin' | 'simon'> }> = [
   { id: 'newsletter', label: 'Newsletter', href: '/admin/newsletter', visibleTo: ['admin'] },
   { id: 'roster', label: 'Roster', href: '/admin/roster', visibleTo: ['admin', 'simon'] },
+  { id: 'review', label: 'Review queue', href: '/admin/review', visibleTo: ['admin'] },
   { id: 'sotm', label: 'Student of the month', href: '/admin/sotm', visibleTo: ['admin', 'simon'] },
   { id: 'campus-update', label: 'Monthly update', href: '/admin/campus-update', visibleTo: ['simon'] },
   { id: 'fulfillment', label: 'Fulfillment', href: '/admin/fulfillment', visibleTo: ['admin'] },

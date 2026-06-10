@@ -459,6 +459,27 @@ export interface RosterKid {
   // per-field red dots on the roster card and red borders in the
   // editor.
   pendingFields: string[];
+  // Simon's pending structured-field edits, parsed from the
+  // PendingDraft JSON field. Each entry is what Simon proposed; the
+  // live public value still lives on the kid's regular field until
+  // Kevin approves. Empty object when nothing's pending. Drives the
+  // /admin/review queue cards and the per-field approval UI.
+  pendingDraft: {
+    nameMeaning?: string;
+    familyContext?: string;
+    loves?: string;
+    childQuote?: string;
+    notes?: string;
+  };
+  // Public field values, kept alongside pendingDraft so /admin/review
+  // can render the diff (current → proposed) without re-fetching.
+  publicValues: {
+    nameMeaning: string;
+    familyContext: string;
+    loves: string;
+    childQuote: string;
+    notes: string;
+  };
   // True when ReportCards attachment field has at least one file.
   // Used by the deadlines banner on /admin/roster to count kids
   // missing this quarter's report card.
@@ -558,6 +579,14 @@ export async function getRoster(): Promise<RosterKid[]> {
       hasPendingIntake: !!(f.IntakeFromCampus as string),
       lastEditedBySimon: (f.LastEditedBySimon as string) || null,
       pendingFields: parsePendingFields(f.PendingFields),
+      pendingDraft: parsePendingDraft(f.PendingDraft),
+      publicValues: {
+        nameMeaning: (f.NameMeaning as string) || '',
+        familyContext: (f.FamilyContext as string) || '',
+        loves: (f.Loves as string) || '',
+        childQuote: (f.ChildQuote as string) || '',
+        notes: (f.Notes as string) || '',
+      },
       hasReportCards: Array.isArray(f.ReportCards) && (f.ReportCards as unknown[]).length > 0,
       hasLetters: Array.isArray(f.Letters) && (f.Letters as unknown[]).length > 0,
       studentOfMonth: (f.StudentOfMonth as string) || '',
@@ -585,6 +614,25 @@ function parsePendingFields(raw: unknown): string[] {
   return raw
     .map(v => (typeof v === 'string' ? v : (v as { name?: string })?.name || ''))
     .filter(Boolean);
+}
+
+/** PendingDraft is a JSON-encoded multilineText field on the Children
+ *  table holding Simon's per-field structured edits before Kevin
+ *  approves. Returns an empty object when the field is missing, blank,
+ *  or unparseable. */
+function parsePendingDraft(raw: unknown): {
+  nameMeaning?: string;
+  familyContext?: string;
+  loves?: string;
+  childQuote?: string;
+  notes?: string;
+} {
+  if (typeof raw !== 'string' || !raw) return {};
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === 'object') return parsed;
+  } catch {}
+  return {};
 }
 
 export interface RosterKidAttachment {
@@ -683,6 +731,14 @@ export async function getRosterKidByNumber(shirtNumber: number): Promise<RosterK
     hasPendingIntake: !!(f.IntakeFromCampus as string),
     lastEditedBySimon: (f.LastEditedBySimon as string) || null,
     pendingFields: parsePendingFields(f.PendingFields),
+    pendingDraft: parsePendingDraft(f.PendingDraft),
+    publicValues: {
+      nameMeaning: (f.NameMeaning as string) || '',
+      familyContext: (f.FamilyContext as string) || '',
+      loves: (f.Loves as string) || '',
+      childQuote: (f.ChildQuote as string) || '',
+      notes: (f.Notes as string) || '',
+    },
     hasReportCards: Array.isArray(f.ReportCards) && (f.ReportCards as unknown[]).length > 0,
     hasLetters: Array.isArray(f.Letters) && (f.Letters as unknown[]).length > 0,
     studentOfMonth: (f.StudentOfMonth as string) || '',
