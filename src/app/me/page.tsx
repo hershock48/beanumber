@@ -80,8 +80,25 @@ async function fetchLatestUpdateForChild(
   if (!childId) return null;
   try {
     const safeChildId = childId.replace(/"/g, '\\"');
+    // Two paths to find a match, OR'd together:
+    //   1. {ChildID}="HSP/BAN-002" — the Child Updates row has its
+    //      own denormalized ChildID text field. All current writers
+    //      (admin updates, sponsor messages, sponsor update requests)
+    //      populate this at write time.
+    //   2. FIND(",HSP/BAN-002,", "," & ARRAYJOIN({Child}, ",") & ",")
+    //      — match via the Child linked-record field. The Children
+    //      table's primary field IS ChildID, so ARRAYJOIN of the
+    //      link yields a comma-separated string of ChildIDs.
+    //      Bracketing the search term and the joined string with
+    //      commas prevents prefix collisions (e.g., "HSP/BAN-2"
+    //      matching inside "HSP/BAN-20" if zero-padding ever drifts).
+    //
+    // Either path alone would catch the common case. OR-ing them is
+    // the future-proof play: rows created by a non-current writer
+    // (Airtable UI, future code paths, data import) still match
+    // through the link field even if they leave ChildID empty.
     const formula = encodeURIComponent(
-      `AND({VisibleToSponsor}=TRUE(), NOT({PublishedAt}=BLANK()), {ChildID}="${safeChildId}")`
+      `AND({VisibleToSponsor}=TRUE(), NOT({PublishedAt}=BLANK()), OR({ChildID}="${safeChildId}", FIND("," & "${safeChildId}" & ",", "," & ARRAYJOIN({Child}, ",") & ",")))`
     );
     const url =
       `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(
@@ -238,10 +255,31 @@ export default async function MePage() {
     redirect('/signin?next=/me&reason=your-kids');
   }
 
-  const [rows, recentNewsletters] = await Promise.all([
+  const [rawRows, recentNewsletters] = await Promise.all([
     fetchSponsorshipsForEmail(email),
     getRecentCampusNewsletters(1),
   ]);
+
+  // Dedupe by kid record ID. A user could end up with multiple
+  // sponsorship rows for the same kid (Active + Holder, or two
+  // Holder rows from a previous bug), and the roster would render
+  // duplicate cards. Prefer the monthly (Active) row over the
+  // holder row when both exist for the same kid, since the
+  // monthly relationship is the more meaningful one to surface.
+  const byKidRecord = new Map<string, SponsorshipRow>();
+  for (const r of rawRows) {
+    const key = r.child.recordId || r.recordId;
+    const existing = byKidRecord.get(key);
+    if (!existing) {
+      byKidRecord.set(key, r);
+    } else if (
+      existing.monthlyOrHolder === 'holder' &&
+      r.monthlyOrHolder === 'monthly'
+    ) {
+      byKidRecord.set(key, r);
+    }
+  }
+  const rows = Array.from(byKidRecord.values());
 
   // Hydrate each row with the latest published Child Update for its
   // kid. Done in parallel so a sponsor with 6 kids doesn&rsquo;t pay 6×
