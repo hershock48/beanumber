@@ -29,6 +29,7 @@ import { cookies } from 'next/headers';
 import Link from 'next/link';
 import Image from 'next/image';
 import { SESSION } from '@/lib/constants';
+import { YourKidsStripSticky } from './YourKidsStripSticky';
 
 interface KidLink {
   shirtNumber: number;
@@ -176,6 +177,7 @@ export async function YourKidsStrip({
   const overflow = Math.max(0, others.length - 12);
 
   return (
+    <YourKidsStripSticky>
     <div className="bg-[#1a1208] text-white border-b border-[#3a2f24]">
       <div className="max-w-5xl mx-auto px-5 py-3">
         <div className="flex items-center gap-4 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -232,5 +234,6 @@ export async function YourKidsStrip({
         </div>
       </div>
     </div>
+    </YourKidsStripSticky>
   );
 }
