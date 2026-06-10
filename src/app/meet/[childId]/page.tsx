@@ -29,6 +29,7 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
+import { MeetSponsorButton } from './MeetSponsorButton';
 import { BANNavigation } from '@/components/BANNavigation';
 import { BANFooter } from '@/components/BANFooter';
 import { RecentKidsStrip } from '@/components/RecentKidsStrip';
@@ -243,12 +244,12 @@ export default async function MeetKidPage({
                     $25/month keeps {firstName} in school, fed, and seen
                     by a doctor. Cancel anytime.
                   </p>
-                  <Link
-                    href={`/sponsorship?kid=${encodeURIComponent(record.id)}`}
-                    className="inline-block w-full text-center px-5 py-3 bg-[#D4A843] hover:bg-[#c49a3a] text-[#0d0d0d] font-bold text-xs uppercase tracking-wider transition-colors"
-                  >
-                    Start sponsoring {firstName} — $25/mo
-                  </Link>
+                  <MeetSponsorButton
+                    childRecordId={record.id}
+                    childId={f.ChildID || ''}
+                    childDisplayName={displayName}
+                    firstName={firstName}
+                  />
                 </div>
               )}
             </div>

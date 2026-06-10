@@ -183,7 +183,12 @@ function IconLaptop({ className = 'w-6 h-6' }: { className?: string }) {
 function SponsorshipPageContent() {
   const searchParams = useSearchParams();
 
-  const preselectedChildId = searchParams.get('child');
+  // Accept either ?child= or ?kid= so we don't lose preselection when
+  // a link uses the legacy parameter name. /meet/[childId] used to
+  // link with ?kid= and the page only read ?child=, so the focused
+  // view never engaged — the visitor landed on the generic grid.
+  const preselectedChildId =
+    searchParams.get('child') || searchParams.get('kid');
   const referringShirtSessionId = searchParams.get('from_shirt');
 
   const [children, setChildren] = useState<AvailableChild[]>([]);
