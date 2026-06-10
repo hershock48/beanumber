@@ -31,6 +31,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { MeetSponsorButton } from './MeetSponsorButton';
 import { YourKidsStrip } from '@/components/YourKidsStrip';
+import { getViewerSponsorshipForChild } from '@/lib/sponsor-relationship';
 import { BANNavigation } from '@/components/BANNavigation';
 import { BANFooter } from '@/components/BANFooter';
 import { RecentKidsStrip } from '@/components/RecentKidsStrip';
@@ -128,6 +129,12 @@ export default async function MeetKidPage({
   const photo = f.ProfilePhoto?.[0]?.url;
   const age = computeAge(f.DateOfBirth);
   const isDeparted = !!f.DepartedAt;
+
+  // Check whether the signed-in viewer (if any) already sponsors or
+  // holds this kid. If so, /meet renders a relationship-acknowledging
+  // card instead of a cold "Sponsor [name]" CTA. Same recognition
+  // path /[N] uses; lives in src/lib/sponsor-relationship.ts.
+  const viewerRel = await getViewerSponsorshipForChild(f.ChildID || '');
 
   return (
     <div className="bg-[#FFF8F0] min-h-screen flex flex-col">
@@ -234,7 +241,49 @@ export default async function MeetKidPage({
                 </blockquote>
               )}
 
-              {!isDeparted && (
+              {!isDeparted && viewerRel?.kind === 'sponsor' && (
+                <div className="mt-2 bg-white border-2 border-[#D4A843]/30 p-5">
+                  <p className="text-xs font-bold uppercase tracking-[0.25em] text-[#D4A843] mb-2">
+                    You sponsor {firstName}
+                  </p>
+                  <p
+                    className="text-xl text-[#0d0d0d] mb-2"
+                    style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
+                  >
+                    Through your ${viewerRel.monthlyAmount}/month, {firstName} is
+                    in school, fed, and seen by a doctor.
+                  </p>
+                  <p className="text-xs text-[#888]">
+                    Manage your subscription or download a giving
+                    statement from{' '}
+                    <Link href="/me" className="text-[#D4A843] hover:underline font-bold">
+                      Your kids
+                    </Link>{' '}
+                    in the nav.
+                  </p>
+                </div>
+              )}
+              {!isDeparted && viewerRel?.kind === 'holder' && (
+                <div className="mt-2 bg-white border-2 border-[#D4A843]/30 p-5">
+                  <p className="text-xs font-bold uppercase tracking-[0.25em] text-[#D4A843] mb-2">
+                    {firstName} is yours
+                  </p>
+                  <p
+                    className="text-sm text-[#555] leading-relaxed mb-4"
+                  >
+                    You hold {firstName}&rsquo;s number. Whenever you&rsquo;re
+                    ready, $25/month keeps {firstName} in school, fed,
+                    and seen by a doctor. No pressure to decide today.
+                  </p>
+                  <MeetSponsorButton
+                    childRecordId={record.id}
+                    childId={f.ChildID || ''}
+                    childDisplayName={displayName}
+                    firstName={firstName}
+                  />
+                </div>
+              )}
+              {!isDeparted && !viewerRel && (
                 <div className="mt-2 bg-[#FFF8F0] border-2 border-[#D4A843] p-5">
                   <p
                     className="text-xl text-[#0d0d0d] mb-2"

@@ -34,6 +34,17 @@ export async function POST(request: NextRequest) {
       // payment method to the new subscription session.
       existingCustomerId: z.string().optional(),
       buyerEmail: z.string().email().optional().or(z.literal('')),
+      // Path the user should land on if they cancel out of Stripe.
+      // Set by callers that have meaningful context to preserve
+      // (MeetSponsorButton sends /meet/[childId] so the user lands
+      // back on the kid they were about to sponsor instead of the
+      // generic browse grid). Must be a same-origin path — we
+      // validate before using.
+      returnPath: z
+        .string()
+        .max(200)
+        .regex(/^\/[^\s]*$/, 'returnPath must be an absolute same-origin path')
+        .optional(),
     });
 
     const parsed = sponsorSchema.safeParse(await request.json());
@@ -43,7 +54,7 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-    const { childRecordId, childId, childDisplayName, email, name, referringShirtSessionId, existingCustomerId, buyerEmail } = parsed.data;
+    const { childRecordId, childId, childDisplayName, email, name, referringShirtSessionId, existingCustomerId, buyerEmail, returnPath } = parsed.data;
 
     // Attribution breadcrumb. When a sponsor arrives via the shirt success
     // page, we thread the original shirt checkout session id here so the
@@ -79,7 +90,11 @@ export async function POST(request: NextRequest) {
       ],
       mode: 'subscription',
       success_url: `${origin}/sponsor/welcome?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${origin}/sponsorship`,
+      // Cancel returns to the caller's preserved context (e.g.
+      // /meet/[childId]) when provided, otherwise the generic
+      // sponsorship browse page. Schema validation already ensured
+      // returnPath is a same-origin absolute path.
+      cancel_url: `${origin}${returnPath || '/sponsorship'}`,
       ...(hasExistingCustomer
         ? { customer: existingCustomerId as string }
         : { customer_email: email || buyerEmail || undefined }),

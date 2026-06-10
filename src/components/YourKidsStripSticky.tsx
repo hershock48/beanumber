@@ -63,8 +63,14 @@ export function YourKidsStripSticky({ children }: YourKidsStripStickyProps) {
 
   return (
     <div
-      className="sticky top-[72px] z-40 transition-transform duration-300 ease-out"
+      className="sticky z-40 transition-transform duration-300 ease-out"
       style={{
+        // Read the navbar's actual rendered height from the CSS var
+        // BANNavigationClient publishes (updated via ResizeObserver
+        // whenever the navbar resizes, including when the mobile menu
+        // expands). Falls back to 72 px if the var isn't set yet,
+        // which is the static navbar height for the desktop case.
+        top: 'var(--nav-height, 72px)',
         transform: hidden ? 'translateY(-100%)' : 'translateY(0)',
         // Tell the browser this element's transform changes a lot;
         // gives it a separate compositing layer so the slide stays

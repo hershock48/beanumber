@@ -32,10 +32,27 @@ import { SESSION } from '@/lib/constants';
 import { YourKidsStripSticky } from './YourKidsStripSticky';
 
 interface KidLink {
+  recordId: string;
   shirtNumber: number;
   firstName: string;
   photoUrl?: string;
   relationship: 'sponsor' | 'holder';
+  /**
+   * Does the viewer actually own the number tied to this kid?
+   *
+   * - Holder → yes (they claimed the number, with or without buying
+   *   the shirt; the relationship IS the number).
+   * - Active sponsor whose email matches the kid&rsquo;s ShirtBuyerEmail →
+   *   yes (they bought the shirt that put them in the relationship).
+   * - Active sponsor who came in through /sponsorship without ever
+   *   buying that kid&rsquo;s shirt → no (the relationship is with the
+   *   kid; the number belongs to someone else&rsquo;s shirt).
+   *
+   * Drives where the avatar links: owners get /children/[N] (their
+   * Number&rsquo;s page), non-owners get /meet/[recordId] (the unnumbered
+   * relationship page).
+   */
+  ownsNumber: boolean;
 }
 
 const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID || '';
@@ -113,7 +130,21 @@ async function fetchKidsForEmail(email: string): Promise<KidLink[]> {
           const amount = (sp.fields?.MonthlyAmount as number) || 0;
           const relationship: 'sponsor' | 'holder' =
             status === 'Active' && amount > 0 ? 'sponsor' : 'holder';
+
+          // Number ownership rule. Holders own the number by
+          // definition; Active sponsors own it only if their email
+          // is the shirt buyer for this kid. Otherwise the
+          // sponsorship lives without a corresponding shirt purchase,
+          // and routing to /[N] would push them into a number page
+          // they don&rsquo;t own.
+          const shirtBuyerEmail =
+            (cf.ShirtBuyerEmail as string | undefined)?.trim().toLowerCase() || '';
+          const ownsNumber =
+            relationship === 'holder' ||
+            (shirtBuyerEmail !== '' && shirtBuyerEmail === email);
+
           return {
+            recordId: c.id as string,
             shirtNumber,
             firstName:
               cf.FirstName ||
@@ -121,6 +152,7 @@ async function fetchKidsForEmail(email: string): Promise<KidLink[]> {
               'them',
             photoUrl: cf.ProfilePhoto?.[0]?.url as string | undefined,
             relationship,
+            ownsNumber,
           } satisfies KidLink;
         } catch {
           return null;
@@ -187,9 +219,13 @@ export async function YourKidsStrip({
           {display.map(kid => (
             <Link
               key={kid.shirtNumber}
-              href={`/children/${kid.shirtNumber}`}
+              href={
+                kid.ownsNumber
+                  ? `/children/${kid.shirtNumber}`
+                  : `/meet/${kid.recordId}`
+              }
               className="flex-shrink-0 flex items-center gap-2 group"
-              title={`${kid.firstName} (#${kid.shirtNumber})`}
+              title={kid.firstName}
             >
               <div className="w-9 h-9 md:w-10 md:h-10 rounded-full overflow-hidden bg-[#2a1f14] relative ring-1 ring-[#3a2f24] group-hover:ring-[#D4A843] transition">
                 {kid.photoUrl ? (

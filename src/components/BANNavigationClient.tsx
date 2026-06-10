@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { Logo } from '@/components/Logo';
 
@@ -20,6 +20,7 @@ export function BANNavigationClient({
 }: BANNavigationClientProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const navRef = useRef<HTMLElement | null>(null);
 
   // For server-rendered pages, the BANNavigation server wrapper passes
   // the correct signedIn value as a prop and there&rsquo;s no flicker. For
@@ -37,6 +38,29 @@ export function BANNavigationClient({
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  // Publish the navbar&rsquo;s actual rendered height as --nav-height on the
+  // document root so the sticky strip below us can offset itself
+  // correctly. The navbar grows when the mobile menu opens, so we
+  // track real height with ResizeObserver instead of hardcoding 72 px
+  // everywhere. Falls back to the static value when ResizeObserver
+  // isn&rsquo;t available.
+  useEffect(() => {
+    const el = navRef.current;
+    if (!el) return;
+    const setHeight = (h: number) => {
+      document.documentElement.style.setProperty('--nav-height', `${h}px`);
+    };
+    setHeight(el.offsetHeight);
+    if (typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(entries => {
+      for (const entry of entries) {
+        setHeight((entry.target as HTMLElement).offsetHeight);
+      }
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
   useEffect(() => {
     if (signedInProp !== undefined) return;
     let cancelled = false;
@@ -50,6 +74,75 @@ export function BANNavigationClient({
       .catch(() => {});
     return () => { cancelled = true; };
   }, [signedInProp]);
+
+  // Multi-tab auth sync. When the user signs out in one tab, push a
+  // message via BroadcastChannel so other tabs flip their nav state
+  // immediately instead of staying stuck on "Sign out" until the
+  // user navigates. Same channel listens for sign-in confirmations
+  // so a magic-link callback in one tab pulls the others into the
+  // authed state without a refresh.
+  useEffect(() => {
+    if (typeof BroadcastChannel === 'undefined') return;
+    let channel: BroadcastChannel;
+    try {
+      channel = new BroadcastChannel('ban-auth');
+    } catch {
+      return;
+    }
+    channel.onmessage = event => {
+      if (event.data?.type === 'signout') setResolvedSignedIn(false);
+      else if (event.data?.type === 'signin') setResolvedSignedIn(true);
+    };
+    return () => {
+      try { channel.close(); } catch {}
+    };
+  }, []);
+
+  // Visibility fallback: when this tab regains focus, re-check session
+  // status. Catches the case where the user signed out in another tab
+  // that didn&rsquo;t fire BroadcastChannel (older browsers, no-JS submit
+  // flow, etc.).
+  useEffect(() => {
+    const handler = () => {
+      if (document.visibilityState !== 'visible') return;
+      fetch('/api/session/status', { credentials: 'same-origin' })
+        .then(r => r.ok ? r.json() : null)
+        .then(data => {
+          if (data && typeof data.signedIn === 'boolean') {
+            setResolvedSignedIn(data.signedIn);
+          }
+        })
+        .catch(() => {});
+    };
+    document.addEventListener('visibilitychange', handler);
+    return () => document.removeEventListener('visibilitychange', handler);
+  }, []);
+
+  const handleSignOut = useCallback(async (e: React.FormEvent) => {
+    // Intercept the form submit so we can broadcast to other tabs
+    // before navigating. The native form fallback still works if JS
+    // is disabled &mdash; we keep the action/method on the <form> as the
+    // server-side handler.
+    e.preventDefault();
+    try {
+      await fetch('/api/sponsor/logout', {
+        method: 'POST',
+        credentials: 'same-origin',
+      });
+    } catch {
+      // ignore; we&rsquo;re going to navigate home anyway
+    }
+    try {
+      const channel = new BroadcastChannel('ban-auth');
+      channel.postMessage({ type: 'signout' });
+      channel.close();
+    } catch {
+      // BroadcastChannel unsupported; other tabs catch up on
+      // visibilitychange or next navigation.
+    }
+    setResolvedSignedIn(false);
+    window.location.href = '/';
+  }, []);
 
   const signedIn = signedInProp ?? resolvedSignedIn;
   const showSolid = !transparent || scrolled;
@@ -71,6 +164,7 @@ export function BANNavigationClient({
       action="/api/sponsor/logout"
       method="POST"
       className="inline-flex"
+      onSubmit={handleSignOut}
     >
       <button
         type="submit"
@@ -97,6 +191,7 @@ export function BANNavigationClient({
       action="/api/sponsor/logout"
       method="POST"
       className="block"
+      onSubmit={handleSignOut}
     >
       <button
         type="submit"
@@ -117,6 +212,7 @@ export function BANNavigationClient({
 
   return (
     <nav
+      ref={navRef}
       className={`sticky top-0 z-50 transition-all duration-300 ${
         showSolid
           ? 'bg-[#FFF8F0]/95 backdrop-blur-md border-b border-[#e8e0d4]'

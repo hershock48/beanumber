@@ -186,58 +186,63 @@ async function fetchSponsorshipsForEmail(email: string): Promise<SponsorshipRow[
       };
     }> = data.records || [];
 
-    // Hydrate each sponsorship with its linked Child record.
-    const rows: SponsorshipRow[] = [];
-    for (const sp of sponsorshipRecords) {
-      const f = sp.fields;
-      const childRecordId = f.Children?.[0];
-      let childInfo = {
-        recordId: childRecordId || '',
-        // Falls back to the Sponsorship row's ChildID for cases where
-        // we can't fetch the linked Children record; the row stores
-        // a copy via a denormalized lookup.
-        childId: (f as { ChildID?: string }).ChildID || '',
-        shirtNumber: undefined as number | undefined,
-        displayName: f.ChildDisplayName || 'A kid at the campus',
-        firstName: (f.ChildDisplayName || '').split(' ')[0] || 'them',
-        photoUrl: undefined as string | undefined,
-        departed: false,
-      };
-      if (childRecordId) {
-        try {
-          const childRes = await fetch(
-            `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(
-              CHILDREN_TABLE
-            )}/${childRecordId}`,
-            { headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` }, cache: 'no-store' }
-          );
-          if (childRes.ok) {
-            const c = await childRes.json();
-            const cf = c.fields || {};
-            childInfo = {
-              recordId: c.id,
-              childId: (cf.ChildID as string) || childInfo.childId,
-              shirtNumber: typeof cf.ShirtNumber === 'number' ? cf.ShirtNumber : undefined,
-              displayName: cf.DisplayName || cf.FirstName || childInfo.displayName,
-              firstName: cf.FirstName || childInfo.firstName,
-              photoUrl: cf.ProfilePhoto?.[0]?.url,
-              departed: !!cf.DepartedAt,
-            };
-          }
-        } catch {}
-      }
-      const monthlyOrHolder: 'monthly' | 'holder' =
-        f.Status === 'Active' && (f.MonthlyAmount || 0) > 0 ? 'monthly' : 'holder';
-      rows.push({
-        recordId: sp.id,
-        sponsorCode: f.SponsorCode || '',
-        status: f.Status || '',
-        monthlyAmount: typeof f.MonthlyAmount === 'number' ? f.MonthlyAmount : 0,
-        monthlyOrHolder,
-        startDate: f.SponsorshipStartDate,
-        child: childInfo,
-      });
-    }
+    // Hydrate each sponsorship with its linked Child record in
+    // parallel. Previously this used a serial for-loop, which made
+    // /me wait ~150 ms per kid in series — a 6-kid sponsor paid
+    // ~900 ms of round-trip time just for child lookups. Promise.all
+    // collapses that to one round-trip&rsquo;s wall-clock latency.
+    const rows: SponsorshipRow[] = await Promise.all(
+      sponsorshipRecords.map(async sp => {
+        const f = sp.fields;
+        const childRecordId = f.Children?.[0];
+        let childInfo = {
+          recordId: childRecordId || '',
+          // Falls back to the Sponsorship row's ChildID for cases
+          // where we can't fetch the linked Children record; the
+          // row stores a copy via a denormalized lookup.
+          childId: (f as { ChildID?: string }).ChildID || '',
+          shirtNumber: undefined as number | undefined,
+          displayName: f.ChildDisplayName || 'A kid at the campus',
+          firstName: (f.ChildDisplayName || '').split(' ')[0] || 'them',
+          photoUrl: undefined as string | undefined,
+          departed: false,
+        };
+        if (childRecordId) {
+          try {
+            const childRes = await fetch(
+              `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(
+                CHILDREN_TABLE
+              )}/${childRecordId}`,
+              { headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` }, cache: 'no-store' }
+            );
+            if (childRes.ok) {
+              const c = await childRes.json();
+              const cf = c.fields || {};
+              childInfo = {
+                recordId: c.id,
+                childId: (cf.ChildID as string) || childInfo.childId,
+                shirtNumber: typeof cf.ShirtNumber === 'number' ? cf.ShirtNumber : undefined,
+                displayName: cf.DisplayName || cf.FirstName || childInfo.displayName,
+                firstName: cf.FirstName || childInfo.firstName,
+                photoUrl: cf.ProfilePhoto?.[0]?.url,
+                departed: !!cf.DepartedAt,
+              };
+            }
+          } catch {}
+        }
+        const monthlyOrHolder: 'monthly' | 'holder' =
+          f.Status === 'Active' && (f.MonthlyAmount || 0) > 0 ? 'monthly' : 'holder';
+        return {
+          recordId: sp.id,
+          sponsorCode: f.SponsorCode || '',
+          status: f.Status || '',
+          monthlyAmount: typeof f.MonthlyAmount === 'number' ? f.MonthlyAmount : 0,
+          monthlyOrHolder,
+          startDate: f.SponsorshipStartDate,
+          child: childInfo,
+        };
+      })
+    );
     return rows;
   } catch {
     return [];

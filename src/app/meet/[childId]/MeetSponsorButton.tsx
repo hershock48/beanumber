@@ -47,6 +47,11 @@ export function MeetSponsorButton({
           childRecordId,
           childId,
           childDisplayName,
+          // Preserve context: if they back out of Stripe, send them
+          // back to this kid's meet page instead of the generic
+          // /sponsorship browse grid where they'd have to find the
+          // same kid again.
+          returnPath: `/meet/${childRecordId}`,
         }),
       });
       const data = await res.json();
