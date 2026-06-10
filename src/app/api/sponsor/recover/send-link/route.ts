@@ -131,8 +131,18 @@ async function findExistingSponsorship(
   if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) return null;
   if (!childId) return null;
   try {
+    // Two paths OR'd together so we catch both newly-created Holder
+    // rows (which now carry a denormalized ChildID at write time) AND
+    // legacy rows where ChildID was left blank. Matching only on the
+    // text field would miss the blank-ChildID legacy rows and create
+    // duplicate Holders on every sign-in &mdash; exactly the bug Kevin
+    // hit after the first cleanup. The FIND-on-link path uses the
+    // Children primary field (which IS ChildID), bracketed with
+    // commas to prevent prefix collisions.
+    const safeEmail = email.toLowerCase().replace(/"/g, '\\"');
+    const safeChildId = childId.replace(/"/g, '\\"');
     const formula = encodeURIComponent(
-      `AND(LOWER({SponsorEmail})="${email.toLowerCase().replace(/"/g, '\\"')}", OR({Status}="Active",{Status}="Holder"), {ChildID}="${childId.replace(/"/g, '\\"')}")`
+      `AND(LOWER({SponsorEmail})="${safeEmail}", OR({Status}="Active",{Status}="Holder"), OR({ChildID}="${safeChildId}", FIND("," & "${safeChildId}" & ",", "," & ARRAYJOIN({Children}, ",") & ",")))`
     );
     const res = await fetch(
       `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(
@@ -164,8 +174,15 @@ async function isChildAlreadyClaimedByOther(
   if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) return false;
   if (!childId) return false;
   try {
+    // Dual-OR for the same reason as findExistingSponsorship: legacy
+    // rows might not carry ChildID even though they link the kid via
+    // the Children record. Without the FIND fallback we'd let a
+    // second person "claim" a number that's already held by someone
+    // else, just because the first person's row has blank ChildID.
+    const safeExcluding = excludingEmail.toLowerCase().replace(/"/g, '\\"');
+    const safeChildId = childId.replace(/"/g, '\\"');
     const formula = encodeURIComponent(
-      `AND(LOWER({SponsorEmail})!="${excludingEmail.toLowerCase().replace(/"/g, '\\"')}", OR({Status}="Active",{Status}="Holder"), {ChildID}="${childId.replace(/"/g, '\\"')}")`
+      `AND(LOWER({SponsorEmail})!="${safeExcluding}", OR({Status}="Active",{Status}="Holder"), OR({ChildID}="${safeChildId}", FIND("," & "${safeChildId}" & ",", "," & ARRAYJOIN({Children}, ",") & ",")))`
     );
     const res = await fetch(
       `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(
@@ -258,7 +275,8 @@ async function findMostRecentSponsorshipByEmail(email: string): Promise<{
  */
 async function createHolderSponsorship(
   email: string,
-  childRecordId: string
+  childRecordId: string,
+  childId: string
 ): Promise<string | null> {
   if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) return null;
   const sponsorCode = generateSponsorCode();
@@ -271,6 +289,14 @@ async function createHolderSponsorship(
     VisibleToSponsor: true,
     SponsorshipStartDate: today,
     Children: [childRecordId],
+    // Denormalize ChildID at write time. Sponsorships.ChildID is a
+    // plain text field, NOT a lookup from the Children link. The
+    // recovery lookups (findExistingSponsorship,
+    // isChildAlreadyClaimedByOther) match by {ChildID}=value, so if
+    // we leave this blank here every future sign-in attempt by the
+    // same email will create another duplicate Holder row. That's
+    // exactly the bug Kevin hit on /1 after the 2df11df cleanup.
+    ChildID: childId,
     MonthlyAmount: 0,
   };
   try {
@@ -399,7 +425,11 @@ export async function POST(request: NextRequest) {
         );
         return NextResponse.json(responseShape);
       }
-      sponsorCode = await createHolderSponsorship(email, child.recordId);
+      sponsorCode = await createHolderSponsorship(
+        email,
+        child.recordId,
+        child.childId
+      );
       if (!sponsorCode) {
         // Holder creation failed (likely "Holder" not yet added to
         // Sponsorships.Status singleSelect). Return privacy success and

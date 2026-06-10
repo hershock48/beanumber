@@ -182,7 +182,7 @@ export async function YourKidsStrip({
       <div className="max-w-5xl mx-auto px-5 py-3">
         <div className="flex items-center gap-4 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <p className="text-[10px] md:text-xs font-bold uppercase tracking-[0.25em] text-[#D4A843] flex-shrink-0">
-            Your kids
+            Your campus
           </p>
           {display.map(kid => (
             <Link

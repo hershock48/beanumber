@@ -92,6 +92,62 @@ function fireConfetti() {
  * haptic API isn't available (iPhone Safari + all desktops).
  * ~1.5s total. Generated on the fly, no asset required.
  */
+/**
+ * Synthesized "yay!" — two-syllable upbeat exclamation layered over
+ * the chime + confetti at reveal time. Two notes (A4 short then D5
+ * longer) with brass-like harmonic content. Not a recorded sample;
+ * fully procedural so it works offline and doesn't add asset weight.
+ *
+ * Plays alongside playRevealChime() — different audio context so
+ * they overlap naturally. Falls back silently if Web Audio is
+ * unavailable.
+ */
+function playYaySound() {
+  try {
+    const w = window as unknown as { webkitAudioContext?: typeof AudioContext };
+    const AC = window.AudioContext || w.webkitAudioContext;
+    if (!AC) return;
+    const ctx = new AC();
+    const now = ctx.currentTime;
+
+    // Helper: play a single note as a fundamental + three harmonics
+    // for a richer, brass-like timbre. Triangle on the fundamental
+    // gives a bit of warmth without the buzz of sawtooth.
+    const playNote = (
+      freq: number,
+      startTime: number,
+      duration: number,
+      peakGain: number
+    ) => {
+      const harmonicAmps = [1, 0.4, 0.2, 0.08];
+      [1, 2, 3, 4].forEach((mult, h) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = h === 0 ? 'triangle' : 'sine';
+        osc.frequency.value = freq * mult;
+        const amp = peakGain * harmonicAmps[h];
+        gain.gain.setValueAtTime(0, startTime);
+        gain.gain.linearRampToValueAtTime(amp, startTime + 0.02);
+        gain.gain.linearRampToValueAtTime(amp * 0.8, startTime + duration * 0.5);
+        gain.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(startTime);
+        osc.stop(startTime + duration + 0.05);
+      });
+    };
+
+    // "Ya"  — A4 (440 Hz), short staccato
+    playNote(440, now, 0.12, 0.12);
+    // "Ay!" — D5 (587 Hz), longer with sustained tail
+    playNote(587, now + 0.10, 0.38, 0.16);
+
+    setTimeout(() => { try { ctx.close(); } catch {} }, 700);
+  } catch {
+    // Audio not supported / blocked — visual reveal still works.
+  }
+}
+
 function playRevealChime() {
   try {
     const w = window as unknown as { webkitAudioContext?: typeof AudioContext };
@@ -172,6 +228,11 @@ export function RevealOverlay({ shirtNumber, childName, children }: RevealOverla
   const handleComplete = useCallback(() => {
     playRevealChime();
     fireConfetti();
+    // "Yay" lands a beat after the chime starts so the two sounds
+    // overlap as celebration rather than collide as a single hit.
+    // ~180ms gives the chime's first note room to register before
+    // the vocal-style exclamation enters.
+    setTimeout(() => playYaySound(), 180);
     try { localStorage.setItem(storageKey, 'yes'); } catch {}
     setStage('board');
     // Board scrambles + locks (~1.8s), holds locked for ~0.8s, then

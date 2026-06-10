@@ -147,14 +147,16 @@ async function findSponsorshipByEmailForChild(
   if (!childId) return null;
   const safeEmail = email.toLowerCase().replace(/"/g, '\\"');
   const safeChildId = childId.replace(/"/g, '\\"');
-  // Match on Sponsorships.ChildID equality rather than FIND on
-  // ARRAYJOIN({Children}, ","). Airtable's ARRAYJOIN of a linked-
-  // record field joins the linked record's PRIMARY FIELD values
-  // (ChildID strings like "HSP/BAN-002"), NOT record IDs — so the
-  // old `FIND(recordId, ...)` pattern never matched, and legitimate
-  // sponsors were misread as strangers on their own kid's page.
+  // Dual-OR: ChildID equality OR FIND on Children link with
+  // comma-bracketing. Equality covers freshly-written rows (the
+  // webhook + Holder writer both denormalize ChildID at write time),
+  // FIND-on-link covers legacy or hand-edited rows where ChildID is
+  // empty. ARRAYJOIN of a linked-record field joins the linked
+  // record's primary field — which for Children IS ChildID — so the
+  // FIND path is structurally correct without depending on
+  // denormalization having happened.
   const formula = encodeURIComponent(
-    `AND(LOWER({SponsorEmail})="${safeEmail}", OR({Status}="Active",{Status}="Holder"), {ChildID}="${safeChildId}")`
+    `AND(LOWER({SponsorEmail})="${safeEmail}", OR({Status}="Active",{Status}="Holder"), OR({ChildID}="${safeChildId}", FIND("," & "${safeChildId}" & ",", "," & ARRAYJOIN({Children}, ",") & ",")))`
   );
   try {
     const res = await fetch(
@@ -733,6 +735,12 @@ const getChildByShirtNumber = cache(async function getChildByShirtNumber(shirtNu
       // sponsorship record's SponsorCode.
       viewer_is_sponsor: viewerIsSponsor,
       viewer_is_holder: viewerIsHolder,
+      // True when the viewer has a valid sponsor_session cookie at
+      // all, even if they don't own THIS specific kid. The
+      // AlreadySponsoringBanner uses this to hide the "Sponsoring
+      // monthly? Sign in" prompt for viewers who are signed in for
+      // a different kid — they shouldn't be asked to sign in again.
+      viewer_signed_in: Boolean(viewerEmail),
       sponsor_code: viewerIsSponsor ? sponsorship!.SponsorCode : undefined,
       // Surfaced for the impact stats strip in the unified sponsor view.
       // Only populated when this viewer is the verified sponsor, since
@@ -1091,10 +1099,14 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
           unsigned visitors (sponsors and holders already see their
           acknowledgment further down; this is the off-ramp for the
           existing-sponsor-on-new-device case who would otherwise
-          panic at the public view). */}
-      {!child.viewer_is_sponsor && !child.viewer_is_holder && (
-        <AlreadySponsoringBanner shirtNumber={Number(number)} />
-      )}
+          panic at the public view). Also suppressed for viewers
+          who have a session cookie for a DIFFERENT kid — they're
+          already signed in, asking them to sign in again is wrong. */}
+      {!child.viewer_is_sponsor &&
+        !child.viewer_is_holder &&
+        !child.viewer_signed_in && (
+          <AlreadySponsoringBanner shirtNumber={Number(number)} />
+        )}
 
       {/* Replacement chooser short-circuit. When the sponsor's
           original kid has departed and we've staged 3 candidates,

@@ -54,12 +54,16 @@ export function BANNavigationClient({
   const signedIn = signedInProp ?? resolvedSignedIn;
   const showSolid = !transparent || scrolled;
 
+  // Nav order is intentional. Conversion path first (Shirts,
+  // Sponsor), then the user's own surface (Your kids), then the
+  // story/about beat (Story) right before sign-in. Impact moved
+  // to the footer — it's important context but doesn't need to
+  // compete with the conversion path for nav real estate.
   const navLinks = [
     { href: '/shirts', label: 'Shirts' },
     { href: '/sponsorship', label: 'Sponsor' },
-    { href: '/founder', label: 'Story' },
-    { href: '/impact', label: 'Impact' },
     { href: '/me', label: 'Your kids' },
+    { href: '/founder', label: 'Story' },
   ];
 
   const authButton = signedIn ? (
