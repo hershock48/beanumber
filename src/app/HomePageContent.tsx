@@ -171,14 +171,20 @@ export function HomePageContent() {
                   90deg,
                   transparent 0%,
                   rgba(255, 230, 150, 0.0) 20%,
-                  rgba(255, 230, 150, 0.65) 50%,
+                  rgba(255, 230, 150, 0.85) 50%,
                   rgba(255, 230, 150, 0.0) 80%,
                   transparent 100%
                 );
                 pointer-events: none;
                 animation: banSearchShimmer 1.8s ease-out 1.2s both;
+                /* On top of the input + button (which sit at z-10),
+                   so the highlight actually paints over their
+                   opaque backgrounds. mix-blend-mode: screen
+                   lightens whatever's beneath rather than
+                   obscuring it, so the input text and Find label
+                   stay readable as the sweep passes. */
                 mix-blend-mode: screen;
-                z-index: 5;
+                z-index: 30;
               }
             `}</style>
             <input
