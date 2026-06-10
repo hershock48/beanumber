@@ -13,10 +13,12 @@
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import { BANNavigation } from '@/components/BANNavigation';
 import { BANFooter } from '@/components/BANFooter';
 import { RecentKidsStrip } from '@/components/RecentKidsStrip';
 import { SESSION } from '@/lib/constants';
+import { getRecentCampusNewsletters } from '@/lib/newsletter-feed';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -149,7 +151,10 @@ export default async function MePage() {
     redirect('/signin?next=/me&reason=your-kids');
   }
 
-  const rows = await fetchSponsorshipsForEmail(email);
+  const [rows, recentNewsletters] = await Promise.all([
+    fetchSponsorshipsForEmail(email),
+    getRecentCampusNewsletters(1),
+  ]);
 
   const monthlyTotal = rows
     .filter(r => r.monthlyOrHolder === 'monthly')
@@ -157,6 +162,7 @@ export default async function MePage() {
 
   const sponsors = rows.filter(r => r.monthlyOrHolder === 'monthly');
   const holders = rows.filter(r => r.monthlyOrHolder === 'holder');
+  const latestNewsletter = recentNewsletters[0];
 
   return (
     <div className="bg-[#FFF8F0] min-h-screen flex flex-col">
@@ -196,6 +202,50 @@ export default async function MePage() {
             )}
           </p>
         </div>
+
+        {/* Campus snapshot — pulls the latest newsletter so /me reads
+            like the campus is alive when you visit, not a static
+            list of your relationships. Renders only when we have a
+            newsletter to surface; quiet otherwise. */}
+        {latestNewsletter && (
+          <Link
+            href="/news"
+            className="group block bg-[#1a1208] text-white mb-10 md:mb-14 overflow-hidden hover:ring-2 hover:ring-[#D4A843] transition"
+          >
+            <div className="flex flex-col md:flex-row">
+              {latestNewsletter.heroPhotoUrl && (
+                <div className="md:w-1/3 aspect-[16/10] md:aspect-auto relative bg-[#2a1f14]">
+                  <Image
+                    src={latestNewsletter.heroPhotoUrl}
+                    alt={latestNewsletter.title || 'From the campus'}
+                    fill
+                    sizes="(max-width: 768px) 100vw, 33vw"
+                    className="object-cover group-hover:scale-105 transition-transform duration-500"
+                  />
+                </div>
+              )}
+              <div className="p-6 md:p-7 flex-1">
+                <p className="text-xs font-bold uppercase tracking-[0.25em] text-[#D4A843] mb-2">
+                  From the campus
+                  {latestNewsletter.publishedAt && (
+                    <span className="text-[#d8cfc1] font-normal normal-case tracking-normal ml-2">
+                      &middot; {formatRelativeMonth(latestNewsletter.publishedAt)}
+                    </span>
+                  )}
+                </p>
+                <p
+                  className="text-xl md:text-2xl leading-tight mb-2"
+                  style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
+                >
+                  {latestNewsletter.title || latestNewsletter.subject || 'Latest from Uganda'}
+                </p>
+                <p className="text-xs uppercase tracking-wider text-[#D4A843] font-bold group-hover:underline">
+                  Read this issue &rarr;
+                </p>
+              </div>
+            </div>
+          </Link>
+        )}
 
         {rows.length === 0 ? (
           <div className="bg-white border border-[#e8e0d4] p-8 md:p-12 text-center">
@@ -363,4 +413,13 @@ function KidCard({ row }: { row: SponsorshipRow }) {
 function monthsBetween(a: Date, b: Date): number {
   const ms = b.getTime() - a.getTime();
   return Math.max(0, Math.floor(ms / (1000 * 60 * 60 * 24 * 30)));
+}
+
+function formatRelativeMonth(iso: string): string {
+  try {
+    const d = new Date(iso);
+    return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  } catch {
+    return '';
+  }
 }

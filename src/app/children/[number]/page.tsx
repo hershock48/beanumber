@@ -21,6 +21,7 @@ import { SponsorRecoveryForm } from './SponsorRecoveryForm';
 import { OtherKidsAtCampus } from './OtherKidsAtCampus';
 import { ClaimThisNumberCard } from './ClaimThisNumberCard';
 import { ClaimGate } from './ClaimGate';
+import { YourKidsStrip } from '@/components/YourKidsStrip';
 import { AlreadySponsoringBanner } from './AlreadySponsoringBanner';
 import { RecentKidsTracker } from '@/components/RecentKidsTracker';
 import { RecentKidsStrip } from '@/components/RecentKidsStrip';
@@ -1079,6 +1080,12 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
       <RevealBeacon number={Number(number)} />
 
       <BANNavigation currentPath={'/children/' + number} />
+
+      {/* Your kids strip — appears at the top of every kid page for
+          signed-in users who own 2+ kids. Turns this kid page into a
+          navigation surface for the rest of their family, so they
+          don't have to bounce through /me to switch between kids. */}
+      <YourKidsStrip excludeShirtNumber={Number(number)} />
 
       {/* Already-sponsoring banner — slim, dismissible, only shown to
           unsigned visitors (sponsors and holders already see their

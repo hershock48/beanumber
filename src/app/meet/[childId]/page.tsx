@@ -30,6 +30,7 @@ import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { MeetSponsorButton } from './MeetSponsorButton';
+import { YourKidsStrip } from '@/components/YourKidsStrip';
 import { BANNavigation } from '@/components/BANNavigation';
 import { BANFooter } from '@/components/BANFooter';
 import { RecentKidsStrip } from '@/components/RecentKidsStrip';
@@ -131,6 +132,7 @@ export default async function MeetKidPage({
   return (
     <div className="bg-[#FFF8F0] min-h-screen flex flex-col">
       <BANNavigation />
+      <YourKidsStrip />
       <main className="flex-1">
         <div className="max-w-5xl mx-auto px-5 py-8 md:py-14">
           {fromShirt ? (
