@@ -3,7 +3,7 @@
 import { Suspense, useState, useEffect, useRef, useMemo } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { BANNavigation } from '@/components/BANNavigation';
+import { BANNavigationClient as BANNavigation } from '@/components/BANNavigationClient';
 import { BANFooter } from '@/components/BANFooter';
 
 /**
