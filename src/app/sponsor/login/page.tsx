@@ -155,8 +155,8 @@ export default function SponsorLogin() {
           {/* Not a sponsor yet */}
           <p className="text-center text-sm text-[#aaa] mt-8">
             Not a sponsor yet?{' '}
-            <Link href="/sponsorship" className="text-[#D4A843] font-medium hover:underline">
-              Meet the kids.
+            <Link href="/campus" className="text-[#D4A843] font-medium hover:underline">
+              Meet the campus.
             </Link>
           </p>
         </div>

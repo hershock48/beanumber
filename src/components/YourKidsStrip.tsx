@@ -14,7 +14,7 @@
  *     names. Click any of them → that kid&rsquo;s /[N] page.
  *   - Excludes the currently-viewed kid (no link to yourself).
  *   - Caps at 12 kids to keep mobile rows manageable.
- *   - Trailing &ldquo;+ Add&rdquo; tile that links to /sponsorship.
+ *   - Trailing &ldquo;+ Add&rdquo; tile that links to /campus.
  *   - Returns null entirely for non-signed-in visitors, signed-in
  *     visitors with zero kids, or signed-in visitors whose only kid
  *     IS the one they&rsquo;re looking at. The strip should be quiet when
@@ -44,7 +44,7 @@ interface KidLink {
    *   the shirt; the relationship IS the number).
    * - Active sponsor whose email matches the kid&rsquo;s ShirtBuyerEmail →
    *   yes (they bought the shirt that put them in the relationship).
-   * - Active sponsor who came in through /sponsorship without ever
+   * - Active sponsor who came in through /campus without ever
    *   buying that kid&rsquo;s shirt → no (the relationship is with the
    *   kid; the number belongs to someone else&rsquo;s shirt).
    *
@@ -256,9 +256,9 @@ export async function YourKidsStrip({
             </Link>
           )}
           <Link
-            href="/sponsorship"
+            href="/campus"
             className="flex-shrink-0 flex items-center gap-2 group ml-1"
-            title="Sponsor another kid"
+            title="Browse the campus"
           >
             <div className="w-9 h-9 md:w-10 md:h-10 rounded-full border border-dashed border-[#666] flex items-center justify-center text-[#d8cfc1] group-hover:border-[#D4A843] group-hover:text-[#D4A843] transition-colors">
               <span className="text-xl leading-none -mt-1">+</span>

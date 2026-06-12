@@ -53,6 +53,22 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+  // URL redirects. Permanent (301) so search engines + browsers
+  // cache the new canonical URL.
+  async redirects() {
+    return [
+      {
+        // /sponsorship → /campus. The page changed from a kid-picker
+        // checkout to an explore page; the URL "sponsorship" no
+        // longer matched the content (it's now about meeting the
+        // campus, not buying a sponsorship). Old links from emails,
+        // social posts, and bookmarks keep working via this 301.
+        source: '/sponsorship',
+        destination: '/campus',
+        permanent: true,
+      },
+    ];
+  },
   // next/image optimization. We use this for every Airtable-hosted
   // photo (kid hero, OtherKidsAtCampus strip, CampusNewsfeed covers)
   // so the browser receives a device-sized WebP/AVIF instead of the

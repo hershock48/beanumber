@@ -470,10 +470,10 @@ export function HomePageContent() {
               Get a Shirt
             </Link>
             <Link
-              href="/sponsorship"
+              href="/campus"
               className="px-8 py-4 bg-transparent text-[#FFF8F0] font-bold uppercase tracking-wider text-sm border border-[#444] hover:border-[#D4A843]/50 transition-colors"
             >
-              Browse Children
+              Meet the Campus
             </Link>
           </div>
         </div>

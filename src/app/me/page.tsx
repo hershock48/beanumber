@@ -408,10 +408,10 @@ export default async function MePage() {
                 Shop the Shirts
               </Link>
               <Link
-                href="/sponsorship"
+                href="/campus"
                 className="px-6 py-3 bg-white border border-[#0d0d0d] hover:bg-[#0d0d0d] hover:text-white text-[#0d0d0d] text-xs font-bold uppercase tracking-wider transition-colors"
               >
-                Sponsor a kid
+                Meet the campus
               </Link>
             </div>
           </div>
@@ -470,10 +470,10 @@ export default async function MePage() {
                   Shop another shirt
                 </Link>
                 <Link
-                  href="/sponsorship"
+                  href="/campus"
                   className="px-6 py-3 bg-white border border-[#0d0d0d] hover:bg-[#0d0d0d] hover:text-white text-[#0d0d0d] text-xs font-bold uppercase tracking-wider transition-colors text-center"
                 >
-                  Sponsor a new kid
+                  Meet the campus
                 </Link>
               </div>
             </section>

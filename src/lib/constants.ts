@@ -314,7 +314,11 @@ export const VALIDATION = {
 export const ROUTES = {
   HOME: '/',
   CONTACT: '/contact',
-  SPONSORSHIP: '/sponsorship',
+  // /sponsorship was renamed to /campus when the page changed from a
+  // kid-picker checkout to the campus exploration page. The next.config.ts
+  // redirect keeps old links working; this constant points at the new
+  // canonical URL.
+  SPONSORSHIP: '/campus',
   SPONSOR_LOGIN: '/sponsor/login',
   SPONSOR_DASHBOARD: (code: string) => `/sponsor/${code}`,
   DONATE_SUCCESS: '/donate/success',

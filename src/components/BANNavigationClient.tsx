@@ -162,7 +162,7 @@ export function BANNavigationClient({
   // compete with the conversion path for nav real estate.
   const navLinks = [
     { href: '/shirts', label: 'Shirts' },
-    { href: '/sponsorship', label: 'Sponsor' },
+    { href: '/campus', label: 'Campus' },
     { href: '/me', label: 'Your kids' },
     { href: '/founder', label: 'Story' },
   ];

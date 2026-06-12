@@ -47,17 +47,17 @@ export default function DonatePage() {
               className="text-2xl md:text-3xl text-[#0d0d0d] mb-4"
               style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
             >
-              Prefer to sponsor a specific child?
+              Want to meet the campus first?
             </h2>
             <p className="text-[#777] leading-relaxed mb-6">
-              Our sponsorship program connects you to one child by name. You receive
-              their photo, their story, and updates throughout the year.
+              Read the stories of the kids at our campus in Northern Uganda. When you get a Shirt,
+              your Number connects you to one of them.
             </p>
             <a
-              href="/sponsorship"
+              href="/campus"
               className="inline-block px-8 py-4 bg-transparent text-[#0d0d0d] font-bold uppercase tracking-wider text-sm border border-[#e8e0d4] hover:border-[#D4A843]/50 transition-colors"
             >
-              See sponsorship
+              Meet the campus
             </a>
           </div>
         </section>

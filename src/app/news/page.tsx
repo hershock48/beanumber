@@ -142,11 +142,11 @@ export default async function NewsPage() {
           </Link>
 
           <Link
-            href="/sponsorship"
+            href="/campus"
             className="block bg-white border border-[#e8e0d4] p-6 md:p-7 hover:border-[#D4A843] transition-colors group"
           >
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-2">
-              Sponsor monthly
+              The campus
             </p>
             <p
               className="text-xl text-[#0d0d0d] leading-snug mb-2"

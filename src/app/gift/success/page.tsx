@@ -53,10 +53,10 @@ export default function GiftSuccessPage() {
             Back to home
           </Link>
           <Link
-            href="/sponsorship"
+            href="/campus"
             className="inline-block bg-white border border-[#e8e0d4] text-[#0d0d0d] font-bold uppercase tracking-wider py-3 px-8 hover:bg-[#f5f0e8] transition-colors"
           >
-            Meet a child of your own
+            Meet the campus
           </Link>
         </div>
       </main>

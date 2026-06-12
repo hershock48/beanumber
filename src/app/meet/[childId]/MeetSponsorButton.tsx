@@ -6,7 +6,7 @@
  * The /meet page is the numberless kid profile someone lands on after
  * clicking a tile in "Other kids at the campus." When they hit
  * "Sponsor [name]" here, they have already picked. There's no reason
- * to bounce them through /sponsorship's browse grid.
+ * to bounce them through /campus's browse grid.
  *
  * This button POSTs straight to the create-sponsor-checkout API and
  * redirects to Stripe in one click. Two clicks total from kid tile to
@@ -49,7 +49,7 @@ export function MeetSponsorButton({
           childDisplayName,
           // Preserve context: if they back out of Stripe, send them
           // back to this kid's meet page instead of the generic
-          // /sponsorship browse grid where they'd have to find the
+          // /campus browse grid where they'd have to find the
           // same kid again.
           returnPath: `/meet/${childRecordId}`,
         }),

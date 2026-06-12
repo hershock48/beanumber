@@ -349,10 +349,10 @@ export default function Impact() {
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link
-              href="/sponsorship"
+              href="/campus"
               className="px-8 py-4 bg-[#D4A843] text-[#0d0d0d] font-bold uppercase tracking-wider text-sm hover:bg-[#c49a3a] transition-colors"
             >
-              Sponsor a Child
+              Meet the Campus
             </Link>
             <Link
               href="/shirts"
