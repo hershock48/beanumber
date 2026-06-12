@@ -45,15 +45,48 @@
  *     kid at once.
  */
 
+import type { Metadata } from 'next';
 import { cookies } from 'next/headers';
 import Link from 'next/link';
 import Image from 'next/image';
 import { BANNavigation } from '@/components/BANNavigation';
 import { BANFooter } from '@/components/BANFooter';
 import { SESSION } from '@/lib/constants';
+import {
+  getRecentCampusNewsletters,
+  type CampusNewsletterEntry,
+} from '@/lib/newsletter-feed';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
+
+/**
+ * Page metadata. /campus is the natural URL someone shares when
+ * pointing a friend at BAN ("here are the kids"), so the share
+ * preview matters more here than on most surfaces. Overrides the
+ * root layout&rsquo;s defaults with campus-specific framing; falls back
+ * to the site hero image for the OG card until we ship a campus
+ * composite.
+ */
+export const metadata: Metadata = {
+  title: 'Meet the kids | Be A Number',
+  description:
+    'Every kid enrolled at the YDO campus in Omoro District, Northern Uganda. School, meals, medical care, and mentorship. Meet them.',
+  openGraph: {
+    title: 'Meet the kids at the campus | Be A Number',
+    description:
+      'Every kid enrolled at the YDO campus in Omoro District, Northern Uganda. Meet them.',
+    url: 'https://www.beanumber.org/campus',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Meet the kids at the campus | Be A Number',
+    description:
+      'Every kid at the YDO campus in Omoro District, Northern Uganda.',
+  },
+  alternates: { canonical: 'https://www.beanumber.org/campus' },
+};
 
 // ── Types ─────────────────────────────────────────────────────────
 
@@ -295,10 +328,19 @@ function lovesPhrase(loves?: string): string | null {
 export default async function CampusPage() {
   const email = await getViewerEmail();
 
-  const [allChildren, viewerKids] = await Promise.all([
+  // Three fetches, run in parallel: the roster (always), the
+  // viewer&rsquo;s sponsored-kid set (only if signed in), and the most
+  // recent campus newsletter (always — surfaces the page&rsquo;s
+  // &ldquo;from the campus this week&rdquo; card). All three return
+  // empty/empty/null on failure so the page renders gracefully if
+  // Airtable is flaky.
+  const [allChildren, viewerKids, recentNewsletters] = await Promise.all([
     fetchAllChildren(),
     email ? fetchViewerKids(email) : Promise.resolve([] as ViewerKid[]),
+    getRecentCampusNewsletters(1),
   ]);
+  const latestNewsletter: CampusNewsletterEntry | null =
+    recentNewsletters[0] || null;
 
   // Only kids with a photo go in the discovery grid. A faceless tile
   // defeats the whole "meet the kid" purpose. The trust strip still
@@ -322,9 +364,41 @@ export default async function CampusPage() {
       ? { min: Math.min(...ages), max: Math.max(...ages) }
       : null;
 
+  // JSON-LD ItemList. Lets Google index the campus as a structured
+  // collection so "Be A Number children" search lands on the grid as
+  // a recognized list of profiles. Per-tile image URLs are skipped
+  // intentionally — Airtable attachment URLs rotate, baking them
+  // into long-lived structured data would point Google at expired
+  // URLs. Each /meet/[id] page carries its own image metadata.
+  const itemListJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    name: 'Children enrolled at the YDO campus',
+    description:
+      'Every kid currently enrolled at the YDO campus in Omoro District, Northern Uganda.',
+    numberOfItems: orderedChildren.length,
+    itemListOrder: 'https://schema.org/ItemListUnordered',
+    itemListElement: orderedChildren.map((c, i) => ({
+      '@type': 'ListItem',
+      position: i + 1,
+      url: `https://www.beanumber.org/meet/${c.recordId}`,
+      item: {
+        '@type': 'Person',
+        name: c.displayName,
+        givenName: c.firstName,
+      },
+    })),
+  };
+
   return (
     <div className="min-h-screen bg-[#FFF8F0]">
       <BANNavigation currentPath="/campus" />
+
+      {/* JSON-LD structured data, invisible to humans. */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(itemListJsonLd) }}
+      />
 
       {/* ========== HERO — state-aware, no funnel CTA ========== */}
       <section className="pt-24 pb-12 px-6">
@@ -379,6 +453,22 @@ export default async function CampusPage() {
         </div>
       </section>
 
+      {/* ========== CAMPUS-AS-PLACE — three sentences, names the
+          place, the team, the buildings. The page is named "campus"
+          so the campus should appear on it. Sits above the grid
+          because it&rsquo;s context for what the visitor is about to see. */}
+      <section className="pb-12 px-6">
+        <div className="max-w-3xl mx-auto">
+          <p className="text-[#444] leading-relaxed text-center text-base md:text-lg">
+            Six acres in Omoro District, Northern Uganda. Simon Peter
+            Wilobo and thirty teachers, nurses, and mentors run the
+            day. The campus has a nursery, a primary school, an
+            on-site clinic, vocational training for local women, and
+            a lodge for sponsors who come visit.
+          </p>
+        </div>
+      </section>
+
       {/* ========== KID GRID — every face, server-rendered ========== */}
       <section className="pb-16 px-6">
         <div className="max-w-6xl mx-auto">
@@ -397,6 +487,20 @@ export default async function CampusPage() {
           )}
         </div>
       </section>
+
+      {/* ========== FROM THE CAMPUS THIS WEEK — pulls the most recent
+          published newsletter as a single bridge card. Makes the
+          page feel alive instead of static. Hides if there&rsquo;s no
+          newsletter yet so we don&rsquo;t render a placeholder. */}
+      {latestNewsletter && (
+        <FromTheCampus newsletter={latestNewsletter} />
+      )}
+
+      {/* ========== TWO WAYS IN — cold-visitor only. Per core_model
+          §0b both paths are legitimate (shirt-first and
+          discovery-first), but the page currently only nods to the
+          shirt path. This block makes the second path explicit. */}
+      {!ownsAnyKid && <TwoWaysIn />}
 
       {/* ========== BOTTOM — quiet for owners, shirt-first for cold ========== */}
       <section className="pb-20 px-6 border-t border-[#e8e0d4] pt-12">
@@ -568,5 +672,100 @@ function EmptyState() {
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * Bridge card to the newsletter archive. Renders the most recent
+ * Sent campus newsletter as a hero photo + label + title + date,
+ * linking to /news where the full body lives on every kid page.
+ *
+ * Date format: "June 5, 2026" via toLocaleDateString — month name
+ * spelled out reads warmer than 6/5/26 and matches the date style
+ * on /me and the kid pages.
+ *
+ * Image: Airtable signed URL via next/image; falls back to a
+ * cream-tone tile if the newsletter has no HeroPhoto attached.
+ */
+function FromTheCampus({
+  newsletter,
+}: {
+  newsletter: CampusNewsletterEntry;
+}) {
+  const dateLabel = newsletter.publishedAt
+    ? new Date(newsletter.publishedAt).toLocaleDateString('en-US', {
+        month: 'long',
+        day: 'numeric',
+        year: 'numeric',
+      })
+    : '';
+  return (
+    <section className="pb-16 px-6">
+      <div className="max-w-4xl mx-auto">
+        <Link
+          href="/news"
+          className="group block bg-white border border-[#e8e0d4] overflow-hidden hover:border-[#D4A843] transition-colors"
+        >
+          <div className="grid md:grid-cols-5">
+            <div className="md:col-span-2 aspect-[4/3] md:aspect-auto relative bg-[#f5f0e8]">
+              {newsletter.heroPhotoUrl ? (
+                <Image
+                  src={newsletter.heroPhotoUrl}
+                  alt={newsletter.title || 'From the campus'}
+                  fill
+                  sizes="(max-width: 768px) 100vw, 40vw"
+                  className="object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+                />
+              ) : null}
+            </div>
+            <div className="md:col-span-3 p-6 md:p-8 flex flex-col justify-center">
+              <p className="text-xs font-bold uppercase tracking-[0.3em] text-[#D4A843] mb-3">
+                From the campus
+              </p>
+              <h3
+                className="text-2xl md:text-3xl text-[#0d0d0d] leading-tight mb-2"
+                style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
+              >
+                {newsletter.title || 'A note from the campus'}
+              </h3>
+              {dateLabel && (
+                <p className="text-sm text-[#999] mb-4">{dateLabel}</p>
+              )}
+              <span className="inline-flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-[#D4A843] group-hover:text-[#0d0d0d] transition-colors">
+                Read the latest &rarr;
+              </span>
+            </div>
+          </div>
+        </Link>
+      </div>
+    </section>
+  );
+}
+
+/**
+ * &ldquo;Two ways in&rdquo; — explicit acknowledgment that someone can
+ * walk into a campus relationship either by buying a shirt (and
+ * meeting whoever the cycle assigns) or by picking a face here and
+ * sponsoring that kid directly. Both paths are sanctioned by
+ * core_model.md §0b; the page used to imply only the first. Sits
+ * between the grid and the bottom CTA, cold-visitor only.
+ */
+function TwoWaysIn() {
+  return (
+    <section className="pb-12 px-6">
+      <div className="max-w-2xl mx-auto text-center">
+        <h2
+          className="text-2xl md:text-3xl text-[#0d0d0d] mb-4"
+          style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
+        >
+          Two ways in.
+        </h2>
+        <p className="text-[#555] leading-relaxed">
+          Get a Shirt and meet the kid your Number connects you to.
+          Or pick a face above and sponsor that kid directly. Both
+          start a real relationship; neither costs more than $25.
+        </p>
+      </div>
+    </section>
   );
 }
