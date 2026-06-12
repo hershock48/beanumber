@@ -160,10 +160,17 @@ export function BANNavigationClient({
   // story/about beat (Story) right before sign-in. Impact moved
   // to the footer — it's important context but doesn't need to
   // compete with the conversion path for nav real estate.
+  // /campus is removed from the main nav for all viewers — public
+  // and signed-in. The page itself is sign-in gated (see
+  // src/app/campus/page.tsx) so cold visitors get pushed to /shirts.
+  // Signed-in sponsors still reach /campus contextually via /me
+  // and the YourKidsStrip &ldquo;+Add&rdquo; tile, which is when browsing
+  // the rest of the campus actually makes sense. The nav now
+  // reinforces the brand mechanic (shirts → number → kid)
+  // instead of presenting a parallel directory surface.
   const navLinks = [
     { href: '/shirts', label: 'Shirts' },
-    { href: '/campus', label: 'Campus' },
-    { href: '/me', label: 'Your kids' },
+    ...(signedIn ? [{ href: '/me', label: 'Your kids' }] : []),
     { href: '/founder', label: 'Story' },
   ];
 

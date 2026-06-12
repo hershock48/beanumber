@@ -462,18 +462,12 @@ export function HomePageContent() {
             A child in Africa with a name, a classroom, and a story that&rsquo;s just getting started. Your shirt is how you meet them.
           </p>
 
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+          <div className="flex justify-center">
             <Link
               href="/shirts"
               className="px-8 py-4 bg-[#D4A843] text-[#0d0d0d] font-bold uppercase tracking-wider text-sm hover:bg-[#c49a3a] transition-colors"
             >
               Get a Shirt
-            </Link>
-            <Link
-              href="/campus"
-              className="px-8 py-4 bg-transparent text-[#FFF8F0] font-bold uppercase tracking-wider text-sm border border-[#444] hover:border-[#D4A843]/50 transition-colors"
-            >
-              Meet the Campus
             </Link>
           </div>
         </div>

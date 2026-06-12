@@ -9,7 +9,7 @@ import type Stripe from 'stripe';
  * to payment. Used in drip nurture emails so the CTA is frictionless —
  * no intermediate page, no extra clicks.
  *
- * Falls back to /campus if anything goes wrong (missing number,
+ * Falls back to /shirts if anything goes wrong (missing number,
  * child not found, child already sponsored, Stripe error).
  */
 
@@ -62,7 +62,7 @@ interface AirtableChildRecord {
 }
 
 export async function GET(request: NextRequest) {
-  const fallback = `${SITE_URL}/campus`;
+  const fallback = `${SITE_URL}/shirts`;
 
   try {
     const numberParam = request.nextUrl.searchParams.get('number');
@@ -97,7 +97,7 @@ export async function GET(request: NextRequest) {
       (fields.SponsorshipStatus && fields.SponsorshipStatus !== 'Available')
     ) {
       return NextResponse.redirect(
-        `${SITE_URL}/campus`
+        `${SITE_URL}/shirts`
       );
     }
 

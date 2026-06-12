@@ -58,13 +58,13 @@ const nextConfig: NextConfig = {
   async redirects() {
     return [
       {
-        // /sponsorship → /campus. The page changed from a kid-picker
-        // checkout to an explore page; the URL "sponsorship" no
-        // longer matched the content (it's now about meeting the
-        // campus, not buying a sponsorship). Old links from emails,
-        // social posts, and bookmarks keep working via this 301.
+        // /sponsorship → /shirts. The page went through a
+        // kid-picker → explore → sign-in-gated arc. Pointing the
+        // legacy URL straight at /shirts keeps cold visitors on
+        // the brand mechanic instead of bouncing them through a
+        // gated page that will redirect them to /shirts anyway.
         source: '/sponsorship',
-        destination: '/campus',
+        destination: '/shirts',
         permanent: true,
       },
     ];

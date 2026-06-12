@@ -142,11 +142,11 @@ export default async function NewsPage() {
           </Link>
 
           <Link
-            href="/campus"
+            href="/shirts"
             className="block bg-white border border-[#e8e0d4] p-6 md:p-7 hover:border-[#D4A843] transition-colors group"
           >
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-2">
-              The campus
+              Become a sponsor
             </p>
             <p
               className="text-xl text-[#0d0d0d] leading-snug mb-2"
@@ -155,12 +155,12 @@ export default async function NewsPage() {
               $25/month keeps a kid in school.
             </p>
             <p className="text-sm text-[#666] leading-relaxed mb-3">
-              Pool-funded across the whole campus &mdash; school
-              fees, meals, the on-site clinic, teachers&rsquo;
-              salaries. Cancel anytime.
+              Every Shirt carries a Number, every Number is a Child.
+              Get a Shirt to meet yours and start a $25/month
+              sponsorship. Cancel anytime.
             </p>
             <p className="text-sm font-bold text-[#D4A843] group-hover:text-[#0d0d0d] transition-colors">
-              Start a sponsorship →
+              Get a Shirt →
             </p>
           </Link>
         </section>

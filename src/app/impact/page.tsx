@@ -349,14 +349,8 @@ export default function Impact() {
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link
-              href="/campus"
-              className="px-8 py-4 bg-[#D4A843] text-[#0d0d0d] font-bold uppercase tracking-wider text-sm hover:bg-[#c49a3a] transition-colors"
-            >
-              Meet the Campus
-            </Link>
-            <Link
               href="/shirts"
-              className="px-8 py-4 border border-[#e8e0d4] text-[#0d0d0d] font-bold uppercase tracking-wider text-sm hover:border-[#D4A843]/50 transition-colors"
+              className="px-8 py-4 bg-[#D4A843] text-[#0d0d0d] font-bold uppercase tracking-wider text-sm hover:bg-[#c49a3a] transition-colors"
             >
               Get a Shirt
             </Link>

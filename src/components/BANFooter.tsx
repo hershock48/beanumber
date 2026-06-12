@@ -27,7 +27,6 @@ export function BANFooter() {
             <h3 className="text-[#FFF8F0] text-xs font-bold uppercase tracking-[0.2em] mb-4">Get Involved</h3>
             <div className="space-y-2.5 text-sm">
               <Link href="/shirts" className="block hover:text-[#D4A843] transition-colors">Shirts</Link>
-              <Link href="/campus" className="block hover:text-[#D4A843] transition-colors">The campus</Link>
               <Link href="/donate" className="block hover:text-[#D4A843] transition-colors">Donate</Link>
               <Link href="/signin" className="block hover:text-[#D4A843] transition-colors">Sign in</Link>
             </div>

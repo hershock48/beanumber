@@ -102,7 +102,7 @@ export async function POST(request: NextRequest) {
       // /meet/[childId]) when provided, otherwise the generic
       // sponsorship browse page. Schema validation already ensured
       // returnPath is a same-origin absolute path.
-      cancel_url: `${origin}${returnPath || '/campus'}`,
+      cancel_url: `${origin}${returnPath || '/shirts'}`,
       ...(hasExistingCustomer
         ? { customer: existingCustomerId as string }
         : { customer_email: email || buyerEmail || undefined }),

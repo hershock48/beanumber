@@ -1,52 +1,40 @@
 /**
- * /campus — the campus, by faces.
+ * /campus — the signed-in browse surface.
  *
- * Discovery surface. No checkout. The page&rsquo;s entire job is to put
- * every enrolled kid&rsquo;s face in front of the visitor and let them
- * tap through to /meet/[id] for the relationship. Sponsorship CTAs
- * live on /[N] (for owners of that Number) and /meet/[id] (for
- * visitors adding a relationship). Do not reintroduce a kid-picker
- * here — that violates core_model.md §0b and rolls back the
- * sponsorship/campus rename we just shipped.
+ * Sign-in gated. Cold visitors get redirected to /shirts. Reasoning:
+ * a public &ldquo;browse all the kids&rdquo; grid undermines the brand mechanic
+ * (shirt → number → kid → revelation) because a buyer can scout
+ * the roster before purchase and the reveal becomes &ldquo;did I get the
+ * one I wanted&rdquo; instead of meeting the kid the shirt connected
+ * them to. The public grid also looks like the conventional
+ * sponsorship-org directory we&rsquo;re deliberately not — and publishing
+ * 100 minors&rsquo; photos, names, ages, and home villages on a single
+ * Google-crawlable URL is exposure surface worth declining.
  *
- * Server-rendered.
- *   - Kids are fetched on the request and rendered into the HTML on
- *     first paint. No client spinner, no fetch waterfall, no
- *     shuffle-on-every-visit. The previous version was 'use client'
- *     end-to-end with an Airtable round-trip in a useEffect — the
- *     cold visitor saw two screens of pitch and a loading state
- *     before the first kid face appeared.
- *   - Order is a deterministic shuffle seeded by the UTC day, so the
- *     campus reads stably within a 24-hour window (Mary, returning
- *     Thursday after meeting a kid on Tuesday, can find them again)
- *     but rotates day-over-day so the page doesn&rsquo;t go stale.
+ * The page is also removed from the main nav (BANNavigationClient)
+ * and from the public footer. Signed-in sponsors still reach it
+ * contextually: from /me (the &ldquo;Add another kid&rdquo; CTAs) and from the
+ * YourKidsStrip &ldquo;+Add&rdquo; tile. That&rsquo;s the audience the page actually
+ * serves — Mary adding a second relationship, Holders exploring the
+ * campus they&rsquo;re already part of, sponsors looking up a kid by name.
  *
- * State-aware.
- *   - Signed-in sponsor → the hero recognizes them by their kid&rsquo;s
- *     first name, their own kids&rsquo; tiles get a "Your kid" badge in
- *     the grid, and the bottom CTA drops the Get-a-Shirt push.
- *   - Cold visitor → straight discovery, Get a Shirt CTA at the
- *     bottom (after they&rsquo;ve met the kids), pitch lives on /shirts.
+ * Cold-direct sponsorship per core_model §0b still works at the
+ * per-kid level: every /meet/[id] page is public, individually
+ * indexable, and shareable. The collection is what we hide, not the
+ * individual stories. A cold visitor who finds a kid via the
+ * homepage carousel, a press link, or a Google search for that
+ * kid&rsquo;s name can still sponsor them directly.
  *
- * What used to live here that&rsquo;s gone.
- *   - The "How sponsorship works / What your sponsorship provides /
- *     What you&rsquo;ll receive as a sponsor" info block: same audience
- *     content already lives on /shirts (for shirt buyers) and
- *     /meet/[id] (for direct-discovery sponsors). On /campus it was
- *     friction between the visitor and the kid faces.
- *   - The four-step "How it works" sequence: it&rsquo;s the /shirts brand
- *     mechanic. We cross-link to /shirts in the bottom CTA instead.
- *   - The 11-question FAQ: 4–5 questions overlapped /shirts verbatim.
- *     The remainder belongs on /shirts; cross-link there.
- *   - The carousel-thumbnails + paginated expanded cards: two views
- *     of the same data, both lossy, the carousel meaningless to
- *     navigate, the pagination implying there are kids you haven&rsquo;t
- *     seen yet. Replaced with one responsive grid that shows every
- *     kid at once.
+ * noindex/nofollow on the metadata so the gated page isn&rsquo;t crawled.
+ *
+ * Server-rendered. Grid is in the HTML on first paint. Daily-stable
+ * shuffle so returning sponsors find the kid they were thinking
+ * about, rotating across days for variety.
  */
 
 import type { Metadata } from 'next';
 import { cookies } from 'next/headers';
+import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { BANNavigation } from '@/components/BANNavigation';
@@ -61,31 +49,13 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 /**
- * Page metadata. /campus is the natural URL someone shares when
- * pointing a friend at BAN ("here are the kids"), so the share
- * preview matters more here than on most surfaces. Overrides the
- * root layout&rsquo;s defaults with campus-specific framing; falls back
- * to the site hero image for the OG card until we ship a campus
- * composite.
+ * Page metadata. noindex/nofollow because the page is sign-in gated
+ * — surfacing it in Google would point search traffic at a redirect.
+ * Per-kid /meet/[id] pages remain indexable on their own merits.
  */
 export const metadata: Metadata = {
-  title: 'Meet the kids | Be A Number',
-  description:
-    'Every kid enrolled at the YDO campus in Omoro District, Northern Uganda. School, meals, medical care, and mentorship. Meet them.',
-  openGraph: {
-    title: 'Meet the kids at the campus | Be A Number',
-    description:
-      'Every kid enrolled at the YDO campus in Omoro District, Northern Uganda. Meet them.',
-    url: 'https://www.beanumber.org/campus',
-    type: 'website',
-  },
-  twitter: {
-    card: 'summary_large_image',
-    title: 'Meet the kids at the campus | Be A Number',
-    description:
-      'Every kid at the YDO campus in Omoro District, Northern Uganda.',
-  },
-  alternates: { canonical: 'https://www.beanumber.org/campus' },
+  title: 'Campus | Be A Number',
+  robots: { index: false, follow: false },
 };
 
 // ── Types ─────────────────────────────────────────────────────────
@@ -326,130 +296,62 @@ function lovesPhrase(loves?: string): string | null {
 // ── Page ──────────────────────────────────────────────────────────
 
 export default async function CampusPage() {
+  // Sign-in gate. Cold visitors get pushed to /shirts (the brand
+  // mechanic) before any data fetching happens — no point loading
+  // the roster for someone we&rsquo;re about to redirect.
   const email = await getViewerEmail();
+  if (!email) {
+    redirect('/shirts');
+  }
 
-  // Three fetches, run in parallel: the roster (always), the
-  // viewer&rsquo;s sponsored-kid set (only if signed in), and the most
-  // recent campus newsletter (always — surfaces the page&rsquo;s
-  // &ldquo;from the campus this week&rdquo; card). All three return
-  // empty/empty/null on failure so the page renders gracefully if
-  // Airtable is flaky.
+  // Three fetches in parallel: the roster, the viewer&rsquo;s
+  // sponsored-kid set, and the most recent campus newsletter (the
+  // bridge card below the grid). All three return empty/empty/null
+  // on failure so the page renders gracefully if Airtable is flaky.
   const [allChildren, viewerKids, recentNewsletters] = await Promise.all([
     fetchAllChildren(),
-    email ? fetchViewerKids(email) : Promise.resolve([] as ViewerKid[]),
+    fetchViewerKids(email),
     getRecentCampusNewsletters(1),
   ]);
   const latestNewsletter: CampusNewsletterEntry | null =
     recentNewsletters[0] || null;
 
-  // Only kids with a photo go in the discovery grid. A faceless tile
-  // defeats the whole "meet the kid" purpose. The trust strip still
-  // reports the true enrolled headcount so we don&rsquo;t undercount the
-  // campus just because intake photography is lagging.
-  const enrolledCount = allChildren.length;
+  // Only kids with a photo go in the grid. A faceless tile defeats
+  // the whole &ldquo;meet the kid&rdquo; purpose.
   const displayChildren = allChildren.filter(c => !!c.photoUrl);
   const orderedChildren = seededShuffle(displayChildren, daySeed());
 
   const ownedRecordIds = new Set(viewerKids.map(k => k.recordId));
   const ownsAnyKid = viewerKids.length > 0;
 
-  // Age range across the visible roster, for the trust strip. If
-  // either bound is missing (no DOBs filled in), we drop the stat
-  // gracefully instead of saying "Ages undefined to undefined".
-  const ages = allChildren
-    .map(c => c.age)
-    .filter((n): n is number => typeof n === 'number');
-  const ageRange =
-    ages.length > 0
-      ? { min: Math.min(...ages), max: Math.max(...ages) }
-      : null;
-
-  // JSON-LD ItemList. Lets Google index the campus as a structured
-  // collection so "Be A Number children" search lands on the grid as
-  // a recognized list of profiles. Per-tile image URLs are skipped
-  // intentionally — Airtable attachment URLs rotate, baking them
-  // into long-lived structured data would point Google at expired
-  // URLs. Each /meet/[id] page carries its own image metadata.
-  const itemListJsonLd = {
-    '@context': 'https://schema.org',
-    '@type': 'ItemList',
-    name: 'Children enrolled at the YDO campus',
-    description:
-      'Every kid currently enrolled at the YDO campus in Omoro District, Northern Uganda.',
-    numberOfItems: orderedChildren.length,
-    itemListOrder: 'https://schema.org/ItemListUnordered',
-    itemListElement: orderedChildren.map((c, i) => ({
-      '@type': 'ListItem',
-      position: i + 1,
-      url: `https://www.beanumber.org/meet/${c.recordId}`,
-      item: {
-        '@type': 'Person',
-        name: c.displayName,
-        givenName: c.firstName,
-      },
-    })),
-  };
-
   return (
     <div className="min-h-screen bg-[#FFF8F0]">
       <BANNavigation currentPath="/campus" />
 
-      {/* JSON-LD structured data, invisible to humans. */}
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(itemListJsonLd) }}
-      />
-
-      {/* ========== HERO — state-aware, no funnel CTA ========== */}
+      {/* ========== HERO — signed-in only; the cold-visitor branch
+          was removed when the page became gated, and the trust strip
+          + &ldquo;All real. All enrolled.&rdquo; subhead were removed because
+          the campus paragraph below already does the trust work. */}
       <section className="pt-24 pb-12 px-6">
         <div className="max-w-3xl mx-auto text-center">
           <p className="text-xs font-bold text-[#D4A843] uppercase tracking-[0.3em] mb-6">
             The campus
           </p>
           {ownsAnyKid ? (
-            <>
-              <h1
-                className="text-4xl md:text-5xl text-[#0d0d0d] mb-4"
-                style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 700 }}
-              >
-                {ownerHeroHeadline(viewerKids)}
-              </h1>
-              <p className="text-lg text-[#777] max-w-2xl mx-auto leading-relaxed">
-                These are the other kids at the campus.
-              </p>
-            </>
+            <h1
+              className="text-4xl md:text-5xl text-[#0d0d0d] mb-4"
+              style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 700 }}
+            >
+              {ownerHeroHeadline(viewerKids)}
+            </h1>
           ) : (
-            <>
-              <h1
-                className="text-4xl md:text-5xl text-[#0d0d0d] mb-4"
-                style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 700 }}
-              >
-                Meet the kids at the campus.
-              </h1>
-              <p className="text-lg text-[#777] max-w-2xl mx-auto leading-relaxed">
-                All real. All enrolled.
-              </p>
-            </>
+            <h1
+              className="text-4xl md:text-5xl text-[#0d0d0d] mb-4"
+              style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 700 }}
+            >
+              The kids at the campus.
+            </h1>
           )}
-        </div>
-      </section>
-
-      {/* ========== TRUST STRIP — one line of context, no pitch ========== */}
-      <section className="pb-10 px-6">
-        <div className="max-w-3xl mx-auto">
-          <div className="bg-white border border-[#e8e0d4] px-6 py-5 flex flex-col sm:flex-row gap-4 sm:gap-8 items-center justify-center text-center">
-            <Stat number={enrolledCount} label="enrolled" />
-            {ageRange && (
-              <>
-                <Divider />
-                <Stat
-                  text={`Ages ${ageRange.min}–${ageRange.max}`}
-                />
-              </>
-            )}
-            <Divider />
-            <Stat number={CAMPUS_CAPACITY} label="campus capacity" />
-          </div>
         </div>
       </section>
 
@@ -496,53 +398,14 @@ export default async function CampusPage() {
         <FromTheCampus newsletter={latestNewsletter} />
       )}
 
-      {/* ========== TWO WAYS IN — cold-visitor only. Per core_model
-          §0b both paths are legitimate (shirt-first and
-          discovery-first), but the page currently only nods to the
-          shirt path. This block makes the second path explicit. */}
-      {!ownsAnyKid && <TwoWaysIn />}
-
-      {/* ========== BOTTOM — quiet for owners, shirt-first for cold ========== */}
+      {/* ========== BOTTOM — quiet sponsor-only message. The cold-
+          visitor branch was removed when the page became gated. */}
       <section className="pb-20 px-6 border-t border-[#e8e0d4] pt-12">
         <div className="max-w-2xl mx-auto text-center">
-          {ownsAnyKid ? (
-            <p className="text-[#777] leading-relaxed">
-              See someone who moves you? Tap their face and use the
-              sponsor button on their page to add them.
-            </p>
-          ) : (
-            <>
-              <h2
-                className="text-3xl text-[#0d0d0d] mb-3"
-                style={{
-                  fontFamily: 'var(--font-lora), serif',
-                  fontWeight: 600,
-                }}
-              >
-                Get on the campus.
-              </h2>
-              <p className="text-[#777] leading-relaxed mb-6 max-w-md mx-auto">
-                Every Shirt has a Number. Every Number is one of these
-                kids. Pick a color, get a Shirt, meet your kid.
-              </p>
-              <Link
-                href="/shirts"
-                className="inline-block px-8 py-4 bg-[#D4A843] text-[#0d0d0d] font-bold uppercase tracking-wider text-sm hover:bg-[#c49a3a] transition-colors"
-              >
-                Get a Shirt
-              </Link>
-              <p className="text-xs text-[#aaa] mt-6">
-                Want the full breakdown of how this works?{' '}
-                <Link
-                  href="/shirts"
-                  className="text-[#D4A843] hover:underline"
-                >
-                  See /shirts
-                </Link>
-                .
-              </p>
-            </>
-          )}
+          <p className="text-[#777] leading-relaxed">
+            See someone who moves you? Tap their face and use the
+            sponsor button on their page to add them.
+          </p>
         </div>
       </section>
 
@@ -552,49 +415,6 @@ export default async function CampusPage() {
 }
 
 // ── Inline subcomponents (server, no client state) ────────────────
-
-function Stat({
-  number,
-  label,
-  text,
-}: {
-  number?: number;
-  label?: string;
-  text?: string;
-}) {
-  if (typeof text === 'string') {
-    return (
-      <span className="text-sm text-[#0d0d0d]">
-        <span
-          className="text-xl text-[#0d0d0d] tabular-nums mr-1"
-          style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
-        >
-          {text}
-        </span>
-      </span>
-    );
-  }
-  return (
-    <span className="text-sm">
-      <span
-        className="text-2xl text-[#D4A843] tabular-nums mr-2"
-        style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 700 }}
-      >
-        {number}
-      </span>
-      <span className="text-[#777]">{label}</span>
-    </span>
-  );
-}
-
-function Divider() {
-  return (
-    <span
-      className="hidden sm:block w-px h-6 bg-[#e8e0d4]"
-      aria-hidden="true"
-    />
-  );
-}
 
 function KidTile({
   child,
@@ -742,30 +562,3 @@ function FromTheCampus({
   );
 }
 
-/**
- * &ldquo;Two ways in&rdquo; — explicit acknowledgment that someone can
- * walk into a campus relationship either by buying a shirt (and
- * meeting whoever the cycle assigns) or by picking a face here and
- * sponsoring that kid directly. Both paths are sanctioned by
- * core_model.md §0b; the page used to imply only the first. Sits
- * between the grid and the bottom CTA, cold-visitor only.
- */
-function TwoWaysIn() {
-  return (
-    <section className="pb-12 px-6">
-      <div className="max-w-2xl mx-auto text-center">
-        <h2
-          className="text-2xl md:text-3xl text-[#0d0d0d] mb-4"
-          style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
-        >
-          Two ways in.
-        </h2>
-        <p className="text-[#555] leading-relaxed">
-          Get a Shirt and meet the kid your Number connects you to.
-          Or pick a face above and sponsor that kid directly. Both
-          start a real relationship; neither costs more than $25.
-        </p>
-      </div>
-    </section>
-  );
-}

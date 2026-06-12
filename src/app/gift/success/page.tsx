@@ -53,10 +53,10 @@ export default function GiftSuccessPage() {
             Back to home
           </Link>
           <Link
-            href="/campus"
+            href="/shirts"
             className="inline-block bg-white border border-[#e8e0d4] text-[#0d0d0d] font-bold uppercase tracking-wider py-3 px-8 hover:bg-[#f5f0e8] transition-colors"
           >
-            Meet the campus
+            Get a Shirt
           </Link>
         </div>
       </main>

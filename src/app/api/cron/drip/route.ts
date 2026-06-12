@@ -152,7 +152,7 @@ function shirtNurtureEmail(
   // we don't list the numbers.
   const numbers = parseShirtNumbers(shirtNumber);
   const multi = numbers.length > 1;
-  const sponsorUrl = `${SITE_URL}/campus`;
+  const sponsorUrl = `${SITE_URL}/shirts`;
 
   switch (stage) {
     // ── Email 1: Did it arrive + how to claim (ship + 3 days) ─────────────
@@ -326,7 +326,7 @@ function donorConvertEmail(
   donor: DripDonor
 ): { subject: string; html: string } | null {
   const { firstName } = donor;
-  const sponsorUrl = `${SITE_URL}/campus`;
+  const sponsorUrl = `${SITE_URL}/shirts`;
 
   switch (stage) {
     // ── Email 1: Where the donation went (Day ~5) ────────────────────────
@@ -500,7 +500,7 @@ function monthlyDonorEmail(
           <p>I wanted to give you a better picture of how things work on the ground, since your monthly gift is part of what makes it all run.</p>
           <p>Every child at the campus has a number, and that number goes on a shirt. When someone buys that shirt or sponsors that child, they get connected to a real kid by name. The sponsor gets letters, photos, and report cards, and the child knows their sponsor. It&rsquo;s not a big faceless program.</p>
           <p>Your monthly gift is what keeps the whole campus going: the meals, the teachers, the clinic. Without monthly donors, none of the rest of it would work.</p>
-          <p>If you want to see the kids your gift is supporting, you can <a href="${SITE_URL}/campus" style="color: #D4A843; font-weight: bold;">meet them here</a>.</p>
+          <p>If you want to be matched with one of the kids your gift is supporting, you can <a href="${SITE_URL}/shirts" style="color: #D4A843; font-weight: bold;">get a Shirt here</a>.</p>
           <p>Kevin</p>
         `),
       };
@@ -518,9 +518,9 @@ function monthlyDonorEmail(
           <p style="margin-top: 0;">Hey ${firstName},</p>
           <p>Your monthly gift keeps the campus running, and I&rsquo;m thankful for it. One more thing I want to mention, then I&rsquo;ll let you go.</p>
           <p>Sponsorship is the other side of how people give to us. $25 a month connects you to one specific kid at the campus by name. The kid knows yours. You get letters, photos, and report cards from them. Same campus, same kids, plus a real relationship with one of them by name.</p>
-          <p>If you ever want to add that piece, you can meet the campus at <a href="${SITE_URL}/campus" style="color: #D4A843; font-weight: bold;">beanumber.org/campus</a>. No pressure if monthly giving is the right shape for you &mdash; what you&rsquo;re already giving keeps a lot of lights on.</p>
+          <p>If you ever want to add that piece, you can get a Shirt at <a href="${SITE_URL}/shirts" style="color: #D4A843; font-weight: bold;">beanumber.org/shirts</a>. Every Shirt has a Number and every Number is a kid. No pressure if monthly giving is the right shape for you &mdash; what you&rsquo;re already giving keeps a lot of lights on.</p>
           <p style="text-align: center; margin: 24px 0;">
-            <a href="${SITE_URL}/campus" style="display: inline-block; background: #D4A843; color: #0d0d0d; font-weight: bold; text-decoration: none; padding: 14px 32px; font-size: 15px; letter-spacing: 0.05em;">MEET THE CAMPUS</a>
+            <a href="${SITE_URL}/shirts" style="display: inline-block; background: #D4A843; color: #0d0d0d; font-weight: bold; text-decoration: none; padding: 14px 32px; font-size: 15px; letter-spacing: 0.05em;">GET A SHIRT</a>
           </p>
           <p>From here on out, when you hear from me it&rsquo;ll be the monthly newsletter from the campus. Thank you for being part of this.</p>
           <p>God bless,<br>Kevin</p>

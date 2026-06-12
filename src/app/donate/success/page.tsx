@@ -99,9 +99,9 @@ export default function DonateSuccess() {
                   II
                 </span>
                 <p className="text-[#666] text-sm leading-relaxed">
-                  <a href="/campus" className="text-[#0d0d0d] font-semibold underline hover:text-[#D4A843] transition-colors">Meet the campus.</a>{' '}
-                  Read the stories of the kids at our campus in Northern Uganda. $25/month supports school, meals, medical care, and a local
-                  mentor for a matched child &mdash; you&rsquo;ll get photos, letters, and a year-end report card.
+                  <a href="/shirts" className="text-[#0d0d0d] font-semibold underline hover:text-[#D4A843] transition-colors">Get a Shirt.</a>{' '}
+                  Every Shirt carries a Number and every Number is a Child. $25/month supports school, meals, medical care, and a local
+                  mentor for your matched Child &mdash; you&rsquo;ll get photos, letters, and a year-end report card.
                 </p>
               </div>
               <div className="flex gap-4 items-start">
