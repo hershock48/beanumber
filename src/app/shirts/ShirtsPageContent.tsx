@@ -630,8 +630,8 @@ export default function ShirtsPageContent() {
             className="text-4xl md:text-5xl lg:text-6xl text-[#0d0d0d] mb-6 leading-tight"
             style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
           >
-            Pick a color.<br />
-            Get a number.<br />
+            Pick a Color.<br />
+            Get a Number.<br />
             Meet a Child.
           </h1>
           <p className="text-lg text-[#777] max-w-xl mx-auto leading-relaxed">
