@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useState, useEffect, useRef } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
 import { BANNavigationClient as BANNavigation } from '@/components/BANNavigationClient';
@@ -57,11 +57,36 @@ interface Child {
   shirt_number_end?: number;
 }
 
-export function HomePageContent() {
+/**
+ * Inner content — needs Suspense around it because useSearchParams
+ * triggers a CSR bailout in Next 16 unless wrapped.
+ */
+function HomePageInner() {
   const [searchNumber, setSearchNumber] = useState('');
   const [children, setChildren] = useState<Child[]>([]);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Welcome state: user just signed in via magic link, the callback
+  // redirected them to /?welcome=1&n=N. We prefill the Number input
+  // with their Number, focus it, show a "Welcome back" treatment,
+  // and forward just_signed_in=1 when they submit — so the kid
+  // page&rsquo;s ClaimGate &ldquo;first sign-in&rdquo; branch still fires.
+  const welcomeFlow = searchParams.get('welcome') === '1';
+  const welcomePrefill = searchParams.get('n') || '';
+
+  useEffect(() => {
+    if (!welcomeFlow) return;
+    if (welcomePrefill) setSearchNumber(welcomePrefill);
+    // Microtask delay so the input mounts before we try to focus it.
+    const id = window.setTimeout(() => {
+      searchInputRef.current?.focus();
+      searchInputRef.current?.select();
+    }, 50);
+    return () => window.clearTimeout(id);
+  }, [welcomeFlow, welcomePrefill]);
 
   // Ref + helper for the children carousel. Kids without profile photos are
   // filtered out — a face is the whole point of the section — and the
@@ -99,9 +124,14 @@ export function HomePageContent() {
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    if (searchNumber.trim()) {
-      router.push('/children/' + searchNumber.trim());
-    }
+    const n = searchNumber.trim();
+    if (!n) return;
+    // Forward just_signed_in=1 when the user is completing the
+    // welcome-flow handoff. Lets the kid page&rsquo;s ClaimGate render
+    // the &ldquo;you just signed in&rdquo; treatment instead of the
+    // returning-visitor treatment.
+    const suffix = welcomeFlow ? '?just_signed_in=1' : '';
+    router.push(`/children/${n}${suffix}`);
   };
 
   return (
@@ -135,6 +165,25 @@ export function HomePageContent() {
             Every Number is a Child.<br />
             Find Yours.
           </p>
+
+          {/* Welcome chip — appears only when the user has just
+              completed the magic-link sign-in. The callback redirects
+              to /?welcome=1&n=N and we render this band to make the
+              hand-off feel personal: &ldquo;you&rsquo;re signed in, here&rsquo;s your
+              Number, hit Find.&rdquo; The chip frames the Number input as
+              the gateway ritual instead of a generic search box. */}
+          {welcomeFlow && (
+            <div className="max-w-md mx-auto mb-5">
+              <div className="bg-[#D4A843]/15 border border-[#D4A843]/40 px-4 py-3 text-[#FFF8F0] text-sm text-center">
+                <span className="block text-xs font-bold uppercase tracking-[0.25em] text-[#D4A843] mb-1">
+                  Welcome back
+                </span>
+                <span className="text-[#FFF8F0]/90">
+                  Your Number is loaded. Hit Find to go to your kid.
+                </span>
+              </div>
+            </div>
+          )}
 
           {/* Search box wrapped in a relative shimmer host. A single
               diagonal gold sweep fires ~1.2s after mount so the user
@@ -188,6 +237,7 @@ export function HomePageContent() {
               }
             `}</style>
             <input
+              ref={searchInputRef}
               type="text"
               value={searchNumber}
               onChange={e => setSearchNumber(e.target.value)}
@@ -475,6 +525,22 @@ export function HomePageContent() {
 
       <BANFooter />
     </div>
+  );
+}
+
+/**
+ * Public export. Wraps the inner component in Suspense so
+ * useSearchParams (read inside HomePageInner for the welcome-flow
+ * handoff) doesn&rsquo;t bail out of static rendering on the rest of
+ * the tree. Fallback is null because the page&rsquo;s above-the-fold
+ * hero is server-irrelevant content; the Suspense boundary just
+ * exists to satisfy Next 16&rsquo;s search-params rules.
+ */
+export function HomePageContent() {
+  return (
+    <Suspense fallback={null}>
+      <HomePageInner />
+    </Suspense>
   );
 }
 

@@ -181,11 +181,20 @@ export async function GET(request: NextRequest) {
     console.warn('[Recovery] advanceDripOnClaim threw:', err);
   });
 
-  // ?just_signed_in=1 lets the kid page distinguish "first sign-in"
-  // from "returning visit." First-time claimers see "You own #N now";
-  // returning sponsors see "Welcome back." The kid page reads the
-  // param and renders accordingly.
+  // Land on the homepage with the Number-input prefilled and
+  // highlighted ("Welcome back, enter your Number"). The Number
+  // lookup is the consistent ritual that gates every user&rsquo;s entry
+  // to the rest of the site — even after sign-in. The home page
+  // reads ?welcome=1 to render the welcome treatment, and ?n=N
+  // to prefill the input. When the user submits the form from
+  // that state, the homepage forwards just_signed_in=1 to the
+  // kid page so the ClaimGate&rsquo;s "first sign-in" branch still
+  // fires correctly.
+  //
+  // Previous behavior was a direct redirect to /children/[N]
+  // which bypassed the Number ritual. Skipping the ritual saved
+  // a click but stripped meaning from the gateway.
   return NextResponse.redirect(
-    `${SITE_URL}/children/${shirtNumber}?just_signed_in=1`
+    `${SITE_URL}/?welcome=1&n=${shirtNumber}`
   );
 }
