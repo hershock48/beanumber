@@ -35,23 +35,46 @@ A first-time visitor with a shirt whose number was assigned but who has no Spons
 - **No fulfillment-step bookkeeping by Kevin.** Ownership crystallizes when the wearer comes to the site and types their email, not when Kevin marks a shirt number in `/admin/fulfillment`.
 - **Departures fan out to all owners.** When a kid departs and you click "Stage candidate cards" in admin, the system stages the chooser on every Sponsorship linked to that kid — Active sponsors AND Holders. AND it fires an auto-login email to each one with a one-tap link straight into their chooser. Departures become re-engagement moments, not dead ends.
 
-### 0b. NO MATCHING. EVER. (the rule Kevin keeps having to repeat)
+### 0b. NO PRE-MATCHING. (the rule Kevin keeps having to repeat)
 
-**We do not match buyers to children. We used to. We don't anymore.**
+**The system does not pre-match buyers to children at the moment of purchase.**
 
-When someone buys a shirt and signs up to sponsor:
-- They do **not** choose a kid.
+The earlier version of this rule was "no matching, ever." That was an overcorrection from when we ripped out the kid-picker checkout. There IS a legitimate matching path — it's just always user-driven and always happens AFTER discovery, not BEFORE purchase. Spelling it out so future-me doesn't accidentally rip out the parts that are correct.
+
+#### What's banned
+
+When someone buys a shirt + monthly:
+- The buyer does **not** choose a kid at checkout.
 - Kevin does **not** assign them to a kid.
 - The system does **not** create a per-buyer kid pairing.
 - The buyer doesn't know what shirt number they'll get until the shirt ships.
-- Kevin doesn't know what shirt number they'll get either — it's whatever's next in the open batch.
+- Kevin doesn't know either — it's whatever's next in the open batch.
 - The "kid" associated with that shirt number is whatever the batch cycle math returns at display time.
 
-A **sponsor** is just a sponsor — a person paying $25/mo into the pool. The Sponsorship record should be created the instant they pay, with **`Children` link blank, forever, by default**.
+A **sponsor in this path** is just a sponsor — a person paying $25/mo into the pool. The Sponsorship record is created the instant they pay, with **`Children` link blank by default**.
 
-The only time a Sponsorship gets a `Children` link is if the sponsor explicitly visits a specific `/[number]` page, sees that kid, and we want to remember the visit. Even then it's optional. The kid card displayed on `/[number]` is derived from cycle math against the shirt number, not from the Sponsorship's `Children` link.
+The `/sponsorship` page itself is **explore-only**. It is NOT a checkout. Kid cards on that page link to `/meet/[recordId]` for the kid's story. There is no "pick this kid" button on `/sponsorship`. (There used to be — it's gone. If you find one, it was reintroduced by mistake.)
 
-**Code consequence:** any code path that says "we can't create the Sponsorship yet because we don't know the kid" is wrong. There is no kid to know. Create the Sponsorship at purchase. Empty `Children`. Move on.
+#### What's allowed: user-driven discovery sponsorship
+
+There is a second legitimate path. Someone discovers a specific kid by reading their story (either by entering their own shirt Number and landing on `/[N]`, or by exploring the campus from `/sponsorship` and clicking through to `/meet/[recordId]`), feels connected, and chooses to walk into that relationship. They were not pre-matched. They chose, after meeting.
+
+This is wired through `/api/create-sponsor-checkout` and the `MeetSponsorButton` component on `/meet/[childId]`. The Sponsorship row that gets created here DOES carry a `Children` link to the kid the visitor explicitly chose. That's correct. The user wasn't told "this is your kid" by the system; they walked into the relationship under their own steam.
+
+Two examples that both honor the rule:
+
+- **Mary's path:** Bought a shirt. Got #N. Entered #N on the site. Met the cycle-assigned kid behind that number. Sponsored that kid (the `/[N]` page's Sponsor button). Then explored "Other kids at the campus," found someone else who moved her, clicked through to `/meet/[id]`, and added a second sponsorship via `MeetSponsorButton`. Two Sponsorship rows; both kid-linked; both user-initiated.
+- **Cold visitor path:** No shirt. Browses `/sponsorship`, reads a few stories on `/meet/[id]` pages, picks one whose story landed, taps Sponsor. One Sponsorship row, kid-linked, user-initiated.
+
+#### The simple summary
+
+- Sponsorship created at shirt+monthly checkout → `Children` link blank.
+- Sponsorship created at `MeetSponsorButton` or `/[N]` Sponsor button → `Children` link set to the kid the visitor chose to walk into.
+- The `Children` link is meaningful for the user-discovery path (it IS the kid they chose). For the shirt-path it's meaningless and stays blank.
+
+The kid card displayed on `/[number]` is derived from cycle math against the shirt number, NOT from the Sponsorship's `Children` link. The `Children` link tells us who the sponsor chose to be related to; the cycle math tells us who that number belongs to on the wall.
+
+**Code consequence:** any code path that says "we can't create the Sponsorship yet because we don't know the kid" is wrong for the shirt-checkout path. There is no kid to know. Create the Sponsorship at purchase. Empty `Children`. Move on. The kid-linked path is a SEPARATE endpoint (`/api/create-sponsor-checkout` driven by an explicit user choice), and it's fine for it to carry the link.
 
 ### 1. Pool funding, not per-kid budgets
 
