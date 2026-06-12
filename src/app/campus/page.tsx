@@ -18,12 +18,12 @@
  * serves — Mary adding a second relationship, Holders exploring the
  * campus they&rsquo;re already part of, sponsors looking up a kid by name.
  *
- * Cold-direct sponsorship per core_model §0b still works at the
- * per-kid level: every /meet/[id] page is public, individually
- * indexable, and shareable. The collection is what we hide, not the
- * individual stories. A cold visitor who finds a kid via the
- * homepage carousel, a press link, or a Google search for that
- * kid&rsquo;s name can still sponsor them directly.
+ * Cold-direct sponsorship is no longer supported (core_model §0b
+ * rewrite, June 12, 2026). Per-kid /meet/[id] pages remain public
+ * and individually shareable so a cold visitor can read a kid&rsquo;s
+ * story — but the Sponsor button on those pages is signed-in only,
+ * and the cold branch shows &ldquo;Get a Shirt to meet your kid&rdquo;
+ * → /shirts. Every sponsorship has to trace back to a Number.
  *
  * noindex/nofollow on the metadata so the gated page isn&rsquo;t crawled.
  *
@@ -33,13 +33,12 @@
  */
 
 import type { Metadata } from 'next';
-import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { BANNavigation } from '@/components/BANNavigation';
 import { BANFooter } from '@/components/BANFooter';
-import { SESSION } from '@/lib/constants';
+import { getViewerEmail } from '@/lib/sponsor-relationship';
 import {
   getRecentCampusNewsletters,
   type CampusNewsletterEntry,
@@ -191,20 +190,6 @@ async function fetchAllChildren(): Promise<CampusChild[]> {
       });
   } catch {
     return [];
-  }
-}
-
-async function getViewerEmail(): Promise<string | null> {
-  try {
-    const store = await cookies();
-    const raw = store.get(SESSION.COOKIE_NAME);
-    if (!raw) return null;
-    const session = JSON.parse(raw.value);
-    if (new Date(session.expires) < new Date()) return null;
-    const email = (session.email as string | undefined)?.trim().toLowerCase();
-    return email && email.length > 0 ? email : null;
-  } catch {
-    return null;
   }
 }
 

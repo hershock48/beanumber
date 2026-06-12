@@ -3,19 +3,21 @@
 /**
  * Direct-to-Stripe sponsor button for /meet/[childId].
  *
- * The /meet page is the numberless kid profile someone lands on after
- * clicking a tile in "Other kids at the campus." When they hit
- * "Sponsor [name]" here, they have already picked. There's no reason
- * to bounce them through /campus's browse grid.
+ * Only rendered for signed-in viewers (see /meet/[childId]/page.tsx —
+ * cold visitors see &ldquo;Get a Shirt to meet your kid&rdquo; instead, per
+ * core_model.md §0b: every sponsorship traces back to a Number).
+ * For a signed-in user who lands here from the &ldquo;Other kids at the
+ * campus&rdquo; rail on their /[N] page, the button POSTs straight to
+ * /api/create-sponsor-checkout and redirects to Stripe — they&rsquo;ve
+ * already picked, no reason to bounce them anywhere else.
  *
- * This button POSTs straight to the create-sponsor-checkout API and
- * redirects to Stripe in one click. Two clicks total from kid tile to
- * Stripe instead of "tile → meet → sponsorship → find kid in grid →
- * sponsor → Stripe."
+ * The API also gates server-side on the sponsor_session cookie. If
+ * a session expires between page render and click, the API returns
+ * 401 with { redirect: '/shirts' } and we surface the message inline.
  *
- * If the API errors, we surface a small inline message in place of a
- * full-page alert — kid pages are otherwise quiet, and surprise alerts
- * feel broken.
+ * cancel_url on the Stripe session falls back to /meet/[childRecordId]
+ * so backing out preserves context (the kid they were about to sponsor)
+ * instead of dumping them on a generic page.
  */
 
 import { useState } from 'react';
@@ -48,9 +50,9 @@ export function MeetSponsorButton({
           childId,
           childDisplayName,
           // Preserve context: if they back out of Stripe, send them
-          // back to this kid's meet page instead of the generic
-          // /campus browse grid where they'd have to find the
-          // same kid again.
+          // back to this kid's meet page instead of the API's default
+          // /shirts fallback. Same kid in front of them, no lost
+          // thread.
           returnPath: `/meet/${childRecordId}`,
         }),
       });

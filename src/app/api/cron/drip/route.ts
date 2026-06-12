@@ -152,7 +152,16 @@ function shirtNurtureEmail(
   // we don't list the numbers.
   const numbers = parseShirtNumbers(shirtNumber);
   const multi = numbers.length > 1;
-  const sponsorUrl = `${SITE_URL}/shirts`;
+  // Route the &ldquo;sponsor for $25/mo&rdquo; CTAs toward the user&rsquo;s OWN
+  // kid page when we have a single Number to point at. The recipient
+  // already owns a Shirt; sending them to /shirts says &ldquo;buy another
+  // Shirt&rdquo;, which is the wrong nudge for a campaign whose whole
+  // theme is &ldquo;sponsor the kid behind the Shirt you have.&rdquo; Multi-
+  // shirt buyers fall back to the homepage Number ritual since we
+  // can&rsquo;t pick &ldquo;the&rdquo; kid for them.
+  const sponsorUrl = !multi && numbers[0]
+    ? `${SITE_URL}/children/${numbers[0]}`
+    : `${SITE_URL}/`;
 
   switch (stage) {
     // ── Email 1: Did it arrive + how to claim (ship + 3 days) ─────────────
@@ -326,7 +335,6 @@ function donorConvertEmail(
   donor: DripDonor
 ): { subject: string; html: string } | null {
   const { firstName } = donor;
-  const sponsorUrl = `${SITE_URL}/shirts`;
 
   switch (stage) {
     // ── Email 1: Where the donation went (Day ~5) ────────────────────────
@@ -350,9 +358,9 @@ function donorConvertEmail(
           <p style="margin-top: 0;">Hey ${firstName},</p>
           <p>I wanted to tell you a little more about how we work, since you already took a chance on us once.</p>
           <p>Every child at our campus has a number, and that number is the bridge to a sponsor. The sponsor pays $25 a month, which supports school, two meals a day, and medical care at the campus. In return, the sponsor gets letters, photos, and report cards from their matched child. The child knows their sponsor&rsquo;s name. It&rsquo;s a real relationship between two real people, and that&rsquo;s kind of the whole point of what we built.</p>
-          <p>If you want to see the kids, you can <a href="${sponsorUrl}" style="color: #D4A843; font-weight: bold;">meet them here</a>. Or if you want to grab a shirt and get randomly matched to a child by number, <a href="${SITE_URL}/shirts" style="color: #D4A843; font-weight: bold;">check out the shirts here</a>.</p>
+          <p>If you want in, grab a shirt and the number on the back is your kid. <a href="${SITE_URL}/shirts" style="color: #D4A843; font-weight: bold;">Pick a shirt here</a>.</p>
           <p style="text-align: center; margin: 24px 0;">
-            <a href="${sponsorUrl}" style="display: inline-block; background: #D4A843; color: #0d0d0d; font-weight: bold; text-decoration: none; padding: 14px 32px; font-size: 15px; letter-spacing: 0.05em;">MEET THE KIDS</a>
+            <a href="${SITE_URL}/shirts" style="display: inline-block; background: #D4A843; color: #0d0d0d; font-weight: bold; text-decoration: none; padding: 14px 32px; font-size: 15px; letter-spacing: 0.05em;">GET A SHIRT</a>
           </p>
           <p>Kevin</p>
         `),
@@ -368,7 +376,7 @@ function donorConvertEmail(
           <p>What you gave went to real kids. It supported meals, kept them in school, paid for a nurse on the days they needed one. That&rsquo;s where it landed. No overhead games, no admin layer between your gift and the kids who got fed.</p>
           <p>If you ever want to go deeper, sponsoring a child for $25 a month connects you to one specific kid at the campus by name. You get letters, photos, and report cards from them. Or grab a shirt at <a href="${SITE_URL}/shirts" style="color: #D4A843; font-weight: bold;">beanumber.org/shirts</a> and the number on the back is your match.</p>
           <p style="text-align: center; margin: 24px 0;">
-            <a href="${sponsorUrl}" style="display: inline-block; background: #D4A843; color: #0d0d0d; font-weight: bold; text-decoration: none; padding: 14px 32px; font-size: 15px; letter-spacing: 0.05em;">BROWSE THE KIDS</a>
+            <a href="${SITE_URL}/shirts" style="display: inline-block; background: #D4A843; color: #0d0d0d; font-weight: bold; text-decoration: none; padding: 14px 32px; font-size: 15px; letter-spacing: 0.05em;">GET A SHIRT</a>
           </p>
           <p>From here on out, when you hear from me it&rsquo;ll be the monthly newsletter from the campus. Thank you again.</p>
           <p>Kevin</p>
