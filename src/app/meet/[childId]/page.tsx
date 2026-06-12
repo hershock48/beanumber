@@ -31,7 +31,10 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { MeetSponsorButton } from './MeetSponsorButton';
 import { YourKidsStrip } from '@/components/YourKidsStrip';
-import { getViewerSponsorshipForChild } from '@/lib/sponsor-relationship';
+import {
+  getViewerEmail,
+  getViewerSponsorshipForChild,
+} from '@/lib/sponsor-relationship';
 import { BANNavigation } from '@/components/BANNavigation';
 import { BANFooter } from '@/components/BANFooter';
 import { RecentKidsStrip } from '@/components/RecentKidsStrip';
@@ -134,7 +137,20 @@ export default async function MeetKidPage({
   // holds this kid. If so, /meet renders a relationship-acknowledging
   // card instead of a cold "Sponsor [name]" CTA. Same recognition
   // path /[N] uses; lives in src/lib/sponsor-relationship.ts.
-  const viewerRel = await getViewerSponsorshipForChild(f.ChildID || '');
+  //
+  // Also fetch the raw viewer email so we can distinguish a
+  // signed-in user who happens to not sponsor this specific kid
+  // (the user-driven discovery path — Mary on her second
+  // relationship) from a cold visitor with no session at all.
+  // Per the Number-is-identity model: only signed-in users get the
+  // Sponsor button on /meet/[id]; cold visitors get pushed to
+  // /shirts to get a Number first. Every sponsorship traces back
+  // to a Number.
+  const [viewerRel, viewerEmail] = await Promise.all([
+    getViewerSponsorshipForChild(f.ChildID || ''),
+    getViewerEmail(),
+  ]);
+  const isSignedIn = !!viewerEmail;
 
   return (
     <div className="bg-[#FFF8F0] min-h-screen flex flex-col">
@@ -283,7 +299,7 @@ export default async function MeetKidPage({
                   />
                 </div>
               )}
-              {!isDeparted && !viewerRel && (
+              {!isDeparted && !viewerRel && isSignedIn && (
                 <div className="mt-2 bg-[#FFF8F0] border-2 border-[#D4A843] p-5">
                   <p
                     className="text-xl text-[#0d0d0d] mb-2"
@@ -293,7 +309,8 @@ export default async function MeetKidPage({
                   </p>
                   <p className="text-sm text-[#555] leading-relaxed mb-4">
                     $25/month keeps {firstName} in school, fed, and seen
-                    by a doctor. Cancel anytime.
+                    by a doctor. Cancel anytime. {firstName} gets
+                    added to your Number.
                   </p>
                   <MeetSponsorButton
                     childRecordId={record.id}
@@ -301,6 +318,36 @@ export default async function MeetKidPage({
                     childDisplayName={displayName}
                     firstName={firstName}
                   />
+                </div>
+              )}
+              {!isDeparted && !viewerRel && !isSignedIn && (
+                <div className="mt-2 bg-[#FFF8F0] border-2 border-[#D4A843] p-5">
+                  <p
+                    className="text-xl text-[#0d0d0d] mb-2"
+                    style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
+                  >
+                    Meet {firstName}.
+                  </p>
+                  <p className="text-sm text-[#555] leading-relaxed mb-4">
+                    Every relationship at the campus starts with a
+                    Shirt. Get one — yours comes with a Number,
+                    your Number is a Child, and you can add {firstName}{' '}
+                    once you&rsquo;re on the campus.
+                  </p>
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <Link
+                      href="/shirts"
+                      className="inline-block text-center w-full sm:w-auto px-5 py-3 bg-[#D4A843] hover:bg-[#c49a3a] text-[#0d0d0d] font-bold text-xs uppercase tracking-wider transition-colors"
+                    >
+                      Get a Shirt
+                    </Link>
+                    <Link
+                      href="/"
+                      className="inline-block text-center w-full sm:w-auto px-5 py-3 border border-[#e8e0d4] hover:border-[#D4A843] text-[#0d0d0d] font-bold text-xs uppercase tracking-wider transition-colors"
+                    >
+                      Already have a Number?
+                    </Link>
+                  </div>
                 </div>
               )}
             </div>

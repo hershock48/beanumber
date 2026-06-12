@@ -1,6 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
 import type Stripe from 'stripe';
 import { z } from 'zod';
+import { SESSION } from '@/lib/constants';
+
+/**
+ * Gate per the Number-is-identity model: every sponsorship must
+ * trace back to a Number. The caller is either (a) a signed-in
+ * sponsor (sponsor_session cookie present and valid), or
+ * (b) a freshly-finished shirt buyer in the §2 one-tap conversion
+ * window (existingCustomerId + buyerEmail handed across by the
+ * /[N] page). Cold-direct sponsorship without a Number is no
+ * longer supported — see core_model.md §0b.
+ */
+async function hasSponsorSession(): Promise<boolean> {
+  try {
+    const cookieStore = await cookies();
+    const raw = cookieStore.get(SESSION.COOKIE_NAME);
+    if (!raw) return false;
+    const session = JSON.parse(raw.value);
+    if (!session?.email) return false;
+    if (new Date(session.expires) < new Date()) return false;
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 async function getStripe() {
   const StripeModule = (await import('stripe')).default;
@@ -63,6 +88,29 @@ export async function POST(request: NextRequest) {
       );
     }
     const { childRecordId, childId, childDisplayName, email, name, referringShirtSessionId, existingCustomerId, buyerEmail, returnPath } = parsed.data;
+
+    // Number-is-identity gate. Reject any sponsor-checkout request
+    // that doesn&rsquo;t come from a signed-in sponsor OR a fresh shirt
+    // buyer carrying the §2 one-tap conversion context. UI gating
+    // already steers the cold path to /shirts (see /meet/[id] cold
+    // branch), this is the API-level belt-and-suspenders so a
+    // hand-crafted POST can&rsquo;t create an orphan Sponsorship.
+    const oneTapContext =
+      Boolean(existingCustomerId && existingCustomerId.startsWith('cus_')) &&
+      Boolean(buyerEmail && buyerEmail.length > 0);
+    if (!oneTapContext) {
+      const signedIn = await hasSponsorSession();
+      if (!signedIn) {
+        return NextResponse.json(
+          {
+            error:
+              'Sponsorships must be attached to a Number. Get a Shirt or sign in with the email tied to your Number first.',
+            redirect: '/shirts',
+          },
+          { status: 401 }
+        );
+      }
+    }
 
     // Attribution breadcrumb. When a sponsor arrives via the shirt success
     // page, we thread the original shirt checkout session id here so the
