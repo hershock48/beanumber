@@ -3258,43 +3258,67 @@ export async function POST(request: NextRequest) {
                 const lookupData = await lookupRes.json();
                 const donorRecord = lookupData.records?.[0];
                 if (donorRecord) {
-                  // If the donor is in a shirt pipeline, leave them there.
-                  // Shirt drips are tied to physical delivery — overwriting them
-                  // with a subscription drip causes premature "did your shirt arrive?" emails.
-                  const currentPipeline = donorRecord.fields?.DripPipeline || '';
-                  if (currentPipeline === 'shirt_sponsor' || currentPipeline === 'shirt_nurture') {
-                    console.log(`[WH] Donor already in ${currentPipeline} drip, skipping subscription enrollment`);
-                  } else {
-                  // Determine which pipeline: sponsorship subscriptions have
-                  // order_type='sponsorship' in metadata. Monthly donations from
-                  // the donate page have donation_type='monthly' but no order_type.
+                  // Determine the target pipeline based on the subscription
+                  // type. Sponsorship subs (order_type='sponsorship') go to
+                  // sponsor_onboard; monthly donations (no order_type)
+                  // go to monthly_donor.
                   const subMeta = subscription.metadata || {};
                   const isSponsorship = subMeta.order_type === 'sponsorship';
                   const targetPipeline = isSponsorship ? 'sponsor_onboard' : 'monthly_donor';
 
-                  const dripStartDate = new Date();
-                  dripStartDate.setUTCDate(dripStartDate.getUTCDate() + 3);
-                  const dripNextSend = dripStartDate.toISOString().split('T')[0];
+                  const currentPipeline = donorRecord.fields?.DripPipeline || '';
 
-                  await fetch(
-                    `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_DONORS_TABLE}/${donorRecord.id}`,
-                    {
-                      method: 'PATCH',
-                      headers: getAirtableHeaders(),
-                      body: JSON.stringify({
-                        fields: {
-                          DripPipeline: targetPipeline,
-                          DripStage: 0,
-                          DripNextSend: dripNextSend,
-                          // Keep existing DripChildName/DripShirtNumber if set
-                        },
-                      }),
+                  // Drip-drift fix (June 2026): the old rule was &ldquo;if the
+                  // donor is already on shirt_sponsor or shirt_nurture,
+                  // leave them there.&rdquo; That stranded converting buyers
+                  // (Christina&rsquo;s case): they bought a shirt, entered the
+                  // shirt_nurture drip, met their kid, sponsored — but
+                  // kept getting &ldquo;have you sponsored yet?&rdquo; nudges
+                  // because the webhook never moved them. The fix: when
+                  // a sponsorship subscription is created, ALWAYS move the
+                  // donor to sponsor_onboard regardless of where they
+                  // started. shirt_sponsor + shirt_nurture are conversion
+                  // drips with a single goal; once the conversion happens,
+                  // they&rsquo;re done.
+                  //
+                  // The remaining preserve-don&rsquo;t-overwrite case is when
+                  // a NON-sponsorship subscription lands (monthly donation
+                  // from /donate) on a donor already in a shirt drip —
+                  // their shirt journey is still relevant, the monthly
+                  // donation is a side-channel relationship.
+                  const isInShirtDrip =
+                    currentPipeline === 'shirt_sponsor' ||
+                    currentPipeline === 'shirt_nurture';
+                  if (isInShirtDrip && !isSponsorship) {
+                    console.log(`[WH] Donor in ${currentPipeline} + non-sponsorship sub created, leaving drip alone`);
+                  } else {
+                    const dripStartDate = new Date();
+                    dripStartDate.setUTCDate(dripStartDate.getUTCDate() + 3);
+                    const dripNextSend = dripStartDate.toISOString().split('T')[0];
+
+                    await fetch(
+                      `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_DONORS_TABLE}/${donorRecord.id}`,
+                      {
+                        method: 'PATCH',
+                        headers: getAirtableHeaders(),
+                        body: JSON.stringify({
+                          fields: {
+                            DripPipeline: targetPipeline,
+                            DripStage: 0,
+                            DripNextSend: dripNextSend,
+                            // Keep existing DripChildName/DripShirtNumber if set
+                          },
+                        }),
+                      }
+                    );
+                    if (isInShirtDrip) {
+                      console.log(`[WH] Migrated ${currentPipeline} → ${targetPipeline}:`, donorRecord.id);
+                    } else {
+                      console.log(`[WH] Enrolled in ${targetPipeline} drip:`, donorRecord.id);
                     }
-                  );
-                  console.log(`[WH] Enrolled in ${targetPipeline} drip:`, donorRecord.id);
+                  }
                 }
               }
-            }
             }
           } catch (err: any) {
             console.error('[WH] sponsor_onboard drip enrollment failed (non-fatal):', String(err?.message || err).slice(0, 200));

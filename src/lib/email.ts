@@ -264,7 +264,12 @@ export async function sendCampusNewsletterEmail(params: {
     .replace(/\{\{\s*sponsorFirstName\s*\}\}/g, escapeHtml(firstName))
     .replace(/\{\{\s*sponsorName\s*\}\}/g, escapeHtml(sponsorName || 'Friend'));
 
-  const portalUrl = `${process.env.NEXT_PUBLIC_SITE_URL || 'https://www.beanumber.org'}/sponsor/login`;
+  // Under the Number-is-identity model the &ldquo;portal&rdquo; is /[N] (the
+  // user&rsquo;s kid page). We don&rsquo;t know their Number from the newsletter
+  // sender context, so the link points at the homepage where they
+  // enter it. The deprecated /sponsor/login was this link&rsquo;s old
+  // destination — see core_model.md §0b.
+  const siteRoot = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.beanumber.org';
   // Signed, one-click unsubscribe target. RFC 8058 + Gmail bulk sender
   // requirements both expect this to be a real, verifiable link and not
   // a page that asks the recipient to log in first.
@@ -293,9 +298,7 @@ export async function sendCampusNewsletterEmail(params: {
       </div>
       <hr style="border:none;border-top:1px solid #e8e0d4;margin:32px 0;">
       <p style="font-size:14px;color:#666;line-height:1.6;">
-        You're receiving this because you're a Be A Number sponsor.
-        <a href="${portalUrl}" style="color:#D4A843;">Visit your portal</a> to see updates about your child, or
-        <a href="${unsubscribeUrl}" style="color:#999;">manage your emails</a>.
+        You're receiving this because you're a Be A Number sponsor. Updates about your kid show up on your kid's page &mdash; enter your Number at <a href="${siteRoot}" style="color:#D4A843;">beanumber.org</a> to get there. Or <a href="${unsubscribeUrl}" style="color:#999;">manage your emails</a>.
       </p>
       <p style="font-size:12px;color:#999;text-align:center;margin-top:24px;">
         Be A Number, International &middot; 501(c)(3) Nonprofit<br>
@@ -562,15 +565,25 @@ export async function sendUpdateNotificationEmail(
   sponsorName: string,
   childName: string,
   updateTitle: string,
-  updatePreview: string
+  updatePreview: string,
+  shirtNumber?: number
 ): Promise<EmailSendResult> {
-  const dashboardUrl = `${SITE_URL}/sponsor/login`;
+  // If we know the kid&rsquo;s Number, deep-link straight to /[N] —
+  // that&rsquo;s the canonical dashboard under the Number-is-identity
+  // model and the update will render in place. If not, send them
+  // to the homepage to enter their Number.
+  const dashboardUrl = shirtNumber
+    ? `${SITE_URL}/children/${shirtNumber}`
+    : SITE_URL;
+  const dashboardLabel = shirtNumber
+    ? `${childName}&rsquo;s page`
+    : 'your kid&rsquo;s page';
   const firstName = (sponsorName || 'Friend').trim().split(/\s+/)[0] || 'Friend';
 
   const html = wrapTransactionalEmail(`
     <p style="margin-top: 0;">Hey ${firstName},</p>
 
-    <p>There is a new update about ${childName} waiting for you in your portal.</p>
+    <p>There&rsquo;s a new update about ${childName} on ${dashboardLabel}.</p>
 
     <div style="background: #f5f0e8; border: 1px solid #e8e0d4; padding: 16px 20px; margin: 24px 0;">
       <p style="margin: 0 0 6px 0; font-weight: bold; color: #0d0d0d;">${updateTitle}</p>
@@ -646,7 +659,7 @@ export async function sendUpdateRequestConfirmationEmail(
   const html = wrapTransactionalEmail(`
     <p style="margin-top: 0;">Hey ${firstName},</p>
 
-    <p>Got your update request for ${childName}. I am passing it along to the team on the ground, and they will put together recent photos and a progress update. Expect it within 2 to 4 weeks. I will email you when it is ready in your portal.</p>
+    <p>Got your update request for ${childName}. I am passing it along to the team on the ground, and they will put together recent photos and a progress update. Expect it within 2 to 4 weeks. I&rsquo;ll email you when it lands on ${childName}&rsquo;s page.</p>
 
     <p>Your next update request opens up on ${nextEligibleDate}.</p>
 
