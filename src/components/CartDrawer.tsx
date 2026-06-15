@@ -266,7 +266,12 @@ export function CartDrawer() {
                 onSubmit={e => {
                   e.preventDefault();
                   const v = codeInputValue.trim().toUpperCase();
-                  if (v) setPromoCode(v);
+                  // Only commit + collapse when the user actually typed
+                  // something. Empty submit is a no-op; the input stays
+                  // open so they can try again without re-tapping the
+                  // &ldquo;Have a code?&rdquo; link.
+                  if (!v) return;
+                  setPromoCode(v);
                   setCodeInputValue('');
                   setCodeInputOpen(false);
                 }}

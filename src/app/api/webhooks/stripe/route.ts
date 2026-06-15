@@ -1827,7 +1827,7 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
         organization: organization || undefined,
         address,
         donationSource: 'Shirt Order',
-        notes: `[Cart: ${cartItems.length} shirts, stockpile fulfillment]${session.metadata?.ref_code ? ` [Ref: ${session.metadata.ref_code}]` : ''}\n${assignmentNotes.join('\n')}`,
+        notes: `[Cart: ${cartItems.length} shirts, stockpile fulfillment]${session.metadata?.ref_code ? ` [Ref: ${session.metadata.ref_code}]` : ''}${session.metadata?.promo_code ? ` [Promo: ${session.metadata.promo_code} ${session.metadata.promo_percent_off || ''}%]` : ''}\n${assignmentNotes.join('\n')}`,
         // childRecordId intentionally omitted — match resolved post-shipment
       });
 
@@ -2255,7 +2255,7 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
         organization: organization || undefined,
         address,
         donationSource: 'Shirt + Monthly',
-        notes: `Shirt+Monthly: ${shirtName} / ${shirtColor} / ${shirtSize}${assignmentNote}${session.metadata?.ref_code ? ` [Ref: ${session.metadata.ref_code}]` : ''}${referral ? ` \u00b7 Heard via: ${referral}` : ''}`,
+        notes: `Shirt+Monthly: ${shirtName} / ${shirtColor} / ${shirtSize}${assignmentNote}${session.metadata?.ref_code ? ` [Ref: ${session.metadata.ref_code}]` : ''}${session.metadata?.promo_code ? ` [Promo: ${session.metadata.promo_code} ${session.metadata.promo_percent_off || ''}%]` : ''}${referral ? ` \u00b7 Heard via: ${referral}` : ''}`,
         // childRecordId intentionally omitted \u2014 match resolved post-shipment
       });
 
@@ -2413,7 +2413,7 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
         organization: organization || undefined,
         address,
         donationSource: 'Shirt Order',
-        notes: `Shirt: ${shirtName} / ${shirtColor} / ${shirtSize}${assignmentNote}${session.metadata?.ref_code ? ` [Ref: ${session.metadata.ref_code}]` : ''}`,
+        notes: `Shirt: ${shirtName} / ${shirtColor} / ${shirtSize}${assignmentNote}${session.metadata?.ref_code ? ` [Ref: ${session.metadata.ref_code}]` : ''}${session.metadata?.promo_code ? ` [Promo: ${session.metadata.promo_code} ${session.metadata.promo_percent_off || ''}%]` : ''}`,
         // childRecordId intentionally omitted — match not yet known
       });
 
@@ -2576,7 +2576,7 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
         organization: organization || undefined,
         address,
         donationSource: 'Portal Repeat',
-        notes: `Portal reorder: ${shirtName} / ${shirtColor} / ${shirtSize} / Re-using #${existingShirtNumber} (${childDisplayName})${session.metadata?.ref_code ? ` [Ref: ${session.metadata.ref_code}]` : ''}`,
+        notes: `Portal reorder: ${shirtName} / ${shirtColor} / ${shirtSize} / Re-using #${existingShirtNumber} (${childDisplayName})${session.metadata?.ref_code ? ` [Ref: ${session.metadata.ref_code}]` : ''}${session.metadata?.promo_code ? ` [Promo: ${session.metadata.promo_code} ${session.metadata.promo_percent_off || ''}%]` : ''}`,
       });
 
       let emailStatus = 'Sent';

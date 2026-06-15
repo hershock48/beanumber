@@ -640,38 +640,44 @@ function PromoPill() {
   if (!promo) return null;
   if (promo.applicable) {
     return (
-      <div className="bg-[#D4A843] text-[#0d0d0d] px-5 py-3 text-sm text-center font-semibold relative">
-        <span className="uppercase tracking-wider text-xs font-bold mr-2">
-          {promo.code.code}
-        </span>
-        <span>
-          {promo.code.label} applied &middot; {promo.code.expiresLabel}
+      <div className="bg-[#D4A843] text-[#0d0d0d] px-5 py-3 text-sm font-semibold">
+        <div className="max-w-3xl mx-auto flex items-center justify-center gap-3 flex-wrap">
+          <span>
+            <span className="uppercase tracking-wider text-xs font-bold mr-2">
+              {promo.code.code}
+            </span>
+            {promo.code.label} applied &middot; {promo.code.expiresLabel}
+          </span>
+          <button
+            type="button"
+            onClick={() => setPromoCode(null)}
+            aria-label="Remove promo code"
+            className="text-[#0d0d0d]/60 hover:text-[#0d0d0d] text-xs underline shrink-0"
+          >
+            Remove
+          </button>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className="bg-[#fff4e0] border-y border-[#D4A843]/30 text-[#0d0d0d] px-5 py-3 text-sm">
+      <div className="max-w-3xl mx-auto flex items-start sm:items-center justify-center gap-3 flex-wrap">
+        <span className="text-center sm:text-left">
+          <span className="uppercase tracking-wider text-xs font-bold text-[#D4A843] mr-2">
+            {promo.rawCode}
+          </span>
+          <span className="text-[#555]">{promo.reason}</span>
         </span>
         <button
           type="button"
           onClick={() => setPromoCode(null)}
           aria-label="Remove promo code"
-          className="absolute right-3 top-1/2 -translate-y-1/2 text-[#0d0d0d]/60 hover:text-[#0d0d0d] text-xs underline"
+          className="text-[#888] hover:text-[#0d0d0d] text-xs underline shrink-0"
         >
           Remove
         </button>
       </div>
-    );
-  }
-  return (
-    <div className="bg-[#fff4e0] border-y border-[#D4A843]/30 text-[#0d0d0d] px-5 py-3 text-sm text-center">
-      <span className="uppercase tracking-wider text-xs font-bold text-[#D4A843] mr-2">
-        {promo.rawCode}
-      </span>
-      <span className="text-[#555]">{promo.reason}</span>
-      <button
-        type="button"
-        onClick={() => setPromoCode(null)}
-        aria-label="Remove promo code"
-        className="ml-3 text-[#888] hover:text-[#0d0d0d] text-xs underline"
-      >
-        Remove
-      </button>
     </div>
   );
 }
