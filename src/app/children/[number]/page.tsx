@@ -1168,34 +1168,41 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
           {/* Details */}
           <div className="flex flex-col justify-center py-0 md:py-4">
             {/* Departure banner — when the kid is no longer at the
-                campus. Reframed June 2026 to read as an invitation,
-                not an obituary: the headline focuses on the OPEN
-                NUMBER (forward-looking), the polite departure note
-                sits below as small italic context, and the primary
-                CTA points the visitor to meeting another kid. The
-                photo + name above stay because the shirt is forever
-                tied to this kid. */}
+                campus. Under the auto-reveal model (core_model.md §0b,
+                June 2026), this state is transient: the admin marks
+                the kid as departed, the system auto-picks a
+                replacement and transfers the ShirtNumber, and the
+                sponsor lands on the new kid via the RevealOverlay on
+                next visit. A sponsor seeing THIS banner means admin
+                marked the kid departed but hasn&rsquo;t run auto-reveal
+                yet — copy reflects that.
+                Visitors who aren&rsquo;t the sponsor see a quieter
+                acknowledgment. No &ldquo;pick a kid&rdquo; CTA: humans don&rsquo;t
+                pick, the Number picks. */}
             {child.departed_at && (
               <div className="mb-4 p-5 border border-[#D4A843] bg-[#fffaf0]">
                 <p className="text-xs font-bold uppercase tracking-[0.3em] text-[#D4A843] mb-2">
-                  #{number} is open
+                  No longer at the campus
                 </p>
                 <p
                   className="text-xl md:text-2xl text-[#0d0d0d] leading-snug mb-2"
                   style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
                 >
-                  Pick a kid to take this number forward.
+                  {firstName} has moved on.
                 </p>
-                <p className="text-sm text-[#666] leading-relaxed mb-3">
-                  Every kid on the campus has a story you can step into. Your
-                  number can land on any of them.
-                </p>
-                <a
-                  href="/"
-                  className="inline-flex items-center gap-2 bg-[#D4A843] hover:bg-[#c49a3a] text-[#0d0d0d] text-sm font-bold uppercase tracking-wider px-5 py-2.5 transition-colors"
-                >
-                  Browse the kids →
-                </a>
+                {(child.viewer_is_sponsor || child.viewer_is_holder) ? (
+                  <p className="text-sm text-[#666] leading-relaxed mb-3">
+                    Your Number &mdash; #{number} &mdash; is being
+                    reassigned to a new kid at the campus. We&rsquo;ll
+                    email you when they&rsquo;re ready to meet.
+                  </p>
+                ) : (
+                  <p className="text-sm text-[#666] leading-relaxed mb-3">
+                    {firstName}&rsquo;s record stays here because their
+                    story matters. Their Number now belongs to another
+                    kid at the campus.
+                  </p>
+                )}
                 {child.departure_note && (
                   <p
                     className="mt-4 pt-3 border-t border-[#e8e0d4] text-xs text-[#888] leading-relaxed italic whitespace-pre-wrap"
@@ -1379,34 +1386,63 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
             )}
           </div>
 
-          {/* RIGHT — CTA card (3 states based on viewer identity).
-              Departed kids skip every CTA state and render a soft
-              "meet another kid" card instead — no point inviting
-              sponsorship of a kid who's no longer at the campus, and
-              existing sponsors already saw the departure banner up
-              top. */}
+          {/* RIGHT — CTA card. State-aware per viewer identity. The
+              departed-kid branch (auto-reveal model, §0b): a
+              sponsor/holder sees a quiet &ldquo;your new kid is on the
+              way&rdquo; card that points them at /me for their other
+              relationships; a cold visitor sees the brand mechanic
+              (Shirt → Number → Kid) as the path to meeting a kid
+              of their own. No &ldquo;Hope Bridge&rdquo; (off-brand) and no
+              link to / for browsing — humans don&rsquo;t pick the kid,
+              the Number does. */}
           <div>
             {child.departed_at ? (
-              <div className="bg-white border border-[#e8e0d4] p-7 text-center">
-                <p
-                  className="text-xl text-[#0d0d0d] mb-3"
-                  style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
-                >
-                  {firstName} is no longer at the campus.
-                </p>
-                <p className="text-[#555] leading-relaxed mb-5">
-                  Their record stays here because their shirt belongs
-                  to a sponsor and their story matters. If you&rsquo;re
-                  looking for a kid to support, meet the others at
-                  Hope Bridge.
-                </p>
-                <Link
-                  href="/"
-                  className="inline-block bg-[#D4A843] text-[#0d0d0d] font-bold uppercase tracking-wider py-4 px-10 hover:bg-[#c49a3a] transition-colors"
-                >
-                  Meet the kids
-                </Link>
-              </div>
+              (child.viewer_is_sponsor || child.viewer_is_holder) ? (
+                <div className="bg-white border-2 border-[#D4A843]/30 p-7">
+                  <p className="text-xs font-bold uppercase tracking-[0.25em] text-[#D4A843] mb-3">
+                    Number being reassigned
+                  </p>
+                  <p
+                    className="text-xl md:text-2xl text-[#0d0d0d] mb-3 leading-tight"
+                    style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
+                  >
+                    Your new kid is on the way.
+                  </p>
+                  <p className="text-[#555] leading-relaxed mb-5">
+                    {firstName} has moved on, and #{number} is being
+                    matched with a new kid at the campus. We&rsquo;ll
+                    email you the moment they&rsquo;re ready to meet.
+                  </p>
+                  <p className="text-xs text-[#888] leading-relaxed">
+                    See your other kids and updates from{' '}
+                    <Link href="/me" className="text-[#D4A843] hover:underline font-bold">
+                      Your kids
+                    </Link>{' '}
+                    in the nav.
+                  </p>
+                </div>
+              ) : (
+                <div className="bg-white border border-[#e8e0d4] p-7 text-center">
+                  <p
+                    className="text-xl text-[#0d0d0d] mb-3"
+                    style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
+                  >
+                    {firstName} is no longer at the campus.
+                  </p>
+                  <p className="text-[#555] leading-relaxed mb-5">
+                    Their record stays here because their story
+                    matters. Want a kid of your own? Every Be A Number
+                    Shirt comes with a Number on the back, and that
+                    Number is a real kid at the campus.
+                  </p>
+                  <Link
+                    href="/shirts"
+                    className="inline-block bg-[#D4A843] text-[#0d0d0d] font-bold uppercase tracking-wider py-4 px-10 hover:bg-[#c49a3a] transition-colors"
+                  >
+                    Get a Shirt
+                  </Link>
+                </div>
+              )
             ) : child.viewer_is_sponsor ? (
               /* Active monthly sponsor: acknowledgment, no $25/mo ask
                  because they're already paying it. */
