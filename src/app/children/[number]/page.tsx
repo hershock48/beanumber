@@ -8,7 +8,6 @@ import { BANFooter } from '@/components/BANFooter';
 import { RevealBeacon } from './RevealBeacon';
 import { RevealOverlay } from './RevealOverlay';
 import { ReassignReveal } from './ReassignReveal';
-import { ReplacementChooser } from './ReplacementChooser';
 import { SponsorButton } from './SponsorButton';
 import { ClaimMatchCard } from './ClaimMatchCard';
 import { SponsorPortalSections } from './SponsorPortalSections';
@@ -597,75 +596,15 @@ const getChildByShirtNumber = cache(async function getChildByShirtNumber(shirtNu
       sponsorship = emailMatchedSponsorship;
     }
 
-    // Chooser detection. When this sponsor's sponsorship has
-    // PendingCandidateChildIDs set, the original kid departed and
-    // the sponsor needs to pick a replacement from 3 cards before
-    // anything else happens. We render the chooser instead of the
-    // normal profile in that case.
-    let pendingChooserCandidates:
-      | Array<{
-          recordId: string;
-          firstName: string;
-          displayName: string;
-          gradeClass: string;
-          photoUrl: string | null;
-          loves: string;
-        }>
-      | null = null;
-    const pendingBlob = (sponsorship?.PendingCandidateChildIDs as string) || '';
-    if (
-      viewerIsSponsor &&
-      pendingBlob.trim().length > 0
-    ) {
-      const ids = pendingBlob
-        .split(/\r?\n/)
-        .map(s => s.trim())
-        .filter(Boolean)
-        .slice(0, 3);
-      try {
-        const fetched = await Promise.all(
-          ids.map(async id => {
-            const url =
-              `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID || ''}` +
-              `/${encodeURIComponent(process.env.AIRTABLE_CHILDREN_TABLE || 'Children')}/${id}`;
-            const r = await fetch(url, {
-              headers: {
-                Authorization: `Bearer ${process.env.AIRTABLE_PAT || process.env.AIRTABLE_API_KEY || ''}`,
-              },
-              cache: 'no-store',
-            });
-            if (!r.ok) return null;
-            const data = await r.json();
-            const f = data.fields || {};
-            const photoArr =
-              (f.ProfilePhoto as Array<{
-                url: string;
-                thumbnails?: { large?: { url: string } };
-              }>) || [];
-            const photoUrl =
-              photoArr[0]?.thumbnails?.large?.url ||
-              photoArr[0]?.url ||
-              null;
-            return {
-              recordId: data.id as string,
-              firstName: (f.FirstName as string) || '',
-              displayName:
-                (f.DisplayName as string) ||
-                (f.FirstName as string) ||
-                'Kid',
-              gradeClass: (f.GradeClass as string) || '',
-              photoUrl,
-              loves: (f.Loves as string) || '',
-            };
-          })
-        );
-        pendingChooserCandidates = fetched.filter(
-          (k): k is NonNullable<typeof k> => !!k
-        );
-      } catch {
-        pendingChooserCandidates = null;
-      }
-    }
+    // The legacy chooser flow (PendingCandidateChildIDs +
+    // PendingChoiceAt + a 3-candidate picker) was retired in June 2026
+    // when departure became auto-reveal. The admin endpoint now picks
+    // ONE replacement for all sponsors of the departing kid, transfers
+    // the ShirtNumber, and clears ChildRevealedAt so the RevealOverlay
+    // fires on the next visit. The re-reveal reads PreviousChildIDs and
+    // LastReassignedAt (already wired into needsReassignReveal below).
+    // The chooser compute block and the JSX short-circuit that used it
+    // are gone. See core_model.md §0b.
 
     // Reassignment reveal detection. When this sponsor's sponsorship
     // has LastReassignedAt set AND ChildRevealedAt is empty, the
@@ -767,7 +706,6 @@ const getChildByShirtNumber = cache(async function getChildByShirtNumber(shirtNu
       departure_note: child.DepartureNote,
       needs_reassign_reveal: needsReassignReveal,
       previous_kid_name: previousKidName,
-      pending_chooser_candidates: pendingChooserCandidates,
     };
   } catch (error) {
     console.error('[children/page] Error fetching child', {
@@ -1108,24 +1046,11 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
           <AlreadySponsoringBanner shirtNumber={Number(number)} />
         )}
 
-      {/* Replacement chooser short-circuit. When the sponsor's
-          original kid has departed and we've staged 3 candidates,
-          we skip the entire normal profile until they pick one.
-          Their pick triggers the swap + the celebration animation;
-          the page refreshes onto the new kid's profile afterward. */}
-      {child.viewer_is_sponsor &&
-      child.pending_chooser_candidates &&
-      child.pending_chooser_candidates.length > 0 ? (
-        <main className="max-w-5xl mx-auto px-5">
-          <ReplacementChooser
-            shirtNumber={Number(number)}
-            previousKidName={
-              child.first_name || child.display_name || null
-            }
-            candidates={child.pending_chooser_candidates}
-          />
-        </main>
-      ) : (
+      {/* Departure now uses auto-reveal (June 2026, core_model.md
+          §0b). The old 3-card chooser short-circuit lived here; it
+          was replaced by the RevealOverlay's reassignment branch
+          which fires when LastReassignedAt is set and
+          ChildRevealedAt is empty. Same magic, no picking. */}
       <main className="max-w-5xl mx-auto px-5 py-6 md:py-16">
         {/* Breadcrumb */}
         <Link
@@ -1685,7 +1610,6 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
         </RevealOverlay>
         </ReassignReveal>
       </main>
-      )}
 
       <BANFooter />
     </div>

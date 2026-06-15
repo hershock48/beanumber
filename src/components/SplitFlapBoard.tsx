@@ -19,8 +19,8 @@ import { useEffect, useState } from 'react';
  * screen until the parent unmounts the board.
  *
  * Used by:
- *   - ReplacementChooser (post-pick reveal of new kid's name)
  *   - RevealOverlay (first-time meet-them reveal on /[N])
+ *   - ReassignReveal (second reveal after a departure auto-reveal)
  *
  * Brand vocabulary: this animation is the BAN signature for "a name
  * is being revealed." Any moment where a child's identity appears

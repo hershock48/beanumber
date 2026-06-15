@@ -1,18 +1,45 @@
 /**
  * POST /api/admin/roster/stage-candidates
- *   Body: { fromShirtNumber: number, candidateRecordIds?: string[] }
+ *   Body: { fromShirtNumber: number, replacementRecordId?: string }
  *
- * Stages 3 replacement candidates onto every active sponsorship
- * tied to the kid at fromShirtNumber. Next time each sponsor visits
- * /[their #], they see the chooser instead of the regular profile.
+ * Auto-reveal-on-depart. When a kid leaves the campus, the system
+ * picks ONE replacement (random from the same-grade pool, fallback
+ * to any non-departed kid) and reassigns every active sponsorship
+ * tied to the departing kid&rsquo;s number to that one new kid. Next
+ * time each sponsor visits /[their #], the RevealOverlay fires —
+ * &ldquo;[old name] has moved on. Hold to meet your new kid.&rdquo; — and
+ * shows the new kid&rsquo;s name + photo. Same magic as the first
+ * reveal, second time.
  *
- * If candidateRecordIds isn't supplied, the system picks 3 kids
- * randomly from the same grade (active, not departed, not the
- * departing kid themselves). If the grade has fewer than 3 eligible
- * kids, picks from any grade. Order on disk is the order shown to
- * the sponsor.
+ * The endpoint replaced the old chooser-staging flow (June 2026).
+ * The previous version staged 3 candidate cards onto each
+ * Sponsorship and the sponsor picked one. That contradicted
+ * core_model.md §0b (we don&rsquo;t let humans pick kids, the Number
+ * picks) and had a brittle chooser UI. The endpoint URL stayed
+ * the same so the admin ReassignBlock caller didn&rsquo;t need to move;
+ * the behavior changed underneath.
+ *
+ * On success, atomic-ish:
+ *   1. Departed kid: move ShirtNumber → ArchivedShirtNumber, clear ShirtNumber.
+ *   2. Replacement: if they had a ShirtNumber, move it to ArchivedShirtNumber.
+ *      Set replacement&rsquo;s ShirtNumber = departed kid&rsquo;s old number.
+ *   3. For every Active/Holder/Awaiting-Sponsor Sponsorship on the
+ *      departed kid:
+ *        - Append departed kid&rsquo;s ChildID to PreviousChildIDs
+ *        - Swap Children link: departed → replacement
+ *        - Set LastReassignedAt = now
+ *        - Clear ChildRevealedAt (so RevealOverlay fires next visit)
+ *        - Clear PendingCandidateChildIDs + PendingChoiceAt (legacy
+ *          chooser fields; defensive cleanup)
+ *   4. Email each affected owner with the auto-login link.
  *
  * Admin only.
+ *
+ * Pool-funding consequence (core_model.md §1): ONE replacement
+ * covers ALL sponsors of the departing kid. The Number is the
+ * thing that gets a new identity, not each individual sponsor&rsquo;s
+ * relationship — they all share the new kid. Multiple sponsors
+ * per kid is the default in this model, not a collision.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -30,7 +57,15 @@ const SPONSORSHIPS_TABLE =
   process.env.AIRTABLE_SPONSORSHIPS_TABLE || 'Sponsorships';
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.beanumber.org';
 
+const F_CHILDREN = {
+  shirtNumber: 'fldFLnW4dMCjyKFkO',
+  archivedShirtNumber: 'fld01whJoezADPNB6',
+};
 const F_SPONSORSHIPS = {
+  children: 'fld5hJJWvO9E2qVFg',
+  previousChildIDs: 'fldM0JVmkm6ezr4Vc',
+  lastReassignedAt: 'fldAggq3BvZKaIFDi',
+  childRevealedAt: 'fldxnWrpn1QMFQUOf',
   pendingCandidateChildIDs: 'fldWZHlDz3fmu8YxS',
   pendingChoiceAt: 'fldg09iRhIkpOshTc',
 };
@@ -43,7 +78,11 @@ function atHeaders() {
 }
 
 interface ChildFields {
+  ChildID?: string;
   ShirtNumber?: number;
+  ArchivedShirtNumber?: number;
+  FirstName?: string;
+  DisplayName?: string;
   GradeClass?: string;
   DepartedAt?: string;
 }
@@ -63,15 +102,24 @@ async function findKidByShirtNumber(n: number): Promise<ChildRecord | null> {
   return (data.records?.[0] as ChildRecord) || null;
 }
 
-async function listEligibleKids(
-  excludeId: string
-): Promise<ChildRecord[]> {
+async function getKidByRecordId(id: string): Promise<ChildRecord | null> {
+  const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(
+    CHILDREN_TABLE
+  )}/${id}`;
+  const res = await fetch(url, { headers: atHeaders(), cache: 'no-store' });
+  if (!res.ok) return null;
+  return (await res.json()) as ChildRecord;
+}
+
+async function listEligibleKids(excludeId: string): Promise<ChildRecord[]> {
   const out: ChildRecord[] = [];
   let offset: string | undefined;
   do {
     const params = new URLSearchParams();
     params.set('pageSize', '100');
+    params.append('fields[]', 'ChildID');
     params.append('fields[]', 'ShirtNumber');
+    params.append('fields[]', 'FirstName');
     params.append('fields[]', 'GradeClass');
     params.append('fields[]', 'DepartedAt');
     if (offset) params.set('offset', offset);
@@ -87,7 +135,6 @@ async function listEligibleKids(
   return out.filter(r => {
     const f = r.fields;
     if (r.id === excludeId) return false;
-    if (typeof f.ShirtNumber !== 'number' || f.ShirtNumber < 1) return false;
     if (f.DepartedAt) return false;
     return true;
   });
@@ -112,9 +159,7 @@ interface AffectedSponsorship {
 /**
  * Find every Sponsorship currently linked to this child — active
  * monthly sponsors AND Holders (shirt-only number owners). All of
- * them get the chooser. The Holder additions June 2026 mean shirt
- * buyers who never went monthly are also part of the relationship
- * and deserve the pick experience when their kid leaves.
+ * them get re-revealed onto the same new kid.
  */
 async function findSponsorshipsForKid(
   childRecordId: string
@@ -129,19 +174,21 @@ async function findSponsorshipsForKid(
   const res = await fetch(url, { headers: atHeaders(), cache: 'no-store' });
   if (!res.ok) return [];
   const data = await res.json();
-  return (data.records || []).map((r: {
-    id: string;
-    fields?: {
-      SponsorEmail?: string;
-      SponsorCode?: string;
-      SponsorName?: string;
-    };
-  }) => ({
-    id: r.id,
-    sponsorEmail: r.fields?.SponsorEmail || '',
-    sponsorCode: r.fields?.SponsorCode || '',
-    sponsorName: r.fields?.SponsorName || '',
-  }));
+  return (data.records || []).map(
+    (r: {
+      id: string;
+      fields?: {
+        SponsorEmail?: string;
+        SponsorCode?: string;
+        SponsorName?: string;
+      };
+    }) => ({
+      id: r.id,
+      sponsorEmail: r.fields?.SponsorEmail || '',
+      sponsorCode: r.fields?.SponsorCode || '',
+      sponsorName: r.fields?.SponsorName || '',
+    })
+  );
 }
 
 export async function POST(request: NextRequest) {
@@ -155,7 +202,7 @@ export async function POST(request: NextRequest) {
 
   let body: {
     fromShirtNumber?: number;
-    candidateRecordIds?: string[];
+    replacementRecordId?: string;
   };
   try {
     body = await request.json();
@@ -182,14 +229,30 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  let candidates: string[];
-  if (Array.isArray(body.candidateRecordIds) && body.candidateRecordIds.length > 0) {
-    candidates = body.candidateRecordIds.filter(
-      id => typeof id === 'string' && id.startsWith('rec')
-    );
+  // Pick the replacement. If the admin pre-selected one, honor it.
+  // Otherwise: prefer same-grade, fall back to any non-departed kid.
+  // Same selection pool the old chooser used to surface — we&rsquo;re
+  // just picking one instead of three.
+  let replacement: ChildRecord | null = null;
+  if (
+    typeof body.replacementRecordId === 'string' &&
+    body.replacementRecordId.startsWith('rec')
+  ) {
+    replacement = await getKidByRecordId(body.replacementRecordId);
+    if (!replacement) {
+      return NextResponse.json(
+        { error: 'Replacement record not found' },
+        { status: 404 }
+      );
+    }
   } else {
-    // Auto-pick 3 from same grade. If fewer than 3, pad from any grade.
     const allEligible = await listEligibleKids(departing.id);
+    if (allEligible.length === 0) {
+      return NextResponse.json(
+        { error: 'No eligible candidates on the roster.' },
+        { status: 409 }
+      );
+    }
     const targetGradeKey = normalizeGrade(departing.fields.GradeClass).key;
     const sameGrade = shuffle(
       allEligible.filter(
@@ -201,29 +264,99 @@ export async function POST(request: NextRequest) {
         r => normalizeGrade(r.fields.GradeClass).key !== targetGradeKey
       )
     );
-    candidates = [...sameGrade, ...others].slice(0, 3).map(r => r.id);
+    replacement = sameGrade[0] || others[0] || null;
   }
-
-  if (candidates.length === 0) {
+  if (!replacement) {
     return NextResponse.json(
-      { error: 'No eligible candidates on the roster.' },
-      { status: 409 }
+      { error: 'Failed to select a replacement.' },
+      { status: 500 }
     );
   }
 
   const sponsorships = await findSponsorshipsForKid(departing.id);
-  if (sponsorships.length === 0) {
-    return NextResponse.json({
-      ok: true,
-      staged: 0,
-      candidates,
-      note: 'No active sponsorships on this kid — nothing to stage.',
-    });
-  }
 
-  const candidateBlob = candidates.join('\n');
-  const stagedAt = new Date().toISOString();
+  // ── ShirtNumber transfer ────────────────────────────────────────
+  // 1. Departed kid: ShirtNumber → ArchivedShirtNumber, clear ShirtNumber.
+  // 2. Replacement: if they had a ShirtNumber, archive it. Set ShirtNumber
+  //    to the departed kid&rsquo;s old number.
+  //
+  // The transfers happen even when no sponsors are linked — it&rsquo;s about
+  // the public-facing kid-at-#N resolution, not just the relationships.
+
+  const departingArchivedFromCurrent: number | null =
+    typeof departing.fields.ShirtNumber === 'number'
+      ? departing.fields.ShirtNumber
+      : null;
+
+  // Update departed kid
+  await fetch(
+    `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(
+      CHILDREN_TABLE
+    )}/${departing.id}`,
+    {
+      method: 'PATCH',
+      headers: atHeaders(),
+      body: JSON.stringify({
+        fields: {
+          [F_CHILDREN.shirtNumber]: null,
+          ...(departingArchivedFromCurrent !== null
+            ? { [F_CHILDREN.archivedShirtNumber]: departingArchivedFromCurrent }
+            : {}),
+        },
+      }),
+    }
+  );
+
+  // Update replacement
+  const replacementCurrentShirtNumber: number | null =
+    typeof replacement.fields.ShirtNumber === 'number'
+      ? replacement.fields.ShirtNumber
+      : null;
+  await fetch(
+    `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(
+      CHILDREN_TABLE
+    )}/${replacement.id}`,
+    {
+      method: 'PATCH',
+      headers: atHeaders(),
+      body: JSON.stringify({
+        fields: {
+          [F_CHILDREN.shirtNumber]: fromShirtNumber,
+          ...(replacementCurrentShirtNumber !== null
+            ? { [F_CHILDREN.archivedShirtNumber]: replacementCurrentShirtNumber }
+            : {}),
+        },
+      }),
+    }
+  );
+
+  // ── Sponsorship rewrites ────────────────────────────────────────
+  // For each affected Sponsorship: swap Children, append PreviousChildIDs,
+  // stamp LastReassignedAt, clear ChildRevealedAt so the reveal fires.
+  const now = new Date().toISOString();
+  const departingChildID = departing.fields.ChildID || '';
+  let reassignedCount = 0;
   for (const s of sponsorships) {
+    // Fetch current PreviousChildIDs so we can append
+    let previousChildIDsText = '';
+    try {
+      const r = await fetch(
+        `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(
+          SPONSORSHIPS_TABLE
+        )}/${s.id}`,
+        { headers: atHeaders(), cache: 'no-store' }
+      );
+      if (r.ok) {
+        const d = await r.json();
+        previousChildIDsText = (d?.fields?.PreviousChildIDs as string) || '';
+      }
+    } catch {}
+    const updatedHistory = departingChildID
+      ? previousChildIDsText
+        ? `${previousChildIDsText}\n${departingChildID}`
+        : departingChildID
+      : previousChildIDsText;
+
     await fetch(
       `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(
         SPONSORSHIPS_TABLE
@@ -233,23 +366,31 @@ export async function POST(request: NextRequest) {
         headers: atHeaders(),
         body: JSON.stringify({
           fields: {
-            [F_SPONSORSHIPS.pendingCandidateChildIDs]: candidateBlob,
-            [F_SPONSORSHIPS.pendingChoiceAt]: stagedAt,
+            [F_SPONSORSHIPS.children]: [replacement.id],
+            [F_SPONSORSHIPS.previousChildIDs]: updatedHistory,
+            [F_SPONSORSHIPS.lastReassignedAt]: now,
+            [F_SPONSORSHIPS.childRevealedAt]: null,
+            // Defensive: clear any leftover chooser staging from the
+            // legacy flow. New writes never set these, but a sponsor
+            // mid-chooser when the model changed should be auto-revealed
+            // out of it.
+            [F_SPONSORSHIPS.pendingCandidateChildIDs]: null,
+            [F_SPONSORSHIPS.pendingChoiceAt]: null,
           },
         }),
       }
     );
+    reassignedCount += 1;
   }
 
-  // Email every affected owner — Sponsors AND Holders — with a one-tap
-  // auto-login link straight into their chooser. Departure becomes a
-  // re-engagement moment instead of a dead end. Best-effort: failures
-  // don't roll back the staging. Sent serially to keep this endpoint's
-  // memory + latency footprint predictable for typical fan-out (1-30
-  // affected owners per kid).
-  const departingFirstName: string =
-    (departing.fields as { FirstName?: string; DisplayName?: string }).FirstName ||
-    'their kid';
+  // ── Email each owner ────────────────────────────────────────────
+  // Best-effort: failures don&rsquo;t roll back the reassignment. Each
+  // sponsor gets an auto-login link straight to /[their #] where the
+  // RevealOverlay fires on arrival.
+  const departingFirstName =
+    departing.fields.FirstName ||
+    departing.fields.DisplayName?.split(' ')[0] ||
+    'your kid';
   let emailsSent = 0;
   let emailsFailed = 0;
   for (const s of sponsorships) {
@@ -270,22 +411,20 @@ export async function POST(request: NextRequest) {
           <body style="font-family: Georgia, 'Times New Roman', serif; line-height: 1.7; color: #333; max-width: 560px; margin: 0 auto; padding: 30px 20px;">
             <p style="margin-top: 0;">${greeting}</p>
             <p>
-              ${departingFirstName} is no longer at the campus, which means
-              your number — #${fromShirtNumber} — gets to point at a new
-              kid. You get to pick who.
+              ${departingFirstName} is no longer at the campus. Your
+              Number — #${fromShirtNumber} — has a new kid waiting
+              behind it.
             </p>
             <p>
-              I&rsquo;ve lined up three kids for you to choose from. Tap
-              the button below to open the picker. One tap, and the new
-              kid is yours.
+              Tap below to meet them.
             </p>
             <p style="text-align: center; margin: 28px 0;">
               <a href="${callbackUrl}" style="display: inline-block; background: #D4A843; color: #0d0d0d; font-weight: bold; text-decoration: none; padding: 14px 32px; font-size: 15px; letter-spacing: 0.05em; text-transform: uppercase;">
-                Pick a new kid for #${fromShirtNumber}
+                Meet your new kid
               </a>
             </p>
             <p style="color: #888; font-size: 13px;">
-              The link signs you in for 30 days. If you have any questions, just reply &mdash; this email comes straight to me.
+              The link signs you in for 30 days. Any questions, just reply &mdash; comes straight to me.
             </p>
             <hr style="border: none; border-top: 1px solid #e8e0d4; margin: 24px 0;">
             <p style="font-size: 12px; color: #999; line-height: 1.5;">
@@ -300,22 +439,25 @@ export async function POST(request: NextRequest) {
       const result = await sendEmail({
         to: { email: s.sponsorEmail, name: s.sponsorName || '' },
         from: { email: fromEmail, name: 'Be A Number' },
-        subject: `#${fromShirtNumber} — pick a new kid`,
+        subject: `#${fromShirtNumber} — meet your new kid`,
         html,
       });
       if (result.success) emailsSent += 1;
       else emailsFailed += 1;
     } catch (err) {
       emailsFailed += 1;
-      console.error('[StageCandidates] Email send error:', err);
+      console.error('[AutoReveal] Email send error:', err);
     }
   }
 
   return NextResponse.json({
     ok: true,
-    staged: sponsorships.length,
+    staged: reassignedCount, // legacy key — number of sponsors handled
+    reassigned: reassignedCount,
     emailsSent,
     emailsFailed,
-    candidates,
+    replacementRecordId: replacement.id,
+    replacementFirstName:
+      replacement.fields.FirstName || replacement.fields.DisplayName || null,
   });
 }

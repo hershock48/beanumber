@@ -85,9 +85,9 @@ export function ReassignBlock({
   async function stageForSponsorChoice() {
     if (staging) return;
     const ok = confirm(
-      `Stage 3 candidate cards for the sponsor${
+      `Auto-reveal a new kid for #${shirtNumber}'s sponsor${
         (context?.sponsorships.length || 0) === 1 ? '' : 's'
-      } to pick from? Next time they visit /${shirtNumber} they'll see a chooser instead of the regular page.`
+      }? The system will pick a replacement, transfer the Number to them, and email each sponsor a link to meet the new kid. The reveal animation fires the next time they visit /${shirtNumber}.`
     );
     if (!ok) return;
     setStaging(true);
@@ -101,12 +101,13 @@ export function ReassignBlock({
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || `Failed: ${res.status}`);
+      const replacementName = data.replacementFirstName || 'a new kid';
       setStagedNote(
-        `Staged. ${data.staged} sponsor${data.staged === 1 ? '' : 's'} will see the chooser next visit.`
+        `Done. ${data.reassigned ?? data.staged ?? 0} sponsor${(data.reassigned ?? data.staged ?? 0) === 1 ? '' : 's'} re-revealed onto ${replacementName}. ${data.emailsSent || 0} email${data.emailsSent === 1 ? '' : 's'} sent.`
       );
       router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Staging failed.');
+      setError(err instanceof Error ? err.message : 'Auto-reveal failed.');
     } finally {
       setStaging(false);
     }
@@ -178,10 +179,10 @@ export function ReassignBlock({
         <span className="font-semibold">
           {context.sponsorships.map(s => s.sponsorName).join(', ')}
         </span>
-        . Pick a replacement kid in the same grade —{' '}
-        {firstName}&apos;s shirt #{shirtNumber} will become theirs, and each
-        sponsor will see a &ldquo;you&apos;ve been assigned a new child&rdquo;
-        reveal on their next visit.
+        . Auto-reveal picks a replacement kid (same grade when possible),
+        transfers {firstName}&apos;s shirt #{shirtNumber} to the new kid, and
+        emails every sponsor a link to meet them. The reveal animation
+        fires on their next visit. Or pick the replacement yourself below.
       </p>
 
       {!picking ? (
@@ -192,7 +193,7 @@ export function ReassignBlock({
             disabled={staging}
             className="bg-[#D4A843] text-[#0d0d0d] hover:bg-[#c49a3a] font-bold text-xs uppercase tracking-wider px-4 py-2 transition-colors disabled:opacity-50"
           >
-            {staging ? 'Staging…' : 'Let sponsor pick from 3 cards (recommended)'}
+            {staging ? 'Auto-revealing…' : 'Auto-reveal next kid (recommended)'}
           </button>
           <button
             type="button"
