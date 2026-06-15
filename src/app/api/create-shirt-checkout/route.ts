@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import type Stripe from 'stripe';
 import { z } from 'zod';
+import {
+  canApplyPromoToCart,
+  discountedAmountCents,
+} from '@/lib/promo-codes';
 
 async function getStripe() {
   const StripeModule = (await import('stripe')).default;
@@ -40,6 +44,10 @@ export async function POST(request: NextRequest) {
       name: z.string().max(255).optional().default(''),
       continueMonthly: z.boolean().optional().default(false),
       ref_code: z.string().max(50).optional().default(''),
+      // Promo code is server-validated against the SAME helper the
+      // cart context uses. Rejection (e.g. shirt-only code on a
+      // shirt+monthly purchase) silently falls back to full price.
+      promo_code: z.string().max(50).optional().default(''),
     });
 
     const parsed = shirtSchema.safeParse(await request.json());
@@ -49,7 +57,7 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-    const { shirtId, size, color, email, name, continueMonthly, ref_code } = parsed.data;
+    const { shirtId, size, color, email, name, continueMonthly, ref_code, promo_code } = parsed.data;
     const origin = request.headers.get('origin') || 'https://www.beanumber.org';
 
     const shirt = SHIRTS[shirtId]!;
@@ -58,6 +66,20 @@ export async function POST(request: NextRequest) {
     // always works on its own and we never start a subscription by accident.
     const optIn = continueMonthly === true;
     const orderType = optIn ? 'shirt_plus_monthly' : 'shirt';
+
+    // Server-side promo validation. Same rule as cart endpoint —
+    // shirt-only codes don&rsquo;t apply when the buyer is opting into
+    // monthly, because we can&rsquo;t split a recurring line item into
+    // &ldquo;shirt today&rdquo; + &ldquo;monthly forever.&rdquo; The cart context already
+    // told the user this; here we just enforce.
+    const promoResult = promo_code
+      ? canApplyPromoToCart(promo_code, { hasMonthly: optIn })
+      : null;
+    const appliedPromo =
+      promoResult && promoResult.ok ? promoResult.code : null;
+    const shirtUnitAmount = appliedPromo
+      ? discountedAmountCents(SHIRT_PRICE * 100, appliedPromo.percentOff)
+      : SHIRT_PRICE * 100;
 
     // Shared metadata so the webhook can handle both variants the same way.
     // The webhook branches on `order_type` and will assign a child, then
@@ -72,6 +94,13 @@ export async function POST(request: NextRequest) {
       customer_name: name || '',
       continue_monthly: optIn ? 'true' : 'false',
       ...(ref_code ? { ref_code } : {}),
+      // Audit trail for promo redemption — what code, how much off.
+      ...(appliedPromo
+        ? {
+            promo_code: appliedPromo.code,
+            promo_percent_off: String(appliedPromo.percentOff),
+          }
+        : {}),
     };
 
     // --- One-time shirt purchase (default) ---------------------------------
@@ -96,7 +125,7 @@ export async function POST(request: NextRequest) {
                 description:
                   'Be A Number heavyweight tee. Your shirt number connects you to a real child. $25 gets you the shirt and starts their year at the campus.',
               },
-              unit_amount: SHIRT_PRICE * 100,
+              unit_amount: shirtUnitAmount,
             },
             quantity: 1,
           },

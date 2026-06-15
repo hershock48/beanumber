@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
+import {
+  canApplyPromoToCart,
+  discountedAmountCents,
+} from '@/lib/promo-codes';
 
 async function getStripe() {
   const StripeModule = (await import('stripe')).default;
@@ -34,6 +38,10 @@ const cartSchema = z.object({
   email: z.string().email().optional().or(z.literal('')),
   name: z.string().max(255).optional().default(''),
   ref_code: z.string().max(50).optional().default(''),
+  // Promo code is validated server-side against the SAME helper the
+  // cart context uses, so an out-of-date client cart can&rsquo;t bypass
+  // the shirt-only rule. Trimmed + uppercased before validation.
+  promo_code: z.string().max(50).optional().default(''),
 });
 
 export async function POST(request: NextRequest) {
@@ -48,8 +56,32 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { items, email, name, ref_code } = parsed.data;
+    const { items, email, name, ref_code, promo_code } = parsed.data;
     const origin = request.headers.get('origin') || 'https://www.beanumber.org';
+
+    const hasMonthlyForPromo = items.some(i => i.continueMonthly);
+    // Server-side promo validation. Mirrors the cart context: if the
+    // raw code is set, run it through canApplyPromoToCart against the
+    // current cart shape. The result drives both the discounted
+    // unit_amount on shirt line items AND a metadata breadcrumb so we
+    // can audit redemptions later. Rejection is silent here — the
+    // server keeps the cart total at full price and the client&rsquo;s
+    // inline reason banner already told the user why. We don&rsquo;t hard-
+    // error because that would block a checkout the cart context is
+    // already showing at full price; the user already agreed to it.
+    const promoResult = promo_code
+      ? canApplyPromoToCart(promo_code, { hasMonthly: hasMonthlyForPromo })
+      : null;
+    const appliedPromo =
+      promoResult && promoResult.ok ? promoResult.code : null;
+    /**
+     * unit_amount in cents for a shirt line item. With an applied
+     * promo, the cents are reduced; otherwise full price. Stripe
+     * wants integer cents.
+     */
+    const shirtUnitAmount = appliedPromo
+      ? discountedAmountCents(SHIRT_PRICE * 100, appliedPromo.percentOff)
+      : SHIRT_PRICE * 100;
 
     // Per-item metadata for the webhook (so it can build Fulfillment
     // and (when monthly) Sponsorship rows).
@@ -78,6 +110,15 @@ export async function POST(request: NextRequest) {
       items_json: JSON.stringify(itemsMeta),
       customer_name: name || '',
       ...(ref_code ? { ref_code } : {}),
+      // Audit trail for the redemption: what code was applied, how
+      // much came off. Helps Kevin reconcile FB-comment-driven
+      // checkouts later without re-pulling Stripe.
+      ...(appliedPromo
+        ? {
+            promo_code: appliedPromo.code,
+            promo_percent_off: String(appliedPromo.percentOff),
+          }
+        : {}),
     };
 
     // Two shapes depending on whether the cart contains a monthly opt-in.
@@ -107,6 +148,12 @@ export async function POST(request: NextRequest) {
       const lineItems = items.map(item => {
         const shirt = SHIRTS[item.shirtId]!;
         if (item.continueMonthly) {
+          // Recurring line items are deliberately never discounted —
+          // the promo system rejects shirt-only codes the moment any
+          // item is monthly. The full SHIRT_PRICE here is the
+          // belt-and-suspenders defense in case a future promo with
+          // appliesTo='any-shirt' ships and someone forgets that
+          // recurring is still off-limits.
           return {
             price_data: {
               currency: 'usd' as const,
@@ -129,7 +176,7 @@ export async function POST(request: NextRequest) {
               description:
                 'Be A Number heavyweight tee. Your shirt number connects you to a real child.',
             },
-            unit_amount: SHIRT_PRICE * 100,
+            unit_amount: shirtUnitAmount,
           },
           quantity: 1,
         };
@@ -163,7 +210,9 @@ export async function POST(request: NextRequest) {
       });
     } else {
       // No monthly opt-in: payment-mode session. Save card off-session
-      // for the post-purchase one-tap conversion (Memo §2).
+      // for the post-purchase one-tap conversion (Memo §2). All line
+      // items are one-time shirts so the promo discount (if applied)
+      // hits every one of them at the discounted shirtUnitAmount.
       const lineItems = items.map(item => {
         const shirt = SHIRTS[item.shirtId]!;
         return {
@@ -174,7 +223,7 @@ export async function POST(request: NextRequest) {
               description:
                 'Be A Number heavyweight tee. Your shirt number connects you to a real child.',
             },
-            unit_amount: SHIRT_PRICE * 100,
+            unit_amount: shirtUnitAmount,
           },
           quantity: 1,
         };

@@ -611,6 +611,71 @@ function RefCapture() {
   return null;
 }
 
+/**
+ * Captures ?code= from the URL on mount and stores it in CartContext.
+ * Powers the magic-URL flow — e.g. someone tapping a FB-comment
+ * reply link like /shirts?code=WIN10 gets the discount applied
+ * before they pick a shirt. The actual validation + applicability
+ * check runs inside the cart context against the current cart shape.
+ */
+function PromoCapture() {
+  const searchParams = useSearchParams();
+  const { setPromoCode } = useCart();
+  useEffect(() => {
+    const code = searchParams.get('code');
+    if (code) setPromoCode(code);
+  }, [searchParams, setPromoCode]);
+  return null;
+}
+
+/**
+ * Banner at the top of the shirts page when a promo code is set
+ * &mdash; whether or not it currently applies to the cart shape.
+ * Applicable: gold pill with the code, label, and expiry. Not
+ * applicable: same shape but with the reason the cart shape rejects
+ * it. Hidden when no code is set at all.
+ */
+function PromoPill() {
+  const { promo, setPromoCode } = useCart();
+  if (!promo) return null;
+  if (promo.applicable) {
+    return (
+      <div className="bg-[#D4A843] text-[#0d0d0d] px-5 py-3 text-sm text-center font-semibold relative">
+        <span className="uppercase tracking-wider text-xs font-bold mr-2">
+          {promo.code.code}
+        </span>
+        <span>
+          {promo.code.label} applied &middot; {promo.code.expiresLabel}
+        </span>
+        <button
+          type="button"
+          onClick={() => setPromoCode(null)}
+          aria-label="Remove promo code"
+          className="absolute right-3 top-1/2 -translate-y-1/2 text-[#0d0d0d]/60 hover:text-[#0d0d0d] text-xs underline"
+        >
+          Remove
+        </button>
+      </div>
+    );
+  }
+  return (
+    <div className="bg-[#fff4e0] border-y border-[#D4A843]/30 text-[#0d0d0d] px-5 py-3 text-sm text-center">
+      <span className="uppercase tracking-wider text-xs font-bold text-[#D4A843] mr-2">
+        {promo.rawCode}
+      </span>
+      <span className="text-[#555]">{promo.reason}</span>
+      <button
+        type="button"
+        onClick={() => setPromoCode(null)}
+        aria-label="Remove promo code"
+        className="ml-3 text-[#888] hover:text-[#0d0d0d] text-xs underline"
+      >
+        Remove
+      </button>
+    </div>
+  );
+}
+
 export default function ShirtsPageContent() {
   // Shuffle order so every visitor sees a different arrangement — keeps any
   // one colorway from being permanently buried at the bottom of the page.
@@ -619,8 +684,10 @@ export default function ShirtsPageContent() {
   return (
     <CartProvider>
     <RefCapture />
+    <PromoCapture />
     <div className="min-h-screen bg-[#FFF8F0]">
       <BANNavigation currentPath="/shirts" />
+      <PromoPill />
 
       {/* Hero */}
       <section className="py-12 md:py-28 px-5">

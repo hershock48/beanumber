@@ -4,9 +4,29 @@ import { useState } from 'react';
 import { useCart } from './CartContext';
 
 export function CartDrawer() {
-  const { items, removeItem, toggleMonthly, clearCart, isOpen, setIsOpen, totalOneTime, totalMonthly, shippingCost, totalWithShipping, itemCount, refCode } = useCart();
+  const {
+    items,
+    removeItem,
+    toggleMonthly,
+    clearCart,
+    isOpen,
+    setIsOpen,
+    totalOneTime,
+    totalMonthly,
+    shippingCost,
+    totalWithShipping,
+    totalWithShippingDiscounted,
+    itemCount,
+    refCode,
+    setPromoCode,
+    promo,
+  } = useCart();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Codeable-by-the-user input for the &ldquo;Have a code?&rdquo; fallback
+  // when they didn&rsquo;t arrive via the /shirts?code=X magic URL.
+  const [codeInputOpen, setCodeInputOpen] = useState(false);
+  const [codeInputValue, setCodeInputValue] = useState('');
 
   async function handleCheckout() {
     if (items.length === 0) return;
@@ -25,6 +45,15 @@ export function CartDrawer() {
             continueMonthly: i.continueMonthly,
           })),
           ...(refCode ? { ref_code: refCode } : {}),
+          // Send the raw promo code to the server even when the
+          // current cart shape rejects it — the API re-validates
+          // against the SAME canApplyPromoToCart helper. If the cart
+          // shape changed between page load and checkout (user
+          // toggled monthly on), the server&rsquo;s rejection is the
+          // authoritative one.
+          ...(promo?.applicable
+            ? { promo_code: promo.code.code }
+            : {}),
         }),
       });
 
@@ -169,9 +198,21 @@ export function CartDrawer() {
                   Sponsor a child or add {3 - itemCount} more shirt{3 - itemCount !== 1 ? 's' : ''} for free shipping
                 </p>
               )}
+              {promo?.applicable && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-[#D4A843] font-semibold">
+                    {promo.code.label} &middot; {promo.code.code}
+                  </span>
+                  <span className="font-semibold text-[#D4A843]">
+                    &minus;${promo.oneTimeDiscountDollars.toFixed(2)}
+                  </span>
+                </div>
+              )}
               <div className="flex justify-between text-sm pt-1 border-t border-[#e8e0d4]">
                 <span className="font-semibold text-[#0d0d0d]">Today</span>
-                <span className="font-semibold text-[#0d0d0d]">${totalWithShipping}</span>
+                <span className="font-semibold text-[#0d0d0d]">
+                  ${totalWithShippingDiscounted.toFixed(2)}
+                </span>
               </div>
               {monthlyCount > 0 && (
                 <div className="flex justify-between text-sm">
@@ -185,8 +226,68 @@ export function CartDrawer() {
 
             {monthlyCount > 0 && (
               <p className="text-xs text-[#999] leading-snug">
-                ${totalOneTime} charged today. Monthly sponsorships ($25/mo each) start 30 days from now. Cancel anytime.
+                ${totalOneTime.toFixed(2)} charged today. Monthly sponsorships ($25/mo each) start 30 days from now. Cancel anytime.
               </p>
+            )}
+
+            {/* Promo code area. If a code is set but can&rsquo;t apply
+                (cart has monthly), surface the reason inline so the
+                user can adjust their cart or clear the code. */}
+            {promo?.applicable === false && (
+              <div className="bg-[#fff4e0] border border-[#D4A843]/40 px-3 py-2 text-xs text-[#0d0d0d] leading-snug flex items-start gap-2">
+                <span className="font-bold text-[#D4A843]">{promo.rawCode}:</span>
+                <span className="flex-1">{promo.reason}</span>
+                <button
+                  type="button"
+                  onClick={() => setPromoCode(null)}
+                  className="text-[#888] hover:text-[#0d0d0d] underline shrink-0"
+                  aria-label="Remove promo code"
+                >
+                  Remove
+                </button>
+              </div>
+            )}
+
+            {/* &ldquo;Have a code?&rdquo; fallback for users who didn&rsquo;t
+                arrive via the /shirts?code=X magic URL. Hidden when a
+                code is already applied or set; tap to expand the
+                input inline. */}
+            {!promo && !codeInputOpen && (
+              <button
+                type="button"
+                onClick={() => setCodeInputOpen(true)}
+                className="text-xs text-[#888] hover:text-[#0d0d0d] underline self-start"
+              >
+                Have a code?
+              </button>
+            )}
+            {!promo && codeInputOpen && (
+              <form
+                onSubmit={e => {
+                  e.preventDefault();
+                  const v = codeInputValue.trim().toUpperCase();
+                  if (v) setPromoCode(v);
+                  setCodeInputValue('');
+                  setCodeInputOpen(false);
+                }}
+                className="flex gap-2"
+              >
+                <input
+                  type="text"
+                  value={codeInputValue}
+                  onChange={e => setCodeInputValue(e.target.value)}
+                  placeholder="Enter code"
+                  autoFocus
+                  className="flex-1 border border-[#e8e0d4] bg-white px-3 py-2 text-sm text-[#0d0d0d] focus:outline-none focus:border-[#D4A843] uppercase"
+                  maxLength={32}
+                />
+                <button
+                  type="submit"
+                  className="bg-[#0d0d0d] text-[#FFF8F0] font-bold uppercase tracking-wider text-xs px-4 py-2 hover:bg-[#333] transition-colors"
+                >
+                  Apply
+                </button>
+              </form>
             )}
 
             {error && (
@@ -202,7 +303,7 @@ export function CartDrawer() {
                   : 'bg-[#D4A843] text-[#0d0d0d] hover:bg-[#c49a3a] cursor-pointer'
               }`}
             >
-              <span>Checkout &middot; ${totalWithShipping}</span>
+              <span>Checkout &middot; ${totalWithShippingDiscounted.toFixed(2)}</span>
               {loading && (
                 <svg
                   aria-hidden="true"
