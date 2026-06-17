@@ -127,48 +127,36 @@ export async function POST(request: NextRequest) {
     //                  saved off-session via setup_future_usage so the
     //                  buyer can convert later from /[number] in one tap.
     //
-    // 2) Any monthly → subscription-mode session. The +monthly shirts
-    //                  become recurring $25/mo line items (month 1 paid
-    //                  today, ships the shirt — same single-shirt model).
-    //                  Shirt-only items in the same cart ride alongside
-    //                  as one-time line_items in the same mode=subscription
-    //                  session (Stripe permits one-time + recurring mixed
-    //                  in Checkout subscription mode; one-time items hit
-    //                  the first invoice only). Stripe creates the sub
-    //                  itself during checkout — there is no fragile
-    //                  post-payment subscriptions.create() call in the
-    //                  webhook. June 2026 incident: four +monthly cart
-    //                  buyers had no Stripe sub because that retroactive
-    //                  call silently failed. This shape eliminates that
-    //                  failure mode at the architecture level. See
-    //                  docs/claude/known_gotchas.md.
+    // 2) Any monthly → subscription-mode session. Each +monthly shirt
+    //                  becomes TWO line items: a one-time shirt line
+    //                  (charged today, $25, shipped) plus a recurring
+    //                  $25/mo sponsorship line. The subscription gets
+    //                  `trial_period_days: 30` so the first sponsorship
+    //                  charge fires 30 days from checkout — the buyer
+    //                  pays $25 today (for the shirt) and $25/mo from
+    //                  day 30 onward. Same total over time as the old
+    //                  &ldquo;today is month one&rdquo; framing, but Stripe can now
+    //                  cleanly attach shipping to the one-time line
+    //                  instead of trying (and failing) to attach it to
+    //                  a recurring line with an inline product. The
+    //                  failure mode this fixes: Ronna Whitaker reported
+    //                  June 16, 2026 that Stripe Checkout pops a
+    //                  shipping error mid-checkout for shirt+monthly
+    //                  carts. Inline products via price_data default to
+    //                  non-shippable, and Stripe rejects shipping on
+    //                  a recurring item it can&rsquo;t verify is shippable.
+    //                  Splitting the line items removes the ambiguity.
 
     let session;
     if (hasMonthly) {
-      const lineItems = items.map(item => {
+      // Build flattened line items: one one-time shirt line per item,
+      // plus one recurring sponsorship line per item.continueMonthly.
+      // flatMap so a cart with mixed shirt-only + shirt+monthly stays
+      // a clean array. Discounts (when applicable per the promo rules)
+      // apply only to shirt one-time lines — never to recurring.
+      const lineItems = items.flatMap(item => {
         const shirt = SHIRTS[item.shirtId]!;
-        if (item.continueMonthly) {
-          // Recurring line items are deliberately never discounted —
-          // the promo system rejects shirt-only codes the moment any
-          // item is monthly. The full SHIRT_PRICE here is the
-          // belt-and-suspenders defense in case a future promo with
-          // appliesTo='any-shirt' ships and someone forgets that
-          // recurring is still off-limits.
-          return {
-            price_data: {
-              currency: 'usd' as const,
-              product_data: {
-                name: `${shirt.name} tee · ${item.size} + Monthly Sponsorship`,
-                description:
-                  "Your shirt plus ongoing $25/month sponsorship. Today's $25 ships your shirt and is month one. Cancel anytime.",
-              },
-              unit_amount: SHIRT_PRICE * 100,
-              recurring: { interval: 'month' as const },
-            },
-            quantity: 1,
-          };
-        }
-        return {
+        const shirtLine = {
           price_data: {
             currency: 'usd' as const,
             product_data: {
@@ -180,6 +168,26 @@ export async function POST(request: NextRequest) {
           },
           quantity: 1,
         };
+        if (!item.continueMonthly) {
+          return [shirtLine];
+        }
+        // The recurring line is deliberately never discounted — even if
+        // a future promo with appliesTo='any-shirt' ships, the monthly
+        // is off-limits per Kevin&rsquo;s rule.
+        const monthlyLine = {
+          price_data: {
+            currency: 'usd' as const,
+            product_data: {
+              name: 'Monthly Sponsorship',
+              description:
+                "$25/month keeps your kid in school, fed, and seen by a doctor. First monthly charge 30 days from today. Cancel anytime.",
+            },
+            unit_amount: SHIRT_PRICE * 100,
+            recurring: { interval: 'month' as const },
+          },
+          quantity: 1,
+        };
+        return [shirtLine, monthlyLine];
       });
 
       session = await stripe.checkout.sessions.create({
@@ -205,6 +213,10 @@ export async function POST(request: NextRequest) {
             monthlyCount === 1
               ? 'Be A Number monthly sponsorship'
               : `${monthlyCount}× Be A Number monthly sponsorship`,
+          // 30-day trial so the first sponsorship invoice lands a
+          // month after the shirt ships. Today&rsquo;s $25 covers the
+          // shirt; $25/mo recurring begins on day 30.
+          trial_period_days: 30,
           metadata,
         },
       });

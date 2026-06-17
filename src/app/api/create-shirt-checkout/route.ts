@@ -157,8 +157,20 @@ export async function POST(request: NextRequest) {
 
     // --- Shirt + monthly sponsorship (opted in) ----------------------------
     //
-    // Single Stripe subscription from day one. The $25 today IS month one
-    // (and funds the shirt as a thank-you). Month two onward is $25/month.
+    // Two line items in one subscription-mode session:
+    //   1) one-time $25 shirt (charged today, ships)
+    //   2) recurring $25/mo sponsorship with trial_period_days: 30 so
+    //      the first sponsorship invoice lands 30 days after checkout
+    //
+    // The buyer pays $25 today (for the shirt) and $25/mo starting on
+    // day 30. Same total over time as the previous &ldquo;today is month
+    // one&rdquo; framing, but Stripe can now cleanly attach shipping to the
+    // one-time line. The previous shape had a single recurring line
+    // with an inline product (price_data.product_data, not a persistent
+    // Product object) — Stripe treats inline products as non-shippable
+    // by default and rejects shipping on a recurring line it can&rsquo;t
+    // verify is shippable. That surfaced to Ronna Whitaker on
+    // June 16, 2026 as a shipping error popup mid-checkout.
     //
     // Shirt metadata rides on both the session AND subscription so:
     //   - the webhook can find shirt specs on checkout.session.completed
@@ -170,13 +182,28 @@ export async function POST(request: NextRequest) {
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card', 'link'],
       line_items: [
+        // One-time shirt — charged today, ships.
         {
           price_data: {
             currency: 'usd',
             product_data: {
-              name: `${shirt.name} tee · ${size} + Monthly Sponsorship`,
+              name: `${shirt.name} tee · ${size}`,
               description:
-                "Your shirt plus ongoing $25/month sponsorship. Today's $25 starts their year at the campus and ships your shirt. Cancel anytime.",
+                'Be A Number heavyweight tee. Hand screen-printed. Your shirt number connects you to a real kid.',
+            },
+            unit_amount: shirtUnitAmount,
+          },
+          quantity: 1,
+        },
+        // Recurring sponsorship — first invoice 30 days from checkout
+        // via subscription_data.trial_period_days below.
+        {
+          price_data: {
+            currency: 'usd',
+            product_data: {
+              name: 'Monthly Sponsorship',
+              description:
+                "$25/month keeps your kid in school, fed, and seen by a doctor. First monthly charge 30 days from today. Cancel anytime.",
             },
             unit_amount: SHIRT_PRICE * 100,
             recurring: { interval: 'month' },
@@ -202,6 +229,9 @@ export async function POST(request: NextRequest) {
       metadata: sharedMetadata,
       subscription_data: {
         description: `Monthly sponsorship started with ${shirt.name} (${color}, ${size}).`,
+        // 30-day trial so the recurring $25/mo first charges on day 30,
+        // not today. Today's $25 is the shirt one-time line above.
+        trial_period_days: 30,
         metadata: {
           ...sharedMetadata,
           // referring_shirt_session_id, child_id, child_record_id,
