@@ -211,7 +211,15 @@ export async function POST(request: NextRequest) {
           quantity: 1,
         },
       ],
-      shipping_options: [{ shipping_rate_data: { type: 'fixed_amount' as const, fixed_amount: { amount: 0, currency: 'usd' }, display_name: 'Free shipping' } }],
+      // shipping_options is intentionally NOT set on this
+      // subscription-mode session. Per Stripe&rsquo;s docs: &ldquo;Only
+      // Checkout Sessions in payment mode support shipping options.&rdquo;
+      // This was the cause of Ronna Whitaker&rsquo;s blocked checkout on
+      // June 16, 2026 — passing shipping_options in subscription
+      // mode either fails at session-create or surfaces a shipping
+      // error in Stripe&rsquo;s hosted checkout UI. Shirt+monthly buyers
+      // get free shipping by policy; address still collected for
+      // fulfillment via shipping_address_collection below.
       mode: 'subscription',
       success_url: `${origin}/shirts/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/shirts#${shirtId}`,
