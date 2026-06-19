@@ -64,10 +64,17 @@
  */
 
 import { Suspense, useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 
-const SIZE_OPTIONS = ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL'] as const;
-const COLOR_OPTIONS = ['Onyx', 'Meadow', 'Blossom', 'Sky', 'Pink'] as const;
+// Adult sizes + customer-facing color names. Color names are
+// deliberately the common ones (&ldquo;Pink&rdquo; instead of brand
+// &ldquo;Blossom,&rdquo; etc.) because the label is what retail shoppers
+// read — they understand &ldquo;Pink,&rdquo; they may not parse
+// &ldquo;Blossom.&rdquo; The brand color names stay on the website where
+// context makes them feel intentional.
+export const SIZE_OPTIONS = ['S', 'M', 'L', 'XL', 'XXL'] as const;
+export const COLOR_OPTIONS = ['Pink', 'Green', 'Black', 'Blue'] as const;
 
 const LORA = 'var(--font-lora), Georgia, "Times New Roman", serif';
 const SANS =
@@ -122,8 +129,14 @@ function PrintLabelInner() {
 
       <div className="max-w-5xl mx-auto px-5 py-6 md:py-10">
         <div className="print-hide mb-6">
+          <Link
+            href="/admin/print-label/catalog"
+            className="text-xs text-[#888] hover:text-[#0d0d0d] uppercase tracking-[0.15em] font-bold"
+          >
+            ← All labels
+          </Link>
           <h1
-            className="text-2xl text-[#0d0d0d]"
+            className="text-2xl text-[#0d0d0d] mt-3"
             style={{ fontFamily: LORA, fontWeight: 600 }}
           >
             Bag label
