@@ -120,26 +120,31 @@ export function LabelCatalogClient() {
 
         <div className="mt-10 border-t border-[#e8e0d4] pt-6 text-sm text-[#666] leading-relaxed max-w-2xl">
           <p className="font-bold text-[#0d0d0d] mb-2 uppercase tracking-[0.15em] text-xs">
-            Print tips
+            First-time print tips
           </p>
-          <ul className="list-disc list-inside space-y-1">
+          <ol className="list-decimal list-inside space-y-1.5">
             <li>
-              The label is sized to 4&rdquo;×6&rdquo;. In your browser
-              print dialog, confirm paper size is 4&rdquo;×6&rdquo; (or
-              set it as the default in your Flashlabel Pro printer
-              preferences once).
+              Paper size: <strong>100mm × 150mm</strong> on your
+              Flashlabel Pro (the exact dimensions the label is
+              built for — no scaling).
             </li>
             <li>
-              Pick &ldquo;Save as PDF&rdquo; first to verify the label
-              renders correctly before sending real labels through.
+              In the browser print dialog, expand{' '}
+              <strong>More settings</strong>. Set Margins to{' '}
+              <strong>None</strong> and uncheck{' '}
+              <strong>Headers and footers</strong> — that kills the
+              page URL / date that&rsquo;d otherwise print along the
+              bottom edge.
             </li>
             <li>
-              The form on the single-label page lets you tweak
-              &ldquo;Origin&rdquo; if you ever ship from somewhere other
-              than the YDO campus. Default is &ldquo;YDO Campus · Northern
-              Uganda.&rdquo;
+              Scale: <strong>100%</strong> (not &ldquo;Fit to page&rdquo;).
+              The label is sized to fill the paper exactly.
             </li>
-          </ul>
+            <li>
+              First run, &ldquo;Save as PDF&rdquo; to verify the layout
+              before sending real labels through.
+            </li>
+          </ol>
         </div>
       </div>
     </div>
