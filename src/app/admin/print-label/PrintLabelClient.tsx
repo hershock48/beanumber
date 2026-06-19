@@ -6,23 +6,29 @@
  * hides everything except the label sized to a 4&rdquo;×6&rdquo; thermal
  * label.
  *
- * Design philosophy: lean into the mystery box mechanic. The order
- * number and the matched kid&rsquo;s name are intentionally rendered as
- * question marks on the bag — the bag NEVER reveals who&rsquo;s behind
- * the Shirt. The reveal happens only at beanumber.org/[N] when the
- * buyer enters their Number. Every bag is identical from the
- * customer-facing side — retail-ready: a shirt on a shelf has
- * &ldquo;ORDER # ??????? · CHILD CONNECTED TO ???????&rdquo; as the
- * conversation starter.
+ * v3 design — mystery-first with a single emotional hook.
+ *
+ * Earlier versions had two parallel mystery rows (Order # ??? /
+ * Child ???) that read as symmetric but flat — the buyer&rsquo;s eye
+ * didn&rsquo;t know where to land. v3 has ONE massive ??? as the visual
+ * hero, framed by two short brand sentences: &ldquo;There&rsquo;s a kid
+ * behind this Number.&rdquo; above and &ldquo;Meet them at beanumber.org.&rdquo;
+ * below.
+ *
+ * Designed for two scenarios:
+ *
+ *   1. Online buyer opens their package. The label confirms what
+ *      they bought into — &ldquo;yes, your number is in here, and
+ *      the kid is at the URL.&rdquo; Anticipation peaks at the moment
+ *      they&rsquo;re about to flip the shirt and read the number.
+ *
+ *   2. Retail shopper sees the bagged shirt on a shelf. &ldquo;There&rsquo;s
+ *      a kid behind this Number&rdquo; stops them. The question marks
+ *      drive curiosity. The URL gives them a clear next step.
  *
  * Typography per voice.md:
- *   - Be A Number wordmark and the closing tagline = Lora serif
- *     (the brand heading face)
- *   - Everything else = system sans-serif, voice.md body face
- *
- * Layout per Kevin&rsquo;s mockup (centered, big question marks,
- * horizontal rules between sections, vertical divider between
- * Size and Color).
+ *   - Brand wordmark + headline + resolution = Lora serif
+ *   - Question mark hero + utility footer = system sans
  */
 
 import { Suspense, useEffect, useState } from 'react';
@@ -53,40 +59,6 @@ function PrintLabelInner() {
   function handlePrint() {
     window.print();
   }
-
-  // Field-label styling — small caps, gold accent, generous tracking.
-  // Matches the tiny-label pattern from voice.md
-  // (text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843]).
-  const labelStyle: React.CSSProperties = {
-    fontFamily: SANS,
-    fontSize: '8.5pt',
-    letterSpacing: '0.28em',
-    textTransform: 'uppercase',
-    color: '#D4A843',
-    fontWeight: 700,
-    textAlign: 'center',
-  };
-
-  const mysteryValueStyle: React.CSSProperties = {
-    fontFamily: SANS,
-    fontSize: '34pt',
-    fontWeight: 800,
-    letterSpacing: '0.08em',
-    color: '#0d0d0d',
-    textAlign: 'center',
-    lineHeight: 1,
-    marginTop: '0.08in',
-  };
-
-  const realValueStyle: React.CSSProperties = {
-    fontFamily: SANS,
-    fontSize: '22pt',
-    fontWeight: 800,
-    color: '#0d0d0d',
-    textAlign: 'center',
-    lineHeight: 1.1,
-    marginTop: '0.06in',
-  };
 
   return (
     <div className="min-h-screen bg-[#f5f0e8] text-[#0d0d0d]">
@@ -125,11 +97,12 @@ function PrintLabelInner() {
             Bag label
           </h1>
           <p className="text-sm text-[#666] mt-1 leading-relaxed">
-            Pick Size and Color, then Print. ORDER # and CHILD
-            CONNECTED TO are rendered as question marks on every bag
-            — the reveal only happens at beanumber.org/[N] when the
-            buyer enters their Number. Same label fits every bag,
-            retail-ready.
+            Pick Size and Color, then Print. The label leans into
+            the mystery — &ldquo;There&rsquo;s a kid behind this
+            Number&rdquo; framed by a massive ??? as the visual hero,
+            with the URL underneath. Identical on every bag, retail-
+            ready, the reveal only happens at beanumber.org/[N] when
+            the buyer enters their Number.
           </p>
         </div>
 
@@ -202,7 +175,7 @@ function PrintLabelInner() {
             </div>
           </div>
 
-          {/* Label preview — the only thing printed. */}
+          {/* Label preview — the only element printed. */}
           <div className="flex justify-center">
             <div
               className="print-label bg-white border border-[#e8e0d4] shadow-md"
@@ -216,116 +189,170 @@ function PrintLabelInner() {
                 fontFamily: SANS,
               }}
             >
-              {/* Wordmark — Lora, the heading face. Sits centered at
-                  the very top, no rule above. */}
+              {/* Wordmark — tiny brand anchor at top, no rule above. */}
               <div
                 style={{
                   textAlign: 'center',
-                  paddingBottom: '0.18in',
-                  marginBottom: '0.06in',
-                }}
-              >
-                <div
-                  style={{
-                    fontFamily: LORA,
-                    fontSize: '11pt',
-                    letterSpacing: '0.32em',
-                    fontWeight: 700,
-                    textTransform: 'uppercase',
-                  }}
-                >
-                  Be A Number
-                </div>
-              </div>
-
-              {/* Top rule. */}
-              <div style={{ borderTop: '1px solid #0d0d0d' }} />
-
-              {/* ORDER # — the question marks are the hero. */}
-              <div style={{ padding: '0.18in 0 0.12in' }}>
-                <div style={labelStyle}>Order #</div>
-                <div style={mysteryValueStyle}>???????</div>
-              </div>
-
-              <div style={{ borderTop: '1px solid #0d0d0d' }} />
-
-              {/* CHILD CONNECTED TO — same mystery hero. */}
-              <div style={{ padding: '0.18in 0 0.12in' }}>
-                <div style={labelStyle}>Child Connected To</div>
-                <div style={mysteryValueStyle}>???????</div>
-              </div>
-
-              <div style={{ borderTop: '1px solid #0d0d0d' }} />
-
-              {/* Size + Color — two-column with a vertical divider. */}
-              <div
-                style={{
-                  padding: '0.18in 0 0.14in',
-                  display: 'grid',
-                  gridTemplateColumns: '1fr 1px 1fr',
-                  alignItems: 'center',
-                }}
-              >
-                <div>
-                  <div style={labelStyle}>Size</div>
-                  <div style={realValueStyle}>{size || '—'}</div>
-                </div>
-                <div
-                  style={{
-                    height: '1in',
-                    background: '#0d0d0d',
-                    margin: '0 auto',
-                    alignSelf: 'center',
-                  }}
-                />
-                <div>
-                  <div style={labelStyle}>Color</div>
-                  <div style={realValueStyle}>{color || '—'}</div>
-                </div>
-              </div>
-
-              <div style={{ borderTop: '1px solid #0d0d0d' }} />
-
-              {/* COUNTRY — the brand anchor. */}
-              <div style={{ padding: '0.16in 0 0.14in' }}>
-                <div style={labelStyle}>Country</div>
-                <div style={realValueStyle}>{country || '—'}</div>
-              </div>
-
-              {/* Tagline footer — Lora, voice.md brand sentence. */}
-              <div
-                style={{
-                  marginTop: 'auto',
-                  textAlign: 'center',
-                  paddingTop: '0.18in',
-                  borderTop: '2px solid #0d0d0d',
+                  marginBottom: '0.14in',
                 }}
               >
                 <div
                   style={{
                     fontFamily: LORA,
                     fontSize: '10pt',
-                    lineHeight: 1.35,
-                    color: '#0d0d0d',
-                    fontWeight: 600,
+                    letterSpacing: '0.34em',
+                    fontWeight: 700,
+                    textTransform: 'uppercase',
                   }}
                 >
-                  Every Shirt has a Number.
-                  <br />
-                  Every Number is a Child.
+                  Be A Number
                 </div>
                 <div
                   style={{
                     fontFamily: SANS,
-                    fontSize: '8pt',
-                    color: '#666',
-                    marginTop: '6px',
-                    letterSpacing: '0.18em',
+                    fontSize: '7pt',
+                    color: '#888',
+                    marginTop: '4px',
+                    letterSpacing: '0.22em',
                     textTransform: 'uppercase',
-                    fontWeight: 700,
+                    fontWeight: 600,
                   }}
                 >
-                  Meet yours at beanumber.org
+                  beanumber.org
+                </div>
+              </div>
+
+              <div style={{ borderTop: '1px solid #0d0d0d' }} />
+
+              {/* Headline — Lora 600, the emotional setup. Short
+                  sentence, centered, generous line-height. */}
+              <div
+                style={{
+                  padding: '0.24in 0 0.12in',
+                  textAlign: 'center',
+                }}
+              >
+                <div
+                  style={{
+                    fontFamily: LORA,
+                    fontSize: '14pt',
+                    fontWeight: 600,
+                    lineHeight: 1.25,
+                    color: '#0d0d0d',
+                  }}
+                >
+                  There&rsquo;s a kid
+                  <br />
+                  behind this Number.
+                </div>
+              </div>
+
+              {/* Mystery hero — single huge ???. System sans extra
+                  bold, slight tracking, dead-center. This is the
+                  visual hook that pulls the eye. */}
+              <div
+                style={{
+                  textAlign: 'center',
+                  padding: '0.04in 0 0.06in',
+                  fontFamily: SANS,
+                  fontSize: '78pt',
+                  fontWeight: 900,
+                  lineHeight: 0.9,
+                  letterSpacing: '0.04em',
+                  color: '#0d0d0d',
+                }}
+              >
+                ???
+              </div>
+
+              {/* Resolution — the call to action that resolves the
+                  mystery. Small but bold, gold accent for warmth. */}
+              <div
+                style={{
+                  padding: '0.12in 0 0.2in',
+                  textAlign: 'center',
+                }}
+              >
+                <div
+                  style={{
+                    fontFamily: LORA,
+                    fontSize: '11pt',
+                    fontWeight: 600,
+                    color: '#0d0d0d',
+                    lineHeight: 1.35,
+                  }}
+                >
+                  Meet them at
+                </div>
+                <div
+                  style={{
+                    fontFamily: SANS,
+                    fontSize: '13pt',
+                    fontWeight: 800,
+                    color: '#D4A843',
+                    letterSpacing: '0.04em',
+                    marginTop: '2px',
+                  }}
+                >
+                  beanumber.org
+                </div>
+              </div>
+
+              {/* Utility footer — Size · Color · Country in a single
+                  row at the bottom. Small, sans, dot-separated. Sits
+                  above a closing rule. */}
+              <div
+                style={{
+                  marginTop: 'auto',
+                  borderTop: '1px solid #0d0d0d',
+                  paddingTop: '0.14in',
+                }}
+              >
+                <div
+                  style={{
+                    fontFamily: SANS,
+                    fontSize: '7pt',
+                    letterSpacing: '0.24em',
+                    textTransform: 'uppercase',
+                    color: '#888',
+                    fontWeight: 700,
+                    textAlign: 'center',
+                    marginBottom: '4px',
+                  }}
+                >
+                  Size · Color · Origin
+                </div>
+                <div
+                  style={{
+                    fontFamily: SANS,
+                    fontSize: '13pt',
+                    fontWeight: 800,
+                    color: '#0d0d0d',
+                    textAlign: 'center',
+                    letterSpacing: '0.04em',
+                  }}
+                >
+                  {size || '—'}
+                  <span
+                    style={{
+                      color: '#ccc',
+                      fontWeight: 400,
+                      margin: '0 0.12in',
+                    }}
+                  >
+                    ·
+                  </span>
+                  {color || '—'}
+                  <span
+                    style={{
+                      color: '#ccc',
+                      fontWeight: 400,
+                      margin: '0 0.12in',
+                    }}
+                  >
+                    ·
+                  </span>
+                  {country || '—'}
                 </div>
               </div>
             </div>
