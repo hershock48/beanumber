@@ -262,10 +262,10 @@ function PrintLabelInner() {
                 <div
                   style={{
                     fontFamily: SANS,
-                    fontSize: '7.5pt',
-                    color: '#D4A843',
+                    fontSize: '8pt',
+                    color: '#0d0d0d',
                     marginTop: '5px',
-                    letterSpacing: '0.28em',
+                    letterSpacing: '0.3em',
                     textTransform: 'uppercase',
                     fontWeight: 700,
                   }}
@@ -320,8 +320,13 @@ function PrintLabelInner() {
               </div>
 
               {/* Resolution — what to do next. Direct, two sentences,
-                  voice-doc-compliant. The URL gets the gold accent
-                  (sparingly per voice.md). */}
+                  voice-doc-compliant. The URL gets an inverted-fill
+                  treatment (white text on solid black bar) for max
+                  emphasis on a monochrome thermal printer where gold
+                  (or any color) would just print as gray. The black
+                  bar reads as a stamp / seal and is the second
+                  strongest visual element on the label after the ???
+                  hero. */}
               <div
                 style={{
                   padding: '0.06in 0 0.12in',
@@ -343,12 +348,16 @@ function PrintLabelInner() {
                 </div>
                 <div
                   style={{
+                    background: '#0d0d0d',
+                    color: '#ffffff',
                     fontFamily: SANS,
                     fontSize: '13pt',
                     fontWeight: 800,
-                    color: '#D4A843',
-                    letterSpacing: '0.04em',
-                    marginTop: '3px',
+                    letterSpacing: '0.06em',
+                    marginTop: '6px',
+                    padding: '5px 0',
+                    display: 'inline-block',
+                    minWidth: '2.2in',
                   }}
                 >
                   beanumber.org
@@ -383,7 +392,7 @@ function PrintLabelInner() {
                         fontSize: '7pt',
                         letterSpacing: '0.26em',
                         textTransform: 'uppercase',
-                        color: '#888',
+                        color: '#0d0d0d',
                         fontWeight: 700,
                         marginBottom: '2px',
                       }}
@@ -408,7 +417,7 @@ function PrintLabelInner() {
                         fontSize: '7pt',
                         letterSpacing: '0.26em',
                         textTransform: 'uppercase',
-                        color: '#888',
+                        color: '#0d0d0d',
                         fontWeight: 700,
                         marginBottom: '2px',
                       }}
@@ -431,13 +440,13 @@ function PrintLabelInner() {
                   style={{
                     textAlign: 'center',
                     fontFamily: SANS,
-                    fontSize: '7pt',
-                    letterSpacing: '0.22em',
+                    fontSize: '7.5pt',
+                    letterSpacing: '0.24em',
                     textTransform: 'uppercase',
-                    color: '#D4A843',
+                    color: '#0d0d0d',
                     fontWeight: 700,
-                    paddingTop: '0.06in',
-                    borderTop: '1px dashed #ccc',
+                    paddingTop: '0.08in',
+                    borderTop: '1px solid #0d0d0d',
                   }}
                 >
                   {origin || ' '}
