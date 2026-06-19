@@ -6,29 +6,61 @@
  * hides everything except the label sized to a 4&rdquo;×6&rdquo; thermal
  * label.
  *
- * v3 design — mystery-first with a single emotional hook.
+ * v4 design rationale.
  *
- * Earlier versions had two parallel mystery rows (Order # ??? /
- * Child ???) that read as symmetric but flat — the buyer&rsquo;s eye
- * didn&rsquo;t know where to land. v3 has ONE massive ??? as the visual
- * hero, framed by two short brand sentences: &ldquo;There&rsquo;s a kid
- * behind this Number.&rdquo; above and &ldquo;Meet them at beanumber.org.&rdquo;
- * below.
+ * Kevin&rsquo;s v3 critique: a retail shopper looking at a bag with
+ * &ldquo;???&rdquo; on it has no idea it&rsquo;s a t-shirt. Mystery-box brands
+ * (LootCrate, BarkBox, Pop Mart, Pokémon packs) all keep the
+ * category visible — the mystery is about specifics, never about
+ * &ldquo;is this clothing or food.&rdquo; v3 confused category and content.
  *
- * Designed for two scenarios:
+ * v4 fixes that by:
  *
- *   1. Online buyer opens their package. The label confirms what
- *      they bought into — &ldquo;yes, your number is in here, and
- *      the kid is at the URL.&rdquo; Anticipation peaks at the moment
- *      they&rsquo;re about to flip the shirt and read the number.
+ *   1. Putting &ldquo;Hand-printed cotton tee&rdquo; right under the brand
+ *      wordmark — explicit product category, three-word spec, gold
+ *      small caps. Reads as a hangtag line.
  *
- *   2. Retail shopper sees the bagged shirt on a shelf. &ldquo;There&rsquo;s
- *      a kid behind this Number&rdquo; stops them. The question marks
- *      drive curiosity. The URL gives them a clear next step.
+ *   2. Using BAN&rsquo;s existing brand mantra as the hook:
+ *      &ldquo;Every Shirt has a Number. Every Number is a Child.&rdquo;
+ *      The word &ldquo;Shirt&rdquo; is in the headline itself, which doubles
+ *      as the category signal at the body-copy level. The line is
+ *      already the canonical brand sentence across site and emails;
+ *      using it on the bag ties physical product to brand mantra.
  *
- * Typography per voice.md:
- *   - Brand wordmark + headline + resolution = Lora serif
- *   - Question mark hero + utility footer = system sans
+ *   3. Keeping the massive ??? as the visual hero. Category is
+ *      now answered (it&rsquo;s a tee), the mystery is now specifically
+ *      about WHO the kid is.
+ *
+ *   4. Resolution copy points the buyer at the next action:
+ *      &ldquo;Your Number is on the back. Meet your Child at
+ *      beanumber.org.&rdquo; Two sentences, direct, voice-doc compliant.
+ *
+ *   5. Geography in the footer is named precisely — &ldquo;YDO Campus ·
+ *      Northern Uganda&rdquo; — instead of an ambiguous &ldquo;Country:
+ *      Uganda&rdquo; that could read as &ldquo;made in Uganda&rdquo; (the shirts
+ *      are hand-printed by Kevin, not in Uganda; the KID is in
+ *      Uganda).
+ *
+ * Designed for both scenarios Kevin called out:
+ *
+ *   - Online buyer opens their package: the wordmark + product
+ *     spec confirms what arrived, the mantra reaffirms why they
+ *     bought it, ??? amplifies anticipation, the resolution copy
+ *     points them straight at /[N] for the reveal.
+ *
+ *   - Retail shopper sees it on a shelf: reads &ldquo;Be A Number /
+ *     Hand-printed cotton tee&rdquo; in two seconds (category clarity),
+ *     reads &ldquo;Every Shirt has a Number. Every Number is a Child.&rdquo;
+ *     in three more seconds (story hook + category reinforced),
+ *     sees ??? (curiosity), reads URL (next step). Five seconds,
+ *     hooked.
+ *
+ * Typography (voice.md):
+ *   - Wordmark, hook headline, resolution = Lora 600/700
+ *   - Category spec, footer values, URL accent = system sans
+ *   - Gold (#D4A843) used sparingly — wordmark subtitle and the
+ *     URL only, per voice.md (&ldquo;Gold accent: #D4A843 (used
+ *     sparingly — labels, CTA, hover states)&rdquo;).
  */
 
 import { Suspense, useEffect, useState } from 'react';
@@ -45,15 +77,15 @@ function PrintLabelInner() {
   const params = useSearchParams();
   const [size, setSize] = useState('');
   const [color, setColor] = useState('');
-  const [country, setCountry] = useState('Uganda');
+  const [origin, setOrigin] = useState('YDO Campus · Northern Uganda');
 
   useEffect(() => {
     const s = params.get('size');
     const c = params.get('color');
-    const ctry = params.get('country');
+    const o = params.get('origin') || params.get('country');
     if (s) setSize(s);
     if (c) setColor(c);
-    if (ctry) setCountry(ctry);
+    if (o) setOrigin(o);
   }, [params]);
 
   function handlePrint() {
@@ -97,12 +129,12 @@ function PrintLabelInner() {
             Bag label
           </h1>
           <p className="text-sm text-[#666] mt-1 leading-relaxed">
-            Pick Size and Color, then Print. The label leans into
-            the mystery — &ldquo;There&rsquo;s a kid behind this
-            Number&rdquo; framed by a massive ??? as the visual hero,
-            with the URL underneath. Identical on every bag, retail-
-            ready, the reveal only happens at beanumber.org/[N] when
-            the buyer enters their Number.
+            v4 fixes the &ldquo;is this even a t-shirt?&rdquo; problem from
+            v3 by putting the category at the top (&ldquo;Hand-printed cotton
+            tee&rdquo;) and using the BAN brand mantra as the hook (the word
+            &ldquo;Shirt&rdquo; lives in the headline itself). The
+            ??? hero stays, the mystery is now specifically WHO the kid
+            is — not what the product is. Pick Size and Color, then Print.
           </p>
         </div>
 
@@ -149,15 +181,19 @@ function PrintLabelInner() {
 
             <label className="block">
               <span className="block text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-1">
-                Country
+                Origin (kid&rsquo;s campus)
               </span>
               <input
                 type="text"
-                value={country}
-                onChange={e => setCountry(e.target.value)}
-                placeholder="Uganda"
+                value={origin}
+                onChange={e => setOrigin(e.target.value)}
+                placeholder="YDO Campus · Northern Uganda"
                 className="w-full px-3 py-2 border border-[#e8e0d4] bg-white text-[#0d0d0d] focus:outline-none focus:border-[#D4A843]"
               />
+              <span className="block text-xs text-[#888] mt-1">
+                Where the kid is &mdash; not where the shirt was made.
+                Default works for every YDO kid.
+              </span>
             </label>
 
             <div className="pt-4">
@@ -182,14 +218,17 @@ function PrintLabelInner() {
               style={{
                 width: '4in',
                 height: '6in',
-                padding: '0.32in 0.4in',
+                padding: '0.3in 0.36in',
                 display: 'flex',
                 flexDirection: 'column',
                 color: '#0d0d0d',
                 fontFamily: SANS,
               }}
             >
-              {/* Wordmark — tiny brand anchor at top, no rule above. */}
+              {/* Wordmark + product category. The category line is
+                  what answers &ldquo;is this a t-shirt?&rdquo; in two seconds.
+                  Gold small caps so it reads as a hangtag spec line
+                  rather than competing with the brand mark. */}
               <div
                 style={{
                   textAlign: 'center',
@@ -199,8 +238,8 @@ function PrintLabelInner() {
                 <div
                   style={{
                     fontFamily: LORA,
-                    fontSize: '10pt',
-                    letterSpacing: '0.34em',
+                    fontSize: '12pt',
+                    letterSpacing: '0.32em',
                     fontWeight: 700,
                     textTransform: 'uppercase',
                   }}
@@ -210,52 +249,54 @@ function PrintLabelInner() {
                 <div
                   style={{
                     fontFamily: SANS,
-                    fontSize: '7pt',
-                    color: '#888',
-                    marginTop: '4px',
-                    letterSpacing: '0.22em',
+                    fontSize: '7.5pt',
+                    color: '#D4A843',
+                    marginTop: '5px',
+                    letterSpacing: '0.28em',
                     textTransform: 'uppercase',
-                    fontWeight: 600,
+                    fontWeight: 700,
                   }}
                 >
-                  beanumber.org
+                  Hand-printed cotton tee
                 </div>
               </div>
 
               <div style={{ borderTop: '1px solid #0d0d0d' }} />
 
-              {/* Headline — Lora 600, the emotional setup. Short
-                  sentence, centered, generous line-height. */}
+              {/* Hook — BAN&rsquo;s canonical brand line, used here as the
+                  headline. The word &ldquo;Shirt&rdquo; in the first
+                  sentence reinforces the category at the body-copy
+                  level for retail readers skimming. */}
               <div
                 style={{
-                  padding: '0.24in 0 0.12in',
+                  padding: '0.22in 0 0.08in',
                   textAlign: 'center',
                 }}
               >
                 <div
                   style={{
                     fontFamily: LORA,
-                    fontSize: '14pt',
+                    fontSize: '12.5pt',
                     fontWeight: 600,
-                    lineHeight: 1.25,
+                    lineHeight: 1.35,
                     color: '#0d0d0d',
                   }}
                 >
-                  There&rsquo;s a kid
+                  Every Shirt has a Number.
                   <br />
-                  behind this Number.
+                  Every Number is a Child.
                 </div>
               </div>
 
-              {/* Mystery hero — single huge ???. System sans extra
-                  bold, slight tracking, dead-center. This is the
-                  visual hook that pulls the eye. */}
+              {/* Mystery hero — three giant question marks, dead
+                  center, lots of weight. Category is now answered
+                  above, so the mystery is purely &ldquo;who?&rdquo; */}
               <div
                 style={{
                   textAlign: 'center',
-                  padding: '0.04in 0 0.06in',
+                  padding: '0.02in 0 0.04in',
                   fontFamily: SANS,
-                  fontSize: '78pt',
+                  fontSize: '74pt',
                   fontWeight: 900,
                   lineHeight: 0.9,
                   letterSpacing: '0.04em',
@@ -265,24 +306,27 @@ function PrintLabelInner() {
                 ???
               </div>
 
-              {/* Resolution — the call to action that resolves the
-                  mystery. Small but bold, gold accent for warmth. */}
+              {/* Resolution — what to do next. Direct, two sentences,
+                  voice-doc-compliant. The URL gets the gold accent
+                  (sparingly per voice.md). */}
               <div
                 style={{
-                  padding: '0.12in 0 0.2in',
+                  padding: '0.06in 0 0.12in',
                   textAlign: 'center',
                 }}
               >
                 <div
                   style={{
                     fontFamily: LORA,
-                    fontSize: '11pt',
+                    fontSize: '10pt',
                     fontWeight: 600,
                     color: '#0d0d0d',
                     lineHeight: 1.35,
                   }}
                 >
-                  Meet them at
+                  Your Number is on the back.
+                  <br />
+                  Meet your Child at
                 </div>
                 <div
                   style={{
@@ -291,68 +335,99 @@ function PrintLabelInner() {
                     fontWeight: 800,
                     color: '#D4A843',
                     letterSpacing: '0.04em',
-                    marginTop: '2px',
+                    marginTop: '3px',
                   }}
                 >
                   beanumber.org
                 </div>
               </div>
 
-              {/* Utility footer — Size · Color · Country in a single
-                  row at the bottom. Small, sans, dot-separated. Sits
-                  above a closing rule. */}
+              {/* Utility footer — Size and Color side by side, with
+                  the geography below. Geography is named precisely:
+                  &ldquo;YDO Campus · Northern Uganda&rdquo; — so it reads
+                  as &ldquo;the kid is at this campus&rdquo; not the
+                  ambiguous &ldquo;Country: Uganda&rdquo; which could
+                  misread as &ldquo;made in.&rdquo; */}
               <div
                 style={{
                   marginTop: 'auto',
                   borderTop: '1px solid #0d0d0d',
-                  paddingTop: '0.14in',
+                  paddingTop: '0.12in',
                 }}
               >
                 <div
                   style={{
-                    fontFamily: SANS,
-                    fontSize: '7pt',
-                    letterSpacing: '0.24em',
-                    textTransform: 'uppercase',
-                    color: '#888',
-                    fontWeight: 700,
-                    textAlign: 'center',
-                    marginBottom: '4px',
+                    display: 'grid',
+                    gridTemplateColumns: '1fr 1fr',
+                    gap: '0.16in',
+                    marginBottom: '0.1in',
                   }}
                 >
-                  Size · Color · Origin
+                  <div style={{ textAlign: 'center' }}>
+                    <div
+                      style={{
+                        fontFamily: SANS,
+                        fontSize: '7pt',
+                        letterSpacing: '0.26em',
+                        textTransform: 'uppercase',
+                        color: '#888',
+                        fontWeight: 700,
+                        marginBottom: '2px',
+                      }}
+                    >
+                      Size
+                    </div>
+                    <div
+                      style={{
+                        fontFamily: SANS,
+                        fontSize: '14pt',
+                        fontWeight: 800,
+                        color: '#0d0d0d',
+                      }}
+                    >
+                      {size || '—'}
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'center' }}>
+                    <div
+                      style={{
+                        fontFamily: SANS,
+                        fontSize: '7pt',
+                        letterSpacing: '0.26em',
+                        textTransform: 'uppercase',
+                        color: '#888',
+                        fontWeight: 700,
+                        marginBottom: '2px',
+                      }}
+                    >
+                      Color
+                    </div>
+                    <div
+                      style={{
+                        fontFamily: SANS,
+                        fontSize: '14pt',
+                        fontWeight: 800,
+                        color: '#0d0d0d',
+                      }}
+                    >
+                      {color || '—'}
+                    </div>
+                  </div>
                 </div>
                 <div
                   style={{
-                    fontFamily: SANS,
-                    fontSize: '13pt',
-                    fontWeight: 800,
-                    color: '#0d0d0d',
                     textAlign: 'center',
-                    letterSpacing: '0.04em',
+                    fontFamily: SANS,
+                    fontSize: '7pt',
+                    letterSpacing: '0.22em',
+                    textTransform: 'uppercase',
+                    color: '#D4A843',
+                    fontWeight: 700,
+                    paddingTop: '0.06in',
+                    borderTop: '1px dashed #ccc',
                   }}
                 >
-                  {size || '—'}
-                  <span
-                    style={{
-                      color: '#ccc',
-                      fontWeight: 400,
-                      margin: '0 0.12in',
-                    }}
-                  >
-                    ·
-                  </span>
-                  {color || '—'}
-                  <span
-                    style={{
-                      color: '#ccc',
-                      fontWeight: 400,
-                      margin: '0 0.12in',
-                    }}
-                  >
-                    ·
-                  </span>
-                  {country || '—'}
+                  {origin || ' '}
                 </div>
               </div>
             </div>
