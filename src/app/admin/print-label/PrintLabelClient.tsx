@@ -3,11 +3,26 @@
 /**
  * Client side of the bag label printer. Form on the left, live
  * label preview on the right. Hit Print → @media print kicks in,
- * hides the form + nav + everything, leaves only the label sized
- * to a 4&rdquo;×6&rdquo; thermal label.
+ * hides everything except the label sized to a 4&rdquo;×6&rdquo; thermal
+ * label.
  *
- * URL params are read once on mount so the page can deep-link from
- * a future admin order list with values pre-populated.
+ * Design philosophy: lean into the mystery box mechanic. The order
+ * number and the matched kid&rsquo;s name are intentionally rendered as
+ * question marks on the bag — the bag NEVER reveals who&rsquo;s behind
+ * the Shirt. The reveal happens only at beanumber.org/[N] when the
+ * buyer enters their Number. Every bag is identical from the
+ * customer-facing side — retail-ready: a shirt on a shelf has
+ * &ldquo;ORDER # ??????? · CHILD CONNECTED TO ???????&rdquo; as the
+ * conversation starter.
+ *
+ * Typography per voice.md:
+ *   - Be A Number wordmark and the closing tagline = Lora serif
+ *     (the brand heading face)
+ *   - Everything else = system sans-serif, voice.md body face
+ *
+ * Layout per Kevin&rsquo;s mockup (centered, big question marks,
+ * horizontal rules between sections, vertical divider between
+ * Size and Color).
  */
 
 import { Suspense, useEffect, useState } from 'react';
@@ -16,27 +31,22 @@ import { useSearchParams } from 'next/navigation';
 const SIZE_OPTIONS = ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL'] as const;
 const COLOR_OPTIONS = ['Onyx', 'Meadow', 'Blossom', 'Sky', 'Pink'] as const;
 
+const LORA = 'var(--font-lora), Georgia, "Times New Roman", serif';
+const SANS =
+  '-apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif';
+
 function PrintLabelInner() {
   const params = useSearchParams();
-  const [order, setOrder] = useState('');
-  const [child, setChild] = useState('');
   const [size, setSize] = useState('');
   const [color, setColor] = useState('');
   const [country, setCountry] = useState('Uganda');
 
-  // One-shot pre-fill from URL params. Supports any admin tool that
-  // wants to deep-link a pre-populated label (e.g. an order list with
-  // a &ldquo;Print bag label&rdquo; button per row).
   useEffect(() => {
-    const o = params.get('order');
-    const c = params.get('child');
     const s = params.get('size');
-    const col = params.get('color');
+    const c = params.get('color');
     const ctry = params.get('country');
-    if (o) setOrder(o);
-    if (c) setChild(c);
     if (s) setSize(s);
-    if (col) setColor(col);
+    if (c) setColor(c);
     if (ctry) setCountry(ctry);
   }, [params]);
 
@@ -44,12 +54,42 @@ function PrintLabelInner() {
     window.print();
   }
 
+  // Field-label styling — small caps, gold accent, generous tracking.
+  // Matches the tiny-label pattern from voice.md
+  // (text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843]).
+  const labelStyle: React.CSSProperties = {
+    fontFamily: SANS,
+    fontSize: '8.5pt',
+    letterSpacing: '0.28em',
+    textTransform: 'uppercase',
+    color: '#D4A843',
+    fontWeight: 700,
+    textAlign: 'center',
+  };
+
+  const mysteryValueStyle: React.CSSProperties = {
+    fontFamily: SANS,
+    fontSize: '34pt',
+    fontWeight: 800,
+    letterSpacing: '0.08em',
+    color: '#0d0d0d',
+    textAlign: 'center',
+    lineHeight: 1,
+    marginTop: '0.08in',
+  };
+
+  const realValueStyle: React.CSSProperties = {
+    fontFamily: SANS,
+    fontSize: '22pt',
+    fontWeight: 800,
+    color: '#0d0d0d',
+    textAlign: 'center',
+    lineHeight: 1.1,
+    marginTop: '0.06in',
+  };
+
   return (
     <div className="min-h-screen bg-[#f5f0e8] text-[#0d0d0d]">
-      {/* Print CSS — applies only when the browser is preparing to
-          print. Hides the form column, the print button, and the
-          page chrome. Sizes the label to a 4×6 thermal label and
-          centers it. Black-on-white for readability on any printer. */}
       <style>{`
         @media print {
           @page {
@@ -77,51 +117,25 @@ function PrintLabelInner() {
       `}</style>
 
       <div className="max-w-5xl mx-auto px-5 py-6 md:py-10">
-        {/* Header — hidden when printing. */}
         <div className="print-hide mb-6">
           <h1
             className="text-2xl text-[#0d0d0d]"
-            style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
+            style={{ fontFamily: LORA, fontWeight: 600 }}
           >
             Bag label
           </h1>
           <p className="text-sm text-[#666] mt-1 leading-relaxed">
-            Fill the four fields, hit Print, then send the page to your
-            thermal label printer. Sized to a 4&rdquo;×6&rdquo; thermal
-            label. The form and these instructions hide automatically
-            when you print.
+            Pick Size and Color, then Print. ORDER # and CHILD
+            CONNECTED TO are rendered as question marks on every bag
+            — the reveal only happens at beanumber.org/[N] when the
+            buyer enters their Number. Same label fits every bag,
+            retail-ready.
           </p>
         </div>
 
         <div className="grid md:grid-cols-2 gap-8">
-          {/* Form column — hidden when printing. */}
+          {/* Form — hidden when printing. */}
           <div className="print-hide space-y-4">
-            <label className="block">
-              <span className="block text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-1">
-                Order #
-              </span>
-              <input
-                type="text"
-                value={order}
-                onChange={e => setOrder(e.target.value)}
-                placeholder="BAN-2026-914"
-                className="w-full px-3 py-2 border border-[#e8e0d4] bg-white text-[#0d0d0d] focus:outline-none focus:border-[#D4A843]"
-              />
-            </label>
-
-            <label className="block">
-              <span className="block text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-1">
-                Child Connected To
-              </span>
-              <input
-                type="text"
-                value={child}
-                onChange={e => setChild(e.target.value)}
-                placeholder="Emmanuel Olubrwot"
-                className="w-full px-3 py-2 border border-[#e8e0d4] bg-white text-[#0d0d0d] focus:outline-none focus:border-[#D4A843]"
-              />
-            </label>
-
             <div className="grid grid-cols-2 gap-4">
               <label className="block">
                 <span className="block text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-1">
@@ -183,188 +197,135 @@ function PrintLabelInner() {
               </button>
               <p className="text-xs text-[#888] mt-3 leading-relaxed">
                 Use the browser print dialog. Pick your label printer
-                under Destination and confirm paper size is 4&rdquo;×6&rdquo;
-                (or set in printer preferences).
+                under Destination. Confirm paper size is 4&rdquo;×6&rdquo;.
               </p>
             </div>
           </div>
 
-          {/* Label preview column — always visible on screen, becomes
-              the ONLY thing on the page when printing. */}
+          {/* Label preview — the only thing printed. */}
           <div className="flex justify-center">
             <div
               className="print-label bg-white border border-[#e8e0d4] shadow-md"
               style={{
                 width: '4in',
                 height: '6in',
-                padding: '0.35in 0.4in',
+                padding: '0.32in 0.4in',
                 display: 'flex',
                 flexDirection: 'column',
                 color: '#0d0d0d',
-                fontFamily:
-                  'Georgia, "Times New Roman", serif',
+                fontFamily: SANS,
               }}
             >
-              {/* Brand mark */}
+              {/* Wordmark — Lora, the heading face. Sits centered at
+                  the very top, no rule above. */}
               <div
                 style={{
                   textAlign: 'center',
-                  borderBottom: '2px solid #0d0d0d',
                   paddingBottom: '0.18in',
-                  marginBottom: '0.28in',
+                  marginBottom: '0.06in',
                 }}
               >
                 <div
                   style={{
+                    fontFamily: LORA,
                     fontSize: '11pt',
-                    letterSpacing: '0.25em',
+                    letterSpacing: '0.32em',
                     fontWeight: 700,
                     textTransform: 'uppercase',
                   }}
                 >
                   Be A Number
                 </div>
-                <div
-                  style={{
-                    fontSize: '8pt',
-                    color: '#666',
-                    marginTop: '4px',
-                    letterSpacing: '0.15em',
-                    textTransform: 'uppercase',
-                  }}
-                >
-                  beanumber.org
-                </div>
               </div>
 
-              {/* Order # */}
-              <div style={{ marginBottom: '0.22in' }}>
-                <div
-                  style={{
-                    fontSize: '8pt',
-                    letterSpacing: '0.2em',
-                    textTransform: 'uppercase',
-                    color: '#666',
-                    fontWeight: 700,
-                    marginBottom: '4px',
-                  }}
-                >
-                  Order #
-                </div>
-                <div
-                  style={{
-                    fontSize: '16pt',
-                    fontWeight: 700,
-                    fontFamily: '"Courier New", monospace',
-                    letterSpacing: '0.04em',
-                  }}
-                >
-                  {order || ' '}
-                </div>
+              {/* Top rule. */}
+              <div style={{ borderTop: '1px solid #0d0d0d' }} />
+
+              {/* ORDER # — the question marks are the hero. */}
+              <div style={{ padding: '0.18in 0 0.12in' }}>
+                <div style={labelStyle}>Order #</div>
+                <div style={mysteryValueStyle}>???????</div>
               </div>
 
-              {/* Child Connected To */}
-              <div style={{ marginBottom: '0.28in' }}>
-                <div
-                  style={{
-                    fontSize: '8pt',
-                    letterSpacing: '0.2em',
-                    textTransform: 'uppercase',
-                    color: '#666',
-                    fontWeight: 700,
-                    marginBottom: '4px',
-                  }}
-                >
-                  Child Connected To
-                </div>
-                <div
-                  style={{
-                    fontSize: '16pt',
-                    fontWeight: 600,
-                    lineHeight: 1.2,
-                  }}
-                >
-                  {child || ' '}
-                </div>
+              <div style={{ borderTop: '1px solid #0d0d0d' }} />
+
+              {/* CHILD CONNECTED TO — same mystery hero. */}
+              <div style={{ padding: '0.18in 0 0.12in' }}>
+                <div style={labelStyle}>Child Connected To</div>
+                <div style={mysteryValueStyle}>???????</div>
               </div>
 
-              {/* Divider */}
+              <div style={{ borderTop: '1px solid #0d0d0d' }} />
+
+              {/* Size + Color — two-column with a vertical divider. */}
               <div
                 style={{
-                  borderTop: '1px solid #ccc',
-                  margin: '0 0 0.22in 0',
-                }}
-              />
-
-              {/* Size + Color */}
-              <div
-                style={{
+                  padding: '0.18in 0 0.14in',
                   display: 'grid',
-                  gridTemplateColumns: '1fr 1fr',
-                  gap: '0.2in',
-                  marginBottom: '0.28in',
+                  gridTemplateColumns: '1fr 1px 1fr',
+                  alignItems: 'center',
                 }}
               >
                 <div>
-                  <div
-                    style={{
-                      fontSize: '8pt',
-                      letterSpacing: '0.2em',
-                      textTransform: 'uppercase',
-                      color: '#666',
-                      fontWeight: 700,
-                      marginBottom: '4px',
-                    }}
-                  >
-                    Size
-                  </div>
-                  <div style={{ fontSize: '20pt', fontWeight: 700 }}>
-                    {size || ' '}
-                  </div>
+                  <div style={labelStyle}>Size</div>
+                  <div style={realValueStyle}>{size || '—'}</div>
                 </div>
+                <div
+                  style={{
+                    height: '1in',
+                    background: '#0d0d0d',
+                    margin: '0 auto',
+                    alignSelf: 'center',
+                  }}
+                />
                 <div>
-                  <div
-                    style={{
-                      fontSize: '8pt',
-                      letterSpacing: '0.2em',
-                      textTransform: 'uppercase',
-                      color: '#666',
-                      fontWeight: 700,
-                      marginBottom: '4px',
-                    }}
-                  >
-                    Color
-                  </div>
-                  <div style={{ fontSize: '20pt', fontWeight: 700 }}>
-                    {color || ' '}
-                  </div>
+                  <div style={labelStyle}>Color</div>
+                  <div style={realValueStyle}>{color || '—'}</div>
                 </div>
               </div>
 
-              {/* Country */}
+              <div style={{ borderTop: '1px solid #0d0d0d' }} />
+
+              {/* COUNTRY — the brand anchor. */}
+              <div style={{ padding: '0.16in 0 0.14in' }}>
+                <div style={labelStyle}>Country</div>
+                <div style={realValueStyle}>{country || '—'}</div>
+              </div>
+
+              {/* Tagline footer — Lora, voice.md brand sentence. */}
               <div
                 style={{
                   marginTop: 'auto',
-                  borderTop: '2px solid #0d0d0d',
+                  textAlign: 'center',
                   paddingTop: '0.18in',
-                  display: 'flex',
-                  alignItems: 'baseline',
-                  justifyContent: 'space-between',
+                  borderTop: '2px solid #0d0d0d',
                 }}
               >
                 <div
                   style={{
+                    fontFamily: LORA,
+                    fontSize: '10pt',
+                    lineHeight: 1.35,
+                    color: '#0d0d0d',
+                    fontWeight: 600,
+                  }}
+                >
+                  Every Shirt has a Number.
+                  <br />
+                  Every Number is a Child.
+                </div>
+                <div
+                  style={{
+                    fontFamily: SANS,
                     fontSize: '8pt',
-                    letterSpacing: '0.2em',
-                    textTransform: 'uppercase',
                     color: '#666',
+                    marginTop: '6px',
+                    letterSpacing: '0.18em',
+                    textTransform: 'uppercase',
                     fontWeight: 700,
                   }}
                 >
-                  Country
-                </div>
-                <div style={{ fontSize: '13pt', fontWeight: 700 }}>
-                  {country || ' '}
+                  Meet yours at beanumber.org
                 </div>
               </div>
             </div>
@@ -375,10 +336,6 @@ function PrintLabelInner() {
   );
 }
 
-/**
- * Public wrapper. Suspense is required so useSearchParams doesn&rsquo;t
- * bail the page out of static rendering on Next 16.
- */
 export function PrintLabelClient() {
   return (
     <Suspense fallback={null}>
