@@ -28,6 +28,11 @@
 /.tmp/*
 !/.tmp/.gitkeep
 
+# airtable CSV exports — contain donor / sponsor PII, never commit.
+# kept in working tree only for the one-time migration to Postgres.
+/airtable-export/
+*.csv
+
 # debug
 npm-debug.log*
 yarn-debug.log*
