@@ -86,7 +86,11 @@ function readCsv(filename: string): Record<string, string>[] {
     console.warn(`  ⚠  Missing CSV: ${filename} — skipping table.`);
     return [];
   }
-  const raw = fs.readFileSync(filepath, 'utf-8');
+  let raw = fs.readFileSync(filepath, 'utf-8');
+  // Strip UTF-8 BOM that Airtable&rsquo;s web export prepends. Without
+  // this, the first column name becomes "﻿ColName" and every
+  // row[&apos;ColName&apos;] lookup returns undefined.
+  if (raw.charCodeAt(0) === 0xfeff) raw = raw.slice(1);
   return parseCsv(raw, {
     columns: true,
     skip_empty_lines: true,
@@ -100,17 +104,54 @@ function parseBool(v: string | undefined): boolean | undefined {
   return false;
 }
 
+/**
+ * Normalize a date string to ISO YYYY-MM-DD regardless of source
+ * format. Airtable&rsquo;s CSV web export uses MIXED formats across
+ * tables — some columns export ISO (`2026-04-22`), others export
+ * US (`4/22/2026`). Postgres&rsquo;s default datestyle CAN parse
+ * MDY, but explicit canonicalization here removes the dependency
+ * on session-level datestyle.
+ */
 function parseDate(v: string | undefined): string | undefined {
   if (!v) return undefined;
-  // Airtable date format YYYY-MM-DD; keep as-is for Postgres date type.
-  if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
-  // For datetime values (ISO 8601), Postgres accepts directly.
-  return v;
+  const trimmed = v.trim();
+  if (!trimmed) return undefined;
+  // Already ISO date.
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
+  // US format: M/D/YYYY or MM/DD/YYYY (no time).
+  const us = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (us) {
+    const [, mo, d, y] = us;
+    return `${y}-${mo.padStart(2, '0')}-${d.padStart(2, '0')}`;
+  }
+  // ISO datetime — keep just the date portion ("2026-05-14 08:08" → "2026-05-14").
+  const iso = trimmed.match(/^(\d{4}-\d{2}-\d{2})/);
+  if (iso) return iso[1];
+  // Unknown format — return as-is, let Postgres try.
+  return trimmed;
 }
 
+/**
+ * Normalize a datetime string to ISO. US format like "5/14/2026 08:08"
+ * is converted; ISO passes through unchanged.
+ */
 function parseDateTime(v: string | undefined): string | undefined {
   if (!v) return undefined;
-  return v; // ISO 8601 string, Postgres will coerce
+  const trimmed = v.trim();
+  if (!trimmed) return undefined;
+  // Already ISO (with or without T separator and timezone).
+  if (/^\d{4}-\d{2}-\d{2}/.test(trimmed)) return trimmed;
+  // US format with optional time: M/D/YYYY [HH:MM]
+  const m = trimmed.match(
+    /^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2}))?$/
+  );
+  if (m) {
+    const [, mo, d, y, hh, mm] = m;
+    const date = `${y}-${mo.padStart(2, '0')}-${d.padStart(2, '0')}`;
+    if (hh && mm) return `${date}T${hh.padStart(2, '0')}:${mm}:00`;
+    return date;
+  }
+  return trimmed;
 }
 
 function parseNumeric(v: string | undefined): string | undefined {
@@ -128,9 +169,18 @@ function parseInt32(v: string | undefined): number | undefined {
 }
 
 /**
- * Airtable attachment field exports as a JSON string in the cell.
- * Returns the parsed array of {url, filename, id} or empty if not
- * present.
+ * Airtable attachment field. Two export formats exist:
+ *
+ *   1. API format (JSON array): used by the REST API and some
+ *      automation exports. Each entry has {id, url, filename, ...}.
+ *
+ *   2. Web-UI CSV format: human-readable
+ *      "filename.ext (https://signed-url) [, filename2 (url2)]".
+ *      The id field is not present in this format; we set it empty.
+ *
+ * Try JSON first; fall back to the text format. The signed URLs in
+ * either format expire after a few hours, so this needs to run
+ * close to the CSV export.
  */
 interface AirtableAttachment {
   id: string;
@@ -139,13 +189,33 @@ interface AirtableAttachment {
 }
 function parseAttachments(v: string | undefined): AirtableAttachment[] {
   if (!v || v.trim() === '') return [];
+
+  // API-format JSON.
   try {
     const parsed = JSON.parse(v);
     if (Array.isArray(parsed)) return parsed as AirtableAttachment[];
-    return [];
   } catch {
-    return [];
+    /* fall through to text-format parser */
   }
+
+  // Web-UI text format: "filename (url), filename2 (url2)".
+  // Filenames Airtable auto-generates don&rsquo;t contain commas; if a
+  // user-uploaded filename does, this loses the part before the
+  // comma — acceptable trade-off for a one-time migration.
+  const out: AirtableAttachment[] = [];
+  const re = /([^()]+?)\s*\((https?:\/\/[^)]+)\)/g;
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(v)) !== null) {
+    // Strip leading comma+space from filename when it&rsquo;s the
+    // second-or-later attachment in a multi-attachment cell.
+    const filename = match[1].replace(/^,\s*/, '').trim();
+    out.push({
+      id: '',
+      filename,
+      url: match[2],
+    });
+  }
+  return out;
 }
 
 /**
