@@ -11,6 +11,11 @@
     "create-test-sponsorship": "tsx scripts/create-test-sponsorship.ts",
     "migrate-children": "tsx scripts/migrate-children-to-airtable.ts",
     "check-airtable": "tsx scripts/check-airtable-setup.ts",
+    "migrate-csv": "tsx scripts/migrate-from-csv.ts",
+    "migrate-csv-dry": "tsx scripts/migrate-from-csv.ts --dry-run",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:studio": "drizzle-kit studio",
     "remotion:preview": "remotion studio src/remotion/index.ts",
     "remotion:render": "remotion render src/remotion/index.ts ImpactReport out/impact-report.mp4",
     "remotion:reel": "remotion render src/remotion/index.ts ImpactReel out/impact-reel.mp4"

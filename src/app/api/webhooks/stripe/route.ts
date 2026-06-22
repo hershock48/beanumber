@@ -1,6 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import type Stripe from 'stripe';
 import { sendEmail } from '@/lib/email';
+import {
+  mirrorToPostgres,
+  mirrorDonation,
+  mirrorSponsorship,
+  mirrorSubscription,
+  mirrorSubscriptionDeleted,
+  mirrorRefund,
+  mirrorDripFields,
+} from '@/lib/db/webhook-bridge';
 
 // Allow up to 60 seconds for the webhook handler. The default 10s on
 // Hobby plans is too tight — a shirt order does 8+ Airtable API calls,
@@ -635,6 +644,45 @@ async function upsertDonation(
   if (donationData.donorId) {
     updateDonorSummary(donationData.donorId).catch(() => {});
   }
+
+  // Dual-write to Postgres. Failures here log but never break the
+  // Airtable write — the bridge wraps everything in try/catch.
+  await mirrorToPostgres(
+    `donation ${paymentIntentId}`,
+    () =>
+      mirrorDonation({
+        donor: {
+          email: donationData.email,
+          name: donationData.name || null,
+          organizationName: donationData.organization || null,
+          mailingAddress: donationData.address
+            ? typeof donationData.address === 'string'
+              ? donationData.address
+              : JSON.stringify(donationData.address)
+            : null,
+          stripeCustomerId: donationData.customerId || null,
+        },
+        donation: {
+          donationAmount: donationData.amount,
+          currency: donationData.currency,
+          donationSource: donationData.donationSource || 'Website',
+          paymentStatus: donationData.status,
+          recurringDonation: donationData.isRecurring,
+          stripePaymentIntentId: paymentIntentId,
+          stripeCheckoutSessionId: donationData.sessionId || null,
+          stripeCustomerId: donationData.customerId || null,
+          donorEmailAtDonation: donationData.email,
+          donationNote: finalNote || null,
+          donationDate: donationData.donationDate || null,
+        },
+        // Pass legacy ChildID for FK resolution if the upstream
+        // caller knew which kid this was for (sponsorship branch).
+        // The childRecordId here is the Airtable record id — we
+        // can&rsquo;t use it for Postgres FK; the bridge falls back to
+        // text legacy id resolution via id_mapping if needed.
+        designatedChildLegacyId: null,
+      })
+  );
 
   return data.id;
 }
@@ -1388,6 +1436,25 @@ async function createSponsorshipRecord(data: {
 
   const result = await response.json();
   console.log('[Airtable] Created sponsorship:', result.id, sponsorCode);
+
+  // Dual-write to Postgres. Idempotent on sponsor_code (uniquely
+  // indexed) — a webhook retry won&rsquo;t duplicate.
+  await mirrorToPostgres(
+    `sponsorship ${sponsorCode}`,
+    () =>
+      mirrorSponsorship({
+        sponsorCode,
+        sponsorEmail: data.sponsorEmail,
+        sponsorName: data.sponsorName ?? null,
+        monthlyAmount: data.monthlyAmount ?? 25,
+        childLegacyId: data.childId,
+        childDisplayName: data.childDisplayName,
+        stripeSubscriptionId: data.subscriptionId ?? null,
+        sponsorshipStartDate: today,
+        revealedNow: !!data.alreadyRevealed,
+      })
+  );
+
   return { recordId: result.id, sponsorCode };
 }
 
@@ -1442,6 +1509,24 @@ async function createSponsorshipFromCartCheckout(data: {
 
   const result = await response.json();
   console.log('[Airtable] Created cart Sponsorship:', result.id, data.sponsorCode);
+
+  // Dual-write to Postgres — no child link, matches the cart-mode
+  // Airtable shape.
+  await mirrorToPostgres(
+    `cart sponsorship ${data.sponsorCode}`,
+    () =>
+      mirrorSponsorship({
+        sponsorCode: data.sponsorCode,
+        sponsorEmail: data.sponsorEmail,
+        sponsorName: data.sponsorName ?? null,
+        monthlyAmount: data.monthlyAmount,
+        childLegacyId: null,
+        stripeSubscriptionId: data.stripeSubscriptionId,
+        sponsorshipStartDate: data.sponsorshipStartDate,
+        revealedNow: false,
+      })
+  );
+
   return { recordId: result.id };
 }
 
@@ -3118,6 +3203,12 @@ async function handleSubscriptionCanceled(subscription: Stripe.Subscription): Pr
       console.error('[Webhook] Failed to mark sponsorship Ended:', record.id, errText);
     }
   }
+
+  // Dual-write to Postgres.
+  await mirrorToPostgres(
+    `sub.deleted ${subscriptionId}`,
+    () => mirrorSubscriptionDeleted(subscriptionId)
+  );
 }
 
 /**
@@ -3208,6 +3299,18 @@ async function handleChargeRefunded(charge: Stripe.Charge): Promise<void> {
       console.error('[Webhook] Failed to mark donation Refunded:', record.id, errText);
     }
   }
+
+  // Dual-write to Postgres.
+  await mirrorToPostgres(
+    `refund ${paymentIntentId}`,
+    () =>
+      mirrorRefund({
+        stripePaymentIntentId: paymentIntentId,
+        partial: !isFullRefund,
+        refundedAmount: amountRefundedCents / 100,
+        refundedAt: new Date(),
+      })
+  );
 }
 
 export async function POST(request: NextRequest) {
@@ -3415,6 +3518,78 @@ export async function POST(request: NextRequest) {
             }
           } catch (err: any) {
             console.error('[WH] Subscriptions table write failed (non-fatal):', String(err?.message || err).slice(0, 200));
+          }
+        }
+
+        // Dual-write to Postgres: shadow the Subscriptions table and
+        // any drip-pipeline changes from the .created branch above.
+        {
+          const custIdMirror =
+            typeof subscription.customer === 'string'
+              ? subscription.customer
+              : subscription.customer?.id || '';
+          const subAnyM = subscription as any;
+          const amountM = subAnyM.items?.data?.[0]?.price?.unit_amount
+            ? subAnyM.items.data[0].price.unit_amount / 100
+            : 25;
+          const periodEndM = subAnyM.current_period_end
+            ? new Date(subAnyM.current_period_end * 1000)
+            : null;
+          const startDateM = subAnyM.start_date
+            ? new Date(subAnyM.start_date * 1000)
+            : new Date();
+
+          // Resolve donor email — Stripe customer.email is the
+          // canonical source; if the bridge can&rsquo;t find a donor by
+          // customer id it&rsquo;ll fall back to email or stub-create.
+          let donorEmailMirror = '';
+          try {
+            const stripeM = await getStripe();
+            const customer = custIdMirror
+              ? await stripeM.customers.retrieve(custIdMirror)
+              : null;
+            if (customer && !('deleted' in customer && customer.deleted)) {
+              donorEmailMirror =
+                (customer as Stripe.Customer).email || '';
+            }
+          } catch (e) {
+            console.warn('[WH] customer lookup for pg mirror failed:', e);
+          }
+
+          await mirrorToPostgres(
+            `subscription ${subscription.id}`,
+            () =>
+              mirrorSubscription({
+                stripeSubscriptionId: subscription.id,
+                stripeCustomerId: custIdMirror,
+                donorEmail: donorEmailMirror,
+                status: subscription.status,
+                amount: amountM,
+                frequency: 'monthly',
+                startDate: startDateM,
+                currentPeriodEnd: periodEndM,
+              })
+          );
+
+          // Mirror drip-field updates for the .created branch.
+          if (event.type === 'customer.subscription.created' && donorEmailMirror) {
+            const subMetaM = subscription.metadata || {};
+            const isSponsorshipM = subMetaM.order_type === 'sponsorship';
+            const targetPipelineM = isSponsorshipM
+              ? 'sponsor_onboard'
+              : 'monthly_donor';
+            const dripStartM = new Date();
+            dripStartM.setUTCDate(dripStartM.getUTCDate() + 3);
+            await mirrorToPostgres(
+              `drip ${donorEmailMirror}`,
+              () =>
+                mirrorDripFields({
+                  email: donorEmailMirror,
+                  dripPipeline: targetPipelineM,
+                  dripStage: 0,
+                  dripNextSend: dripStartM,
+                })
+            );
           }
         }
         break;
