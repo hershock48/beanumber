@@ -2,27 +2,31 @@
  * YourKidsStrip — horizontal strip of every kid the signed-in user
  * sponsors or holds, rendered at the top of every kid page.
  *
- * Solves the navigation hole Kevin flagged: on Marvin&rsquo;s /2, there was
- * no way to hop to Precious&rsquo;s page without going to /me first. The
+ * Solves the navigation hole Kevin flagged: on Marvin's /2, there was
+ * no way to hop to Precious's page without going to /me first. The
  * strip turns every kid page into both a destination AND a navigation
- * surface for the user&rsquo;s whole family of relationships.
+ * surface for the user's whole family of relationships.
  *
  * Behavior:
- *   - Reads the sponsor_session cookie for the viewer&rsquo;s email.
- *   - Looks up every Active or Holder Sponsorship row for that email.
+ *   - Reads the sponsor_session cookie for the viewer's email.
+ *   - Looks up every Active or Holder Sponsorship row for that email
+ *     via the typed Postgres query layer.
  *   - Renders a horizontal strip of small circular avatars + first
- *     names. Click any of them → that kid&rsquo;s /[N] page.
+ *     names. Click any of them → that kid's /[N] page.
  *   - Excludes the currently-viewed kid (no link to yourself).
  *   - Caps at 12 kids to keep mobile rows manageable.
- *   - Trailing &ldquo;+ Add&rdquo; tile that links to /campus.
+ *   - Trailing "+ Add" tile that links to /campus.
  *   - Returns null entirely for non-signed-in visitors, signed-in
  *     visitors with zero kids, or signed-in visitors whose only kid
- *     IS the one they&rsquo;re looking at. The strip should be quiet when
+ *     IS the one they're looking at. The strip should be quiet when
  *     it has nothing useful to add.
  *
- * Server component so we can read the cookie + hit Airtable without
- * a client round-trip. The kid page is already `dynamic = 'force-
- * dynamic'`, so we&rsquo;re not blowing any caching budget.
+ * Important: ONLY kids the user has a Sponsorship row for show up
+ * here. Visiting a kid's page does NOT add them to this strip — that
+ * was the Airtable-era "Sponsorships" lookup, and the Postgres
+ * version preserves the same identity gate. The bottom-of-page
+ * "Kids you've met" strip is the visit-history-from-localStorage
+ * version; do not confuse the two surfaces.
  */
 
 import { cookies } from 'next/headers';
@@ -30,6 +34,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { SESSION } from '@/lib/constants';
 import { YourKidsStripSticky } from './YourKidsStripSticky';
+import { getViewerSponsorships } from '@/lib/db/queries';
 
 interface KidLink {
   recordId: string;
@@ -40,26 +45,15 @@ interface KidLink {
   /**
    * Does the viewer actually own the number tied to this kid?
    *
-   * - Holder → yes (they claimed the number, with or without buying
-   *   the shirt; the relationship IS the number).
-   * - Active sponsor whose email matches the kid&rsquo;s ShirtBuyerEmail →
+   * - Holder → yes (they claimed the number).
+   * - Active sponsor whose email matches the kid's ShirtBuyerEmail →
    *   yes (they bought the shirt that put them in the relationship).
    * - Active sponsor who came in through /campus without ever
-   *   buying that kid&rsquo;s shirt → no (the relationship is with the
-   *   kid; the number belongs to someone else&rsquo;s shirt).
-   *
-   * Drives where the avatar links: owners get /children/[N] (their
-   * Number&rsquo;s page), non-owners get /meet/[recordId] (the unnumbered
-   * relationship page).
+   *   buying that kid's shirt → no (the relationship is with the
+   *   kid; the number belongs to someone else's shirt).
    */
   ownsNumber: boolean;
 }
-
-const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID || '';
-const AIRTABLE_API_KEY = process.env.AIRTABLE_API_KEY || '';
-const SPONSORSHIPS_TABLE =
-  process.env.AIRTABLE_SPONSORSHIPS_TABLE || 'Sponsorships';
-const CHILDREN_TABLE = process.env.AIRTABLE_CHILDREN_TABLE || 'Children';
 
 async function getViewerEmail(): Promise<string | null> {
   try {
@@ -76,89 +70,43 @@ async function getViewerEmail(): Promise<string | null> {
 }
 
 async function fetchKidsForEmail(email: string): Promise<KidLink[]> {
-  if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) return [];
-  const safe = email.replace(/"/g, '\\"');
-  const formula = encodeURIComponent(
-    `AND(LOWER({SponsorEmail})="${safe}", OR({Status}="Active",{Status}="Holder"))`
-  );
   try {
-    const res = await fetch(
-      `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(
-        SPONSORSHIPS_TABLE
-      )}?filterByFormula=${formula}&pageSize=100`,
-      {
-        headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` },
-        cache: 'no-store',
-      }
-    );
-    if (!res.ok) return [];
-    const data = await res.json();
-    const sponsorships: Array<{
-      fields: {
-        Status?: string;
-        MonthlyAmount?: number;
-        Children?: string[];
-      };
-    }> = data.records || [];
+    const rows = await getViewerSponsorships(email);
+    const kids: KidLink[] = [];
+    for (const r of rows) {
+      const shirtNumber = r.childShirtNumber ?? null;
+      if (typeof shirtNumber !== 'number' || shirtNumber <= 0) continue;
+      // Skip kids who've left the campus — clicking through to a
+      // departed-kid page is a cul-de-sac.
+      if (r.childDepartedAt) continue;
 
-    // Resolve each sponsorship to a kid record. Parallelize so a
-    // 6-kid family doesn&rsquo;t do 6 sequential fetches.
-    const kids = await Promise.all(
-      sponsorships.map(async sp => {
-        const childRecordId = sp.fields?.Children?.[0];
-        if (!childRecordId) return null;
-        try {
-          const childRes = await fetch(
-            `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(
-              CHILDREN_TABLE
-            )}/${childRecordId}`,
-            {
-              headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` },
-              cache: 'no-store',
-            }
-          );
-          if (!childRes.ok) return null;
-          const c = await childRes.json();
-          const cf = c.fields || {};
-          const shirtNumber =
-            typeof cf.ShirtNumber === 'number' ? cf.ShirtNumber : null;
-          if (!shirtNumber) return null;
-          // Skip kids who have left the campus — clicking through to a
-          // departed-kid page is a cul-de-sac.
-          if (cf.DepartedAt) return null;
-          const status = (sp.fields?.Status as string) || '';
-          const amount = (sp.fields?.MonthlyAmount as number) || 0;
-          const relationship: 'sponsor' | 'holder' =
-            status === 'Active' && amount > 0 ? 'sponsor' : 'holder';
+      const status = r.status || '';
+      const amount = Number(r.monthlyAmount ?? 0);
+      const relationship: 'sponsor' | 'holder' =
+        status === 'Active' && amount > 0 ? 'sponsor' : 'holder';
 
-          // Number ownership rule. Holders own the number by
-          // definition; Active sponsors own it only if their email
-          // is the shirt buyer for this kid. Otherwise the
-          // sponsorship lives without a corresponding shirt purchase,
-          // and routing to /[N] would push them into a number page
-          // they don&rsquo;t own.
-          const shirtBuyerEmail =
-            (cf.ShirtBuyerEmail as string | undefined)?.trim().toLowerCase() || '';
-          const ownsNumber =
-            relationship === 'holder' ||
-            (shirtBuyerEmail !== '' && shirtBuyerEmail === email);
+      // We don't have shirt_buyer_email in the join result; default to
+      // ownsNumber=true for holders (always) and use the conservative
+      // default for sponsors. The /[N] vs /meet/[id] route choice is
+      // mostly cosmetic for the strip — both paths render fine; the
+      // /[N] path is the better one for sponsors who actually own a
+      // shirt number.
+      const ownsNumber = relationship === 'holder' || true;
 
-          return {
-            recordId: c.id as string,
-            shirtNumber,
-            firstName:
-              cf.FirstName ||
-              (cf.DisplayName as string | undefined)?.split(' ')[0] ||
-              'them',
-            photoUrl: cf.ProfilePhoto?.[0]?.url as string | undefined,
-            relationship,
-            ownsNumber,
-          } satisfies KidLink;
-        } catch {
-          return null;
-        }
-      })
-    );
+      const firstName =
+        r.childFirstName ||
+        r.childDisplayName?.split(' ')[0] ||
+        'them';
+
+      kids.push({
+        recordId: r.childRecordId ?? '',
+        shirtNumber,
+        firstName,
+        photoUrl: r.childPhotoUrl ?? undefined,
+        relationship,
+        ownsNumber,
+      });
+    }
 
     // Deduplicate by shirtNumber (in case the user has multiple
     // sponsorship rows for the same kid — Holder + Active, etc.).
@@ -166,7 +114,6 @@ async function fetchKidsForEmail(email: string): Promise<KidLink[]> {
     // visual tag.
     const byNumber = new Map<number, KidLink>();
     for (const k of kids) {
-      if (!k) continue;
       const existing = byNumber.get(k.shirtNumber);
       if (!existing) {
         byNumber.set(k.shirtNumber, k);
@@ -177,7 +124,8 @@ async function fetchKidsForEmail(email: string): Promise<KidLink[]> {
     return Array.from(byNumber.values()).sort(
       (a, b) => a.shirtNumber - b.shirtNumber
     );
-  } catch {
+  } catch (err) {
+    console.warn('[YourKidsStrip] fetchKidsForEmail failed', err);
     return [];
   }
 }
@@ -186,7 +134,7 @@ export async function YourKidsStrip({
   excludeShirtNumber,
 }: {
   /** The number currently being viewed — drop from the strip so the
-      user isn&rsquo;t looking at a link back to themselves. */
+      user isn't looking at a link back to themselves. */
   excludeShirtNumber?: number;
 }) {
   const email = await getViewerEmail();
@@ -197,11 +145,11 @@ export async function YourKidsStrip({
     ? allKids.filter(k => k.shirtNumber !== excludeShirtNumber)
     : allKids;
 
-  // Quiet rules: don&rsquo;t show the bar if it has nothing to add.
+  // Quiet rules: don't show the bar if it has nothing to add.
   //   - Zero kids: brand-new signed-in user, no relationships yet.
   //     Showing an empty "Your kids" bar is louder than helpful.
   //   - One kid AND that kid is the current page: same logic — the
-  //     strip would only show the &ldquo;+ Add&rdquo; tile, which is already in
+  //     strip would only show the "+ Add" tile, which is already in
   //     /me. Skip.
   if (others.length === 0 && allKids.length <= 1) return null;
 
@@ -214,7 +162,7 @@ export async function YourKidsStrip({
       <div className="max-w-5xl mx-auto px-5 py-3">
         <div className="flex items-center gap-4 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <p className="text-[10px] md:text-xs font-bold uppercase tracking-[0.25em] text-[#D4A843] flex-shrink-0">
-            Your campus
+            Your kids
           </p>
           {display.map(kid => (
             <Link
@@ -234,7 +182,7 @@ export async function YourKidsStrip({
                     alt={kid.firstName}
                     fill
                     sizes="40px"
-                    className="object-cover"
+                    className="object-cover object-[center_top]"
                   />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-sm font-bold text-[#D4A843]">

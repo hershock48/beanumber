@@ -43,10 +43,24 @@ export function RecentKidsStrip({
       if (!Array.isArray(list)) {
         setKids([]);
       } else {
-        const filtered = list.filter(
-          k => typeof k.shirtNumber === 'number' &&
-            (!excludeShirtNumber || k.shirtNumber !== excludeShirtNumber)
-        );
+        // Pre-migration localStorage entries carry Airtable signed
+        // URLs (v5.airtableusercontent.com / dl.airtable.com) that
+        // have since expired. Strip those photo URLs so the tile
+        // shows an empty placeholder instead of a broken image; the
+        // next visit to that kid&rsquo;s page will refresh the URL with
+        // the permanent Supabase Storage value.
+        const filtered = list
+          .filter(
+            k => typeof k.shirtNumber === 'number' &&
+              (!excludeShirtNumber || k.shirtNumber !== excludeShirtNumber)
+          )
+          .map(k => {
+            const url = k.photoUrl || '';
+            const stale =
+              url.includes('airtableusercontent.com') ||
+              url.includes('dl.airtable.com');
+            return stale ? { ...k, photoUrl: undefined } : k;
+          });
         setKids(filtered.slice(0, 8));
       }
     } catch {
@@ -73,7 +87,7 @@ export function RecentKidsStrip({
                   alt={kid.displayName}
                   fill
                   sizes="80px"
-                  className="object-cover"
+                  className="object-cover object-[center_top]"
                 />
               )}
             </div>
@@ -97,11 +111,14 @@ export function RecentKidsStrip({
           Kids you&rsquo;ve met
         </p>
         <h2
-          className="text-2xl md:text-3xl text-[#0d0d0d] mb-6 leading-tight"
+          className="text-2xl md:text-3xl text-[#0d0d0d] mb-2 leading-tight"
           style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
         >
-          Your campus.
+          Recently visited.
         </h2>
+        <p className="text-sm text-[#888] mb-6 max-w-xl">
+          Pages you&rsquo;ve looked at on this device. Not your sponsorships — those live in the bar at the top.
+        </p>
         <div className="flex gap-4 overflow-x-auto pb-3">
           {kids.map(kid => (
             <Link
@@ -116,7 +133,7 @@ export function RecentKidsStrip({
                     alt={kid.displayName}
                     fill
                     sizes="(max-width: 768px) 112px, 128px"
-                    className="object-cover"
+                    className="object-cover object-[center_top]"
                   />
                 )}
               </div>

@@ -1257,7 +1257,7 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
                       alt={`${displayName} — photo ${i + 1}`}
                       fill
                       sizes="(max-width: 768px) 100vw, 50vw"
-                      className="object-cover"
+                      className="object-cover object-[center_top]"
                       priority={i === 0}
                     />
                   </div>
@@ -1269,7 +1269,11 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
                 alt={displayName}
                 fill
                 sizes="(max-width: 768px) 100vw, 50vw"
-                className="object-cover"
+                // Bias the crop toward the top of the frame so faces
+                // stay in view when the source photo has more torso
+                // than headroom. Fixes Amarorwot (#53) and any other
+                // kid whose photo was framed with the face high.
+                className="object-cover object-[center_top]"
                 priority
               />
             ) : (
