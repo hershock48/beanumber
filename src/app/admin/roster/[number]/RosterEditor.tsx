@@ -29,6 +29,9 @@ interface Fields {
   notes: string;
   intakeFromCampus: string;
   studentOfMonth: string;
+  homeVillage: string;
+  teacherName: string;
+  teacherQuote: string;
 }
 
 export function RosterEditor({
@@ -90,7 +93,10 @@ export function RosterEditor({
     fields.childQuote !== initial.childQuote ||
     fields.notes !== initial.notes ||
     fields.intakeFromCampus !== initial.intakeFromCampus ||
-    fields.studentOfMonth !== initial.studentOfMonth;
+    fields.studentOfMonth !== initial.studentOfMonth ||
+    fields.homeVillage !== initial.homeVillage ||
+    fields.teacherName !== initial.teacherName ||
+    fields.teacherQuote !== initial.teacherQuote;
 
   function update<K extends keyof Fields>(key: K, value: Fields[K]) {
     setFields(prev => ({ ...prev, [key]: value }));
@@ -311,6 +317,48 @@ export function RosterEditor({
           onChange={e => update('childQuote', e.target.value)}
           className="w-full px-3 py-2 bg-white border border-[#e8e0d4] focus:outline-none focus:border-[#D4A843] focus:ring-1 focus:ring-[#D4A843] text-base"
           placeholder="e.g. I want to become a doctor and treat Mama."
+        />
+      </Field>
+
+      <Field
+        label="Home village"
+        helper="Where they live. Short — village or area name."
+        pending={role === 'admin' && pendingFields.includes('HomeVillage')}
+      >
+        <input
+          type="text"
+          value={fields.homeVillage}
+          onChange={e => update('homeVillage', e.target.value)}
+          className="w-full px-3 py-2 bg-white border border-[#e8e0d4] focus:outline-none focus:border-[#D4A843] focus:ring-1 focus:ring-[#D4A843] text-base"
+          placeholder="e.g. Lakwana"
+        />
+      </Field>
+
+      <Field
+        label="Teacher's name"
+        helper="The teacher whose classroom they sit in this term."
+        pending={role === 'admin' && pendingFields.includes('TeacherName')}
+      >
+        <input
+          type="text"
+          value={fields.teacherName}
+          onChange={e => update('teacherName', e.target.value)}
+          className="w-full px-3 py-2 bg-white border border-[#e8e0d4] focus:outline-none focus:border-[#D4A843] focus:ring-1 focus:ring-[#D4A843] text-base"
+          placeholder="e.g. Teacher Susan"
+        />
+      </Field>
+
+      <Field
+        label="Teacher's quote about them"
+        helper="One sentence the teacher wrote. Renders as a quote block on the page."
+        pending={role === 'admin' && pendingFields.includes('TeacherQuote')}
+      >
+        <textarea
+          value={fields.teacherQuote}
+          onChange={e => update('teacherQuote', e.target.value)}
+          rows={3}
+          className="w-full px-3 py-2 bg-white border border-[#e8e0d4] focus:outline-none focus:border-[#D4A843] focus:ring-1 focus:ring-[#D4A843] text-base leading-relaxed"
+          placeholder="e.g. Marvin is the kid the others go to when they're stuck."
         />
       </Field>
 

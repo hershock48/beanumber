@@ -11,6 +11,8 @@ import {
   ValidationError,
 } from '@/lib/errors';
 import { requireAdminAuth } from '@/lib/auth';
+import { AuthorizationError } from '@/lib/errors';
+import { getAdminRole } from '@/lib/admin-session';
 import { parseRequestBody } from '@/lib/validation';
 import { sendUpdateNotificationEmail } from '@/lib/email';
 import { db } from '@/lib/db/client';
@@ -23,6 +25,11 @@ async function handler(request: NextRequest): Promise<NextResponse> {
   logger.apiRequest(method, path);
 
   requireAdminAuth(request);
+  // Admin only — sponsor emails are not Simon&rsquo;s to fire.
+  const role = await getAdminRole();
+  if (role !== 'admin') {
+    throw new AuthorizationError('Admin role required to notify sponsors');
+  }
 
   const bodyResult = await parseRequestBody(request);
   if (!bodyResult.success) {

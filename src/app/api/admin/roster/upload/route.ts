@@ -28,6 +28,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdminToken } from '@/lib/auth';
+import { getAdminRole } from '@/lib/admin-session';
 import { sendEmail } from '@/lib/email';
 import { db } from '@/lib/db/client';
 import { children, sponsorships } from '@/lib/db/schema';
@@ -47,6 +48,13 @@ export async function POST(request: NextRequest) {
   if (!verifyAdminToken(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
+  // Distinguish Simon&rsquo;s uploads from Kevin&rsquo;s. Simon&rsquo;s photo writes
+  // land in pendingDraft for Kevin to approve; Simon must not be
+  // able to swap the public-facing primary photo on his own. Reports
+  // and letters are sponsor-only documents the public never sees,
+  // so those still flow through immediately under Simon&rsquo;s session.
+  const role = await getAdminRole();
+  const isSimon = role === 'simon';
 
   let body: {
     shirtNumber?: number;
@@ -134,11 +142,34 @@ export async function POST(request: NextRequest) {
       const existing = (kid.letterUrls || []) as AttachmentMeta[];
       patch.letterUrls = [...existing, attachment];
     } else {
-      // photo: append to photoUrls; promote to primary if missing.
-      const existing = (kid.photoUrls || []) as string[];
-      patch.photoUrls = [...existing, uploadResult.publicUrl];
-      if (!kid.profilePhotoUrl) {
-        patch.profilePhotoUrl = uploadResult.publicUrl;
+      // photo upload behavior depends on role.
+      //
+      //   role=admin (Kevin): append to photoUrls; promote to
+      //     profilePhotoUrl if no primary exists. Goes live
+      //     immediately.
+      //
+      //   role=simon: park in pendingDraft.profilePhotoUrl. Kevin
+      //     promotes via the review queue. Photos never go live
+      //     under Simon&rsquo;s session — same gate as text fields. The
+      //     `pendingFields` array gets `profilePhotoUrl` added so
+      //     the review page surfaces the change.
+      if (isSimon) {
+        const draft = (kid.pendingDraft || {}) as Record<string, unknown>;
+        const existingFields = (kid.pendingFields || []) as string[];
+        patch.pendingDraft = {
+          ...draft,
+          profilePhotoUrl: uploadResult.publicUrl,
+        };
+        patch.pendingFields = existingFields.includes('profilePhotoUrl')
+          ? existingFields
+          : [...existingFields, 'profilePhotoUrl'];
+        patch.lastEditedBySimon = new Date();
+      } else {
+        const existing = (kid.photoUrls || []) as string[];
+        patch.photoUrls = [...existing, uploadResult.publicUrl];
+        if (!kid.profilePhotoUrl) {
+          patch.profilePhotoUrl = uploadResult.publicUrl;
+        }
       }
     }
 

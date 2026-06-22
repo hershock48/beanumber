@@ -34,6 +34,10 @@ const GATED_KEY_TO_COLUMN: Record<keyof PendingDraft, string> = {
   loves: 'loves',
   childQuote: 'childQuote',
   notes: 'notes',
+  homeVillage: 'homeVillage',
+  teacherName: 'teacherName',
+  teacherQuote: 'teacherQuote',
+  profilePhotoUrl: 'profilePhotoUrl',
 };
 const KEY_TO_PENDING_OPTION: Record<keyof PendingDraft, string> = {
   nameMeaning: 'NameMeaning',
@@ -41,6 +45,10 @@ const KEY_TO_PENDING_OPTION: Record<keyof PendingDraft, string> = {
   loves: 'Loves',
   childQuote: 'ChildQuote',
   notes: 'Notes',
+  homeVillage: 'HomeVillage',
+  teacherName: 'TeacherName',
+  teacherQuote: 'TeacherQuote',
+  profilePhotoUrl: 'ProfilePhoto',
 };
 
 export async function POST(request: NextRequest) {

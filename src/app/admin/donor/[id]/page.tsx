@@ -72,7 +72,12 @@ export default async function DonorProfilePage({ params }: Props) {
   if (role === 'simon') redirect('/admin/roster');
 
   const { id } = await params;
-  if (!id || !id.startsWith('rec')) notFound();
+  // Donor ID is a Postgres UUID after the migration; the legacy
+  // `rec...` Airtable ID format is gone. Accept either shape so old
+  // bookmarks/email links don&rsquo;t hard-404 — getDonorById handles
+  // either via airtable_id fallback.
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!id || (!UUID_RE.test(id) && !id.startsWith('rec'))) notFound();
 
   const donor = await getDonorById(id);
   if (!donor) notFound();

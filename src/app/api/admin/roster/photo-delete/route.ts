@@ -16,6 +16,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdminToken } from '@/lib/auth';
+import { getAdminRole } from '@/lib/admin-session';
 import { db } from '@/lib/db/client';
 import { children } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
@@ -23,6 +24,16 @@ import { eq } from 'drizzle-orm';
 export async function POST(request: NextRequest) {
   if (!verifyAdminToken(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  // Admin only — Simon should not be able to delete a public photo.
+  // If he wants a swap, he uploads (which goes through pending) and
+  // Kevin approves the replacement.
+  const role = await getAdminRole();
+  if (role !== 'admin') {
+    return NextResponse.json(
+      { error: 'Admin role required' },
+      { status: 403 }
+    );
   }
 
   let body: { shirtNumber?: number; photoUrl?: string; attachmentId?: string };

@@ -85,6 +85,9 @@ export default async function AdminRosterEditPage({ params }: Props) {
             notes: kid.notes,
             intakeFromCampus: kid.intakeFromCampus,
             studentOfMonth: kid.studentOfMonth,
+            homeVillage: kid.homeVillage,
+            teacherName: kid.teacherName,
+            teacherQuote: kid.teacherQuote,
           }}
           reportCards={kid.reportCards}
           letters={kid.letters}

@@ -34,11 +34,29 @@ import {
   upsertSubscription,
 } from '@/lib/db/mutations';
 
+/**
+ * Map a Stripe subscription `status` to our local Sponsorship status.
+ *
+ *   active / trialing / past_due   → Active (relationship is real).
+ *   incomplete / paused            → Active (card decline or pause;
+ *                                    the sponsor still exists, admin
+ *                                    needs to see them to act).
+ *   canceled / unpaid /
+ *     incomplete_expired           → Cancelled (relationship is done).
+ *
+ * The earlier version returned `null` for `incomplete`/`paused`,
+ * which `continue`'d the sync loop and silently dropped those
+ * sponsors — they became invisible in the admin UI even though they
+ * still existed in Stripe. Surfacing them as Active lets Kevin see
+ * them on `/me`-style admin views and chase the card update.
+ */
 function mapStatus(stripeStatus: string): 'Active' | 'Cancelled' | null {
   switch (stripeStatus) {
     case 'active':
     case 'trialing':
     case 'past_due':
+    case 'incomplete':
+    case 'paused':
       return 'Active';
     case 'canceled':
     case 'unpaid':

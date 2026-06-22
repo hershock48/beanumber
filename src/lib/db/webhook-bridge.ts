@@ -246,26 +246,43 @@ export interface MirrorSubscriptionArgs {
  * stripe_customer_id first, then email.
  */
 export async function mirrorSubscription(args: MirrorSubscriptionArgs) {
-  // Resolve donor — prefer stripe_customer_id since it&rsquo;s
-  // authoritative; fall back to email.
-  let donorRow = await db
-    .select({ id: donors.id })
-    .from(donors)
-    .where(eq(donors.stripeCustomerId, args.stripeCustomerId))
-    .limit(1);
-  if (!donorRow[0]) {
+  // Resolve donor — prefer stripe_customer_id (authoritative);
+  // fall back to email.
+  let donorRow: { id: string }[] = [];
+  if (args.stripeCustomerId) {
+    donorRow = await db
+      .select({ id: donors.id })
+      .from(donors)
+      .where(eq(donors.stripeCustomerId, args.stripeCustomerId))
+      .limit(1);
+  }
+  if (!donorRow[0] && args.donorEmail) {
     donorRow = await db
       .select({ id: donors.id })
       .from(donors)
       .where(sql`lower(${donors.email}) = ${args.donorEmail.toLowerCase()}`)
       .limit(1);
   }
-  // If still no donor row, create a stub so the FK isn&rsquo;t lost.
+  // If still no donor row, create a stub — but only if we have
+  // *something* identifying. Refuse to create a stub with both
+  // empty email AND empty stripe_customer_id: that row would carry
+  // no usable join key, and the second such mirror call would
+  // collide on the lowered email unique index (every '' lowercases
+  // to ''). Better to skip the subscription mirror entirely and
+  // log; the next webhook event with a populated identifier will
+  // resolve the donor properly.
   let donorId = donorRow[0]?.id;
   if (!donorId) {
+    if (!args.donorEmail && !args.stripeCustomerId) {
+      console.warn(
+        '[pg-mirror] subscription mirror skipped: no email or customer id',
+        { subId: args.stripeSubscriptionId }
+      );
+      return null;
+    }
     const stub = await upsertDonorByEmail({
-      email: args.donorEmail,
-      stripeCustomerId: args.stripeCustomerId,
+      email: args.donorEmail || `unknown+${args.stripeCustomerId}@beanumber.org`,
+      stripeCustomerId: args.stripeCustomerId || null,
     });
     donorId = stub.id;
   }

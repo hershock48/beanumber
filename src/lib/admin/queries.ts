@@ -630,7 +630,9 @@ export interface RosterKidDetail extends RosterKid {
   childQuote: string;
   notes: string;
   age: string | null;
-  homeVillage: string | null;
+  homeVillage: string;
+  teacherName: string;
+  teacherQuote: string;
   reportCards: RosterKidAttachment[];
   letters: RosterKidAttachment[];
   /** Every ProfilePhoto attached to this kid. Used by the editor to
@@ -733,7 +735,9 @@ export async function getRosterKidByNumber(
     childQuote: row.childQuote || '',
     notes: row.notes || '',
     age: ageStr,
-    homeVillage: row.homeVillage || null,
+    homeVillage: row.homeVillage || '',
+    teacherName: row.teacherName || '',
+    teacherQuote: row.teacherQuote || '',
     reportCards: mapAttachmentArray(row.reportCardUrls, 'report-card'),
     letters: mapAttachmentArray(row.letterUrls, 'letter'),
     photos,

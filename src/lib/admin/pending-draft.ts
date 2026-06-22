@@ -24,6 +24,15 @@ export interface PendingDraft {
   loves?: string;
   childQuote?: string;
   notes?: string;
+  homeVillage?: string;
+  teacherName?: string;
+  teacherQuote?: string;
+  // Photo upload pending — when Simon uploads a profile photo, the
+  // Supabase Storage URL lands here so Kevin can approve before it
+  // goes public. Same gate as the text fields. The roster/upload
+  // endpoint writes this; the approve endpoint promotes it to
+  // children.profilePhotoUrl on accept.
+  profilePhotoUrl?: string;
 }
 
 /** The set of structured-field keys that go through the gated-draft
@@ -34,6 +43,10 @@ export const GATED_FIELDS = new Set<keyof PendingDraft>([
   'loves',
   'childQuote',
   'notes',
+  'homeVillage',
+  'teacherName',
+  'teacherQuote',
+  'profilePhotoUrl',
 ]);
 
 /** PendingDraft body key → matching PendingFields multi-select option. */
@@ -43,6 +56,10 @@ export const FIELD_TO_PENDING_OPTION: Record<keyof PendingDraft, string> = {
   loves: 'Loves',
   childQuote: 'ChildQuote',
   notes: 'Notes',
+  homeVillage: 'HomeVillage',
+  teacherName: 'TeacherName',
+  teacherQuote: 'TeacherQuote',
+  profilePhotoUrl: 'ProfilePhoto',
 };
 
 /** Parse the raw cell value of the PendingDraft field. Tolerates
