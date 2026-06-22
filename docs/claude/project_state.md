@@ -1,6 +1,32 @@
 # Project state
 
-Last updated: June 7, 2026.
+Last updated: June 22, 2026.
+
+## 2026-06-22 session — Postgres migration shipped (dual-write live)
+
+Airtable Free-plan API quota burned through and took the site dark on reads. Kevin refused to upgrade. Migration to a self-owned Postgres stack is now most of the way done:
+
+- **Stack chosen and live**: Supabase Postgres 17 (`ttsnwphctjcbtiyijmdf`) via transaction-mode pooler on `aws-1-us-east-1.pooler.supabase.com:6543`, Drizzle ORM, `postgres` driver. Three Storage buckets (`children-photos`, `update-photos`, `newsletter-photos`) public with 10MB image-MIME allow-list. Connection requires `prepare:false, max:1`. Env vars set in Vercel: `DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`.
+
+- **Schema is live**: 15 tables created via Drizzle migration `0000_initial.sql`. All FKs, indexes, unique constraints in place. `audit_log` and `id_mapping` tables exist for write provenance and Airtable→Postgres ID cross-reference. See `docs/claude/postgres_migration.md` for the architecture decisions.
+
+- **Data-access layer built**:
+  - `src/lib/db/queries.ts` — every public read (kid by shirt number / UUID / legacy ChildID, homepage roster, viewer→child sponsorship, /me dashboard, recent newsletters, latest update per kid, donor + subscription lookups, batches). Backwards-compat join keys so it handles the transition window where some sponsorships still carry only the legacy ChildID.
+  - `src/lib/db/mutations.ts` — every webhook/admin write, each one auditing automatically. Idempotent on natural keys (email lowered, payment intent, subscription id, sponsor_code).
+  - `src/lib/db/webhook-bridge.ts` — bridge module the Stripe webhook calls. Wraps every mutation in `mirrorToPostgres(...)` so Postgres failures log without breaking the Airtable write or the Stripe receipt.
+
+- **Stripe webhook dual-writes everything to Postgres now** (commit `b2deb06`). Touches: donation upsert, sponsorship creation (both standard and cart variants), subscription canceled, charge refunded, subscription created/updated (plus the drip-pipeline field mirror on `.created`). Means no webhook events are lost during the cutover window. Once verified, the final cut to Postgres-only is a one-diff Airtable-branch removal.
+
+- **CSV migrator built** (`scripts/migrate-from-csv.ts`). Idempotent, runs once Kevin exports the 11 CSVs from Airtable's web UI (the web export doesn't burn API quota). Resolves Airtable linked records via primary-field lookup, downloads time-sensitive Airtable signed-URL photos and re-uploads to Supabase Storage with correct extensions (derived from attachment filename or content-type, not hardcoded). Subscription donor FK resolves via Stripe API (`sub` → `customer` → `donor.stripe_customer_id`) with a strict name-match fallback that refuses ambiguous matches.
+
+- **What's blocked on Kevin**: export the 11 CSVs (Donors, Donations, Sponsorships, Children, Child Updates, Communications, Subscriptions, Scheduled Posts, Newsletters, Fulfillments, Batches) into `/airtable-export/` (gitignored). Then I run `npm run migrate-csv-dry`, then `npm run migrate-csv`.
+
+- **What ships after CSVs land**:
+  1. Refactor read paths (`/[N]`, `/meet/[id]`, `/campus`, `/me`, `/news`, `sponsor-relationship.ts`, `newsletter-feed.ts`, `cycle.ts`) to import from `queries.ts` instead of Airtable.
+  2. Verify: row-count diff vs Airtable snapshot, smoke-test `/5` `/10` `/50`, Stripe-CLI replay an end-to-end checkout.
+  3. Remove Airtable writes from the webhook (the dual-write becomes Postgres-only).
+
+- **Reminder**: the sandboxed Linux FS can't unlink files in the mounted folder; `git commit` from the mount leaves a lock file. Commit from `/sessions/<session>/work-beanumber/` instead. Did so for `b2deb06`.
 
 ## 2026-06-07 session — sponsorship data integrity fires
 

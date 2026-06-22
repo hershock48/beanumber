@@ -96,6 +96,18 @@ Deprecated routes (still in code but should not be the primary path):
 
 ## Key libraries in `src/lib/`
 
+### `src/lib/db/` — Postgres data-access layer (the new way, mid-migration)
+
+Live alongside Airtable as of 2026-06-22 (commit `b2deb06`). Webhook dual-writes through it. Public read paths still go through Airtable until the CSV migration loads the data and the page-level refactors land.
+
+- `db/schema.ts` — Drizzle table definitions. Source of truth for the database. Changes go HERE first, then `npx drizzle-kit generate` produces a SQL migration in `/drizzle`, then `npx drizzle-kit migrate` applies it. Conventions: UUID PKs, `airtable_id` text for cross-reference, every queryable column indexed, singleSelect-style stored as text not Postgres enums (easier to evolve).
+- `db/client.ts` — Drizzle + `postgres` driver. Single module-level connection. `prepare:false, max:1` required for Supabase's transaction-mode pooler.
+- `db/queries.ts` — Every read the public site needs. Use these instead of going to Airtable directly. Backwards-compat join keys (child UUID + legacy ChildID text) so lookups work during the transition.
+- `db/mutations.ts` — Every write the webhook/admin makes. Idempotent on natural keys. Every mutation auto-writes a row to `audit_log` with a computed `changed_fields` jsonb diff.
+- `db/webhook-bridge.ts` — The Stripe webhook calls into this. Every function is wrapped in `mirrorToPostgres(label, fn)` at the call site so Postgres errors log without breaking the Airtable path or the Stripe response. Bridge re-resolves the donor by email inside each call, so out-of-order events work (a donation mirror that arrives before the donor mirror just creates a stub donor).
+
+When the public read paths get refactored, this is where to import from. When the cutover happens, the Airtable branches in the webhook get deleted; the bridge calls stay.
+
 - `airtable.ts` — The one place the Airtable client is configured. All reads/writes route through here. Table names and field keys are strings; check `airtable_schema.md` before adding new ones — the webhook has 422'd more than once because we wrote to fields that don't exist.
 - `auth.ts` — Sponsor session cookie helpers (`getViewerSponsorCode`, `verifySessionForCode`) and admin token verification. The "sponsor portal" comments in here are outdated — sponsor auth now gates content on `/[number]`, not a dedicated portal route.
 - `email.ts` — `sendEmail()` abstraction that tries Gmail OAuth2 first, falls back to SendGrid if Gmail isn't configured. In production, Gmail is active. Contains several template functions (`sendSponsorWelcomeEmail`, `sendDonationReceiptEmail`, etc.) that still use old copy and need a voice.md rewrite. All transactional email routes through this file.

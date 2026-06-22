@@ -85,6 +85,44 @@ Same 2026-06-07 session. I "fixed" Sam Banfield's missing newsletter segment by 
 
 Added 2026-06-08 as part of the number-holder claim flow (see `core_model.md` §0a). The `/api/sponsor/recover/send-link` endpoint and downstream code expect `Holder` to be a valid option on the `Sponsorships.Status` singleSelect. The Airtable metadata API cannot add singleSelect options — Kevin has to add it manually in the Airtable UI. Until added, Holder row creation silently 422s with INVALID_MULTIPLE_CHOICE_OPTIONS. The caller logs the failure but returns privacy-success to the user (no error surfaced), so the symptom is "claims silently never work." If a buyer claims and never sees a sponsor view, check this option first.
 
+## Postgres migration traps (added 2026-06-22)
+
+### Don't write to Airtable AND mutations.ts for the same row from the same code path
+
+The Stripe webhook dual-writes through `src/lib/db/webhook-bridge.ts` — the mirror call happens AT THE EXISTING AIRTABLE WRITE SITE inside each helper. Don't add a second mirror call somewhere else for the same event. Audit shape: every Airtable write should have exactly one `mirrorToPostgres(...)` after it, no more. If you add a new Airtable write, add one mirror call alongside it.
+
+### Donor email is stored as-given, lookups must be lowered
+
+`donors.email` is preserved at the case the user typed. The uniqueness constraint is on `lower(email)` via `donors_email_lower_idx`. Any code that looks up a donor by email MUST do `sql\`lower(${donors.email}) = ${input.toLowerCase()}\``. Using `eq(donors.email, input)` will miss rows and then collide on insert. The mutations and the CSV migrator do this correctly; new code should too.
+
+### Sponsorships have BOTH child_id (UUID) AND child_id_legacy (text)
+
+During the transition window some sponsorships will have only the legacy ChildID populated. `queries.ts → getViewerSponsorshipForChild` matches on BOTH columns. When you write code that joins or lookups by kid, follow the same dual-match pattern. Once the legacy column is fully drained you can drop it, but not yet.
+
+### Postgres `numeric` columns return JavaScript strings, not numbers
+
+Drizzle's `numeric(10,2)` columns come back as strings via the `postgres` driver. `Number(row.monthlyAmount)` to convert. Mutations also accept the input as either number or string — they coerce.
+
+### singleSelect statuses are text, not enums
+
+I deliberately did NOT use Postgres enums for status fields. Adding a new enum value requires a migration. App-layer validation enforces valid values. If you see `status: text('status')` in `schema.ts`, that's intentional. Don't "fix" it.
+
+### CSV migration is idempotent — don't write a one-shot migrator
+
+`scripts/migrate-from-csv.ts` checks `id_mapping` (and natural-key fallbacks for sponsorships/subscriptions) before inserting. Safe to re-run. If you write any future migration script, follow the same pattern. Photos are uploaded with `upsert: true` so re-runs overwrite rather than duplicate.
+
+### Don't bypass mutations.ts to write to Postgres directly
+
+Every write goes through `mutations.ts` so it auto-audits. If you find yourself reaching for `db.insert(...)` from a route file, that's a smell — add a typed helper to `mutations.ts` instead. The one exception is admin scripts (one-off backfills); those are short-lived enough to call Drizzle directly.
+
+### Drizzle `db.execute()` requires the sql tag, not a raw string
+
+`db.execute(\`SELECT ...\`)` fails at runtime. `db.execute(sql\`SELECT ...\`)` is correct. Use `sql.identifier(name)` for table/column names and parameter binding for values. (We hit this in the CSV migrator; it's fixed now.)
+
+### Don't commit CSVs to git
+
+`/airtable-export/` and `*.csv` are in `.gitignore`. Exports contain PII (donor names, emails, addresses). Confirm `git status --short` shows no CSVs before pushing.
+
 ## Open bugs (known, not yet fixed)
 
 ### Cart+monthly checkout silently drops the recurring half — CRITICAL
