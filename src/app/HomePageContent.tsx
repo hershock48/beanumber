@@ -349,23 +349,25 @@ function HomePageInner() {
               {childrenWithPhotos.map(child => {
                 const displayName = child.display_name || child.first_name;
                 const photoUrl = child.photo_url as string;
-                const shirtNum = child.shirt_number_start;
                 return (
-                  <Link
+                  // Passive card — no link. The carousel is social
+                  // proof / texture, not a kid-browser. The brand
+                  // mechanic (core_model.md §0) is: shirt → reveal
+                  // → kid. Letting a visitor click into a specific
+                  // kid&rsquo;s bio before they have a shirt turns the
+                  // funnel into the conventional pick-a-kid model
+                  // BAN deliberately isn&rsquo;t. The single CTA below
+                  // routes everyone to /shirts.
+                  <div
                     key={child.id || child.child_id}
-                    href={'/children/' + (shirtNum || child.child_id)}
-                    className="group snap-start shrink-0 w-[280px] sm:w-[320px] bg-white overflow-hidden border border-[#e8e0d4] hover:border-[#D4A843]/40 hover:shadow-lg transition-all duration-300"
+                    className="snap-start shrink-0 w-[280px] sm:w-[320px] bg-white overflow-hidden border border-[#e8e0d4]"
                   >
                     <div className="aspect-[4/5] bg-[#f5f0e8] overflow-hidden relative">
                       <img
                         src={photoUrl}
                         alt={displayName}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        className="w-full h-full object-cover"
                       />
-                      {/* No number badge on the carousel cards. The whole
-                          brand turns on the moment a number becomes a
-                          name — that reveal belongs at checkout and on
-                          the child's own page, not on a browse tile. */}
                     </div>
                     <div className="p-5">
                       <h3
@@ -374,26 +376,35 @@ function HomePageInner() {
                       >
                         {displayName}
                       </h3>
-                      <div className="flex items-center gap-3 text-sm text-[#999] mb-4">
+                      <div className="flex items-center gap-3 text-sm text-[#999]">
                         {child.age && <span>Age {child.age}</span>}
                         {child.age && child.grade_class && <span className="text-[#ccc]">&middot;</span>}
                         {child.grade_class && <span>{child.grade_class}</span>}
                       </div>
                       {child.fun_fact && (
-                        <p className="text-sm text-[#777] italic mb-4 line-clamp-2">
+                        <p className="text-sm text-[#777] italic mt-3 line-clamp-2">
                           &ldquo;{child.fun_fact}&rdquo;
                         </p>
                       )}
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-[#aaa]">$25/month</span>
-                        <span className="text-sm font-bold text-[#D4A843] group-hover:translate-x-1 transition-transform uppercase tracking-wider">
-                          Meet them &rarr;
-                        </span>
-                      </div>
                     </div>
-                  </Link>
+                  </div>
                 );
               })}
+            </div>
+            {/* Single funnel CTA below the carousel — replaces the
+                per-card &ldquo;Meet them&rdquo; links so the only path to a
+                specific kid&rsquo;s page is buying a shirt. */}
+            <div className="mt-10 md:mt-12 text-center">
+              <p className="text-base md:text-lg text-[#444] max-w-2xl mx-auto leading-relaxed">
+                These are real children at the YDO campus in Omoro District,
+                Northern Uganda.{' '}
+                <Link
+                  href="/shirts"
+                  className="text-[#D4A843] font-bold hover:underline whitespace-nowrap"
+                >
+                  Get a shirt to meet one of them &rarr;
+                </Link>
+              </p>
             </div>
           </div>
         )}
