@@ -2,74 +2,49 @@
  * Available Children API
  * Lists children awaiting sponsors (PUBLIC - no auth required)
  *
- * After pulling sponsorship records from the tool, we do a secondary
- * fetch against the Children table to enrich each child with the
- * hand-written Loves one-liner (used on the sponsorship carousel).
+ * Sources from Postgres: `sponsorships` rows with status='Awaiting
+ * Sponsor', joined with their linked `children` row for profile
+ * fields (Loves, ChildQuote, FamilyContext, ShirtNumber, photo).
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { asc, eq, sql } from 'drizzle-orm';
 import { logger } from '@/lib/logger';
 import {
   createSuccessResponse,
   withErrorHandling,
 } from '@/lib/errors';
-import { listAvailableChildrenTool } from '@/lib/tools';
+import { db } from '@/lib/db/client';
+import {
+  children as childrenTable,
+  sponsorships as sponsorshipsTable,
+} from '@/lib/db/schema';
 
-const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID!;
-const AIRTABLE_API_KEY = process.env.AIRTABLE_API_KEY!;
-const AIRTABLE_CHILDREN_TABLE = process.env.AIRTABLE_CHILDREN_TABLE || 'Children';
-
-interface ChildEnrichment {
+interface AvailableChildOut {
+  id: string;            // legacy ChildID (HSP/BAN-...) for back-compat
+  recordId: string;      // Postgres UUID
+  displayName: string;
+  age?: string;
+  location?: string;
+  photo?: { url: string; filename: string };
+  sponsorshipStartDate?: string;
   loves?: string;
   childQuote?: string;
   familyContext?: string;
   shirtNumber?: number;
 }
 
-/**
- * Batch-fetch profile fields from the Children table for every ChildID
- * in the sponsorship result set. Returns a Map<ChildID, enrichment>.
- */
-async function fetchChildEnrichment(childIds: string[]): Promise<Map<string, ChildEnrichment>> {
-  const enrichmentMap = new Map<string, ChildEnrichment>();
-  if (!childIds.length || !AIRTABLE_BASE_ID || !AIRTABLE_API_KEY) return enrichmentMap;
-
-  try {
-    const clauses = childIds.map(id => `{ChildID}="${id}"`).join(',');
-    const formula = encodeURIComponent(`OR(${clauses})`);
-    const fieldNames = ['ChildID', 'Loves', 'ChildQuote', 'FamilyContext', 'ShirtNumber'];
-    const fieldsParam = fieldNames.map(f => 'fields[]=' + encodeURIComponent(f)).join('&');
-
-    const url =
-      `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(AIRTABLE_CHILDREN_TABLE)}` +
-      `?filterByFormula=${formula}&${fieldsParam}&pageSize=100`;
-
-    const res = await fetch(url, {
-      headers: {
-        Authorization: `Bearer ${AIRTABLE_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-    });
-
-    if (res.ok) {
-      const data = await res.json();
-      for (const record of data.records || []) {
-        const cid = record.fields?.ChildID;
-        if (cid) {
-          enrichmentMap.set(cid, {
-            loves: record.fields?.Loves || undefined,
-            childQuote: record.fields?.ChildQuote || undefined,
-            familyContext: record.fields?.FamilyContext || undefined,
-            shirtNumber: record.fields?.ShirtNumber || undefined,
-          });
-        }
-      }
-    }
-  } catch (err) {
-    logger.warn('[sponsorship/available] Child enrichment failed', { error: String(err) });
+function computeAge(dateOfBirth?: string | null): string | undefined {
+  if (!dateOfBirth) return undefined;
+  const birth = new Date(dateOfBirth);
+  if (isNaN(birth.getTime())) return undefined;
+  const today = new Date();
+  let years = today.getFullYear() - birth.getFullYear();
+  const monthDiff = today.getMonth() - birth.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+    years -= 1;
   }
-
-  return enrichmentMap;
+  return years >= 0 ? String(years) : undefined;
 }
 
 async function handler(request: NextRequest): Promise<NextResponse> {
@@ -78,45 +53,80 @@ async function handler(request: NextRequest): Promise<NextResponse> {
 
   logger.apiRequest(method, path);
 
-  // Parse query params
   const { searchParams } = new URL(request.url);
   const limitParam = searchParams.get('limit');
   const limit = limitParam ? parseInt(limitParam, 10) : undefined;
 
-  // Use the WAT tool to list available children
-  const result = await listAvailableChildrenTool({ limit });
+  // Pull every "Awaiting Sponsor" sponsorship in one shot, joined with
+  // its linked child. LEFT JOIN on both new UUID FK and legacy ChildID
+  // text so transition-state rows still resolve.
+  const rows = await db
+    .select({
+      sponsorshipId: sponsorshipsTable.id,
+      childDisplayName: sponsorshipsTable.childDisplayName,
+      childAge: sponsorshipsTable.childAge,
+      childLocation: sponsorshipsTable.childLocation,
+      sponsorshipStartDate: sponsorshipsTable.sponsorshipStartDate,
+      childIdLegacy: sponsorshipsTable.childIdLegacy,
+      // Coalesced over both join variants.
+      childRecordId: sql<string | null>`coalesce(${childrenTable.id}, child_legacy.id)`,
+      childIdRow: sql<string | null>`coalesce(${childrenTable.childId}, child_legacy.child_id)`,
+      displayNameRow: sql<string | null>`coalesce(${childrenTable.displayName}, child_legacy.display_name)`,
+      firstNameRow: sql<string | null>`coalesce(${childrenTable.firstName}, child_legacy.first_name)`,
+      lastInitialRow: sql<string | null>`coalesce(${childrenTable.lastInitial}, child_legacy.last_initial)`,
+      photoUrlRow: sql<string | null>`coalesce(${childrenTable.profilePhotoUrl}, child_legacy.profile_photo_url)`,
+      lovesRow: sql<string | null>`coalesce(${childrenTable.loves}, child_legacy.loves)`,
+      childQuoteRow: sql<string | null>`coalesce(${childrenTable.childQuote}, child_legacy.child_quote)`,
+      familyContextRow: sql<string | null>`coalesce(${childrenTable.familyContext}, child_legacy.family_context)`,
+      shirtNumberRow: sql<number | null>`coalesce(${childrenTable.shirtNumber}, child_legacy.shirt_number)`,
+      dateOfBirthRow: sql<string | null>`coalesce(${childrenTable.dateOfBirth}, child_legacy.date_of_birth)`,
+    })
+    .from(sponsorshipsTable)
+    .leftJoin(childrenTable, eq(childrenTable.id, sponsorshipsTable.childId))
+    .leftJoin(
+      sql`children as child_legacy`,
+      sql`child_legacy.child_id = ${sponsorshipsTable.childIdLegacy}`
+    )
+    .where(eq(sponsorshipsTable.status, 'Awaiting Sponsor'))
+    .orderBy(asc(sponsorshipsTable.childDisplayName));
 
-  if (!result.success) {
-    throw new Error(result.error || 'Failed to fetch available children');
-  }
-
-  // Enrich with profile fields from the Children table
-  const children = result.data?.children || [];
-  const childIds = children.map(c => c.id).filter(Boolean);
-  const enrichmentMap = await fetchChildEnrichment(childIds);
-
-  const enriched = children.map(child => {
-    const extra = enrichmentMap.get(child.id);
+  let children: AvailableChildOut[] = rows.map(r => {
+    const displayName =
+      r.displayNameRow ||
+      r.childDisplayName ||
+      `${r.firstNameRow || 'Child'}${r.lastInitialRow ? ' ' + r.lastInitialRow : ''}`.trim();
     return {
-      ...child,
-      loves: extra?.loves || undefined,
-      childQuote: extra?.childQuote || undefined,
-      familyContext: extra?.familyContext || undefined,
-      shirtNumber: extra?.shirtNumber || undefined,
+      id: r.childIdRow || r.childIdLegacy || r.childRecordId || r.sponsorshipId,
+      recordId: r.childRecordId || r.sponsorshipId,
+      displayName,
+      age: r.childAge || computeAge(r.dateOfBirthRow),
+      location: r.childLocation || 'Gulu, Northern Uganda',
+      photo: r.photoUrlRow
+        ? { url: r.photoUrlRow, filename: '' }
+        : undefined,
+      sponsorshipStartDate: r.sponsorshipStartDate ?? undefined,
+      loves: r.lovesRow ?? undefined,
+      childQuote: r.childQuoteRow ?? undefined,
+      familyContext: r.familyContextRow ?? undefined,
+      shirtNumber: r.shirtNumberRow ?? undefined,
     };
   });
 
+  const total = children.length;
+  if (limit && limit < children.length) {
+    children = children.slice(0, limit);
+  }
+
   logger.info('Listed available children', {
-    total: result.data?.total,
-    returned: enriched.length,
-    enriched: enrichmentMap.size,
+    total,
+    returned: children.length,
   });
 
   logger.apiResponse(method, path, 200);
 
   return createSuccessResponse({
-    children: enriched,
-    total: result.data?.total || 0,
+    children,
+    total,
   });
 }
 

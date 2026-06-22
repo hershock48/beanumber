@@ -2,137 +2,23 @@
  * Sponsor recovery callback — clicked from the magic-link email.
  *
  * Validates the signed token, resolves the sponsor's email from
- * Airtable (so the cookie we drop matches the format the rest of the
+ * Postgres (so the cookie we drop matches the format the rest of the
  * app expects), sets a 365-day sponsor_session cookie (length lives in
- * SESSION.MAX_AGE_DAYS), and redirects
- * the user back to /children/[number] in authenticated mode.
+ * SESSION.MAX_AGE_DAYS), and redirects the user back to the homepage
+ * with the Number prefilled so they go through the gateway ritual.
  *
  * Failure modes — bad signature, expired token, missing sponsorship —
- * all redirect to /sponsor/login with a soft error, so a user with a
- * dead link still has a clear way back in.
+ * all redirect to /signin with a soft error, so a user with a dead
+ * link still has a clear way back in.
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { SESSION } from '@/lib/constants';
 import { verifyRecoveryToken } from '@/lib/recovery-tokens';
+import { getSponsorshipEmailByCode } from '@/lib/db/queries';
+import { advanceDripOnClaim } from '@/lib/db/mutations';
 
-const AIRTABLE_API_KEY = process.env.AIRTABLE_API_KEY;
-const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID;
-const SPONSORSHIPS_TABLE = process.env.AIRTABLE_SPONSORSHIPS_TABLE || 'Sponsorships';
-const DONORS_TABLE = process.env.AIRTABLE_DONORS_TABLE || 'Donors';
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.beanumber.org';
-
-function atHeaders() {
-  return {
-    Authorization: `Bearer ${AIRTABLE_API_KEY}`,
-    'Content-Type': 'application/json',
-  };
-}
-
-/**
- * Recategorize-on-claim. When a user signs in via magic link they&rsquo;ve
- * just engaged with their kid&rsquo;s page — they obviously received the
- * shirt, found the number, and went through the claim flow. Whatever
- * stage of the drip they were on, the "did it arrive?" and "have
- * you met your kid yet?" emails are now obsolete.
- *
- * Rule:
- *   shirt_nurture or shirt_sponsor at stage 0 or 1 → bump to stage 2
- *     (the sponsorship-pitch / sponsor-onboarding email)
- *   no pipeline (Donorbox import, manual donor, etc.) → enroll in
- *     shirt_nurture at stage 2 directly. The sign-in event proves
- *     they&rsquo;re a shirt buyer who&rsquo;s past the early touches.
- *   sponsor_onboard / donor_convert / monthly_donor → no change,
- *     their sequence doesn&rsquo;t have pre-claim touches to skip.
- *
- * DripNextSend gets reset to today + 5 so we don&rsquo;t hit them with the
- * pitch right after sign-in. Quiet space, then the ask.
- *
- * Fire-and-forget: we never block the redirect on this PATCH. Sign-in
- * UX comes first; if Airtable is slow we&rsquo;d rather miss a re-stage
- * than leave the user staring at a spinner.
- */
-async function advanceDripOnClaim(email: string): Promise<void> {
-  if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) return;
-  try {
-    const safeEmail = email.toLowerCase().replace(/"/g, '\\"');
-    const formula = encodeURIComponent(`LOWER({Email Address})="${safeEmail}"`);
-    const lookupRes = await fetch(
-      `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(
-        DONORS_TABLE
-      )}?filterByFormula=${formula}&maxRecords=1`,
-      { headers: atHeaders(), cache: 'no-store' }
-    );
-    if (!lookupRes.ok) return;
-    const data = await lookupRes.json();
-    const donor = data.records?.[0];
-    if (!donor) return;
-
-    const pipeline = (donor.fields?.DripPipeline as string) || '';
-    const stage = (donor.fields?.DripStage as number | undefined) ?? 0;
-
-    // Decide the patch.
-    const patchFields: Record<string, unknown> = {};
-    if (!pipeline) {
-      patchFields.DripPipeline = 'shirt_nurture';
-      patchFields.DripStage = 2;
-    } else if (
-      (pipeline === 'shirt_nurture' || pipeline === 'shirt_sponsor') &&
-      stage < 2
-    ) {
-      patchFields.DripStage = 2;
-    } else {
-      // Already past the pre-claim touches, or in a pipeline whose
-      // touches are still relevant. No change.
-      return;
-    }
-
-    // Give them 5 days of quiet before the next email. They just
-    // engaged; no need to immediately ask them for more.
-    const next = new Date();
-    next.setUTCDate(next.getUTCDate() + 5);
-    patchFields.DripNextSend = next.toISOString().split('T')[0];
-
-    await fetch(
-      `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(
-        DONORS_TABLE
-      )}/${donor.id}`,
-      {
-        method: 'PATCH',
-        headers: atHeaders(),
-        body: JSON.stringify({ fields: patchFields }),
-      }
-    );
-  } catch (err) {
-    console.warn('[Recovery] Drip advance failed (non-fatal):', err);
-  }
-}
-
-async function resolveSponsorshipEmail(sponsorCode: string): Promise<string | null> {
-  if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) return null;
-  try {
-    // Look up the email for an Active sponsor OR a Holder (shirt-only
-    // owner). Previously this only checked Status=Active, which meant
-    // first-time claimers (Status=Holder) failed verification and got
-    // bounced to /sponsor/login with no error visible to them.
-    const formula = encodeURIComponent(
-      `AND({SponsorCode}="${sponsorCode.replace(/"/g, '\\"')}", OR({Status}="Active",{Status}="Holder"))`
-    );
-    const res = await fetch(
-      `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(
-        SPONSORSHIPS_TABLE
-      )}?filterByFormula=${formula}&maxRecords=1`,
-      { headers: atHeaders(), cache: 'no-store' }
-    );
-    if (!res.ok) return null;
-    const data = await res.json();
-    const email = data.records?.[0]?.fields?.SponsorEmail;
-    return typeof email === 'string' ? email : null;
-  } catch (err) {
-    console.warn('[Recovery] Email resolve failed', err);
-    return null;
-  }
-}
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -140,13 +26,11 @@ export async function GET(request: NextRequest) {
 
   const verified = verifyRecoveryToken(token);
   if (!verified) {
-    return NextResponse.redirect(
-      `${SITE_URL}/signin?error=expired`
-    );
+    return NextResponse.redirect(`${SITE_URL}/signin?error=expired`);
   }
   const { sponsorCode, shirtNumber } = verified;
 
-  const email = await resolveSponsorshipEmail(sponsorCode);
+  const email = await getSponsorshipEmailByCode(sponsorCode);
   if (!email) {
     // Token was valid but the underlying Sponsorship has gone away —
     // canceled, archived, or the sponsor code rotated. Bounce to
@@ -176,25 +60,19 @@ export async function GET(request: NextRequest) {
   );
 
   // Re-stage the donor's drip pipeline now that they've engaged.
-  // Fire-and-forget — never block the redirect on this PATCH.
+  // Fire-and-forget — never block the redirect on the mutation.
   advanceDripOnClaim(email).catch(err => {
     console.warn('[Recovery] advanceDripOnClaim threw:', err);
   });
 
   // Land on the homepage with the Number-input prefilled and
   // highlighted ("Welcome back, enter your Number"). The Number
-  // lookup is the consistent ritual that gates every user&rsquo;s entry
+  // lookup is the consistent ritual that gates every user's entry
   // to the rest of the site — even after sign-in. The home page
   // reads ?welcome=1 to render the welcome treatment, and ?n=N
   // to prefill the input. When the user submits the form from
   // that state, the homepage forwards just_signed_in=1 to the
-  // kid page so the ClaimGate&rsquo;s "first sign-in" branch still
+  // kid page so the ClaimGate's "first sign-in" branch still
   // fires correctly.
-  //
-  // Previous behavior was a direct redirect to /children/[N]
-  // which bypassed the Number ritual. Skipping the ritual saved
-  // a click but stripped meaning from the gateway.
-  return NextResponse.redirect(
-    `${SITE_URL}/?welcome=1&n=${shirtNumber}`
-  );
+  return NextResponse.redirect(`${SITE_URL}/?welcome=1&n=${shirtNumber}`);
 }

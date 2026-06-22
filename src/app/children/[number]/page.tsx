@@ -30,6 +30,7 @@ import {
   getChildByChildId,
   getDonorByStripeCustomerId,
 } from '@/lib/db/queries';
+import { resolveShirtToKid } from '@/lib/cycle';
 import { db } from '@/lib/db/client';
 import {
   children as childrenTable,
@@ -524,34 +525,55 @@ const getChildByShirtNumber = cache(async function getChildByShirtNumber(shirtNu
     let isSynthesizedCycleRow = false;
 
     // Cycle-math fallback: if no Children row carries this shirt
-    // number, derive the canonical kid via the hardcoded cycle
-    // formula (see canonicalShirtNumber + core_model.md §2). Only
-    // canonical kids #1–53 are materialized in Postgres; every
-    // higher number resolves at display time. This is the single
-    // most important branch — without it, /children/55 (and most
-    // numbers above 53) would 404 even though there's a real kid
-    // they cycle-resolve to.
+    // number, resolve via the Batches table&rsquo;s locked roster
+    // snapshot (cycle.ts). The Batches model is the source of
+    // truth for shirt N → kid mapping per core_model.md §2; new
+    // batches Kevin opens past #150 will Just Work because the
+    // resolver reads from DB, not a hardcoded formula. If Batches
+    // returns nothing (e.g., shirt sold under a batch we haven&rsquo;t
+    // opened yet), we fall back to the hardcoded canonical formula
+    // as a safety net — that path will retire once every shirt has
+    // a Batches row covering it.
     if (!childRow) {
-      const canonicalNum = canonicalShirtNumber(shirtNumber);
-      if (canonicalNum) {
-        const canonical = await getChildByShirtNumberFromDb(canonicalNum);
-        if (canonical) {
-          // Synthesize a cycle-record: canonical kid's data, but
-          // identity (shirt_number, child_id) stays bound to the
-          // requested cycle shirt number. The synthesized row has
-          // id='' so downstream sponsorship lookups do NOT match
-          // the canonical kid's UUID — only legacy ChildID matches
-          // count for cycle records. This is the privacy boundary:
-          // a sponsor of Isaiah (#15) must not be recognized on
-          // every cycle shirt that maps to #15 (#67, #119, …).
-          childRow = {
-            ...canonical,
-            id: '',
-            shirtNumber: shirtNumber,
-            childId: `HSP/BAN-${String(shirtNumber).padStart(3, '0')}`,
-          };
-          isSynthesizedCycleRow = true;
+      let canonicalChildId: string | null = null;
+      try {
+        const resolved = await resolveShirtToKid(shirtNumber);
+        if (resolved?.childRecordId) {
+          canonicalChildId = resolved.childRecordId;
         }
+      } catch (e) {
+        console.warn('[children/page] Batches resolver failed', e);
+      }
+
+      let canonical = canonicalChildId
+        ? await getChildByChildId(canonicalChildId)
+        : null;
+
+      // Hardcoded-formula fallback for any shirt that doesn&rsquo;t
+      // resolve via Batches. Keep until every batch is in the DB.
+      if (!canonical) {
+        const canonicalNum = canonicalShirtNumber(shirtNumber);
+        if (canonicalNum) {
+          canonical = await getChildByShirtNumberFromDb(canonicalNum);
+        }
+      }
+
+      if (canonical) {
+        // Synthesize a cycle-record: canonical kid's data, but
+        // identity (shirt_number, child_id) stays bound to the
+        // requested cycle shirt number. The synthesized row has
+        // id='' so downstream sponsorship lookups do NOT match
+        // the canonical kid's UUID — only legacy ChildID matches
+        // count for cycle records. This is the privacy boundary:
+        // a sponsor of Isaiah (#15) must not be recognized on
+        // every cycle shirt that maps to #15 (#67, #119, …).
+        childRow = {
+          ...canonical,
+          id: '',
+          shirtNumber: shirtNumber,
+          childId: `HSP/BAN-${String(shirtNumber).padStart(3, '0')}`,
+        };
+        isSynthesizedCycleRow = true;
       }
     }
 

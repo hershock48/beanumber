@@ -1,14 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { eq } from 'drizzle-orm';
+import { db } from '@/lib/db/client';
+import {
+  children as childrenTable,
+  donations as donationsTable,
+  donationChildren as donationChildrenTable,
+} from '@/lib/db/schema';
 
 // Never cache. This endpoint is polled by the success page and must reflect
 // the webhook's assignment as soon as it lands.
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
-
-const AIRTABLE_API_KEY = process.env.AIRTABLE_API_KEY;
-const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID;
-const AIRTABLE_DONATIONS_TABLE = process.env.AIRTABLE_DONATIONS_TABLE || 'Donations';
-const AIRTABLE_CHILDREN_TABLE = process.env.AIRTABLE_CHILDREN_TABLE || 'Children';
 
 interface OrderStatusResponse {
   shirt: {
@@ -164,105 +166,84 @@ export async function GET(request: NextRequest) {
 }
 
 /**
- * Look up the donation row for this checkout session and follow its Child
- * link. Returns null if no donation exists yet (webhook pending) OR the
- * donation exists without a Child link (no child was available at the time).
+ * Look up the donation row for this checkout session and follow its
+ * donation_children junction to the linked kid. Returns null if no
+ * donation exists yet (webhook pending) OR the donation exists
+ * without a child link (no child was available at the time, or this
+ * was a non-shirt path).
  *
  * The caller decides how to present each case.
  */
 async function lookupAssignedChild(
   sessionId: string
 ): Promise<OrderStatusResponse['child']> {
-  if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) {
-    console.warn('[Order Status] Airtable not configured');
-    return null;
-  }
+  // Find the donation row for this checkout session.
+  const donationRows = await db
+    .select({ id: donationsTable.id })
+    .from(donationsTable)
+    .where(eq(donationsTable.stripeCheckoutSessionId, sessionId))
+    .limit(1);
 
-  const donationFormula = `{Stripe Checkout Session ID} = "${sessionId}"`;
-  const donationsUrl =
-    `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(AIRTABLE_DONATIONS_TABLE)}` +
-    `?filterByFormula=${encodeURIComponent(donationFormula)}&maxRecords=1`;
-
-  const donationRes = await fetch(donationsUrl, {
-    headers: {
-      Authorization: `Bearer ${AIRTABLE_API_KEY}`,
-      'Content-Type': 'application/json',
-    },
-    cache: 'no-store',
-  });
-
-  if (!donationRes.ok) {
-    console.warn('[Order Status] Donation lookup failed', donationRes.status);
-    return null;
-  }
-
-  const donationData = await donationRes.json();
-  const donation = donationData.records?.[0];
+  const donation = donationRows[0];
   if (!donation) {
     // Webhook hasn't run yet. Client should keep polling.
     return null;
   }
 
-  const childLinks = donation.fields?.['Child'];
-  if (!Array.isArray(childLinks) || childLinks.length === 0) {
-    // Donation exists but no child was assigned (e.g. all children matched).
+  // Pick the first linked kid via the donation_children junction.
+  const linkRows = await db
+    .select({ childId: donationChildrenTable.childId })
+    .from(donationChildrenTable)
+    .where(eq(donationChildrenTable.donationId, donation.id))
+    .limit(1);
+
+  const link = linkRows[0];
+  if (!link) {
+    // Donation exists but no child was assigned (e.g. all children matched,
+    // or this was a donation that didn't get a shirt assignment).
     return null;
   }
 
-  const childRecordId = childLinks[0];
+  const childRows = await db
+    .select()
+    .from(childrenTable)
+    .where(eq(childrenTable.id, link.childId))
+    .limit(1);
 
-  const childUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(AIRTABLE_CHILDREN_TABLE)}/${childRecordId}`;
-  const childRes = await fetch(childUrl, {
-    headers: {
-      Authorization: `Bearer ${AIRTABLE_API_KEY}`,
-      'Content-Type': 'application/json',
-    },
-    cache: 'no-store',
-  });
+  const childRow = childRows[0];
+  if (!childRow) return null;
 
-  if (!childRes.ok) {
-    console.warn('[Order Status] Child fetch failed', childRes.status);
-    return null;
-  }
-
-  const childRecord = await childRes.json();
-  const fields = childRecord.fields || {};
-
-  const firstName = fields.FirstName || 'Your child';
-  const lastInitial = fields.LastInitial || '';
+  const firstName = childRow.firstName || 'Your child';
+  const lastInitial = childRow.lastInitial || '';
   const displayName =
-    fields.DisplayName ||
+    childRow.displayName ||
     `${firstName}${lastInitial ? ' ' + lastInitial : ''}`.trim();
 
   // Age: prefer DateOfBirth math; leave null if not available.
   let age: string | null = null;
-  if (fields.DateOfBirth) {
-    const birth = new Date(fields.DateOfBirth);
-    const now = new Date();
-    let years = now.getFullYear() - birth.getFullYear();
-    const monthDiff = now.getMonth() - birth.getMonth();
-    if (monthDiff < 0 || (monthDiff === 0 && now.getDate() < birth.getDate())) {
-      years -= 1;
+  if (childRow.dateOfBirth) {
+    const birth = new Date(childRow.dateOfBirth);
+    if (!isNaN(birth.getTime())) {
+      const now = new Date();
+      let years = now.getFullYear() - birth.getFullYear();
+      const monthDiff = now.getMonth() - birth.getMonth();
+      if (monthDiff < 0 || (monthDiff === 0 && now.getDate() < birth.getDate())) {
+        years -= 1;
+      }
+      if (years >= 0 && years < 100) age = String(years);
     }
-    if (years >= 0 && years < 100) age = String(years);
   }
 
-  const photoUrl =
-    Array.isArray(fields.ProfilePhoto) && fields.ProfilePhoto[0]?.url
-      ? (fields.ProfilePhoto[0].url as string)
-      : null;
-
-  const shirtNumber = Number(fields.ShirtNumber);
-  const childId = fields.ChildID || childRecordId;
+  const shirtNumber = childRow.shirtNumber ?? 0;
 
   return {
-    childId,
+    childId: childRow.childId || childRow.id,
     firstName,
     displayName,
     age,
-    shirtNumber: Number.isFinite(shirtNumber) ? shirtNumber : 0,
-    photoUrl,
-    funFact: fields.Notes || null,
+    shirtNumber,
+    photoUrl: childRow.profilePhotoUrl ?? null,
+    funFact: childRow.notes ?? null,
     location: 'Gulu, Northern Uganda',
   };
 }

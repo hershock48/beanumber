@@ -25,7 +25,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { logger } from '@/lib/logger';
 import { verifyUnsubscribeToken } from '@/lib/unsubscribe-token';
-import { findDonorByEmail, updateDonorOptIn } from '@/lib/airtable';
+import { getDonorByEmail } from '@/lib/db/queries';
+import { upsertDonorByEmail } from '@/lib/db/mutations';
 
 /**
  * Do the actual work: verify the signature, look up the donor, flip the bit.
@@ -41,7 +42,7 @@ async function processUnsubscribe(
   if (!email || !token) return 'invalid';
   if (!verifyUnsubscribeToken(email, token)) return 'invalid';
 
-  const donor = await findDonorByEmail(email);
+  const donor = await getDonorByEmail(email);
   if (!donor) {
     // Signature was valid but we have no donor record on file. Treat as
     // success from the user's perspective — they wanted to unsubscribe and
@@ -52,11 +53,14 @@ async function processUnsubscribe(
     return 'not-found';
   }
 
-  if (donor.fields['Communication Opt-In'] === false) {
+  if (donor.communicationOptIn === false) {
     return 'already';
   }
 
-  await updateDonorOptIn(donor.id, false);
+  await upsertDonorByEmail({
+    email: donor.email,
+    communicationOptIn: false,
+  });
   logger.info('Donor unsubscribed via one-click link', {
     donorId: donor.id,
     email: logger.maskEmail(email),

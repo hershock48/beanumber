@@ -64,6 +64,31 @@ async function audit(args: AuditArgs) {
   }
 }
 
+/**
+ * Audit-log diff between two row snapshots.
+ *
+ * Pitfalls handled:
+ *   - `Object.is(new Date(t), new Date(t))` is always false. Naive
+ *     diff flagged every UPDATE as having changed `createdAt` and
+ *     `updatedAt` — turning the audit jsonb into noise. We compare
+ *     Date instances by their numeric time.
+ *   - `updatedAt` always changes by design (every mutation bumps it
+ *     to `new Date()`); recording it as a diff entry is pure noise.
+ *     Excluded.
+ *   - JSON.stringify chokes on `bigint` and silently drops
+ *     `undefined`. The driver never returns bigints from these
+ *     tables (numerics come back as strings), so the practical risk
+ *     is low; still, we coerce-stringify defensively at the JSON
+ *     boundary so a future column doesn&rsquo;t crash the writer.
+ */
+const NOISE_FIELDS = new Set(['updatedAt', 'createdAt']);
+
+function valuesEqual(a: unknown, b: unknown): boolean {
+  if (Object.is(a, b)) return true;
+  if (a instanceof Date && b instanceof Date) return a.getTime() === b.getTime();
+  return false;
+}
+
 function computeChangedFields(
   before: Record<string, unknown> | null | undefined,
   after: Record<string, unknown> | null | undefined
@@ -76,7 +101,8 @@ function computeChangedFields(
   }
   const out: Record<string, { from: unknown; to: unknown }> = {};
   for (const k of Object.keys(after)) {
-    if (!Object.is(before[k], after[k])) {
+    if (NOISE_FIELDS.has(k)) continue;
+    if (!valuesEqual(before[k], after[k])) {
       out[k] = { from: before[k], to: after[k] };
     }
   }
@@ -251,6 +277,28 @@ export async function recordDonation(input: RecordDonationInput) {
   return donation;
 }
 
+/**
+ * Best-effort tag of an existing Donation with a child link via the
+ * `donation_children` junction table. Used by the claim-match flow to
+ * backfill reporting when a Shirt + Stay buyer pairs to their kid.
+ * Idempotent: the junction table&rsquo;s composite unique index makes
+ * duplicate inserts a no-op (we swallow the duplicate-key error).
+ */
+export async function linkDonationToChild(
+  donationId: string,
+  childId: string
+) {
+  if (!donationId || !childId) return;
+  try {
+    await db
+      .insert(donationChildren)
+      .values({ donationId, childId })
+      .onConflictDoNothing();
+  } catch (err) {
+    console.warn('[linkDonationToChild] non-fatal:', err);
+  }
+}
+
 // ─── Subscriptions ──────────────────────────────────────────────
 
 export interface UpsertSubscriptionInput {
@@ -341,7 +389,26 @@ export async function markDonationRefunded(args: {
   const note = args.partial
     ? `[Partially refunded ${args.refundedAmount ? `$${args.refundedAmount.toFixed(2)} ` : ''}on ${dateStr}]`
     : `[Refunded in full on ${dateStr}]`;
-  const newNote = before.donationNote ? `${before.donationNote}\n${note}` : note;
+  // Idempotency: Stripe can fire `charge.refunded` multiple times
+  // for the same refund event (retries, partial → full progression).
+  // If we already appended this exact note line OR the donation is
+  // already marked Refunded in full, skip the append and return the
+  // existing row. Otherwise we&rsquo;d grow donationNote unboundedly
+  // across retries.
+  const existingNote = before.donationNote ?? '';
+  if (existingNote.includes(note)) {
+    return before;
+  }
+  if (!args.partial && before.paymentStatus === 'Refunded') {
+    // A full-refund event arriving after we already marked the row
+    // Refunded — even if the exact date string differs slightly,
+    // don&rsquo;t double-log. Partial-then-full IS a real progression so
+    // we still want to append the &ldquo;Refunded in full&rdquo; line on the
+    // first encounter; that case is handled by the includes() check
+    // above on the prior line content.
+    return before;
+  }
+  const newNote = existingNote ? `${existingNote}\n${note}` : note;
 
   const updated = await db
     .update(donations)
@@ -519,6 +586,81 @@ export async function revealChildToSponsor(sponsorshipId: string) {
     after: updated[0] as Record<string, unknown>,
   });
   return updated[0];
+}
+
+/**
+ * Re-stage a donor&rsquo;s drip pipeline at sign-in. When a sponsor
+ * clicks a magic link, they&rsquo;ve obviously received their shirt and
+ * gone through the claim ritual &mdash; whatever drip stage they
+ * were on, the "did it arrive?" and "have you met your kid yet?"
+ * touches are now obsolete.
+ *
+ * Rules (mirror the old Airtable-side advanceDripOnClaim):
+ *   - No pipeline set → enroll in `shirt_nurture` at stage 2.
+ *   - On `shirt_nurture` or `shirt_sponsor` and stage &lt; 2 → bump to 2.
+ *   - Otherwise → no-op (they&rsquo;re already past the pre-claim touches,
+ *     or in a pipeline whose touches stay relevant).
+ *
+ * When a change applies, push the next-send date 5 days out so we
+ * don&rsquo;t hit them with the pitch immediately after they engaged.
+ *
+ * Returns the updated donor row when a change was made, the original
+ * row when no change was applied, or null when the donor isn&rsquo;t found.
+ * Errors are swallowed (logged) so a drip failure never blocks sign-in.
+ */
+export async function advanceDripOnClaim(email: string) {
+  if (!email) return null;
+  try {
+    const emailLower = email.toLowerCase();
+    const existing = await db
+      .select()
+      .from(donors)
+      .where(sql`lower(${donors.email}) = ${emailLower}`)
+      .limit(1);
+    if (!existing[0]) return null;
+    const before = existing[0];
+
+    const pipeline = (before.dripPipeline ?? '').toString();
+    const stage = before.dripStage ?? 0;
+
+    const patch: Record<string, unknown> = {};
+    if (!pipeline) {
+      patch.dripPipeline = 'shirt_nurture';
+      patch.dripStage = 2;
+    } else if (
+      (pipeline === 'shirt_nurture' || pipeline === 'shirt_sponsor') &&
+      stage < 2
+    ) {
+      patch.dripStage = 2;
+    } else {
+      // Already past the pre-claim touches, or in a pipeline whose
+      // touches are still relevant. No change.
+      return before;
+    }
+
+    const next = new Date();
+    next.setUTCDate(next.getUTCDate() + 5);
+    patch.dripNextSend = next.toISOString().slice(0, 10);
+    patch.updatedAt = new Date();
+
+    const updated = await db
+      .update(donors)
+      .set(patch)
+      .where(eq(donors.id, before.id))
+      .returning();
+    await audit({
+      table: 'donors',
+      recordId: before.id,
+      action: 'UPDATE',
+      actorType: 'sponsor',
+      before: before as Record<string, unknown>,
+      after: updated[0] as Record<string, unknown>,
+    });
+    return updated[0];
+  } catch (err) {
+    console.warn('[advanceDripOnClaim] failed (non-fatal):', err);
+    return null;
+  }
 }
 
 // ─── Children ───────────────────────────────────────────────────

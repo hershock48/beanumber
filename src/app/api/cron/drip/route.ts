@@ -20,21 +20,14 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { and, isNotNull, lte, sql } from 'drizzle-orm';
 import { sendEmail } from '@/lib/email';
+import { db } from '@/lib/db/client';
+import { donors as donorsTable } from '@/lib/db/schema';
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
-const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID || '';
-const AIRTABLE_API_KEY = process.env.AIRTABLE_PAT || process.env.AIRTABLE_API_KEY || '';
-const DONORS_TABLE = 'tblhuLpJgYLB0pTjx';
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.beanumber.org';
-
-function getHeaders() {
-  return {
-    Authorization: `Bearer ${AIRTABLE_API_KEY}`,
-    'Content-Type': 'application/json',
-  };
-}
 
 // ── Auth ─────────────────────────────────────────────────────────────────────
 
@@ -89,7 +82,7 @@ const PIPELINE_CONFIGS: Record<string, PipelineConfig> = {
 };
 
 type DripDonor = {
-  recordId: string;
+  donorId: string;         // Postgres UUID
   email: string;
   firstName: string;
   pipeline: string;
@@ -104,18 +97,6 @@ function parseShirtNumbers(raw: string): number[] {
 }
 function parseChildNames(raw: string): string[] {
   return String(raw).split(',').map(s => s.trim()).filter(Boolean);
-}
-function isMultiShirt(donor: DripDonor): boolean {
-  return parseShirtNumbers(donor.shirtNumber).length > 1;
-}
-function multiChildBlock(numbers: number[], names: string[]): string {
-  return numbers.map((n, i) => {
-    const name = names[i] || '';
-    const url = `${SITE_URL}/children/${n}`;
-    return name
-      ? `<a href="${url}" style="color: #D4A843; font-weight: bold;">#${n} &rarr; ${name}</a>`
-      : `<a href="${url}" style="color: #D4A843; font-weight: bold;">#${n}</a>`;
-  }).join('<br>');
 }
 
 // ── Email templates ──────────────────────────────────────────────────────────
@@ -165,10 +146,6 @@ function shirtNurtureEmail(
 
   switch (stage) {
     // ── Email 1: Did it arrive + how to claim (ship + 3 days) ─────────────
-    // Lands as a check-in but introduces the full mechanic: number on
-    // the back → site → claim. The claim concept is what unlocks the
-    // rest of the relationship, so we name it explicitly on the first
-    // touch.
     case 0:
       return {
         subject: multi ? "Did your shirts arrive?" : "Did your shirt arrive?",
@@ -190,10 +167,6 @@ function shirtNurtureEmail(
       };
 
     // ── Email 2: A real campus moment (ship + 9 days) ─────────────────────
-    // Previously a generic re-nudge. Now a real story from the school —
-    // Teacher Susan's class learning to write — that ties the abstract
-    // "your shirt is connected to a kid" to a concrete campus reality.
-    // Specific over vague, per voice.md.
     case 1:
       return {
         subject: "Something I want to tell you about",
@@ -211,8 +184,6 @@ function shirtNurtureEmail(
       };
 
     // ── Email 3: Conversion ask, tied to the claim (ship + 17 days) ───────
-    // Assumes by now they&rsquo;ve seen the kid&rsquo;s page. Frames sponsorship
-    // as the next step ON TOP of having claimed, not as a standalone ask.
     case 2:
       return {
         subject: multi ? "About the kids behind your shirts" : "About the kid behind your shirt",
@@ -233,11 +204,6 @@ function shirtNurtureEmail(
       };
 
     // ── Email 4: Warm close — door stays open (ship + 27 days) ────────────
-    // Previously "Last email from me about this" with a flat exit.
-    // Reframed: I&rsquo;ll stop showing up, but the relationship continues
-    // through the campus newsletter, and once they claim, those updates
-    // are about their kid specifically. Future contact has substance,
-    // not nudges.
     case 3:
       return {
         subject: "I'll stop showing up after this one",
@@ -270,14 +236,11 @@ function sponsorOnboardEmail(
   const names = parseChildNames(childName);
   const firstNumber = numbers[0];
   const firstName_ = names[0] || '';
-  // Use first child's page for direct links; sponsor_onboard is always single-sponsor
   const childUrl = firstNumber ? `${SITE_URL}/children/${firstNumber}` : SITE_URL;
   const childUrlLabel = firstNumber ? `beanumber.org/${firstNumber}` : 'beanumber.org';
-  // For display, use the parsed first name rather than raw (may be comma-separated)
   const displayChildName = firstName_ || childName;
 
   switch (stage) {
-    // ── Email 1: Your kid's page (Day ~3) ────────────────────────────────
     case 0:
       return {
         subject: "Your sponsorship is active",
@@ -297,7 +260,6 @@ function sponsorOnboardEmail(
         `),
       };
 
-    // ── Email 2: What to expect (Day ~10) ────────────────────────────────
     case 1:
       return {
         subject: "What to expect over the next few weeks",
@@ -310,7 +272,6 @@ function sponsorOnboardEmail(
         `),
       };
 
-    // ── Email 3: One month (Day ~21) ─────────────────────────────────────
     case 2:
       return {
         subject: "Checking in after your first month",
@@ -337,7 +298,6 @@ function donorConvertEmail(
   const { firstName } = donor;
 
   switch (stage) {
-    // ── Email 1: Where the donation went (Day ~5) ────────────────────────
     case 0:
       return {
         subject: "Following up on your donation",
@@ -350,7 +310,6 @@ function donorConvertEmail(
         `),
       };
 
-    // ── Email 2: The sponsorship model (Day ~14) ─────────────────────────
     case 1:
       return {
         subject: "A little more about how we work",
@@ -366,7 +325,6 @@ function donorConvertEmail(
         `),
       };
 
-    // ── Email 3: Warm close — door stays open (Day ~25) ──────────────────
     case 2:
       return {
         subject: "I'll stop showing up after this one",
@@ -395,18 +353,10 @@ function shirtSponsorEmail(
   donor: DripDonor
 ): { subject: string; html: string } | null {
   const { firstName, shirtNumber } = donor;
-  // Stockpile model: never name a specific child or quote a specific
-  // shirt number. Buyer-to-child match happens when the buyer reads
-  // the number off the back of their shirt and visits beanumber.org/
-  // [number]. We don't pre-assign at checkout anymore, so we don't
-  // write the match as if we know it. `multi` is kept for grammar
-  // ("your shirts" vs "your shirt"), since the buyer literally has
-  // more than one physical shirt — but we don't list the numbers.
   const numbers = parseShirtNumbers(shirtNumber);
   const multi = numbers.length > 1;
 
   switch (stage) {
-    // ── Email 1: Shirt in transit + sponsorship active, NO reveal (Day ~10)
     case 0:
       return {
         subject: multi ? "Your shirts are being made right now" : "Your shirt is being made right now",
@@ -424,11 +374,6 @@ function shirtSponsorEmail(
         `),
       };
 
-    // ── Email 2: Meet the kid + how to get into the sponsor view (Day ~13)
-    //
-    // No personalization, no sponsor code. The buyer's shirt has the
-    // number; entering it on the site is what unlocks their sponsor
-    // view. Their browser remembers them after that. No code to keep.
     case 1: {
       return {
         subject: multi ? "Have you met your kids yet?" : "Have you met your child yet?",
@@ -446,7 +391,6 @@ function shirtSponsorEmail(
       };
     }
 
-    // ── Email 3: Two weeks in (Day ~18) ──────────────────────────────────
     case 2:
       return {
         subject: "Two weeks as a sponsor",
@@ -459,7 +403,6 @@ function shirtSponsorEmail(
         `),
       };
 
-    // ── Email 4: One month (Day ~25) ─────────────────────────────────────
     case 3:
       return {
         subject: "One month in",
@@ -486,7 +429,6 @@ function monthlyDonorEmail(
   const { firstName } = donor;
 
   switch (stage) {
-    // ── Email 1: Where the monthly gift goes (Day ~3) ────────────────────
     case 0:
       return {
         subject: "Where your monthly donation goes",
@@ -499,7 +441,6 @@ function monthlyDonorEmail(
         `),
       };
 
-    // ── Email 2: How it works (Day ~12) ──────────────────────────────────
     case 1:
       return {
         subject: "How things work at the campus",
@@ -513,12 +454,6 @@ function monthlyDonorEmail(
         `),
       };
 
-    // ── Email 3: Soft upgrade ask + warm close (Day ~22) ─────────────────
-    // Previously a pure word-of-mouth ask, which is a fine sentiment
-    // but the wrong final beat for a monthly donor we&rsquo;d ideally
-    // upgrade to a named sponsorship. Reframed as an invitation to
-    // add the relationship piece, with a graceful out if monthly is
-    // already the right shape.
     case 2:
       return {
         subject: "One more thing I want to put in front of you",
@@ -557,94 +492,74 @@ function getEmailForPipeline(
   }
 }
 
-// ── Airtable helpers ─────────────────────────────────────────────────────────
+// ── Postgres helpers ─────────────────────────────────────────────────────────
 
 async function getDripDonorsDue(): Promise<DripDonor[]> {
-  // Query ALL pipelines — not just shirt_nurture
-  const formula = `AND(
-    NOT({DripPipeline}=BLANK()),
-    NOT({DripNextSend}=BLANK()),
-    IS_BEFORE({DripNextSend}, DATEADD(TODAY(), 1, 'day'))
-  )`;
+  // Equivalent of the old Airtable filter:
+  //   AND( DripPipeline != BLANK, DripNextSend != BLANK,
+  //        IS_BEFORE(DripNextSend, DATEADD(TODAY(), 1, 'day')) )
+  // i.e. dripNextSend <= today.
+  const today = new Date().toISOString().split('T')[0];
 
-  const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${DONORS_TABLE}?filterByFormula=${encodeURIComponent(formula)}&maxRecords=50`;
+  const rows = await db
+    .select({
+      id: donorsTable.id,
+      email: donorsTable.email,
+      name: donorsTable.name,
+      pipeline: donorsTable.dripPipeline,
+      dripStage: donorsTable.dripStage,
+      dripChildName: donorsTable.dripChildName,
+      dripShirtNumber: donorsTable.dripShirtNumber,
+    })
+    .from(donorsTable)
+    .where(
+      and(
+        isNotNull(donorsTable.dripPipeline),
+        isNotNull(donorsTable.dripNextSend),
+        lte(donorsTable.dripNextSend, today)
+      )
+    )
+    .limit(50);
 
-  const res = await fetch(url, { headers: getHeaders() });
-  if (!res.ok) {
-    console.error('[Drip] Failed to query donors:', res.status);
-    return [];
-  }
-
-  const data = await res.json();
-  return (data.records || []).map((r: any) => ({
-    recordId: r.id,
-    email: r.fields['Email Address'] || '',
-    firstName: (r.fields['Donor Name'] || '').split(' ')[0] || 'there',
-    pipeline: r.fields['DripPipeline'] || '',
-    dripStage: r.fields['DripStage'] ?? 0,
-    childName: r.fields['DripChildName'] || '',
-    shirtNumber: r.fields['DripShirtNumber'] || '',
-  }));
+  return rows
+    .filter(r => r.email && r.pipeline)
+    .map(r => ({
+      donorId: r.id,
+      email: r.email,
+      firstName: (r.name || '').split(' ')[0] || 'there',
+      pipeline: r.pipeline as string,
+      dripStage: r.dripStage ?? 0,
+      childName: r.dripChildName || '',
+      shirtNumber: r.dripShirtNumber || '',
+    }));
 }
 
 async function advanceDripStage(
-  recordId: string,
+  donorId: string,
   newStage: number,
   nextSendDate: string | null
 ): Promise<void> {
-  const fields: Record<string, unknown> = { DripStage: newStage };
-
   if (nextSendDate) {
-    fields.DripNextSend = nextSendDate;
+    await db
+      .update(donorsTable)
+      .set({
+        dripStage: newStage,
+        dripNextSend: nextSendDate,
+        updatedAt: new Date(),
+      })
+      .where(sql`${donorsTable.id} = ${donorId}`);
   } else {
-    // Sequence complete — clear drip fields
-    fields.DripPipeline = null;
-    fields.DripStage = null;
-    fields.DripNextSend = null;
-    // Keep DripChildName and DripShirtNumber for analytics
-  }
-
-  await fetch(
-    `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${DONORS_TABLE}/${recordId}`,
-    {
-      method: 'PATCH',
-      headers: getHeaders(),
-      body: JSON.stringify({ fields }),
-    }
-  );
-}
-
-// Log to Communications table for audit trail
-async function logDripSend(
-  donorId: string,
-  email: string,
-  subject: string,
-  pipeline: string,
-  stage: number,
-  maxStages: number,
-  status: string
-): Promise<void> {
-  try {
-    await fetch(
-      `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/tblw7ZmsfcphmfsWT`,
-      {
-        method: 'POST',
-        headers: getHeaders(),
-        body: JSON.stringify({
-          fields: {
-            Subject: subject,
-            'Email Body': `[Drip] Pipeline: ${pipeline}, Stage: ${stage + 1} of ${maxStages}`,
-            'Send Date': new Date().toISOString().split('T')[0],
-            Status: status,
-            'Recipient Email': email,
-            'Email Type': 'Monthly Update', // Closest existing option
-            'Related Donor': [donorId],
-          },
-        }),
-      }
-    );
-  } catch (err) {
-    console.error('[Drip] Failed to log communication:', err);
+    // Sequence complete — clear drip fields. Keep dripChildName +
+    // dripShirtNumber as analytics breadcrumbs.
+    await db
+      .update(donorsTable)
+      .set({
+        dripPipeline: null,
+        dripStage: null,
+        dripNextSend: null,
+        updatedAt: new Date(),
+      })
+      .where(sql`${donorsTable.id} = ${donorId}`);
   }
 }
 
@@ -661,10 +576,6 @@ function addDays(dateStr: string, days: number): string {
 export async function GET(request: NextRequest) {
   if (!validateCronAuth(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-  if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) {
-    return NextResponse.json({ error: 'Airtable not configured' }, { status: 500 });
   }
 
   const today = new Date().toISOString().split('T')[0];
@@ -695,8 +606,8 @@ export async function GET(request: NextRequest) {
     const emailContent = getEmailForPipeline(donor.pipeline, donor.dripStage, donor);
 
     if (!emailContent) {
-      // Past the last stage — clear drip
-      await advanceDripStage(donor.recordId, donor.dripStage, null);
+      // Past the last stage — clear drip.
+      await advanceDripStage(donor.donorId, donor.dripStage, null);
       results.push({ email: donor.email, stage: donor.dripStage, status: 'completed' });
       continue;
     }
@@ -713,16 +624,7 @@ export async function GET(request: NextRequest) {
       const gap = config.gaps[donor.dripStage];
       const nextSend = newStage < config.maxStages ? addDays(today, gap ?? 7) : null;
 
-      await advanceDripStage(donor.recordId, newStage, nextSend);
-      await logDripSend(
-        donor.recordId,
-        donor.email,
-        emailContent.subject,
-        donor.pipeline,
-        donor.dripStage,
-        config.maxStages,
-        result.success ? 'Sent' : 'Failed'
-      );
+      await advanceDripStage(donor.donorId, newStage, nextSend);
 
       results.push({
         email: donor.email,

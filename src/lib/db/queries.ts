@@ -22,6 +22,7 @@ import {
   newsletters,
   sponsorships,
   donors,
+  donations,
   subscriptions,
   batches,
 } from './schema';
@@ -243,6 +244,208 @@ export async function getSponsorshipBySponsorCode(code: string) {
   return rows[0] ?? null;
 }
 
+/**
+ * Find the sponsorship row that owns a given Stripe subscription. Used
+ * by the claim-match flow for idempotency &mdash; if a Sponsorship already
+ * exists for this subscription (because the user double-tapped or
+ * Kevin already created one by hand), we return it instead of
+ * inserting a duplicate.
+ */
+export async function getSponsorshipByStripeSubscriptionId(
+  stripeSubscriptionId: string
+) {
+  if (!stripeSubscriptionId) return null;
+  const rows = await db
+    .select()
+    .from(sponsorships)
+    .where(eq(sponsorships.stripeSubscriptionId, stripeSubscriptionId))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+/**
+ * Find an existing Active or Holder sponsorship for a given email +
+ * child. Mirrors the dual-key match (UUID FK OR legacy ChildID) so
+ * transition-state rows are caught either way. Used by the recovery
+ * send-link path to decide between "send sign-in link" vs "create
+ * Holder row + send link."
+ */
+export async function findSponsorshipForEmailAndChild(
+  email: string,
+  child: { id: string; childId: string }
+) {
+  if (!email || (!child.id && !child.childId)) return null;
+  const emailLower = email.toLowerCase();
+  const rows = await db
+    .select()
+    .from(sponsorships)
+    .where(
+      and(
+        sql`lower(${sponsorships.sponsorEmail}) = ${emailLower}`,
+        or(
+          eq(sponsorships.status, 'Active'),
+          eq(sponsorships.status, 'Holder')
+        ),
+        or(
+          eq(sponsorships.childId, child.id),
+          eq(sponsorships.childIdLegacy, child.childId)
+        )
+      )
+    )
+    .orderBy(
+      sql`case when ${sponsorships.status} = 'Active' then 0 else 1 end`,
+      desc(sponsorships.createdAt)
+    )
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+/**
+ * Is there an Active or Holder sponsorship on this child from ANY
+ * email other than the one given? Used to block fraudulent second-
+ * claim attempts on a number that&rsquo;s already been spoken for.
+ */
+export async function isChildClaimedByOtherEmail(
+  child: { id: string; childId: string },
+  excludingEmail: string
+): Promise<boolean> {
+  if (!child.id && !child.childId) return false;
+  const emailLower = excludingEmail.toLowerCase();
+  const rows = await db
+    .select({ id: sponsorships.id })
+    .from(sponsorships)
+    .where(
+      and(
+        sql`lower(${sponsorships.sponsorEmail}) <> ${emailLower}`,
+        or(
+          eq(sponsorships.status, 'Active'),
+          eq(sponsorships.status, 'Holder')
+        ),
+        or(
+          eq(sponsorships.childId, child.id),
+          eq(sponsorships.childIdLegacy, child.childId)
+        )
+      )
+    )
+    .limit(1);
+  return rows.length > 0;
+}
+
+/**
+ * Email-only sign-in fallback. Returns the most recent Active or
+ * Holder sponsorship for this email, hydrated with the linked
+ * kid&rsquo;s shirt number and first name so the recovery route can
+ * mint a magic link without a second round-trip. Returns null if no
+ * matching sponsorship resolves to a kid with a shirt number.
+ *
+ * Mirrors the dual-source kid join used by getViewerSponsorships
+ * (UUID FK first, legacy ChildID text second) so transition-state
+ * rows still resolve.
+ */
+export async function getMostRecentSponsorshipForEmail(viewerEmail: string) {
+  if (!viewerEmail) return null;
+  const emailLower = viewerEmail.toLowerCase();
+  const rows = await db
+    .select({
+      sponsorCode: sponsorships.sponsorCode,
+      sponsorshipStartDate: sponsorships.sponsorshipStartDate,
+      createdAt: sponsorships.createdAt,
+      childShirtNumber: sql<number | null>`coalesce(${children.shirtNumber}, child_legacy.shirt_number)`,
+      childFirstName: sql<string | null>`coalesce(${children.firstName}, child_legacy.first_name)`,
+      childDisplayName: sql<string | null>`coalesce(${children.displayName}, child_legacy.display_name)`,
+    })
+    .from(sponsorships)
+    .leftJoin(children, eq(children.id, sponsorships.childId))
+    .leftJoin(
+      sql`children as child_legacy`,
+      sql`child_legacy.child_id = ${sponsorships.childIdLegacy}`
+    )
+    .where(
+      and(
+        sql`lower(${sponsorships.sponsorEmail}) = ${emailLower}`,
+        or(
+          eq(sponsorships.status, 'Active'),
+          eq(sponsorships.status, 'Holder')
+        )
+      )
+    )
+    .orderBy(
+      desc(sponsorships.sponsorshipStartDate),
+      desc(sponsorships.createdAt)
+    )
+    .limit(10);
+
+  for (const row of rows) {
+    const shirtNumber = row.childShirtNumber;
+    if (typeof shirtNumber !== 'number' || shirtNumber <= 0) continue;
+    const firstName =
+      row.childFirstName ||
+      (row.childDisplayName ? row.childDisplayName.split(' ')[0] : null) ||
+      'them';
+    return {
+      sponsorCode: row.sponsorCode,
+      shirtNumber,
+      firstName,
+    };
+  }
+  return null;
+}
+
+/**
+ * Resolve the email tied to a sponsorCode (only when the row is an
+ * Active or Holder row, the two states the magic-link callback should
+ * trust). Used by the recover callback to populate the sponsor_session
+ * cookie after token verification.
+ */
+export async function getSponsorshipEmailByCode(
+  sponsorCode: string
+): Promise<string | null> {
+  if (!sponsorCode) return null;
+  const rows = await db
+    .select({ sponsorEmail: sponsorships.sponsorEmail })
+    .from(sponsorships)
+    .where(
+      and(
+        eq(sponsorships.sponsorCode, sponsorCode),
+        or(
+          eq(sponsorships.status, 'Active'),
+          eq(sponsorships.status, 'Holder')
+        )
+      )
+    )
+    .limit(1);
+  return rows[0]?.sponsorEmail ?? null;
+}
+
+/**
+ * Hydrate a sponsorship&rsquo;s linked child basics (shirt number, names,
+ * photo) by sponsorCode. Used by the reveal endpoint to compare the
+ * caller&rsquo;s requested number against the kid the sponsor is actually
+ * tied to.
+ */
+export async function getSponsorshipWithChildBySponsorCode(sponsorCode: string) {
+  if (!sponsorCode) return null;
+  const rows = await db
+    .select({
+      sponsorshipId: sponsorships.id,
+      sponsorEmail: sponsorships.sponsorEmail,
+      sponsorCode: sponsorships.sponsorCode,
+      status: sponsorships.status,
+      childRevealedAt: sponsorships.childRevealedAt,
+      childShirtNumber: sql<number | null>`coalesce(${children.shirtNumber}, child_legacy.shirt_number)`,
+      childRecordId: sql<string | null>`coalesce(${children.id}, child_legacy.id)`,
+    })
+    .from(sponsorships)
+    .leftJoin(children, eq(children.id, sponsorships.childId))
+    .leftJoin(
+      sql`children as child_legacy`,
+      sql`child_legacy.child_id = ${sponsorships.childIdLegacy}`
+    )
+    .where(eq(sponsorships.sponsorCode, sponsorCode))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
 // ─── Newsletters ─────────────────────────────────────────────────
 
 export interface CampusNewsletterEntry {
@@ -290,6 +493,27 @@ export async function getRecentCampusNewsletters(
       ? new Date(r.publishedAt).toISOString()
       : undefined,
   }));
+}
+
+/**
+ * Newsletters that are scheduled and due to send. The newsletter
+ * cron picks these up daily — `status='Scheduled' AND send_date <= now`.
+ * Returns full rows so the caller can pass them to the send tool.
+ */
+export async function findNewslettersDueToSend(limit = 20) {
+  const now = new Date();
+  return db
+    .select()
+    .from(newsletters)
+    .where(
+      and(
+        eq(newsletters.status, 'Scheduled'),
+        isNotNull(newsletters.sendDate),
+        sql`${newsletters.sendDate} <= ${now}`
+      )
+    )
+    .orderBy(newsletters.sendDate)
+    .limit(limit);
 }
 
 // ─── Child Updates ───────────────────────────────────────────────
@@ -363,6 +587,34 @@ export async function getDonorByStripeCustomerId(stripeCustomerId: string) {
 }
 
 // ─── Subscriptions ───────────────────────────────────────────────
+
+/**
+ * Look up a Donation by Stripe Checkout Session ID and hydrate with
+ * the donor&rsquo;s email + name. Used by the claim-match flow to verify
+ * a buyer&rsquo;s Shirt + Stay purchase before creating the Sponsorship.
+ */
+export async function getDonationWithDonorByCheckoutSessionId(
+  checkoutSessionId: string
+) {
+  if (!checkoutSessionId) return null;
+  const rows = await db
+    .select({
+      donationId: donations.id,
+      donationSource: donations.donationSource,
+      recurringDonation: donations.recurringDonation,
+      donationAmount: donations.donationAmount,
+      stripeCustomerId: donations.stripeCustomerId,
+      donorEmailAtDonation: donations.donorEmailAtDonation,
+      donorId: donations.donorId,
+      donorEmail: donors.email,
+      donorName: donors.name,
+    })
+    .from(donations)
+    .leftJoin(donors, eq(donors.id, donations.donorId))
+    .where(eq(donations.stripeCheckoutSessionId, checkoutSessionId))
+    .limit(1);
+  return rows[0] ?? null;
+}
 
 export async function getSubscriptionByStripeId(stripeSubscriptionId: string) {
   const rows = await db

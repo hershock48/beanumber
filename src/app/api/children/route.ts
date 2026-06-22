@@ -1,19 +1,20 @@
 import { NextResponse } from 'next/server';
 import {
   getChildByShirtNumber,
+  getChildByChildId,
   listAllChildren,
 } from '@/lib/db/queries';
 import type { Child } from '@/lib/db/schema';
+import { resolveShirtToKid } from '@/lib/cycle';
 
 /**
- * Map a cycle shirt number to its canonical kid (shirts > 53). Mirrors
- * the formula in /children/[number]/page.tsx so the carousel and the
- * kid page agree on what kid #67, #100, etc. show.
+ * Hardcoded-formula safety net for shirts whose Batches row hasn&rsquo;t
+ * been loaded. Same shape as the kid page&rsquo;s fallback so the API
+ * never returns 404 for a number that&rsquo;s logically a cycle of a
+ * real kid.
  *
  *   Era 1 (#54-150):  ((N - 54) % 52) + 2     → kid 2..53
  *   Era 2 (#151+):    ((N - 151) % 53) + 1    → kid 1..53
- *
- * Returns null for #1-53 (no cycle).
  */
 function canonicalShirtNumber(n: number): number | null {
   if (n <= 53) return null;
@@ -109,21 +110,31 @@ export async function GET(request: Request) {
       let child = await getChildByShirtNumber(num);
       // Cycle-math fallback so the API mirrors the kid page: cycle
       // shirts (e.g., #55, #100) resolve to their canonical kid.
-      // Without this, the carousel would 404 on cycle numbers while
-      // /children/55 renders fine, and the two surfaces would
-      // disagree on what shirt #N means.
+      // Prefer the Batches resolver (DB-driven, future-batch safe);
+      // fall through to the hardcoded formula for any shirt not
+      // yet covered by a Batches row.
       if (!child) {
-        const canonicalNum = canonicalShirtNumber(num);
-        if (canonicalNum) {
-          const canonical = await getChildByShirtNumber(canonicalNum);
-          if (canonical) {
-            // Synthesize with the cycle shirt number as identity.
-            child = {
-              ...canonical,
-              shirtNumber: num,
-              childId: `HSP/BAN-${String(num).padStart(3, '0')}`,
-            };
+        let canonical: Child | null = null;
+        try {
+          const resolved = await resolveShirtToKid(num);
+          if (resolved?.childRecordId) {
+            canonical = await getChildByChildId(resolved.childRecordId);
           }
+        } catch {
+          /* Batches read failed; fall through to formula */
+        }
+        if (!canonical) {
+          const canonicalNum = canonicalShirtNumber(num);
+          if (canonicalNum) {
+            canonical = await getChildByShirtNumber(canonicalNum);
+          }
+        }
+        if (canonical) {
+          child = {
+            ...canonical,
+            shirtNumber: num,
+            childId: `HSP/BAN-${String(num).padStart(3, '0')}`,
+          };
         }
       }
       if (!child) {

@@ -1,81 +1,71 @@
+/**
+ * Deprecated manual sign-in form. The current sign-in path is the
+ * magic-link flow (`/api/sponsor/recover/send-link` → callback) which
+ * doesn't require the user to remember their sponsor code. This
+ * endpoint is kept around so any lingering bookmark or legacy email
+ * link still works.
+ *
+ * Verifies an `{ email, sponsorCode }` pair against Postgres and, if
+ * the row is Active + visible, drops the same `sponsor_session` cookie
+ * the magic-link callback uses.
+ */
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
+import { and, eq, sql } from 'drizzle-orm';
 import { SESSION } from '@/lib/constants';
-
-const AIRTABLE_API_KEY = process.env.AIRTABLE_API_KEY;
-const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID;
-const AIRTABLE_SPONSORSHIPS_TABLE = process.env.AIRTABLE_SPONSORSHIPS_TABLE || 'Sponsorships';
+import { db } from '@/lib/db/client';
+import { sponsorships } from '@/lib/db/schema';
 
 interface SponsorData {
   sponsorCode: string;
   email: string;
   name: string;
-  childID: string;
-  childName: string;
-  childPhoto?: string;
-  sponsorshipStartDate: string;
 }
 
-async function verifySponsor(email: string, sponsorCode: string): Promise<SponsorData | null> {
-  if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) {
-    throw new Error('Airtable credentials not configured');
+async function verifySponsor(
+  email: string,
+  sponsorCode: string
+): Promise<SponsorData | null> {
+  // Case-insensitive email match. The sponsor_code is stored
+  // exact-case (BAN-YYYY-NNN) so the eq() match is fine.
+  const rows = await db
+    .select({
+      sponsorCode: sponsorships.sponsorCode,
+      sponsorEmail: sponsorships.sponsorEmail,
+      sponsorName: sponsorships.sponsorName,
+      authStatus: sponsorships.authStatus,
+      visibleToSponsor: sponsorships.visibleToSponsor,
+    })
+    .from(sponsorships)
+    .where(
+      and(
+        sql`lower(${sponsorships.sponsorEmail}) = ${email.toLowerCase()}`,
+        eq(sponsorships.sponsorCode, sponsorCode)
+      )
+    )
+    .limit(1);
+
+  const row = rows[0];
+  if (!row) {
+    console.log('[Verify] No sponsorship for', email, sponsorCode);
+    return null;
   }
 
-  // Search for sponsor by email and sponsor code with all checks in formula
-  // Airtable checkbox = 1 for true, 0 for false
-  const formula = `AND({SponsorEmail}="${email}",{SponsorCode}="${sponsorCode}",{AuthStatus}="Active",{VisibleToSponsor}=1)`;
-  
-  console.log('[Verify] Airtable query:', formula);
-  
-  const response = await fetch(
-    `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_SPONSORSHIPS_TABLE}?filterByFormula=${encodeURIComponent(formula)}`,
-    {
-      headers: {
-        Authorization: `Bearer ${AIRTABLE_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-    }
-  );
-
-  if (!response.ok) {
-    const error = await response.text();
-    console.error('[Verify] Airtable API error:', error);
-    throw new Error(`Airtable API error: ${error}`);
+  // Mirror the legacy checks (AuthStatus=Active AND VisibleToSponsor).
+  if (row.authStatus !== 'Active') {
+    console.log('[Verify] AuthStatus not Active:', row.authStatus);
+    return null;
+  }
+  if (row.visibleToSponsor !== true) {
+    console.log('[Verify] VisibleToSponsor not true:', row.visibleToSponsor);
+    return null;
   }
 
-  const data = await response.json();
-  console.log('[Verify] Airtable response:', { recordCount: data.records?.length || 0 });
-
-  if (data.records && data.records.length > 0) {
-    const record = data.records[0];
-    const fields = record.fields;
-
-    // Double-check fields (formula should handle this, but verify)
-    const authStatus = fields['AuthStatus'];
-    const visibleToSponsor = fields['VisibleToSponsor'];
-
-    if (authStatus !== 'Active') {
-      console.log('[Verify] AuthStatus not Active:', authStatus);
-      return null;
-    }
-
-    if (visibleToSponsor !== true && visibleToSponsor !== 1) {
-      console.log('[Verify] VisibleToSponsor not true:', visibleToSponsor);
-      return null;
-    }
-
-    return {
-      sponsorCode: fields['SponsorCode'] || sponsorCode,
-      email: fields['SponsorEmail'] || email,
-      name: fields['SponsorName'] || '',
-      childID: fields['ChildID'] || '',
-      childName: fields['ChildDisplayName'] || '',
-      childPhoto: fields['ChildPhoto']?.[0]?.url || undefined,
-      sponsorshipStartDate: fields['SponsorshipStartDate'] || '',
-    };
-  }
-
-  return null;
+  return {
+    sponsorCode: row.sponsorCode,
+    email: row.sponsorEmail,
+    name: row.sponsorName ?? '',
+  };
 }
 
 export async function POST(request: NextRequest) {
@@ -89,7 +79,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verify sponsor
     const sponsor = await verifySponsor(email, sponsorCode);
 
     if (!sponsor) {
@@ -110,7 +99,6 @@ export async function POST(request: NextRequest) {
       expires: expires.toISOString(),
     });
 
-    // Cookie settings that work reliably
     cookieStore.set(SESSION.COOKIE_NAME, cookieValue, {
       httpOnly: true,
       secure: true, // Always true for HTTPS (beanumber.org)

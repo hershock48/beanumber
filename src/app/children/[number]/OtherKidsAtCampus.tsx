@@ -22,6 +22,11 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
+import { or, eq } from 'drizzle-orm';
+import { listAllChildren } from '@/lib/db/queries';
+import { db } from '@/lib/db/client';
+import { sponsorships as sponsorshipsTable } from '@/lib/db/schema';
+import type { Child } from '@/lib/db/schema';
 
 interface KidCard {
   recordId: string;
@@ -35,63 +40,6 @@ interface KidCard {
   hasSponsors: boolean;
 }
 
-interface AirtableChildRecord {
-  id: string;
-  fields: {
-    ChildID?: string;
-    DisplayName?: string;
-    FirstName?: string;
-    GradeClass?: string;
-    ProfilePhoto?: Array<{ url: string; filename: string }>;
-    Notes?: string;
-    Loves?: string;
-    ChildQuote?: string;
-    FamilyContext?: string;
-    NameMeaning?: string;
-    Status?: string;
-    ShirtNumber?: number;
-    ReservedForAuction?: boolean;
-    DepartedAt?: string;
-    'Associated Sponsorships'?: string[];
-  };
-}
-
-const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID || '';
-const AIRTABLE_API_KEY = process.env.AIRTABLE_API_KEY || '';
-const CHILDREN_TABLE = process.env.AIRTABLE_CHILDREN_TABLE || 'Children';
-
-async function fetchAllKids(): Promise<AirtableChildRecord[]> {
-  if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) return [];
-  const out: AirtableChildRecord[] = [];
-  let offset: string | undefined;
-  do {
-    const params = new URLSearchParams();
-    params.set('pageSize', '100');
-    if (offset) params.set('offset', offset);
-    const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(CHILDREN_TABLE)}?${params.toString()}`;
-    try {
-      const res = await fetch(url, {
-        headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` },
-        cache: 'no-store',
-      });
-      if (!res.ok) break;
-      const data = await res.json();
-      out.push(...((data.records || []) as AirtableChildRecord[]));
-      offset = data.offset;
-    } catch {
-      break;
-    }
-  } while (offset);
-  return out;
-}
-
-function isVisibleStatus(status?: string): boolean {
-  if (!status) return true; // treat blank as visible
-  const n = status.trim().toLowerCase();
-  if (n === 'graduated' || n === 'archived' || n === 'inactive') return false;
-  return true;
-}
-
 function shuffle<T>(arr: T[]): T[] {
   const a = arr.slice();
   for (let i = a.length - 1; i > 0; i--) {
@@ -102,42 +50,66 @@ function shuffle<T>(arr: T[]): T[] {
 }
 
 /** Score how "filled out" a profile is — drives preference. */
-function profileCompleteness(r: AirtableChildRecord): number {
-  const f = r.fields;
+function profileCompleteness(c: Child): number {
   let score = 0;
-  if (f.Loves && f.Loves.trim().length > 0) score += 1;
-  if (f.FamilyContext && f.FamilyContext.trim().length > 0) score += 1;
-  if (f.ChildQuote && f.ChildQuote.trim().length > 0) score += 1;
-  if (f.NameMeaning && f.NameMeaning.trim().length > 0) score += 1;
-  if (f.Notes && f.Notes.trim().length > 50) score += 1;
+  if (c.loves && c.loves.trim().length > 0) score += 1;
+  if (c.familyContext && c.familyContext.trim().length > 0) score += 1;
+  if (c.childQuote && c.childQuote.trim().length > 0) score += 1;
+  if (c.nameMeaning && c.nameMeaning.trim().length > 0) score += 1;
+  if (c.notes && c.notes.trim().length > 50) score += 1;
   return score;
 }
 
-async function pickFeaturedKids(excludeRecordId: string, count: number = 4): Promise<KidCard[]> {
-  const all = await fetchAllKids();
+/**
+ * Build a Set of child UUIDs that currently have at least one Active
+ * or Holder sponsorship. Used to bucket "popular kids" higher in the
+ * selection order.
+ */
+async function fetchKidsWithSponsors(childIds: string[]): Promise<Set<string>> {
+  const out = new Set<string>();
+  if (childIds.length === 0) return out;
+  const candidateSet = new Set(childIds);
+  const rows = await db
+    .select({ childId: sponsorshipsTable.childId })
+    .from(sponsorshipsTable)
+    .where(
+      or(
+        eq(sponsorshipsTable.status, 'Active'),
+        eq(sponsorshipsTable.status, 'Holder')
+      )
+    );
+  for (const r of rows) {
+    if (r.childId && candidateSet.has(r.childId)) out.add(r.childId);
+  }
+  return out;
+}
 
-  const eligible: KidCard[] = all
-    .filter(r => r.id !== excludeRecordId)
-    .filter(r => !r.fields.ReservedForAuction)
-    .filter(r => !r.fields.DepartedAt)
-    .filter(r => isVisibleStatus(r.fields.Status))
-    .filter(r => typeof r.fields.ShirtNumber === 'number')
-    .filter(r => !!r.fields.ProfilePhoto?.[0]?.url)
-    .map(r => {
-      const completeness = profileCompleteness(r);
-      const f = r.fields;
-      return {
-        recordId: r.id,
-        shirtNumber: f.ShirtNumber as number,
-        firstName: f.FirstName || f.DisplayName?.split(' ')[0] || 'Child',
-        displayName: f.DisplayName || f.FirstName || 'Child',
-        gradeClass: f.GradeClass,
-        photoUrl: f.ProfilePhoto?.[0]?.url,
-        loves: f.Loves,
-        completenessScore: completeness,
-        hasSponsors: (f['Associated Sponsorships']?.length || 0) > 0,
-      } as KidCard;
-    })
+async function pickFeaturedKids(
+  excludeRecordId: string,
+  count: number = 4
+): Promise<KidCard[]> {
+  const all = await listAllChildren({ onlyWithPhoto: true });
+
+  const filtered = all
+    .filter(c => c.id !== excludeRecordId)
+    .filter(c => !c.reservedForAuction)
+    .filter(c => !c.departedAt)
+    .filter(c => typeof c.shirtNumber === 'number');
+
+  const sponsoredSet = await fetchKidsWithSponsors(filtered.map(c => c.id));
+
+  const eligible: KidCard[] = filtered
+    .map(c => ({
+      recordId: c.id,
+      shirtNumber: c.shirtNumber as number,
+      firstName: c.firstName || c.displayName?.split(' ')[0] || 'Child',
+      displayName: c.displayName || c.firstName || 'Child',
+      gradeClass: c.gradeClass ?? undefined,
+      photoUrl: c.profilePhotoUrl ?? undefined,
+      loves: c.loves ?? undefined,
+      completenessScore: profileCompleteness(c),
+      hasSponsors: sponsoredSet.has(c.id),
+    }))
     // Need at least 2 filled-out fields — otherwise the click is a dead end.
     .filter(k => k.completenessScore >= 2);
 
@@ -145,12 +117,16 @@ async function pickFeaturedKids(excludeRecordId: string, count: number = 4): Pro
 
   // Three buckets in preference order. Within each bucket, randomize so the
   // surfaced kids vary across page views.
-  const wellProfiledWithSponsors = eligible.filter(k => k.completenessScore >= 3 && k.hasSponsors);
-  const wellProfiledOrSponsored = eligible.filter(
-    k => k.completenessScore >= 3 || k.hasSponsors
-  ).filter(k => !wellProfiledWithSponsors.includes(k));
+  const wellProfiledWithSponsors = eligible.filter(
+    k => k.completenessScore >= 3 && k.hasSponsors
+  );
+  const wellProfiledOrSponsored = eligible
+    .filter(k => k.completenessScore >= 3 || k.hasSponsors)
+    .filter(k => !wellProfiledWithSponsors.includes(k));
   const restEligible = eligible.filter(
-    k => !wellProfiledWithSponsors.includes(k) && !wellProfiledOrSponsored.includes(k)
+    k =>
+      !wellProfiledWithSponsors.includes(k) &&
+      !wellProfiledOrSponsored.includes(k)
   );
 
   const ordered = [

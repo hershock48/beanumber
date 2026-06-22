@@ -3,16 +3,17 @@
  *
  * GET /api/cron/newsletter
  *
- * Runs once a day. Picks up every Newsletters record with Status=Scheduled
- * and SendDate <= now, and sends each one to all active sponsors.
+ * Runs once a day. Picks up every Newsletters row with status='Scheduled'
+ * and sendDate <= now, and sends each one through the campus newsletter
+ * tool to every active sponsor + emailable non-sponsor donor.
  *
  * Secured by the CRON_SECRET env var (passed as Bearer token by Vercel Cron
  * or as ?secret= for manual testing).
  *
  * To draft + schedule a newsletter:
- *   1. Open the Newsletters table in Airtable.
- *   2. Add a row with Title, Subject, BodyHTML, optional HeroPhoto.
- *   3. Set Status = Scheduled, SendDate = whenever you want it to go out (UTC).
+ *   1. Open the Newsletters admin page.
+ *   2. Add a row with title, subject, bodyHtml, optional heroPhotoUrl.
+ *   3. Set status='Scheduled', sendDate=whenever you want it to go out (UTC).
  *   4. Wait; the cron will send it within a day of that timestamp.
  *
  * To send immediately, use POST /api/admin/newsletter/send with { newsletterId }.
@@ -20,7 +21,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { logger } from '@/lib/logger';
-import { findNewslettersDueToSend } from '@/lib/airtable';
+import { findNewslettersDueToSend } from '@/lib/db/queries';
 import { sendCampusNewsletterTool } from '@/lib/tools/email';
 
 function validateCronAuth(request: NextRequest): boolean {
@@ -69,14 +70,14 @@ export async function GET(request: NextRequest) {
       error?: string;
     }> = [];
 
-    for (const record of due) {
-      const title = record.fields.Title || '(untitled)';
+    for (const row of due) {
+      const title = row.title || '(untitled)';
       const result = await sendCampusNewsletterTool({
-        newsletterId: record.id,
+        newsletterId: row.id,
       });
 
       results.push({
-        newsletterId: record.id,
+        newsletterId: row.id,
         title,
         success: result.success,
         sentCount: result.data?.sentCount || 0,
