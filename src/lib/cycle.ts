@@ -1,9 +1,9 @@
 /**
  * Cycle resolver — shirt # to kid record ID.
  *
- * Reads from the Airtable `Batches` table. Each batch defines a
- * block of shirt numbers + the locked roster snapshot that block
- * cycles through. The math inside a batch is:
+ * Reads from the Postgres `batches` table (formerly Airtable Batches).
+ * Each batch defines a block of shirt numbers + the locked roster
+ * snapshot that block cycles through. The math inside a batch is:
  *
  *     index = (shirtNumber - batch.start) mod batch.snapshot.length
  *     kid = batch.snapshot[index]
@@ -12,19 +12,13 @@
  * pool-funding rule (no per-kid sponsor counts in UI), the batch
  * lock invariant (mid-batch additions queue for next batch), and
  * the partner-org joining flow.
+ *
+ * The roster snapshot is stored as a newline-separated string of
+ * record IDs in the Airtable era; that format is preserved verbatim
+ * in Postgres so cycle math stays untouched during the cutover.
  */
 
-const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID || '';
-const AIRTABLE_API_KEY =
-  process.env.AIRTABLE_PAT || process.env.AIRTABLE_API_KEY || '';
-const BATCHES_TABLE = process.env.AIRTABLE_BATCHES_TABLE || 'Batches';
-
-function atHeaders() {
-  return {
-    Authorization: `Bearer ${AIRTABLE_API_KEY}`,
-    'Content-Type': 'application/json',
-  };
-}
+import { listBatches as listBatchesFromDb } from './db/queries';
 
 export interface BatchRecord {
   id: string;
@@ -46,50 +40,31 @@ function clearCache() {
 }
 export const __test_clearBatchCache = clearCache;
 
-/** List every batch from Airtable, sorted by StartShirtNumber. */
+/**
+ * List every batch from Postgres, sorted by startShirtNumber.
+ * Cached for 30 seconds per serverless instance because cycle math
+ * runs on every kid-page render and the underlying batches change
+ * rarely (multiple times per year, not per hour).
+ */
 export async function listBatches(): Promise<BatchRecord[]> {
   if (batchCache && Date.now() - batchCache.at < BATCH_TTL_MS) {
     return batchCache.batches;
   }
-  const out: BatchRecord[] = [];
-  let offset: string | undefined;
-  do {
-    const params = new URLSearchParams();
-    params.set('pageSize', '100');
-    if (offset) params.set('offset', offset);
-    const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(
-      BATCHES_TABLE
-    )}?${params.toString()}`;
-    const res = await fetch(url, { headers: atHeaders(), cache: 'no-store' });
-    if (!res.ok) {
-      throw new Error(`Batches fetch failed: ${res.status} ${await res.text()}`);
-    }
-    const data = await res.json();
-    for (const rec of (data.records || []) as Array<{
-      id: string;
-      fields: Record<string, unknown>;
-    }>) {
-      const f = rec.fields;
-      out.push({
-        id: rec.id,
-        name: (f.BatchName as string) || '(unnamed)',
-        startShirtNumber: (f.StartShirtNumber as number) || 0,
-        endShirtNumber: (f.EndShirtNumber as number) || 0,
-        snapshot: ((f.RosterSnapshot as string) || '')
-          .split(/\r?\n/)
-          .map(s => s.trim())
-          .filter(s => s.startsWith('rec')),
-        status:
-          typeof f.Status === 'string'
-            ? (f.Status as string)
-            : ((f.Status as { name?: string })?.name || ''),
-        openedAt: (f.OpenedAt as string) || null,
-        closedAt: (f.ClosedAt as string) || null,
-        notes: (f.Notes as string) || '',
-      });
-    }
-    offset = data.offset;
-  } while (offset);
+  const rows = await listBatchesFromDb();
+  const out: BatchRecord[] = rows.map(b => ({
+    id: b.id,
+    name: b.batchName || '(unnamed)',
+    startShirtNumber: b.startShirtNumber ?? 0,
+    endShirtNumber: b.endShirtNumber ?? 0,
+    snapshot: (b.rosterSnapshot || '')
+      .split(/\r?\n/)
+      .map(s => s.trim())
+      .filter(s => s.length > 0),
+    status: b.status ?? '',
+    openedAt: b.openedAt ? new Date(b.openedAt).toISOString() : null,
+    closedAt: b.closedAt ? new Date(b.closedAt).toISOString() : null,
+    notes: b.notes || '',
+  }));
   out.sort((a, b) => a.startShirtNumber - b.startShirtNumber);
   batchCache = { at: Date.now(), batches: out };
   return out;
@@ -134,9 +109,8 @@ export async function resolveShirtToKid(
 
 /**
  * For a given kid record ID, list every shirt number across every
- * batch that resolves to them. This is the per-kid "number
- * footprint" — answers Kevin's question "what numbers is this kid
- * the face of."
+ * batch that resolves to them. The per-kid "number footprint" —
+ * answers Kevin's question "what numbers is this kid the face of."
  */
 export function shirtNumbersForKid(
   childRecordId: string,
@@ -155,7 +129,6 @@ export function shirtNumbersForKid(
     if (positions.length === 0) continue;
     const total = b.endShirtNumber - b.startShirtNumber + 1;
     for (const p of positions) {
-      // Every shirt # in this batch where the cycle lands on p.
       for (let k = 0; k * b.snapshot.length + p < total; k++) {
         const shirtNumber = b.startShirtNumber + p + k * b.snapshot.length;
         if (shirtNumber > b.endShirtNumber) break;
@@ -172,12 +145,9 @@ export function shirtNumbersForKid(
 }
 
 /**
- * Compatibility shim — match the legacy `canonicalShirtNumber(n)`
- * function's output by resolving shirt N to a kid and returning that
- * kid's PRIMARY ShirtNumber. Used during the transition before all
- * call sites move off the old hardcoded math.
- *
- * Returns null when the resolved kid has no primary ShirtNumber set.
+ * Compatibility shim — resolves shirt N to a kid and returns that
+ * kid's PRIMARY ShirtNumber via the provided lookup callback.
+ * Returns null when the resolved kid has no primary ShirtNumber.
  */
 export async function canonicalShirtNumberFromBatches(
   shirtNumber: number,

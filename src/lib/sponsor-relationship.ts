@@ -1,26 +1,24 @@
 /**
  * Sponsor relationship detection — shared between /children/[N] and
- * /meet/[childId] so both surfaces can recognize signed-in sponsors
- * via the same code path.
+ * /meet/[childId] so both surfaces recognize signed-in sponsors via
+ * the same code path.
  *
- * Pulls the viewer&rsquo;s email from the sponsor_session cookie, then asks
- * Airtable: does an Active or Holder Sponsorship exist for this email
- * AND this kid? Uses the dual-OR formula (ChildID equality OR
- * FIND-on-Children-link with comma-bracketing) for robustness against
- * legacy rows where ChildID was left blank.
+ * The viewer's email comes from the sponsor_session cookie. The
+ * Postgres lookup matches on both the new child UUID and the legacy
+ * ChildID text column so this works during the transition window
+ * regardless of which join key the sponsorship row carries.
  *
- * Returns null when there&rsquo;s no signed-in viewer or no matching
+ * Returns null when there's no signed-in viewer or no matching
  * sponsorship, allowing the calling page to fall through to its
  * cold-visitor view.
  */
 
 import { cookies } from 'next/headers';
 import { SESSION } from '@/lib/constants';
-
-const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID || '';
-const AIRTABLE_API_KEY = process.env.AIRTABLE_API_KEY || '';
-const SPONSORSHIPS_TABLE =
-  process.env.AIRTABLE_SPONSORSHIPS_TABLE || 'Sponsorships';
+import {
+  getChildByChildId,
+  getViewerSponsorshipForChild as getViewerSponsorshipForChildFromDb,
+} from '@/lib/db/queries';
 
 export interface ViewerRelationship {
   /** 'sponsor' when Active + monthly > 0, 'holder' otherwise. */
@@ -34,7 +32,7 @@ export interface ViewerRelationship {
 }
 
 /**
- * Read the sponsor_session cookie and return the viewer&rsquo;s email
+ * Read the sponsor_session cookie and return the viewer's email
  * (lowercased, trimmed), or null if not signed in / cookie expired.
  */
 export async function getViewerEmail(): Promise<string | null> {
@@ -52,52 +50,40 @@ export async function getViewerEmail(): Promise<string | null> {
 }
 
 /**
- * Returns the viewer&rsquo;s sponsorship of the given kid, if any. Pass the
- * kid&rsquo;s ChildID (e.g., "HSP/BAN-002") so the formula matches against
- * both the denormalized text field and the Children linked-record
- * primary field via FIND.
+ * Returns the viewer's sponsorship of the given kid, if any.
+ *
+ * Accepts the kid's legacy ChildID (e.g. "HSP/BAN-002") so existing
+ * callers don't need to change. We resolve the kid record once
+ * here, then delegate to the typed queries.ts function which knows
+ * how to match against both UUID and legacy ID columns.
  */
 export async function getViewerSponsorshipForChild(
   childId: string
 ): Promise<ViewerRelationship | null> {
-  if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) return null;
   if (!childId) return null;
 
   const email = await getViewerEmail();
   if (!email) return null;
 
   try {
-    const safeEmail = email.toLowerCase().replace(/"/g, '\\"');
-    const safeChildId = childId.replace(/"/g, '\\"');
-    const formula = encodeURIComponent(
-      `AND(LOWER({SponsorEmail})="${safeEmail}", OR({Status}="Active",{Status}="Holder"), OR({ChildID}="${safeChildId}", FIND("," & "${safeChildId}" & ",", "," & ARRAYJOIN({Children}, ",") & ",")))`
-    );
-    const res = await fetch(
-      `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(
-        SPONSORSHIPS_TABLE
-      )}?filterByFormula=${formula}&maxRecords=1`,
-      {
-        headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` },
-        cache: 'no-store',
-      }
-    );
-    if (!res.ok) return null;
-    const data = await res.json();
-    const record = data.records?.[0];
-    if (!record) return null;
-    const f = record.fields || {};
-    const status = (f.Status as string) || '';
-    const amount = (f.MonthlyAmount as number) || 0;
-    const kind: 'sponsor' | 'holder' =
-      status === 'Active' && amount > 0 ? 'sponsor' : 'holder';
+    const child = await getChildByChildId(childId);
+    if (!child) return null;
+
+    const result = await getViewerSponsorshipForChildFromDb(email, {
+      id: child.id,
+      childId: child.childId,
+    });
+    if (!result) return null;
+
     return {
-      kind,
-      sponsorCode: (f.SponsorCode as string) || '',
-      monthlyAmount: amount,
-      startDate: f.SponsorshipStartDate as string | undefined,
-      childRevealedAt: f.ChildRevealedAt as string | undefined,
+      kind: result.kind,
+      sponsorCode: result.sponsorCode,
+      monthlyAmount: result.monthlyAmount,
+      startDate: result.sponsorshipStartDate ?? undefined,
+      childRevealedAt: result.childRevealedAt ?? undefined,
     };
-  } catch {
+  } catch (err) {
+    console.warn('[sponsor-relationship] lookup failed', err);
     return null;
   }
 }
