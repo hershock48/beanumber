@@ -1679,27 +1679,32 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
                  gate replaces it. */
               <>
                 <div className="bg-[#FFF8F0] border-2 border-[#D4A843] p-7 shadow-sm">
-                {viewerLooksLikeBuyer ? (
-                  <p
-                    className="text-2xl text-[#0d0d0d] mb-4"
-                    style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
-                  >
-                    Will you stay with {firstName}?
-                  </p>
-                ) : (
-                  <p
-                    className="text-2xl text-[#0d0d0d] mb-4"
-                    style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
-                  >
-                    Stay with {firstName}.
-                  </p>
-                )}
+                {/* Brand tagline — the two-trade line from the shirt insert,
+                    used everywhere it fits one line per the Jobs-filter
+                    launch spec (docs/claude/mystery_copy.md §0). */}
+                <p
+                  className="text-base text-[#0d0d0d] mb-4 italic text-center leading-snug"
+                  style={{ fontFamily: 'var(--font-lora), serif' }}
+                >
+                  The shirt is how you meet them. $25 a month is how you stay.
+                </p>
+
+                <p
+                  className="text-2xl text-[#0d0d0d] mb-4"
+                  style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
+                >
+                  You know {firstName} now. Stay in their life.
+                </p>
+
+                <p className="text-[#555] leading-relaxed mb-4">
+                  $25 a month covers {firstName}&rsquo;s school day: fees, lunch,
+                  the clinic when malaria hits.
+                </p>
 
                 <p className="text-[#555] leading-relaxed mb-5">
-                  Your $25/month supports the campus where {firstName} goes to school,
-                  eats morning porridge and a hot meal every day, gets care at the
-                  on-site medical center, and learns from teachers who know{' '}
-                  {firstName}&rsquo;s name.
+                  Stay, and you&rsquo;ll keep meeting them. The first letter from
+                  their teacher. A photo from the campus. The report card at the
+                  end of term. You don&rsquo;t get those any other way.
                 </p>
 
                 <div className="flex items-baseline gap-1 mb-4">

@@ -157,13 +157,13 @@ function HomePageInner() {
             className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl text-[#FFF8F0] mb-6 leading-tight tracking-tight"
             style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
           >
-            This Number has a Name.
+            One shirt. One kid.<br />
+            Open the bag to meet them.
           </h1>
           <div className="mb-10" />
-          <p className="text-lg md:text-xl text-[#FFF8F0]/70 mb-12 max-w-lg mx-auto leading-snug">
-            Every Shirt has a Number.<br />
-            Every Number is a Child.<br />
-            Find Yours.
+          <p className="text-lg md:text-xl text-[#FFF8F0]/80 mb-12 max-w-xl mx-auto leading-snug italic">
+            The shirt is how you meet them.<br />
+            $25 a month is how you stay.
           </p>
 
           {/* Welcome chip — appears only when the user has just

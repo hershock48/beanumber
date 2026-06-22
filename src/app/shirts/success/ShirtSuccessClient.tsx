@@ -149,16 +149,23 @@ function ShippingConfirmation({
         </p>
 
         <h1
-          className="text-3xl md:text-4xl text-[#0d0d0d] mb-4"
+          className="text-3xl md:text-4xl text-[#0d0d0d] mb-3"
           style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
         >
           {multi ? 'Your shirts are being made.' : 'Your shirt is being made.'}
         </h1>
 
-        <p className="text-lg text-[#555] leading-relaxed max-w-md mx-auto mb-4">
+        <p
+          className="text-lg text-[#0d0d0d] mb-5 italic max-w-md mx-auto leading-snug"
+          style={{ fontFamily: 'var(--font-lora), serif' }}
+        >
+          The shirt is how you meet them. $25 a month is how you stay.
+        </p>
+
+        <p className="text-base text-[#555] leading-relaxed max-w-md mx-auto mb-4">
           {multi
-            ? <>Expect them within 5&ndash;7 business days. When they arrive, look at the back of each shirt &mdash; there&rsquo;s a number pressed below the main design, and every number belongs to a real child at the campus in Northern Uganda.</>
-            : <>Expect it within 5&ndash;7 business days. When it arrives, look at the back of the shirt &mdash; there&rsquo;s a number pressed below the main design, and that number belongs to a real child at the campus in Northern Uganda.</>}
+            ? <>Expect them within 5&ndash;7 business days. When they arrive, open the bag, look at the back of each shirt &mdash; there&rsquo;s a number pressed below the main design, and every number belongs to a real kid at the campus in Northern Uganda. Neither of us knows which numbers you got. Enter each one at beanumber.org to meet them.</>
+            : <>Expect it within 5&ndash;7 business days. When it arrives, open the bag, find the number pressed on the back of the shirt, and look it up at beanumber.org. Neither of us knows what number you got until you do.</>}
         </p>
 
         <p className="text-[#777] leading-relaxed max-w-md mx-auto">

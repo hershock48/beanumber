@@ -145,24 +145,29 @@ function shirtNurtureEmail(
     : `${SITE_URL}/`;
 
   switch (stage) {
-    // ── Email 1: Did it arrive + how to claim (ship + 3 days) ─────────────
+    // ── Email 1: Your kid is waiting (ship + 3 days) ──────────────────────
+    // Jobs-filter rewrite per docs/claude/mystery_copy.md §0. The brand
+    // tagline ("The shirt is how you meet them. $25 a month is how you stay.")
+    // rides above the body as the architectural truth; the body itself names
+    // the IVE (a real kid in a real classroom right now) and the three-action
+    // close (open / find / meet). P.S. seeds the unboxing photo behavior and
+    // puts Simon's name on the campus side of the relationship.
     case 0:
       return {
-        subject: multi ? "Did your shirts arrive?" : "Did your shirt arrive?",
+        subject: "Your kid is waiting.",
         html: wrapEmail(`
-          <p style="margin-top: 0;">Hey ${firstName},</p>
+          <p style="margin-top: 0; font-style: italic; color: #0d0d0d; font-size: 17px; text-align: center; line-height: 1.5;">The shirt is how you meet them.<br>$25 a month is how you stay.</p>
+          <hr style="border: none; border-top: 1px solid #e8e0d4; margin: 24px 0;">
+          <p>Hey ${firstName},</p>
           ${multi
-            ? `<p>You ordered ${numbers.length} shirts and I wanted to check if they made it. I screen-print every one by hand, so they were made specifically for you.</p>
-               <p>When they arrive, flip each one over. Every shirt has a different number pressed below the main design, and every number belongs to a different kid at our campus in Northern Uganda. Enter each number at <a href="${SITE_URL}" style="color: #D4A843; font-weight: bold;">beanumber.org</a> to meet the kid behind it.</p>
-               <p>You&rsquo;ll have an option to claim each number as yours. When you do, that kid&rsquo;s page becomes your page. Updates from the campus, photos, letters &mdash; all of it comes back to that page. Your browser remembers you on this device, so there&rsquo;s no password to keep track of.</p>`
-            : `<p>I wanted to check in and see if your shirt made it. I screen-print every one by hand, so it was made specifically for you.</p>
-               <p>When it arrives, flip it over. There&rsquo;s a number pressed below the main design, and that number belongs to a real kid at our campus in Northern Uganda. Go to <a href="${SITE_URL}" style="color: #D4A843; font-weight: bold;">beanumber.org</a>, enter your number, and meet them.</p>
-               <p>You&rsquo;ll have an option to claim that number as yours. When you do, that kid&rsquo;s page becomes your page. Updates from the campus, photos, letters &mdash; all of it comes back to that page. Your browser remembers you on this device, so there&rsquo;s no password to keep track of.</p>`
+            ? `<p>Your shirts are in the mail. A real kid is on the other side of each number printed on them. Neither of us knows who yet. Open the bag. Find the numbers. Meet them at <a href="${SITE_URL}" style="color: #D4A843; font-weight: bold;">beanumber.org</a>.</p>`
+            : `<p>Your shirt&rsquo;s in the mail. A real kid is on the other side of the number printed on it. Neither of us knows who yet. Open the bag. Find the number. Meet them at <a href="${SITE_URL}" style="color: #D4A843; font-weight: bold;">beanumber.org</a>.</p>`
           }
-          <p style="text-align: center; margin: 24px 0;">
+          <p style="text-align: center; margin: 28px 0;">
             <a href="${SITE_URL}" style="display: inline-block; background: #D4A843; color: #0d0d0d; font-weight: bold; text-decoration: none; padding: 14px 32px; font-size: 15px; letter-spacing: 0.05em;">ENTER YOUR ${multi ? 'NUMBERS' : 'NUMBER'}</a>
           </p>
           <p>Kevin</p>
+          <p style="color: #777; font-size: 14px; margin-top: 24px;">P.S. When you open it, take a picture. We send those to Simon at the campus, and the kids see who&rsquo;s wearing their number.</p>
         `),
       };
 

@@ -705,12 +705,18 @@ export default function ShirtsPageContent() {
           >
             Pick a Color.<br />
             Get a Number.<br />
-            Meet a Child.
+            Meet a Kid.
           </h1>
+          <p
+            className="text-xl text-[#0d0d0d] mt-2 mb-6 italic max-w-xl mx-auto leading-snug"
+            style={{ fontFamily: 'var(--font-lora), serif' }}
+          >
+            The shirt is how you meet them. $25 a month is how you stay.
+          </p>
           <p className="text-lg text-[#777] max-w-xl mx-auto leading-relaxed">
             Heavyweight cotton, screen-printed, handmade to order. Every
             Shirt ships with a unique Number pressed on the back &mdash;
-            and that Number is matched to a real Child at the campus
+            and that Number is matched to a real Kid at the campus
             in Northern Uganda.
           </p>
         </div>
