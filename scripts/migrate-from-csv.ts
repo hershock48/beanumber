@@ -55,6 +55,16 @@ import * as schema from '../src/lib/db/schema';
 const EXPORT_DIR = path.resolve(process.cwd(), 'airtable-export');
 const DRY_RUN = process.argv.includes('--dry-run');
 
+/**
+ * Optional --tables=a,b,c filter so we can run the migration in
+ * chunks small enough to fit within sandbox bash time budgets.
+ * Names match the migrator-function suffix (children, donors, etc.).
+ */
+const TABLES_ARG = process.argv.find(a => a.startsWith('--tables='));
+const ONLY_TABLES = TABLES_ARG
+  ? new Set(TABLES_ARG.slice('--tables='.length).split(','))
+  : null;
+
 const SUPABASE_URL = process.env.SUPABASE_URL || '';
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
@@ -132,26 +142,41 @@ function parseDate(v: string | undefined): string | undefined {
 }
 
 /**
- * Normalize a datetime string to ISO. US format like "5/14/2026 08:08"
- * is converted; ISO passes through unchanged.
+ * Normalize a datetime and return a Date object — required because
+ * Drizzle&rsquo;s timestamp columns call `.toISOString()` on the value at
+ * query-build time. Strings would crash.
+ *
+ * Accepts ISO ("2026-05-14T08:08", "2026-05-14 08:08"), US
+ * ("5/14/2026 08:08", "5/14/2026"), or plain date.
  */
-function parseDateTime(v: string | undefined): string | undefined {
+function parseDateTime(v: string | undefined): Date | undefined {
   if (!v) return undefined;
   const trimmed = v.trim();
   if (!trimmed) return undefined;
-  // Already ISO (with or without T separator and timezone).
-  if (/^\d{4}-\d{2}-\d{2}/.test(trimmed)) return trimmed;
+
+  // ISO with T or space separator.
+  if (/^\d{4}-\d{2}-\d{2}/.test(trimmed)) {
+    const iso = trimmed.includes('T') ? trimmed : trimmed.replace(' ', 'T');
+    const d = new Date(iso);
+    return isNaN(d.getTime()) ? undefined : d;
+  }
+
   // US format with optional time: M/D/YYYY [HH:MM]
   const m = trimmed.match(
     /^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2}))?$/
   );
   if (m) {
     const [, mo, d, y, hh, mm] = m;
-    const date = `${y}-${mo.padStart(2, '0')}-${d.padStart(2, '0')}`;
-    if (hh && mm) return `${date}T${hh.padStart(2, '0')}:${mm}:00`;
-    return date;
+    const iso = `${y}-${mo.padStart(2, '0')}-${d.padStart(2, '0')}${
+      hh && mm ? `T${hh.padStart(2, '0')}:${mm}:00` : 'T00:00:00'
+    }`;
+    const dt = new Date(iso);
+    return isNaN(dt.getTime()) ? undefined : dt;
   }
-  return trimmed;
+
+  // Last resort — let Date attempt.
+  const fallback = new Date(trimmed);
+  return isNaN(fallback.getTime()) ? undefined : fallback;
 }
 
 function parseNumeric(v: string | undefined): string | undefined {
@@ -366,6 +391,33 @@ async function alreadyMigrated(
   return existing.length > 0;
 }
 
+/**
+ * Tiny concurrency limiter — runs N tasks in parallel, queues the
+ * rest. No external dependency. Used to parallelize photo downloads
+ * so children/newsletters migrations fit in a single sandbox bash call.
+ */
+async function mapConcurrent<T, R>(
+  items: T[],
+  concurrency: number,
+  fn: (item: T, idx: number) => Promise<R>
+): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let cursor = 0;
+  async function worker() {
+    while (true) {
+      const i = cursor++;
+      if (i >= items.length) return;
+      results[i] = await fn(items[i], i);
+    }
+  }
+  const workers = Array.from(
+    { length: Math.min(concurrency, items.length) },
+    () => worker()
+  );
+  await Promise.all(workers);
+  return results;
+}
+
 // ─── Per-table migrators ─────────────────────────────────────────
 
 /**
@@ -379,43 +431,52 @@ async function alreadyMigrated(
 async function migrateChildren(): Promise<number> {
   console.log('\n→ children');
   const rows = readCsv('children.csv');
-  let inserted = 0;
 
+  // Phase 1: filter to rows that need migration.
+  type Task = {
+    row: Record<string, string>;
+    childId: string;
+    airtableId: string;
+  };
+  const tasks: Task[] = [];
   for (const row of rows) {
     const airtableId = row['Airtable Record ID'] || row['__airtable_id'] || '';
-    // CSV exports don&rsquo;t always include the record ID column unless
-    // you have it as a visible field in the view. Many fields use
-    // ChildID as the natural key — sufficient for de-dup.
     const childId = row['ChildID'] || '';
     if (!childId) continue;
-
-    // Idempotency: check id_mapping if we have an airtable_id; else
-    // check by child_id natural key.
-    if (airtableId && (await alreadyMigrated('children', airtableId))) {
-      continue;
-    }
+    if (airtableId && (await alreadyMigrated('children', airtableId))) continue;
     if (!airtableId) {
       const existing = await db
-        .select()
+        .select({ id: schema.children.id })
         .from(schema.children)
         .where(eq(schema.children.childId, childId))
         .limit(1);
       if (existing.length > 0) continue;
     }
+    tasks.push({ row, childId, airtableId });
+  }
+  console.log(`  ${tasks.length} new rows; downloading photos in parallel...`);
 
-    // Photo migration: parse attachment JSON, download, re-upload.
-    let photoUrl: string | undefined;
+  // Phase 2: download photos with concurrency=15. Bottleneck moves
+  // from network-roundtrip × N to network-roundtrip × (N / 15).
+  const photoUrls = await mapConcurrent(tasks, 15, async ({ row, childId }) => {
     const attachments = parseAttachments(row['ProfilePhoto']);
-    if (attachments[0]) {
-      photoUrl = DRY_RUN
-        ? attachments[0].url
-        : await migrateAttachment(
-            'children-photos',
-            childId.replace(/[^a-zA-Z0-9]/g, '_'),
-            attachments[0].url,
-            attachments[0].filename
-          );
-    }
+    if (!attachments[0]) return null;
+    if (DRY_RUN) return attachments[0].url;
+    const url = await migrateAttachment(
+      'children-photos',
+      childId.replace(/[^a-zA-Z0-9]/g, '_'),
+      attachments[0].url,
+      attachments[0].filename
+    );
+    return url ?? null;
+  });
+
+  // Phase 3: insert sequentially (DB is fast; serial preserves
+  // ordering for id_mapping audit trail).
+  let inserted = 0;
+  for (let i = 0; i < tasks.length; i++) {
+    const { row, childId, airtableId } = tasks[i];
+    const photoUrl = photoUrls[i];
 
     const insertData: schema.NewChild = {
       airtableId: airtableId || null,
@@ -440,17 +501,13 @@ async function migrateChildren(): Promise<number> {
       teacherName: row['TeacherName'] || null,
       teacherQuote: row['TeacherQuote'] || null,
       nameMeaning: row['NameMeaning'] || null,
-      shirtAssignedAt: parseDateTime(row['ShirtAssignedAt']) as
-        | Date
-        | undefined as Date | null,
+      shirtAssignedAt: parseDateTime(row['ShirtAssignedAt']) ?? null,
       shirtBuyerEmail: row['ShirtBuyerEmail'] || null,
       shirtBuyerName: row['ShirtBuyerName'] || null,
       reservedForAuction: parseBool(row['ReservedForAuction']) ?? false,
-      departureRequestedAt: parseDateTime(row['DepartureRequestedAt']) as
-        | Date
-        | null,
+      departureRequestedAt: parseDateTime(row['DepartureRequestedAt']) ?? null,
       departureRequestedNote: row['DepartureRequestedNote'] || null,
-      departedAt: parseDateTime(row['DepartedAt']) as Date | null,
+      departedAt: parseDateTime(row['DepartedAt']) ?? null,
       departureNote: row['DepartureNote'] || null,
       studentOfMonth: parseBool(row['StudentOfMonth']) ?? false,
       studentOfMonthReason: row['StudentOfMonthReason'] || null,
@@ -459,13 +516,19 @@ async function migrateChildren(): Promise<number> {
     if (DRY_RUN) {
       console.log(`  + ${childId} (${row['FirstName']})`);
     } else {
-      const [out] = await db
+      // ON CONFLICT DO NOTHING handles within-CSV duplicates (the
+      // export occasionally has a ChildID twice; we treat the first
+      // win and skip subsequent inserts silently).
+      const out = await db
         .insert(schema.children)
         .values(insertData)
+        .onConflictDoNothing({ target: schema.children.childId })
         .returning({ id: schema.children.id });
-      if (airtableId && out) await recordMapping('children', airtableId, out.id);
+      if (out[0]) {
+        if (airtableId) await recordMapping('children', airtableId, out[0].id);
+        inserted++;
+      }
     }
-    inserted++;
   }
   console.log(`  ${inserted} inserted`);
   return inserted;
@@ -649,16 +712,16 @@ async function migrateSponsorships(): Promise<number> {
       sponsorshipStartDate: parseDate(row['SponsorshipStartDate']) || null,
       monthlyAmount: parseNumeric(row['MonthlyAmount']) ?? '25.00',
       stripeSubscriptionId: row['StripeSubscriptionID'] || null,
-      childRevealedAt: parseDateTime(row['ChildRevealedAt']) as Date | null,
+      childRevealedAt: parseDateTime(row['ChildRevealedAt']) ?? null,
       requestedBySponsor: parseBool(row['RequestedBySponsor']) ?? false,
-      requestedAt: parseDateTime(row['RequestedAt']) as Date | null,
-      lastRequestAt: parseDateTime(row['LastRequestAt']) as Date | null,
+      requestedAt: parseDateTime(row['RequestedAt']) ?? null,
+      lastRequestAt: parseDateTime(row['LastRequestAt']) ?? null,
       nextRequestEligibleAt: parseDateTime(
         row['NextRequestEligibleAt']
-      ) as Date | null,
-      publishedAt: parseDateTime(row['PublishedAt']) as Date | null,
+      ) ?? null,
+      publishedAt: parseDateTime(row['PublishedAt']) ?? null,
       previousChildIds: row['PreviousChildIDs'] || null,
-      lastReassignedAt: parseDateTime(row['LastReassignedAt']) as Date | null,
+      lastReassignedAt: parseDateTime(row['LastReassignedAt']) ?? null,
     };
 
     if (DRY_RUN) {
@@ -744,18 +807,18 @@ async function migrateChildUpdates(): Promise<number> {
       photo3FileId: row['Photo3FileID'] || null,
       handwrittenNoteFileId: row['HandwrittenNoteFileID'] || null,
       reportCardFileId: row['ReportCardFileID'] || null,
-      submittedAt: parseDateTime(row['SubmittedAt']) as Date | null,
+      submittedAt: parseDateTime(row['SubmittedAt']) ?? null,
       submittedBy: row['SubmittedBy'] || null,
       reviewedBy: row['ReviewedBy'] || null,
-      reviewedAt: parseDateTime(row['ReviewedAt']) as Date | null,
+      reviewedAt: parseDateTime(row['ReviewedAt']) ?? null,
       rejectionReason: row['RejectionReason'] || null,
       correctionNotes: row['CorrectionNotes'] || null,
       sourceType: row['SourceType'] || null,
       period: row['Period'] || null,
       academicTerm: row['AcademicTerm'] || null,
       requestedBySponsor: parseBool(row['RequestedBySponsor']) ?? false,
-      requestedAt: parseDateTime(row['RequestedAt']) as Date | null,
-      publishedAt: parseDateTime(row['PublishedAt']) as Date | null,
+      requestedAt: parseDateTime(row['RequestedAt']) ?? null,
+      publishedAt: parseDateTime(row['PublishedAt']) ?? null,
       author: row['Author'] || null,
       lastModified: parseDate(row['LastModified']) || null,
     };
@@ -807,8 +870,8 @@ async function migrateNewsletters(): Promise<number> {
       bodyHtml: row['BodyHTML'] || null,
       heroPhotoUrl: heroUrl || null,
       status: row['Status'] || 'Draft',
-      sendDate: parseDateTime(row['SendDate']) as Date | null,
-      publishedAt: parseDateTime(row['PublishedAt']) as Date | null,
+      sendDate: parseDateTime(row['SendDate']) ?? null,
+      publishedAt: parseDateTime(row['PublishedAt']) ?? null,
       recipientCount: parseInt32(row['RecipientCount']),
       sentCount: parseInt32(row['SentCount']),
       failedCount: parseInt32(row['FailedCount']),
@@ -998,9 +1061,9 @@ async function migrateScheduledPosts(): Promise<number> {
       contentType: row['ContentType'] || null,
       caption: row['Caption'] || null,
       hashtags: row['Hashtags'] || null,
-      scheduledAt: parseDateTime(row['ScheduledAt']) as Date | null,
+      scheduledAt: parseDateTime(row['ScheduledAt']) ?? null,
       status: row['Status'] || 'Pending',
-      publishedAt: parseDateTime(row['PublishedAt']) as Date | null,
+      publishedAt: parseDateTime(row['PublishedAt']) ?? null,
       mediaDriveId: row['MediaDriveId'] || null,
       mediaUrl: row['MediaUrl'] || null,
       instagramPostId: row['InstagramPostId'] || null,
@@ -1093,8 +1156,8 @@ async function migrateBatches(): Promise<number> {
       endShirtNumber: parseInt32(row['EndShirtNumber']) ?? 0,
       rosterSnapshot: row['RosterSnapshot'] || null,
       status: row['Status'] || 'Planned',
-      openedAt: parseDateTime(row['OpenedAt']) as Date | null,
-      closedAt: parseDateTime(row['ClosedAt']) as Date | null,
+      openedAt: parseDateTime(row['OpenedAt']) ?? null,
+      closedAt: parseDateTime(row['ClosedAt']) ?? null,
       notes: row['Notes'] || null,
     };
 
@@ -1146,6 +1209,27 @@ async function runMigration() {
 
   let total = 0;
   for (const migrator of MIGRATION_ORDER) {
+    // --tables=X filter: skip any migrator whose name suffix isn&rsquo;t
+    // in the allowed set. Allows chunking a long migration into
+    // multiple sandbox bash calls.
+    if (ONLY_TABLES) {
+      const name = migrator.name.replace(/^migrate/, '').toLowerCase();
+      const aliases: Record<string, string[]> = {
+        children: ['children'],
+        donors: ['donors'],
+        newsletters: ['newsletters'],
+        batches: ['batches'],
+        fulfillments: ['fulfillments', 'fulfillment'],
+        subscriptions: ['subscriptions'],
+        donations: ['donations'],
+        sponsorships: ['sponsorships'],
+        childupdates: ['child_updates', 'childupdates'],
+        communications: ['communications'],
+        scheduledposts: ['scheduled_posts', 'scheduledposts'],
+      };
+      const accepted = aliases[name] || [name];
+      if (!accepted.some(a => ONLY_TABLES.has(a))) continue;
+    }
     try {
       const n = await migrator();
       total += n;
