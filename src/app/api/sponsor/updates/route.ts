@@ -1,22 +1,39 @@
+/**
+ * GET /api/sponsor/updates?sponsorCode=BAN-YYYY-NNN
+ *
+ * The sponsor portal data hook. Returns:
+ *   - childInfo:           kid card data (only present when reveal has fired).
+ *   - childRevealed:       boolean reveal gate.
+ *   - revealedAt:          ISO timestamp the reveal fired.
+ *   - sponsorship:         stats block (startDate, monthsActive, status,
+ *                          monthlyAmount). Used for impact math.
+ *   - updates:             published, sponsor-visible child_updates rows
+ *                          for this kid, newest first.
+ *   - sponsorMessages:     every Sponsor Message this sponsor has sent
+ *                          (source: communications table).
+ *   - nextRequestEligibleAt: throttle date for the next update request.
+ *
+ * Auth: sponsor_session cookie must match sponsorCode.
+ * Reveal gate: childInfo + updates + sponsorMessages all stay null/[]
+ * until `childRevealedAt` is set on the Sponsorship row. The Stripe
+ * webhook (and the magic-link callback for Holder claims) flip this.
+ *
+ * Data source: Postgres only. Airtable is no longer involved.
+ */
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-
-const AIRTABLE_API_KEY = process.env.AIRTABLE_API_KEY;
-const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID;
-const AIRTABLE_SPONSORSHIPS_TABLE = process.env.AIRTABLE_SPONSORSHIPS_TABLE || 'Sponsorships';
-// Use table ID directly — the env var AIRTABLE_UPDATES_TABLE was set to 'Updates'
-// but the table was renamed to 'Child Updates'. IDs never change.
-const AIRTABLE_UPDATES_TABLE = 'tblrmtVBVzL7zCQDE';
-const AIRTABLE_CHILDREN_TABLE = process.env.AIRTABLE_CHILDREN_TABLE || 'Children';
-
-const headers = () => ({
-  Authorization: `Bearer ${AIRTABLE_API_KEY}`,
-  'Content-Type': 'application/json',
-});
+import { SESSION } from '@/lib/constants';
+import {
+  getChildByChildId,
+  getChildByRecordId,
+  getPublishedUpdatesForChild,
+  getSponsorMessagesByCode,
+  getSponsorshipBySponsorCode,
+} from '@/lib/db/queries';
 
 async function verifySession(sponsorCode: string): Promise<boolean> {
   const cookieStore = await cookies();
-  const sessionCookie = cookieStore.get('sponsor_session');
+  const sessionCookie = cookieStore.get(SESSION.COOKIE_NAME);
 
   if (!sessionCookie) return false;
 
@@ -48,166 +65,150 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) {
-      throw new Error('Airtable credentials not configured');
-    }
-
     // ---------------------------------------------------------------
-    // 1. Sponsorship record — parse ONCE.
+    // 1. Sponsorship row.
     // ---------------------------------------------------------------
-    const sponsorshipFormula = `{SponsorCode} = "${sponsorCode}"`;
-    const sponsorshipRes = await fetch(
-      `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_SPONSORSHIPS_TABLE}?filterByFormula=${encodeURIComponent(sponsorshipFormula)}&maxRecords=1`,
-      { headers: headers() }
-    );
+    const sponsorship = await getSponsorshipBySponsorCode(sponsorCode);
 
     let childInfo: any = null;
-    let childID: string | null = null;
     let childRevealed = false;
     let revealedAt: string | null = null;
     let nextRequestEligibleAt: string | null = null;
-    let sponsorship: {
+    let sponsorshipStats: {
       startDate: string | null;
       totalPaid: number;
       monthlyAmount: number;
       monthsActive: number;
       status: string | null;
-    } = { startDate: null, totalPaid: 0, monthlyAmount: 25, monthsActive: 0, status: null };
+    } = {
+      startDate: null,
+      totalPaid: 0,
+      monthlyAmount: 25,
+      monthsActive: 0,
+      status: null,
+    };
 
-    if (sponsorshipRes.ok) {
-      const sponsorshipData = await sponsorshipRes.json();
-      const record = sponsorshipData.records?.[0];
-      if (record) {
-        const f = record.fields;
-        childID = f['ChildID'] || null;
-        revealedAt = f['ChildRevealedAt'] || null;
-        childRevealed = !!revealedAt;
-        nextRequestEligibleAt = f['NextRequestEligibleAt'] || null;
+    let updates: any[] = [];
+    let sponsorMessages: any[] = [];
 
-        // Sponsorship stats for impact math
-        const startDate = f['Started'] || f['SponsorshipStartDate'] || null;
-        const totalPaid = typeof f['Total Paid'] === 'number' ? f['Total Paid'] : 0;
-        const monthlyAmount = typeof f['Monthly Amount'] === 'number' ? f['Monthly Amount'] : 25;
+    if (sponsorship) {
+      revealedAt = sponsorship.childRevealedAt
+        ? new Date(sponsorship.childRevealedAt).toISOString()
+        : null;
+      childRevealed = !!revealedAt;
+      nextRequestEligibleAt = sponsorship.nextRequestEligibleAt
+        ? new Date(sponsorship.nextRequestEligibleAt).toISOString()
+        : null;
 
-        let monthsActive = 0;
-        if (startDate) {
-          const start = new Date(startDate);
-          const now = new Date();
-          monthsActive = Math.max(0,
-            (now.getFullYear() - start.getFullYear()) * 12 +
+      const startDate = sponsorship.sponsorshipStartDate || null;
+      const monthlyAmount = Number(sponsorship.monthlyAmount ?? 25);
+
+      let monthsActive = 0;
+      if (startDate) {
+        const start = new Date(startDate);
+        const now = new Date();
+        monthsActive = Math.max(
+          0,
+          (now.getFullYear() - start.getFullYear()) * 12 +
             (now.getMonth() - start.getMonth()) +
             (now.getDate() >= start.getDate() ? 0 : -1)
-          );
-          // At minimum 1 month if they've started
-          if (monthsActive === 0 && now >= start) monthsActive = 1;
-        }
-
-        const status = (f['Status'] as string | undefined) || null;
-        sponsorship = { startDate, totalPaid, monthlyAmount, monthsActive, status };
-
-        // Build child info only when revealed
-        if (childRevealed) {
-          childInfo = {
-            name: f['ChildDisplayName'] || '',
-            firstName: undefined as string | undefined,
-            photo: f['ChildPhoto']?.[0]?.url || undefined,
-            age: f['ChildAge'] || undefined,
-            location: f['ChildLocation'] || undefined,
-            sponsorshipStartDate: startDate || undefined,
-            birthday: undefined as string | undefined,
-            homeVillage: undefined as string | undefined,
-            familyContext: undefined as string | undefined,
-            loves: undefined as string | undefined,
-            childQuote: undefined as string | undefined,
-            teacherName: undefined as string | undefined,
-            teacherQuote: undefined as string | undefined,
-            notes: undefined as string | undefined,
-          };
-
-          // Children record — pull structured intake + birthday
-          if (childID) {
-            try {
-              const childFormula = `{ChildID} = "${childID}"`;
-              const childRes = await fetch(
-                `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_CHILDREN_TABLE}?filterByFormula=${encodeURIComponent(childFormula)}&maxRecords=1`,
-                { headers: headers() }
-              );
-              if (childRes.ok) {
-                const childFields = (await childRes.json()).records?.[0]?.fields;
-                if (childFields) {
-                  childInfo.firstName = childFields['FirstName'] || undefined;
-                  childInfo.birthday = childFields['Birthday'] || undefined;
-                  childInfo.homeVillage = childFields['HomeVillage'] || undefined;
-                  childInfo.familyContext = childFields['FamilyContext'] || undefined;
-                  childInfo.loves = childFields['Loves'] || undefined;
-                  childInfo.childQuote = childFields['ChildQuote'] || undefined;
-                  childInfo.teacherName = childFields['TeacherName'] || undefined;
-                  childInfo.teacherQuote = childFields['TeacherQuote'] || undefined;
-                  childInfo.notes = childFields['Notes'] || undefined;
-                  // Shop Your Number (memo §5) needs the shirt number on the
-                  // sponsor's matched child so the portal can carry it
-                  // forward to repeat orders.
-                  const shirtNum = childFields['ShirtNumber'];
-                  childInfo.shirtNumber = typeof shirtNum === 'number' ? shirtNum : null;
-                }
-              }
-            } catch (err) {
-              console.warn('[Sponsor Updates] Children lookup failed', err);
-            }
-          }
-        }
+        );
+        // At minimum 1 month if they&rsquo;ve started.
+        if (monthsActive === 0 && now >= start) monthsActive = 1;
       }
-    }
 
-    // ---------------------------------------------------------------
-    // 2. Published updates from YDO (gated on reveal)
-    // ---------------------------------------------------------------
-    let updates: any[] = [];
-    if (childID && childRevealed) {
-      const updatesFormula = `AND({ChildID} = "${childID}", {VisibleToSponsor} = TRUE(), {Status} = "Published")`;
-      const updatesRes = await fetch(
-        `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_UPDATES_TABLE}?filterByFormula=${encodeURIComponent(updatesFormula)}&sort[0][field]=PublishedAt&sort[0][direction]=desc`,
-        { headers: headers() }
-      );
+      sponsorshipStats = {
+        startDate,
+        // Total Paid was an Airtable rollup; we don't have a Postgres
+        // equivalent denormalized on the Sponsorship row. The portal
+        // computes it from monthsActive * monthlyAmount.
+        totalPaid: monthsActive * monthlyAmount,
+        monthlyAmount,
+        monthsActive,
+        status: sponsorship.status ?? null,
+      };
 
-      if (updatesRes.ok) {
-        const updatesData = await updatesRes.json();
-        updates = (updatesData.records || []).map((record: any) => {
-          const f = record.fields;
-          return {
-            id: record.id,
-            date: f['PublishedAt'] || f['RequestedAt'] || '',
-            type: f['UpdateType'] || 'Progress Report',
-            title: f['Title'] || '',
-            content: f['Content'] || '',
-            photos: (f['Photos'] || []).map((photo: any) => photo.url),
-          };
-        });
+      // -------------------------------------------------------------
+      // 2. Resolve the kid (UUID FK first, legacy ChildID fallback).
+      // -------------------------------------------------------------
+      let child = sponsorship.childId
+        ? await getChildByRecordId(sponsorship.childId)
+        : null;
+      if (!child && sponsorship.childIdLegacy) {
+        child = await getChildByChildId(sponsorship.childIdLegacy);
       }
-    }
 
-    // ---------------------------------------------------------------
-    // 3. Sponsor messages (so the timeline shows both sides)
-    // ---------------------------------------------------------------
-    let sponsorMessages: any[] = [];
-    if (childRevealed) {
-      const msgFormula = `AND({SponsorCode} = "${sponsorCode}", {UpdateType} = "Sponsor Message")`;
-      const msgRes = await fetch(
-        `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_UPDATES_TABLE}?filterByFormula=${encodeURIComponent(msgFormula)}&sort[0][field]=RequestedAt&sort[0][direction]=desc`,
-        { headers: headers() }
-      );
+      if (childRevealed && child) {
+        childInfo = {
+          name:
+            sponsorship.childDisplayName ||
+            child.displayName ||
+            child.firstName ||
+            '',
+          firstName: child.firstName || undefined,
+          photo: child.profilePhotoUrl || undefined,
+          age: sponsorship.childAge || undefined,
+          location: sponsorship.childLocation || undefined,
+          sponsorshipStartDate: startDate || undefined,
+          birthday: child.dateOfBirth || undefined,
+          homeVillage: child.homeVillage || undefined,
+          familyContext: child.familyContext || undefined,
+          loves: child.loves || undefined,
+          childQuote: child.childQuote || undefined,
+          teacherName: child.teacherName || undefined,
+          teacherQuote: child.teacherQuote || undefined,
+          notes: child.notes || undefined,
+          // Shop Your Number (memo §5) needs the shirt number on the
+          // sponsor's matched child so the portal can carry it forward
+          // to repeat orders.
+          shirtNumber:
+            typeof child.shirtNumber === 'number' ? child.shirtNumber : null,
+        };
 
-      if (msgRes.ok) {
-        const msgData = await msgRes.json();
-        sponsorMessages = (msgData.records || []).map((record: any) => {
-          const f = record.fields;
-          return {
-            id: record.id,
-            date: f['RequestedAt'] || '',
-            content: f['Content'] || '',
-            status: f['Status'] || 'Pending Review',
-          };
+        // -----------------------------------------------------------
+        // 3. Published updates for this kid (reveal-gated).
+        // -----------------------------------------------------------
+        const updateRows = await getPublishedUpdatesForChild({
+          id: child.id,
+          childId: child.childId || sponsorship.childIdLegacy || '',
         });
+        updates = updateRows.map(row => ({
+          id: row.id,
+          date: row.publishedAt
+            ? new Date(row.publishedAt).toISOString()
+            : row.requestedAt
+              ? new Date(row.requestedAt).toISOString()
+              : '',
+          type: row.updateType || 'Progress Report',
+          title: row.title || '',
+          content: row.content || row.summary || '',
+          photos: Array.isArray(row.photoUrls) ? row.photoUrls : [],
+        }));
+      }
+
+      // -------------------------------------------------------------
+      // 4. Sponsor messages (reveal-gated &mdash; matches old behavior).
+      //    Source moved from Child Updates to Communications table per
+      //    Postgres migration.
+      // -------------------------------------------------------------
+      if (childRevealed) {
+        const msgRows = await getSponsorMessagesByCode(sponsorCode);
+        sponsorMessages = msgRows.map(row => ({
+          id: row.id,
+          date: row.createdAt
+            ? new Date(row.createdAt).toISOString()
+            : row.sendDate
+              ? new Date(row.sendDate).toISOString()
+              : '',
+          // The subject is `[sponsorCode] <preview>` &mdash; strip the
+          // bracketed prefix for display so the UI shows the message
+          // body, not the routing tag.
+          content: (row.subject || '').replace(
+            new RegExp(`^\\[${sponsorCode}\\]\\s*`),
+            ''
+          ),
+          status: row.status || 'Sent',
+        }));
       }
     }
 
@@ -217,7 +218,7 @@ export async function GET(request: NextRequest) {
       childInfo,
       childRevealed,
       revealedAt,
-      sponsorship,
+      sponsorship: sponsorshipStats,
       nextRequestEligibleAt,
     });
   } catch (error: any) {

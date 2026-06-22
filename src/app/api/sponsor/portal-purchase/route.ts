@@ -1,5 +1,5 @@
 /**
- * Sponsor portal — "Shop Your Number" repeat purchase (memo §5).
+ * Sponsor portal &mdash; "Shop Your Number" repeat purchase (memo §5).
  *
  * Active sponsors can order additional shirts that carry their existing
  * shirt number, not a newly-assigned one. This endpoint creates a
@@ -10,18 +10,24 @@
  *
  * Auth: sponsor session cookie (same as /api/sponsor/updates).
  * Gating: sponsorship must be Active (anything else 403s). This makes
- * Shop Your Number a quiet retention lever — lapsed sponsors keep
+ * Shop Your Number a quiet retention lever &mdash; lapsed sponsors keep
  * their relationship but lose the order surface, per memo §7.
+ *
+ * Data layer: all reads go through src/lib/db/queries.ts (Postgres via
+ * Drizzle). The Donation row for this purchase is created by the Stripe
+ * webhook on `checkout.session.completed`, NOT here &mdash; this endpoint
+ * is purely a checkout-session factory.
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { z } from 'zod';
-
-const AIRTABLE_API_KEY = process.env.AIRTABLE_API_KEY;
-const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID;
-const AIRTABLE_SPONSORSHIPS_TABLE = process.env.AIRTABLE_SPONSORSHIPS_TABLE || 'Sponsorships';
-const AIRTABLE_CHILDREN_TABLE = process.env.AIRTABLE_CHILDREN_TABLE || 'Children';
-const AIRTABLE_DONORS_TABLE = process.env.AIRTABLE_DONORS_TABLE || 'Donors';
+import { SESSION } from '@/lib/constants';
+import {
+  getChildByChildId,
+  getChildByRecordId,
+  getDonorByEmail,
+  getSponsorshipBySponsorCode,
+} from '@/lib/db/queries';
 
 const SHIRTS: Record<string, { name: string }> = {
   onyx: { name: 'Onyx' },
@@ -39,14 +45,9 @@ const purchaseSchema = z.object({
   color: z.enum(['Onyx', 'Meadow', 'Blossom', 'Sky']),
 });
 
-const atHeaders = () => ({
-  Authorization: `Bearer ${AIRTABLE_API_KEY}`,
-  'Content-Type': 'application/json',
-});
-
 async function verifySession(sponsorCode: string): Promise<boolean> {
   const cookieStore = await cookies();
-  const sessionCookie = cookieStore.get('sponsor_session');
+  const sessionCookie = cookieStore.get(SESSION.COOKIE_NAME);
   if (!sessionCookie) return false;
   try {
     const session = JSON.parse(sessionCookie.value);
@@ -82,30 +83,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) {
-      console.error('[Portal Purchase] Airtable credentials missing');
-      return NextResponse.json({ error: 'Server misconfigured' }, { status: 500 });
-    }
-
-    // 1. Look up the sponsorship to get status, child link, email.
-    const sponsorshipFormula = `{SponsorCode} = "${sponsorCode}"`;
-    const sponsorshipRes = await fetch(
-      `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_SPONSORSHIPS_TABLE}?filterByFormula=${encodeURIComponent(sponsorshipFormula)}&maxRecords=1`,
-      { headers: atHeaders() }
-    );
-    if (!sponsorshipRes.ok) {
-      console.error('[Portal Purchase] Sponsorship lookup failed', sponsorshipRes.status);
-      return NextResponse.json({ error: 'Sponsorship lookup failed' }, { status: 500 });
-    }
-    const sponsorshipData = await sponsorshipRes.json();
-    const sponsorship = sponsorshipData.records?.[0];
+    // 1. Look up the sponsorship row to check Active status + grab the
+    //    kid linkage and sponsor identity.
+    const sponsorship = await getSponsorshipBySponsorCode(sponsorCode);
     if (!sponsorship) {
       return NextResponse.json({ error: 'Sponsorship not found' }, { status: 404 });
     }
-
-    const f = sponsorship.fields;
-    const status = f['Status'] as string | undefined;
-    if (status !== 'Active') {
+    if (sponsorship.status !== 'Active') {
       // Memo §5 + §7: lapsed sponsors lose the order surface, but their
       // number and matched child are preserved. The relationship outlasts
       // the billing relationship.
@@ -115,34 +99,25 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const childID = f['ChildID'] as string | undefined;
-    const sponsorEmail = (f['SponsorEmail'] as string | undefined) || '';
-    const sponsorName = (f['SponsorName'] as string | undefined) || '';
-    const childDisplayName = (f['ChildDisplayName'] as string | undefined) || '';
+    const sponsorEmail = sponsorship.sponsorEmail || '';
+    const sponsorName = sponsorship.sponsorName || '';
+    const childDisplayName = sponsorship.childDisplayName || '';
 
-    if (!childID) {
+    // 2. Resolve the kid via UUID FK first, legacy ChildID text as
+    //    fallback (transition-window pattern).
+    let child = sponsorship.childId
+      ? await getChildByRecordId(sponsorship.childId)
+      : null;
+    if (!child && sponsorship.childIdLegacy) {
+      child = await getChildByChildId(sponsorship.childIdLegacy);
+    }
+    if (!child) {
       return NextResponse.json(
         { error: 'No child match found on this sponsorship.' },
         { status: 400 }
       );
     }
-
-    // 2. Look up the child to get the shirt number.
-    const childFormula = `{ChildID} = "${childID}"`;
-    const childRes = await fetch(
-      `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_CHILDREN_TABLE}?filterByFormula=${encodeURIComponent(childFormula)}&maxRecords=1`,
-      { headers: atHeaders() }
-    );
-    if (!childRes.ok) {
-      console.error('[Portal Purchase] Child lookup failed', childRes.status);
-      return NextResponse.json({ error: 'Child lookup failed' }, { status: 500 });
-    }
-    const childData = await childRes.json();
-    const childRecord = childData.records?.[0];
-    if (!childRecord) {
-      return NextResponse.json({ error: 'Child record missing' }, { status: 404 });
-    }
-    const shirtNumber = childRecord.fields['ShirtNumber'];
+    const shirtNumber = child.shirtNumber;
     if (typeof shirtNumber !== 'number') {
       return NextResponse.json(
         { error: 'No shirt number on the matched child record.' },
@@ -150,23 +125,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 3. Best-effort: look up the donor's existing Stripe Customer ID so
-    // the new Checkout Session can use saved payment methods (the one-tap
-    // promise of memo §2). If the donor record doesn't have one (older
-    // shirt-only buyers before sprint 2's customer-object continuity fix),
-    // we fall back to customer_email and Stripe creates one.
+    // 3. Best-effort: look up the donor's existing Stripe Customer ID
+    //    so the new Checkout Session can use saved payment methods (the
+    //    one-tap promise of memo §2). If the donor record doesn't have
+    //    one (older shirt-only buyers before sprint 2's customer-object
+    //    continuity fix), we fall back to customer_email and Stripe
+    //    creates one.
     let stripeCustomerId: string | null = null;
     if (sponsorEmail) {
       try {
-        const donorFormula = `LOWER({Email Address}) = "${sponsorEmail.toLowerCase()}"`;
-        const donorRes = await fetch(
-          `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_DONORS_TABLE}?filterByFormula=${encodeURIComponent(donorFormula)}&maxRecords=1`,
-          { headers: atHeaders() }
-        );
-        if (donorRes.ok) {
-          const donorData = await donorRes.json();
-          stripeCustomerId = donorData.records?.[0]?.fields?.['Stripe Customer ID'] || null;
-        }
+        const donor = await getDonorByEmail(sponsorEmail);
+        stripeCustomerId = donor?.stripeCustomerId ?? null;
       } catch (err) {
         console.warn('[Portal Purchase] Donor lookup failed, continuing without customer_id', err);
       }
@@ -176,10 +145,11 @@ export async function POST(request: NextRequest) {
     const origin = request.headers.get('origin') || 'https://www.beanumber.org';
 
     // 4. Build the Stripe Checkout Session. Payment mode (no new
-    // subscription — the existing sponsorship is doing that work).
-    // Free shipping for repeat orders.
+    //    subscription &mdash; the existing sponsorship is doing that work).
+    //    Free shipping for repeat orders.
     const stripe = await getStripe();
 
+    const childIdLegacy = sponsorship.childIdLegacy || child.childId || '';
     const metadata: Record<string, string> = {
       order_type: 'portal_repeat',
       shirt_id: shirtId,
@@ -190,7 +160,8 @@ export async function POST(request: NextRequest) {
       sponsor_email: sponsorEmail,
       sponsor_name: sponsorName,
       existing_shirt_number: String(shirtNumber),
-      child_id: childID,
+      child_id: childIdLegacy,
+      child_record_id: child.id,
       child_display_name: childDisplayName,
       customer_name: sponsorName,
     };

@@ -16,11 +16,13 @@
  *     `audit()` helper so we have a paper trail from day one.
  */
 
-import { eq, sql } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { db } from './client';
 import {
   auditLog,
   children,
+  childUpdates,
+  communications,
   donations,
   donationChildren,
   donors,
@@ -705,4 +707,178 @@ export async function markChildDeparted(
     after: updated[0] as Record<string, unknown>,
   });
   return updated[0];
+}
+
+// ─── Child Updates (sponsor-initiated update requests) ───────────
+
+export interface CreateUpdateRequestInput {
+  sponsorCode: string;
+  sponsorEmail: string;
+  childId: string;
+  childIdLegacy?: string | null;
+}
+
+/**
+ * Records a sponsor-initiated request for a kid update. Writes a
+ * child_updates row tagged `RequestedBySponsor=true`, `Status='Pending
+ * Review'`, `VisibleToSponsor=false` — the YDO team publishes it
+ * later by flipping the visibility/published fields.
+ *
+ * Idempotent against double-tap within the same UTC day: if a row
+ * already exists for this sponsorCode+child today, returns it
+ * unchanged. Callers that want their own dedup window can pre-check
+ * with queries.getTodayPendingUpdateRequest.
+ */
+export async function createUpdateRequest(input: CreateUpdateRequestInput) {
+  // Idempotency: dedup within the same UTC day.
+  const startOfDay = new Date();
+  startOfDay.setUTCHours(0, 0, 0, 0);
+  const existing = await db
+    .select()
+    .from(childUpdates)
+    .where(
+      and(
+        eq(childUpdates.sponsorCode, input.sponsorCode),
+        eq(childUpdates.requestedBySponsor, true),
+        sql`(${childUpdates.childId} = ${input.childId} OR ${childUpdates.childIdLegacy} = ${input.childIdLegacy ?? ''})`,
+        sql`${childUpdates.requestedAt} >= ${startOfDay}`
+      )
+    )
+    .limit(1);
+  if (existing[0]) return existing[0];
+
+  const now = new Date();
+  const inserted = await db
+    .insert(childUpdates)
+    .values({
+      sponsorCode: input.sponsorCode,
+      childId: input.childId,
+      childIdLegacy: input.childIdLegacy ?? null,
+      updateType: 'Requested Update',
+      title: `Update Request from ${input.sponsorEmail}`,
+      content: `Sponsor ${input.sponsorEmail} has requested an update about their sponsored child.`,
+      status: 'Pending Review',
+      visibleToSponsor: false,
+      requestedBySponsor: true,
+      requestedAt: now,
+    })
+    .returning();
+  await audit({
+    table: 'child_updates',
+    recordId: inserted[0].id,
+    action: 'INSERT',
+    actorType: 'sponsor',
+    after: inserted[0] as Record<string, unknown>,
+  });
+  return inserted[0];
+}
+
+/**
+ * Bumps the Sponsorships throttle fields after an update request:
+ * `LastRequestAt` to now, `NextRequestEligibleAt` to 90 days out.
+ * Used in tandem with createUpdateRequest so the request-update
+ * endpoint won&rsquo;t honor a second request until the quarter rolls.
+ */
+export async function markSponsorshipUpdateRequested(sponsorshipId: string) {
+  const existing = await db
+    .select()
+    .from(sponsorships)
+    .where(eq(sponsorships.id, sponsorshipId))
+    .limit(1);
+  if (!existing[0]) return null;
+  const before = existing[0];
+
+  const now = new Date();
+  const next = new Date();
+  next.setUTCDate(next.getUTCDate() + 90);
+
+  const updated = await db
+    .update(sponsorships)
+    .set({
+      lastRequestAt: now,
+      nextRequestEligibleAt: next,
+      requestedBySponsor: true,
+      requestedAt: now,
+      updatedAt: new Date(),
+    })
+    .where(eq(sponsorships.id, sponsorshipId))
+    .returning();
+  await audit({
+    table: 'sponsorships',
+    recordId: before.id,
+    action: 'UPDATE',
+    actorType: 'sponsor',
+    before: before as Record<string, unknown>,
+    after: updated[0] as Record<string, unknown>,
+  });
+  return updated[0];
+}
+
+// ─── Communications (sponsor-to-kid messages) ────────────────────
+
+export interface RecordSponsorMessageInput {
+  sponsorCode: string;
+  sponsorEmail: string;
+  childDisplayName?: string | null;
+  message: string;
+  relatedDonorId?: string | null;
+}
+
+/**
+ * Logs a sponsor-to-kid message as a Communications row with
+ * EmailType=&lsquo;Sponsor Message&rsquo;. Subject is prefixed with the
+ * sponsorCode in square brackets so the queries.ts filter can find
+ * every message a sponsor has sent without a dedicated column.
+ *
+ * Idempotent against double-tap: if a row already exists for this
+ * sponsorCode + exact message text today, returns it unchanged.
+ * The body is folded into the subject (truncated) since the
+ * communications table has no body column post-redesign; the full
+ * text is also stored in a follow-up email send to Kevin / YDO
+ * downstream of this writer.
+ */
+export async function recordSponsorMessage(input: RecordSponsorMessageInput) {
+  const subjectPrefix = `[${input.sponsorCode}]`;
+  const preview = input.message.length > 120
+    ? `${input.message.slice(0, 117)}...`
+    : input.message;
+  const subject = `${subjectPrefix} ${preview}`;
+
+  // Idempotency: same sponsorCode + same body today is treated as a
+  // double-tap.
+  const startOfDay = new Date();
+  startOfDay.setUTCHours(0, 0, 0, 0);
+  const startDateOnly = startOfDay.toISOString().slice(0, 10);
+  const existing = await db
+    .select()
+    .from(communications)
+    .where(
+      and(
+        eq(communications.emailType, 'Sponsor Message'),
+        eq(communications.subject, subject),
+        sql`${communications.sendDate} >= ${startDateOnly}`
+      )
+    )
+    .limit(1);
+  if (existing[0]) return existing[0];
+
+  const inserted = await db
+    .insert(communications)
+    .values({
+      subject,
+      emailType: 'Sponsor Message',
+      status: 'Sent',
+      sendDate: new Date().toISOString().slice(0, 10),
+      recipientEmail: input.sponsorEmail,
+      relatedDonorId: input.relatedDonorId ?? null,
+    })
+    .returning();
+  await audit({
+    table: 'communications',
+    recordId: inserted[0].id,
+    action: 'INSERT',
+    actorType: 'sponsor',
+    after: inserted[0] as Record<string, unknown>,
+  });
+  return inserted[0];
 }

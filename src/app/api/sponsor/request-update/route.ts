@@ -1,16 +1,36 @@
+/**
+ * Sponsor-requested kid update.
+ *
+ * A signed-in sponsor taps "Ask for an update" on the portal. We:
+ *   1. Verify the session cookie matches the sponsorCode.
+ *   2. Throttle: one request per kid per 90 days, enforced by the
+ *      Sponsorship `NextRequestEligibleAt` field.
+ *   3. Insert a `child_updates` row tagged `RequestedBySponsor=true`
+ *      and `Status='Pending Review'`. The YDO team sees it in admin
+ *      and publishes when they have something to share.
+ *   4. Stamp the Sponsorship's `LastRequestAt` / `NextRequestEligibleAt`
+ *      so the throttle holds until the quarter rolls.
+ *
+ * Idempotency: same-day double-tap is collapsed to a single
+ * `child_updates` row by `createUpdateRequest`. Caller still gets a
+ * 200 either way.
+ */
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-
-const AIRTABLE_API_KEY = process.env.AIRTABLE_API_KEY;
-const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID;
-const AIRTABLE_SPONSORSHIPS_TABLE = process.env.AIRTABLE_SPONSORSHIPS_TABLE || 'Sponsorships';
-// Use table ID directly — the env var AIRTABLE_UPDATES_TABLE was set to 'Updates'
-// but the table was renamed to 'Child Updates'. IDs never change.
-const AIRTABLE_UPDATES_TABLE = 'tblrmtVBVzL7zCQDE';
+import { SESSION } from '@/lib/constants';
+import {
+  getChildByChildId,
+  getChildByRecordId,
+  getSponsorshipBySponsorCode,
+} from '@/lib/db/queries';
+import {
+  createUpdateRequest,
+  markSponsorshipUpdateRequested,
+} from '@/lib/db/mutations';
 
 async function verifySession(sponsorCode: string): Promise<boolean> {
   const cookieStore = await cookies();
-  const sessionCookie = cookieStore.get('sponsor_session');
+  const sessionCookie = cookieStore.get(SESSION.COOKIE_NAME);
 
   if (!sessionCookie) return false;
 
@@ -21,46 +41,6 @@ async function verifySession(sponsorCode: string): Promise<boolean> {
   } catch {
     return false;
   }
-}
-
-async function checkLastRequest(sponsorCode: string): Promise<{ canRequest: boolean; daysUntil: number }> {
-  if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) {
-    return { canRequest: false, daysUntil: 0 };
-  }
-
-  const formula = `{SponsorCode} = "${sponsorCode}"`;
-  
-  try {
-    const response = await fetch(
-      `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_SPONSORSHIPS_TABLE}?filterByFormula=${encodeURIComponent(formula)}&maxRecords=1`,
-      {
-        headers: {
-          Authorization: `Bearer ${AIRTABLE_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-      }
-    );
-
-    if (response.ok) {
-      const data = await response.json();
-      if (data.records && data.records.length > 0) {
-        const fields = data.records[0].fields;
-        const nextRequestEligibleAt = fields['NextRequestEligibleAt'];
-        
-        if (nextRequestEligibleAt) {
-          const eligibleDate = new Date(nextRequestEligibleAt);
-          const now = new Date();
-          const canRequest = now >= eligibleDate;
-          const daysUntil = canRequest ? 0 : Math.ceil((eligibleDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-          return { canRequest, daysUntil };
-        }
-      }
-    }
-  } catch (error) {
-    console.error('Error checking last request:', error);
-  }
-
-  return { canRequest: true, daysUntil: 0 };
 }
 
 export async function POST(request: NextRequest) {
@@ -82,104 +62,56 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if can request using NextRequestEligibleAt
-    const { canRequest, daysUntil } = await checkLastRequest(sponsorCode);
-
-    if (!canRequest) {
+    // 1. Load the sponsorship to check the throttle and pull the child
+    //    linkage.
+    const sponsorship = await getSponsorshipBySponsorCode(sponsorCode);
+    if (!sponsorship) {
       return NextResponse.json(
-        { error: `You can request your next update in ${daysUntil} days. Updates are limited to once per quarter.` },
-        { status: 429 }
+        { error: 'Sponsorship not found' },
+        { status: 404 }
       );
     }
 
-    if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) {
-      throw new Error('Airtable credentials not configured');
-    }
-
-    // Get ChildID from Sponsorships table
-    const sponsorshipFormula = `{SponsorCode} = "${sponsorCode}"`;
-    const sponsorshipResponse = await fetch(
-      `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_SPONSORSHIPS_TABLE}?filterByFormula=${encodeURIComponent(sponsorshipFormula)}&maxRecords=1`,
-      {
-        headers: {
-          Authorization: `Bearer ${AIRTABLE_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-      }
-    );
-
-    let childID = null;
-    let sponsorshipRecord: any = null;
-    if (sponsorshipResponse.ok) {
-      const sponsorshipData = await sponsorshipResponse.json();
-      if (sponsorshipData.records && sponsorshipData.records.length > 0) {
-        sponsorshipRecord = sponsorshipData.records[0];
-        childID = sponsorshipRecord.fields['ChildID'] || null;
+    // 2. Throttle check via NextRequestEligibleAt (Postgres timestamp).
+    if (sponsorship.nextRequestEligibleAt) {
+      const eligibleDate = new Date(sponsorship.nextRequestEligibleAt);
+      const now = new Date();
+      if (now < eligibleDate) {
+        const daysUntil = Math.ceil(
+          (eligibleDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
+        );
+        return NextResponse.json(
+          { error: `You can request your next update in ${daysUntil} days. Updates are limited to once per quarter.` },
+          { status: 429 }
+        );
       }
     }
 
-    if (!childID) {
+    // 3. Resolve the kid &mdash; UUID FK first, legacy ChildID text as
+    //    fallback (transition window).
+    let child = sponsorship.childId
+      ? await getChildByRecordId(sponsorship.childId)
+      : null;
+    if (!child && sponsorship.childIdLegacy) {
+      child = await getChildByChildId(sponsorship.childIdLegacy);
+    }
+    if (!child) {
       return NextResponse.json(
         { error: 'Child ID not found for this sponsorship' },
         { status: 404 }
       );
     }
 
-    // Create update request record
-    const now = new Date().toISOString();
-    const response = await fetch(
-      `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_UPDATES_TABLE}`,
-      {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${AIRTABLE_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          fields: {
-            'ChildID': childID,
-            'SponsorCode': sponsorCode,
-            'UpdateType': 'Requested Update',
-            'Title': `Update Request from ${email}`,
-            'Content': `Sponsor ${email} has requested an update about their sponsored child.`,
-            'Status': 'Pending Review',
-            'VisibleToSponsor': false,
-            'RequestedBySponsor': true,
-            'RequestedAt': now,
-          },
-          typecast: true,
-        }),
-      }
-    );
+    // 4. Write the request + stamp the throttle. Idempotent on
+    //    repeated same-day taps via createUpdateRequest.
+    await createUpdateRequest({
+      sponsorCode,
+      sponsorEmail: email,
+      childId: child.id,
+      childIdLegacy: child.childId || sponsorship.childIdLegacy || null,
+    });
 
-    // Update Sponsorships table with LastRequestAt and NextRequestEligibleAt
-    if (response.ok && sponsorshipRecord) {
-      const sponsorshipId = sponsorshipRecord.id;
-      const nextEligible = new Date();
-      nextEligible.setDate(nextEligible.getDate() + 90); // 90 days from now
-
-      await fetch(
-        `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_SPONSORSHIPS_TABLE}/${sponsorshipId}`,
-        {
-          method: 'PATCH',
-          headers: {
-            Authorization: `Bearer ${AIRTABLE_API_KEY}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            fields: {
-              'LastRequestAt': now,
-              'NextRequestEligibleAt': nextEligible.toISOString(),
-            },
-          }),
-        }
-      );
-    }
-
-    if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Airtable API error: ${error}`);
-    }
+    await markSponsorshipUpdateRequested(sponsorship.id);
 
     return NextResponse.json({
       success: true,

@@ -19,6 +19,7 @@ import { db } from './client';
 import {
   children,
   childUpdates,
+  communications,
   newsletters,
   sponsorships,
   donors,
@@ -632,4 +633,100 @@ export async function listBatches() {
     .select()
     .from(batches)
     .orderBy(batches.startShirtNumber);
+}
+
+// ─── Child updates timeline (sponsor portal) ─────────────────────
+
+/**
+ * Published, sponsor-visible updates for a given kid, newest first.
+ * Mirrors the Airtable filter `{VisibleToSponsor}=TRUE AND publishedAt
+ * IS NOT NULL` against either the new UUID FK or the legacy ChildID
+ * text key. Used by the sponsor portal at /api/sponsor/updates.
+ */
+export async function getPublishedUpdatesForChild(child: {
+  id: string;
+  childId: string;
+}) {
+  if (!child.id && !child.childId) return [];
+  return db
+    .select({
+      id: childUpdates.id,
+      title: childUpdates.title,
+      content: childUpdates.content,
+      summary: childUpdates.summary,
+      updateType: childUpdates.updateType,
+      publishedAt: childUpdates.publishedAt,
+      requestedAt: childUpdates.requestedAt,
+      photoUrls: childUpdates.photoUrls,
+    })
+    .from(childUpdates)
+    .where(
+      and(
+        eq(childUpdates.visibleToSponsor, true),
+        isNotNull(childUpdates.publishedAt),
+        or(
+          eq(childUpdates.childId, child.id),
+          eq(childUpdates.childIdLegacy, child.childId)
+        )
+      )
+    )
+    .orderBy(desc(childUpdates.publishedAt));
+}
+
+/**
+ * Every Sponsor Message a given sponsor has sent, newest first. Source
+ * of truth is the `communications` table (EmailType='Sponsor Message');
+ * this powers the "your side of the conversation" panel in the sponsor
+ * portal timeline.
+ */
+export async function getSponsorMessagesByCode(sponsorCode: string) {
+  if (!sponsorCode) return [];
+  return db
+    .select({
+      id: communications.id,
+      subject: communications.subject,
+      status: communications.status,
+      sendDate: communications.sendDate,
+      createdAt: communications.createdAt,
+    })
+    .from(communications)
+    .where(
+      and(
+        eq(communications.emailType, 'Sponsor Message'),
+        // Subject carries the sponsorCode prefix so we can filter on it
+        // without a dedicated column. See recordSponsorMessage().
+        sql`${communications.subject} LIKE ${`[${sponsorCode}]%`}`
+      )
+    )
+    .orderBy(desc(communications.createdAt));
+}
+
+/**
+ * Was a sponsor-update request already submitted today for this code?
+ * Used by /api/sponsor/request-update for idempotency — a double-tap
+ * within the same UTC day is treated as the same request.
+ */
+export async function getTodayPendingUpdateRequest(
+  sponsorCode: string,
+  child: { id: string; childId: string }
+) {
+  if (!sponsorCode) return null;
+  const startOfDay = new Date();
+  startOfDay.setUTCHours(0, 0, 0, 0);
+  const rows = await db
+    .select({ id: childUpdates.id })
+    .from(childUpdates)
+    .where(
+      and(
+        eq(childUpdates.sponsorCode, sponsorCode),
+        eq(childUpdates.requestedBySponsor, true),
+        or(
+          eq(childUpdates.childId, child.id),
+          eq(childUpdates.childIdLegacy, child.childId)
+        ),
+        sql`${childUpdates.requestedAt} >= ${startOfDay}`
+      )
+    )
+    .limit(1);
+  return rows[0] ?? null;
 }

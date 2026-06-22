@@ -1,5 +1,5 @@
 /**
- * Sponsor merch checkout — Number Collection.
+ * Sponsor merch checkout &mdash; Number Collection.
  *
  * Active sponsors of a specific child can buy a hoodie, hat, or
  * sticker pack with that child's shirt number on it. This is the
@@ -7,7 +7,7 @@
  * one-tap merchandise flow: tap "I want a hoodie," see Stripe
  * Checkout pre-filled with your saved card, confirm, done.
  *
- * Unlike shirt orders, merch items don't get a Fulfillment row —
+ * Unlike shirt orders, merch items don't get a Fulfillment row &mdash;
  * they're low enough volume that Kevin makes each by hand on demand.
  * The webhook records the Donation and emails Kevin the order
  * details (item, sponsor's number, shipping address). Kevin packs
@@ -19,21 +19,25 @@
  *
  * Pricing is server-defined to prevent client tampering. Adjust here
  * if Kevin changes prices.
+ *
+ * Data layer: reads via src/lib/db/queries.ts (Postgres). Donation row
+ * for this purchase is created by the Stripe webhook on
+ * `checkout.session.completed`, not here.
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { z } from 'zod';
+import { SESSION } from '@/lib/constants';
+import {
+  getChildByChildId,
+  getChildByRecordId,
+  getDonorByEmail,
+  getSponsorshipBySponsorCode,
+} from '@/lib/db/queries';
 
-const AIRTABLE_API_KEY = process.env.AIRTABLE_API_KEY;
-const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID;
-const AIRTABLE_SPONSORSHIPS_TABLE =
-  process.env.AIRTABLE_SPONSORSHIPS_TABLE || 'Sponsorships';
-const AIRTABLE_CHILDREN_TABLE = process.env.AIRTABLE_CHILDREN_TABLE || 'Children';
-const AIRTABLE_DONORS_TABLE = process.env.AIRTABLE_DONORS_TABLE || 'Donors';
-
-// Merch catalog — single source of truth. Display names and prices live
-// here so the client UI and the Stripe Checkout line items stay in sync
-// without trusting client-side input.
+// Merch catalog &mdash; single source of truth. Display names and prices
+// live here so the client UI and the Stripe Checkout line items stay
+// in sync without trusting client-side input.
 const MERCH_CATALOG: Record<
   string,
   { name: string; description: string; priceCents: number; needsSize: boolean }
@@ -65,16 +69,9 @@ const purchaseSchema = z.object({
   size: z.enum(['S', 'M', 'L', 'XL', '2XL']).optional(),
 });
 
-function atHeaders() {
-  return {
-    Authorization: `Bearer ${AIRTABLE_API_KEY}`,
-    'Content-Type': 'application/json',
-  };
-}
-
 async function verifySession(sponsorCode: string): Promise<boolean> {
   const cookieStore = await cookies();
-  const sessionCookie = cookieStore.get('sponsor_session');
+  const sessionCookie = cookieStore.get(SESSION.COOKIE_NAME);
   if (!sessionCookie) return false;
   try {
     const session = JSON.parse(sessionCookie.value);
@@ -116,60 +113,34 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) {
-      console.error('[Merch] Airtable credentials missing');
-      return NextResponse.json({ error: 'Server misconfigured' }, { status: 500 });
-    }
-
-    // 1. Load the active Sponsorship for this code.
-    const sponsorshipFormula = `AND({SponsorCode} = "${sponsorCode}", {Status} = "Active")`;
-    const sponsorshipRes = await fetch(
-      `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_SPONSORSHIPS_TABLE}?filterByFormula=${encodeURIComponent(sponsorshipFormula)}&maxRecords=1`,
-      { headers: atHeaders() }
-    );
-    if (!sponsorshipRes.ok) {
-      console.error('[Merch] Sponsorship lookup failed', sponsorshipRes.status);
-      return NextResponse.json({ error: 'Sponsorship lookup failed' }, { status: 500 });
-    }
-    const sponsorshipData = await sponsorshipRes.json();
-    const sponsorship = sponsorshipData.records?.[0];
-    if (!sponsorship) {
+    // 1. Load the sponsorship and confirm Active.
+    const sponsorship = await getSponsorshipBySponsorCode(sponsorCode);
+    if (!sponsorship || sponsorship.status !== 'Active') {
       return NextResponse.json(
         { error: 'Active sponsorship not found.' },
         { status: 404 }
       );
     }
-    const f = sponsorship.fields;
-    const sponsorEmail = (f['SponsorEmail'] as string | undefined) || '';
-    const sponsorName = (f['SponsorName'] as string | undefined) || '';
-    const childDisplayName = (f['ChildDisplayName'] as string | undefined) || '';
-    const childID = (f['ChildID'] as string | undefined) || '';
+    const sponsorEmail = sponsorship.sponsorEmail || '';
+    const sponsorName = sponsorship.sponsorName || '';
+    const childDisplayName = sponsorship.childDisplayName || '';
 
-    if (!childID) {
+    // 2. Resolve the kid &mdash; UUID FK first, legacy ChildID text as
+    //    fallback. We use Child.shirtNumber as the source of truth for
+    //    what gets pressed on the merch item.
+    let child = sponsorship.childId
+      ? await getChildByRecordId(sponsorship.childId)
+      : null;
+    if (!child && sponsorship.childIdLegacy) {
+      child = await getChildByChildId(sponsorship.childIdLegacy);
+    }
+    if (!child) {
       return NextResponse.json(
         { error: 'Sponsorship has no child link.' },
         { status: 400 }
       );
     }
-
-    // 2. Resolve the shirt number from the linked Child record. We use
-    //    Child.ShirtNumber as the source of truth — it's what gets
-    //    pressed on the merch item.
-    const childFormula = `{ChildID} = "${childID}"`;
-    const childRes = await fetch(
-      `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_CHILDREN_TABLE}?filterByFormula=${encodeURIComponent(childFormula)}&maxRecords=1`,
-      { headers: atHeaders() }
-    );
-    if (!childRes.ok) {
-      console.error('[Merch] Child lookup failed', childRes.status);
-      return NextResponse.json({ error: 'Child lookup failed' }, { status: 500 });
-    }
-    const childData = await childRes.json();
-    const childRecord = childData.records?.[0];
-    if (!childRecord) {
-      return NextResponse.json({ error: 'Child record missing' }, { status: 404 });
-    }
-    const shirtNumber = childRecord.fields['ShirtNumber'];
+    const shirtNumber = child.shirtNumber;
     if (typeof shirtNumber !== 'number') {
       return NextResponse.json(
         { error: 'No shirt number on the matched child record.' },
@@ -182,24 +153,17 @@ export async function POST(request: NextRequest) {
     let stripeCustomerId: string | null = null;
     if (sponsorEmail) {
       try {
-        const donorFormula = `LOWER({Email Address}) = "${sponsorEmail.toLowerCase()}"`;
-        const donorRes = await fetch(
-          `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_DONORS_TABLE}?filterByFormula=${encodeURIComponent(donorFormula)}&maxRecords=1`,
-          { headers: atHeaders() }
-        );
-        if (donorRes.ok) {
-          const donorData = await donorRes.json();
-          stripeCustomerId =
-            donorData.records?.[0]?.fields?.['Stripe Customer ID'] || null;
-        }
+        const donor = await getDonorByEmail(sponsorEmail);
+        stripeCustomerId = donor?.stripeCustomerId ?? null;
       } catch (err) {
         console.warn('[Merch] Donor lookup failed, continuing without customer_id', err);
       }
     }
 
-    // 4. Build the Stripe Checkout Session. Payment mode (one-off purchase),
-    //    free shipping (merch volume is small and Kevin wants frictionless
-    //    retention buys), Stripe collects shipping address.
+    // 4. Build the Stripe Checkout Session. Payment mode (one-off
+    //    purchase), free shipping (merch volume is small and Kevin
+    //    wants frictionless retention buys), Stripe collects shipping
+    //    address.
     const stripe = await getStripe();
     const origin = request.headers.get('origin') || 'https://www.beanumber.org';
 
@@ -208,6 +172,7 @@ export async function POST(request: NextRequest) {
     const productDescription =
       `${item.description} Pressed/embroidered with #${shirtNumber} — the same number on the back of ${sponsorName || 'your'} shirt, matched to ${childDisplayName || 'your child'}.`;
 
+    const childIdLegacy = sponsorship.childIdLegacy || child.childId || '';
     const metadata: Record<string, string> = {
       order_type: 'merch_purchase',
       merch_type: merchType,
@@ -216,7 +181,8 @@ export async function POST(request: NextRequest) {
       sponsor_code: sponsorCode,
       sponsor_email: sponsorEmail,
       sponsor_name: sponsorName,
-      child_id: childID,
+      child_id: childIdLegacy,
+      child_record_id: child.id,
       child_display_name: childDisplayName,
       customer_name: sponsorName,
     };
@@ -252,7 +218,8 @@ export async function POST(request: NextRequest) {
       shipping_address_collection: { allowed_countries: ['US'] },
       metadata,
       // Keep payment method saved for the next merch purchase or shirt
-      // reorder — retention compounds when the second tap is also one tap.
+      // reorder &mdash; retention compounds when the second tap is also
+      // one tap.
       payment_intent_data: {
         setup_future_usage: 'off_session' as const,
         metadata,
