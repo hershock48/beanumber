@@ -69,13 +69,21 @@ const nextConfig: NextConfig = {
       },
     ];
   },
-  // next/image optimization. We use this for every Airtable-hosted
-  // photo (kid hero, OtherKidsAtCampus strip, CampusNewsfeed covers)
-  // so the browser receives a device-sized WebP/AVIF instead of the
-  // raw 1.5–2 MB source JPEG, and so the edge cache keeps serving
-  // those variants long after Airtable's signed URL expires.
+  // next/image optimization. We use this for every kid hero photo,
+  // OtherKidsAtCampus strip image, CampusNewsfeed cover, etc. The
+  // optimizer fetches the source, transcodes to WebP/AVIF sized for
+  // the device, and edge-caches.
+  //
+  // Allowed source hosts:
+  //   - Supabase Storage (current home for migrated kid + newsletter
+  //     photos; permanent URLs, no expiry).
+  //   - Airtable CDN hosts (legacy era — kept allowlisted so any
+  //     in-flight Airtable-sourced URLs still optimize correctly
+  //     during the cutover window. Can be removed once Airtable
+  //     reads are fully retired.).
   images: {
     remotePatterns: [
+      { protocol: 'https', hostname: '*.supabase.co' },
       { protocol: 'https', hostname: 'v5.airtableusercontent.com' },
       { protocol: 'https', hostname: 'dl.airtable.com' },
     ],
