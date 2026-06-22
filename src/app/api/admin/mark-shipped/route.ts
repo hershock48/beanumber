@@ -1,86 +1,43 @@
 /**
- * Mark Shipped — batch-update fulfillment records and kick off drip emails
+ * Mark Shipped — batch-update unshipped fulfillment rows and kick off
+ * drip emails.
  *
  * POST /api/admin/mark-shipped?token=ADMIN_API_TOKEN
  *
- * Finds all Fulfillment records where Shipping=Not Shipped,
- * marks them as Shipped, then sets DripNextSend on each unique donor so the
- * drip nurture sequence begins 3 days after shipment (not purchase).
+ * Finds every Fulfillment row where shipping='Not Shipped', marks
+ * them shipped, then sets dripNextSend on each unique donor so the
+ * nurture sequence begins 3 days after shipment.
  *
  * Kevin hits this URL after dropping packages at the post office.
  *
- * Auth: query param ?token= must match ADMIN_API_TOKEN env var.
+ * Auth: ?token= must match ADMIN_API_TOKEN or ADMIN_PASSWORD.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getEnv } from '@/lib/env';
+import { db } from '@/lib/db/client';
+import { fulfillments, donors } from '@/lib/db/schema';
+import { eq, sql } from 'drizzle-orm';
 
-const FULFILLMENT_TABLE_ID = 'tblkSZBRrMiHhT3MP';
-const DONORS_TABLE_ID = 'tblhuLpJgYLB0pTjx';
-
-const F = {
-  orderNum:    'fldsUZIXLFesyzg8u',
-  email:       'fldUakXkAhW2hYLxL',
-  buyer:       'fldbGofwASSXDYj9R',
-  production:  'fldbBZtOLYVVDS28X',
-  shipping:    'fldJ6ehpDkpindHtO',
-  tracking:    'flddun1GJzynbK9MU',
-} as const;
-
-interface AirtableRecord {
-  id: string;
-  fields: Record<string, unknown>;
-}
-
-function fieldVal(rec: AirtableRecord, fieldId: string): string {
-  const v = rec.fields[fieldId];
-  if (!v) return '';
-  if (typeof v === 'object' && v !== null && 'name' in v) return (v as { name: string }).name;
-  return String(v);
-}
-
-export async function POST(request: NextRequest) {
-  const env = getEnv();
-
-  // Auth via query param (browser-friendly)
+function isAuthed(request: NextRequest): boolean {
   const token = request.nextUrl.searchParams.get('token');
   const adminToken = process.env.ADMIN_API_TOKEN;
   const adminPassword = process.env.ADMIN_PASSWORD;
-  if ((!adminToken && !adminPassword) || (token !== adminToken && token !== adminPassword)) {
+  if (!adminToken && !adminPassword) return false;
+  return token === adminToken || (!!adminPassword && token === adminPassword);
+}
+
+export async function POST(request: NextRequest) {
+  if (!isAuthed(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const headers = {
-    Authorization: `Bearer ${env.AIRTABLE_API_KEY}`,
-    'Content-Type': 'application/json',
-  };
+  // 1. Fetch unshipped.
+  const rows = await db
+    .select()
+    .from(fulfillments)
+    .where(eq(fulfillments.shipping, 'Not Shipped'));
 
-  // 1. Fetch all Fulfillment records that are ready to ship
-  const formula = `{Shipping}="Not Shipped"`;
-  const allRecords: AirtableRecord[] = [];
-  let offset: string | undefined;
-
-  do {
-    const params = new URLSearchParams();
-    params.set('filterByFormula', formula);
-    params.set('pageSize', '100');
-    params.set('returnFieldsByFieldId', 'true');
-    if (offset) params.set('offset', offset);
-
-    const url = `https://api.airtable.com/v0/${env.AIRTABLE_BASE_ID}/${FULFILLMENT_TABLE_ID}?${params}`;
-    const res = await fetch(url, { headers });
-
-    if (!res.ok) {
-      const err = await res.text();
-      return NextResponse.json({ error: 'Airtable fetch failed', detail: err }, { status: 502 });
-    }
-
-    const data = await res.json();
-    allRecords.push(...(data.records || []));
-    offset = data.offset;
-  } while (offset);
-
-  if (allRecords.length === 0) {
+  if (rows.length === 0) {
     return NextResponse.json({
       message: 'No records to ship. Everything is already marked as shipped.',
       shipped: 0,
@@ -88,125 +45,59 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  // 2. Mark all as Shipped (Airtable allows max 10 records per PATCH)
-  const shippedIds: string[] = [];
-  for (let i = 0; i < allRecords.length; i += 10) {
-    const batch = allRecords.slice(i, i + 10);
-    const patchRes = await fetch(
-      `https://api.airtable.com/v0/${env.AIRTABLE_BASE_ID}/${FULFILLMENT_TABLE_ID}`,
-      {
-        method: 'PATCH',
-        headers,
-        body: JSON.stringify({
-          records: batch.map(rec => ({
-            id: rec.id,
-            fields: { [F.shipping]: 'Shipped' },
-          })),
-          returnFieldsByFieldId: true,
-        }),
-      }
-    );
+  // 2. Mark all as shipped.
+  await db
+    .update(fulfillments)
+    .set({ shipping: 'Shipped', updatedAt: new Date() })
+    .where(eq(fulfillments.shipping, 'Not Shipped'));
 
-    if (!patchRes.ok) {
-      const err = await patchRes.text();
-      return NextResponse.json({
-        error: 'Failed to update Fulfillment records',
-        detail: err,
-        shippedSoFar: shippedIds.length,
-      }, { status: 502 });
-    }
-
-    shippedIds.push(...batch.map(r => r.id));
-  }
-
-  // 3. Collect unique buyer emails from shipped records
-  const uniqueEmails = new Set<string>();
-  for (const rec of allRecords) {
-    const email = fieldVal(rec, F.email).toLowerCase().trim();
-    if (email) uniqueEmails.add(email);
-  }
-
-  // 4. For each unique email, look up the donor and set DripNextSend
+  // 3. Drip enrollment / nudge.
+  const uniqueEmails = Array.from(
+    new Set(
+      rows
+        .map(r => (r.buyerEmail || '').toLowerCase().trim())
+        .filter(Boolean)
+    )
+  );
   const dripDate = new Date();
   dripDate.setUTCDate(dripDate.getUTCDate() + 3);
-  const dripNextSend = dripDate.toISOString().split('T')[0];
+  const dripNextSend = dripDate.toISOString().slice(0, 10);
 
   const dripsStarted: string[] = [];
   const dripErrors: string[] = [];
 
   for (const email of uniqueEmails) {
     try {
-      // Find donor by email
-      const lookupFormula = `LOWER({Email}) = "${email}"`;
-      const lookupParams = new URLSearchParams();
-      lookupParams.set('filterByFormula', lookupFormula);
-      lookupParams.set('maxRecords', '1');
-      lookupParams.set('fields[]', 'Email');
-      lookupParams.append('fields[]', 'DripPipeline');
-      lookupParams.append('fields[]', 'DripNextSend');
-
-      const lookupRes = await fetch(
-        `https://api.airtable.com/v0/${env.AIRTABLE_BASE_ID}/${DONORS_TABLE_ID}?${lookupParams}`,
-        { headers }
-      );
-
-      if (!lookupRes.ok) {
-        dripErrors.push(`${email}: donor lookup failed`);
-        continue;
-      }
-
-      const lookupData = await lookupRes.json();
-      const donor = lookupData.records?.[0];
-
+      const donor = (
+        await db
+          .select()
+          .from(donors)
+          .where(sql`lower(${donors.email}) = ${email}`)
+          .limit(1)
+      )[0];
       if (!donor) {
         dripErrors.push(`${email}: no donor record found`);
         continue;
       }
+      if (!donor.dripPipeline) continue; // nothing to drip
+      if (donor.dripNextSend) continue; // mid-sequence, don't overwrite
 
-      // Only set DripNextSend if they're in a shirt pipeline and don't already
-      // have a DripNextSend (avoids re-triggering for repeat shipments)
-      const pipeline = donor.fields?.DripPipeline || '';
-      const existingNextSend = donor.fields?.DripNextSend || '';
-
-      if (!pipeline) {
-        // No drip pipeline — nothing to start
-        continue;
-      }
-
-      if (existingNextSend) {
-        // Already has a send date — don't overwrite (could be mid-sequence)
-        continue;
-      }
-
-      // Set DripNextSend to 3 days from now
-      const updateRes = await fetch(
-        `https://api.airtable.com/v0/${env.AIRTABLE_BASE_ID}/${DONORS_TABLE_ID}/${donor.id}`,
-        {
-          method: 'PATCH',
-          headers,
-          body: JSON.stringify({
-            fields: { DripNextSend: dripNextSend },
-          }),
-        }
-      );
-
-      if (updateRes.ok) {
-        dripsStarted.push(email);
-      } else {
-        dripErrors.push(`${email}: drip update failed`);
-      }
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      dripErrors.push(`${email}: ${msg.slice(0, 100)}`);
+      await db
+        .update(donors)
+        .set({ dripNextSend, updatedAt: new Date() })
+        .where(eq(donors.id, donor.id));
+      dripsStarted.push(email);
+    } catch (err) {
+      const m = err instanceof Error ? err.message : String(err);
+      dripErrors.push(`${email}: ${m.slice(0, 100)}`);
     }
   }
 
-  // 5. Build order summary for Kevin
-  const orderNums = allRecords.map(r => fieldVal(r, F.orderNum)).filter(Boolean);
+  const orderNums = rows.map(r => String(r.orderNumber ?? '')).filter(Boolean);
 
   return NextResponse.json({
-    message: `Shipped ${shippedIds.length} orders. Drip emails started for ${dripsStarted.length} buyers.`,
-    shipped: shippedIds.length,
+    message: `Shipped ${rows.length} orders. Drip emails started for ${dripsStarted.length} buyers.`,
+    shipped: rows.length,
     orderNumbers: orderNums,
     dripsStarted: dripsStarted.length,
     dripEmails: dripsStarted,
@@ -215,36 +106,19 @@ export async function POST(request: NextRequest) {
   });
 }
 
-// Also support GET so Kevin can bookmark it and just click
+// Also support GET so Kevin can bookmark it and just click.
 export async function GET(request: NextRequest) {
-  const env = getEnv();
-
-  const token = request.nextUrl.searchParams.get('token');
-  const adminToken = process.env.ADMIN_API_TOKEN;
-  const adminPassword = process.env.ADMIN_PASSWORD;
-  if ((!adminToken && !adminPassword) || (token !== adminToken && token !== adminPassword)) {
+  if (!isAuthed(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  // Show a confirmation page instead of firing immediately on GET
-  const formula = `{Shipping}="Not Shipped"`;
-  const params = new URLSearchParams();
-  params.set('filterByFormula', formula);
-  params.set('pageSize', '100');
-  params.set('returnFieldsByFieldId', 'true');
-
-  const res = await fetch(
-    `https://api.airtable.com/v0/${env.AIRTABLE_BASE_ID}/${FULFILLMENT_TABLE_ID}?${params}`,
-    { headers: { Authorization: `Bearer ${env.AIRTABLE_API_KEY}` } }
-  );
-
-  if (!res.ok) {
-    return NextResponse.json({ error: 'Airtable fetch failed' }, { status: 502 });
-  }
-
-  const data = await res.json();
-  const records = (data.records || []) as AirtableRecord[];
-  const orderNums = records.map((r: AirtableRecord) => fieldVal(r, F.orderNum)).filter(Boolean);
+  const rows = await db
+    .select({
+      orderNumber: fulfillments.orderNumber,
+    })
+    .from(fulfillments)
+    .where(eq(fulfillments.shipping, 'Not Shipped'));
+  const orderNums = rows.map(r => String(r.orderNumber ?? '')).filter(Boolean);
 
   const html = `<!DOCTYPE html>
 <html lang="en">
@@ -297,16 +171,17 @@ export async function GET(request: NextRequest) {
 <body>
   <div class="card">
     <h1>Mark Shipped</h1>
-    ${records.length === 0
-      ? '<p class="empty">No orders ready to ship. Everything is already marked as shipped.</p>'
-      : `
-    <div class="count">${records.length}</div>
-    <p>order${records.length === 1 ? '' : 's'} ready to mark as shipped</p>
+    ${
+      rows.length === 0
+        ? '<p class="empty">No orders ready to ship. Everything is already marked as shipped.</p>'
+        : `
+    <div class="count">${rows.length}</div>
+    <p>order${rows.length === 1 ? '' : 's'} ready to mark as shipped</p>
     <div class="orders">Orders: #${orderNums.join(', #')}</div>
     <button class="btn" id="shipBtn" onclick="markShipped()">
       Mark All as Shipped
     </button>
-    <div class="note">This marks them as Shipped in Airtable and starts the drip email countdown (3 days).</div>
+    <div class="note">This marks them as Shipped and starts the drip email countdown (3 days).</div>
     <div class="result" id="result"></div>
     <script>
       async function markShipped() {
@@ -337,7 +212,8 @@ export async function GET(request: NextRequest) {
         }
       }
     </script>
-    `}
+    `
+    }
   </div>
 </body>
 </html>`;

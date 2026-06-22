@@ -1,80 +1,31 @@
 /**
- * Admin OS — read queries.
+ * Admin OS — read queries (Postgres edition).
  *
- * Server-side data fetchers backing the `/admin` home dashboard cards.
- * Each function returns a small, presentation-ready shape designed for
- * one card. Errors are caught and returned as a graceful "unknown"
- * state so a single failing query doesn't blow up the whole dashboard.
+ * Server-side data fetchers backing the `/admin` home dashboard cards,
+ * the roster manager, the review queue, the SOTM picker, and the
+ * per-kid editor. Reads go through Drizzle against the same Postgres
+ * the rest of the app uses — no Airtable dependency.
  *
- * Direct Airtable REST calls — no client SDK. Matches the rest of the
- * codebase. No caching beyond the server's request scope.
+ * Each home-card function returns a small presentation-ready shape
+ * with errors caught and surfaced as a graceful `ok:false` state so a
+ * single failing card doesn't blow up the whole dashboard.
+ *
+ * Function signatures and return types are preserved verbatim from
+ * the Airtable-era module so callers (pages, components) don't need
+ * to change.
  */
 
+import { and, desc, eq, isNotNull, isNull, or, sql } from 'drizzle-orm';
+import { db } from '@/lib/db/client';
+import {
+  children,
+  childUpdates,
+  donations,
+  fulfillments,
+  newsletters,
+  sponsorships,
+} from '@/lib/db/schema';
 import { parsePendingDraft } from './pending-draft';
-
-const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID || '';
-const AIRTABLE_API_KEY =
-  process.env.AIRTABLE_PAT || process.env.AIRTABLE_API_KEY || '';
-
-const CHILDREN_TABLE = process.env.AIRTABLE_CHILDREN_TABLE || 'Children';
-const SPONSORSHIPS_TABLE =
-  process.env.AIRTABLE_SPONSORSHIPS_TABLE || 'Sponsorships';
-const CHILD_UPDATES_TABLE =
-  process.env.AIRTABLE_CHILD_UPDATES_TABLE || 'Child Updates';
-const NEWSLETTERS_TABLE = process.env.AIRTABLE_NEWSLETTERS_TABLE || 'Newsletters';
-const FULFILLMENT_TABLE = process.env.AIRTABLE_FULFILLMENT_TABLE || 'Fulfillment';
-const DONATIONS_TABLE = process.env.AIRTABLE_DONATIONS_TABLE || 'Donations';
-
-function headers() {
-  return {
-    Authorization: `Bearer ${AIRTABLE_API_KEY}`,
-    'Content-Type': 'application/json',
-  };
-}
-
-async function atGet<T>(path: string): Promise<T> {
-  const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}${path}`;
-  const res = await fetch(url, { headers: headers(), cache: 'no-store' });
-  if (!res.ok) {
-    throw new Error(`Airtable ${res.status}: ${await res.text()}`);
-  }
-  return res.json() as Promise<T>;
-}
-
-/**
- * Page through an Airtable table, returning every record. Airtable
- * caps pageSize at 100, so anything larger needs offset pagination.
- */
-async function atListAll<F = Record<string, unknown>>(
-  tableName: string,
-  extraParams = ''
-): Promise<AirtableRecord<F>[]> {
-  const out: AirtableRecord<F>[] = [];
-  let offset: string | undefined;
-  do {
-    const params = new URLSearchParams();
-    params.set('pageSize', '100');
-    if (offset) params.set('offset', offset);
-    const combined = extraParams ? `${extraParams}&${params.toString()}` : params.toString();
-    const page = await atGet<AirtableList<F>>(
-      `/${encodeURIComponent(tableName)}?${combined}`
-    );
-    out.push(...page.records);
-    offset = page.offset;
-  } while (offset);
-  return out;
-}
-
-interface AirtableRecord<F = Record<string, unknown>> {
-  id: string;
-  createdTime: string;
-  fields: F;
-}
-
-interface AirtableList<F = Record<string, unknown>> {
-  records: AirtableRecord<F>[];
-  offset?: string;
-}
 
 // ────────────────────────────────────────────────────────────────────────
 // Card: Updates pending publish
@@ -95,21 +46,38 @@ export interface PendingUpdatesCard {
 
 export async function getPendingUpdatesCard(): Promise<PendingUpdatesCard> {
   try {
-    const formula = encodeURIComponent(`{Status} = "Pending"`);
-    const data = await atGet<AirtableList>(
-      `/${encodeURIComponent(CHILD_UPDATES_TABLE)}?filterByFormula=${formula}&maxRecords=10&sort%5B0%5D%5Bfield%5D=SubmittedAt&sort%5B0%5D%5Bdirection%5D=desc`
-    );
-    const recent = data.records.map(rec => {
-      const f = rec.fields as Record<string, unknown>;
-      const childIdField = f.ChildID as string | undefined;
-      return {
-        id: rec.id,
-        title: (f.Title as string) || (f.UpdateID as string) || 'Untitled update',
-        childDisplayName: childIdField || 'Unknown child',
-        shirtNumber: null, // joining to Children for ShirtNumber is a v2 add
-        submittedAt: (f.SubmittedAt as string) || null,
-      };
-    });
+    // Pending = submitted-by-Simon, not yet published. Mirrors the
+    // Airtable `{Status}="Pending"` filter while adding a LEFT JOIN to
+    // children for shirt-number + display-name hydration (the
+    // Airtable version stubbed shirtNumber=null because the dual-key
+    // join was too expensive there; we can do it cheap here).
+    const rows = await db
+      .select({
+        id: childUpdates.id,
+        updateId: childUpdates.updateId,
+        title: childUpdates.title,
+        submittedAt: childUpdates.submittedAt,
+        childIdLegacy: childUpdates.childIdLegacy,
+        childShirtNumber: sql<number | null>`coalesce(${children.shirtNumber}, child_legacy.shirt_number)`,
+        childDisplayName: sql<string | null>`coalesce(${children.displayName}, child_legacy.display_name)`,
+      })
+      .from(childUpdates)
+      .leftJoin(children, eq(children.id, childUpdates.childId))
+      .leftJoin(
+        sql`children as child_legacy`,
+        sql`child_legacy.child_id = ${childUpdates.childIdLegacy}`
+      )
+      .where(eq(childUpdates.status, 'Pending'))
+      .orderBy(desc(childUpdates.submittedAt))
+      .limit(10);
+
+    const recent = rows.map(r => ({
+      id: r.id,
+      title: r.title || r.updateId || 'Untitled update',
+      childDisplayName: r.childDisplayName || r.childIdLegacy || 'Unknown child',
+      shirtNumber: r.childShirtNumber,
+      submittedAt: r.submittedAt ? new Date(r.submittedAt).toISOString() : null,
+    }));
     return { ok: true, count: recent.length, recent };
   } catch (err) {
     return {
@@ -133,15 +101,23 @@ export interface ShirtsToShipCard {
 
 export async function getShirtsToShipCard(): Promise<ShirtsToShipCard> {
   try {
-    // Anything not yet shipped is fair game for the "to ship" queue. The
-    // exact set of statuses to count depends on Kevin's workflow — we
-    // err inclusive and count anything that has a fulfillment row but
-    // no tracking number yet.
-    const formula = encodeURIComponent(`AND({Tracking}="", {Shipping}!="Shipped")`);
-    const data = await atGet<AirtableList>(
-      `/${encodeURIComponent(FULFILLMENT_TABLE)}?filterByFormula=${formula}&maxRecords=200&fields%5B%5D=Tracking`
-    );
-    return { ok: true, count: data.records.length };
+    // Anything with no tracking number AND not yet shipped is fair
+    // game for the queue — same inclusive rule as the Airtable
+    // formula `AND({Tracking}="", {Shipping}!="Shipped")`.
+    const rows = await db
+      .select({ id: fulfillments.id })
+      .from(fulfillments)
+      .where(
+        and(
+          or(isNull(fulfillments.tracking), eq(fulfillments.tracking, '')),
+          or(
+            isNull(fulfillments.shipping),
+            sql`${fulfillments.shipping} <> 'Shipped'`
+          )
+        )
+      )
+      .limit(500);
+    return { ok: true, count: rows.length };
   } catch (err) {
     return {
       ok: false,
@@ -166,11 +142,17 @@ export interface NewsletterDueCard {
 
 export async function getNewsletterDueCard(): Promise<NewsletterDueCard> {
   try {
-    const formula = encodeURIComponent(`{Status} = "Sent"`);
-    const data = await atGet<AirtableList>(
-      `/${encodeURIComponent(NEWSLETTERS_TABLE)}?filterByFormula=${formula}&maxRecords=1&sort%5B0%5D%5Bfield%5D=PublishedAt&sort%5B0%5D%5Bdirection%5D=desc`
-    );
-    const latest = data.records[0];
+    const rows = await db
+      .select({
+        publishedAt: newsletters.publishedAt,
+        subject: newsletters.subject,
+        title: newsletters.title,
+      })
+      .from(newsletters)
+      .where(eq(newsletters.status, 'Sent'))
+      .orderBy(desc(newsletters.publishedAt))
+      .limit(1);
+    const latest = rows[0];
     if (!latest) {
       return {
         ok: true,
@@ -180,8 +162,9 @@ export async function getNewsletterDueCard(): Promise<NewsletterDueCard> {
         due: true,
       };
     }
-    const f = latest.fields as Record<string, unknown>;
-    const publishedAt = (f.PublishedAt as string) || null;
+    const publishedAt = latest.publishedAt
+      ? new Date(latest.publishedAt).toISOString()
+      : null;
     let daysSinceLast: number | null = null;
     if (publishedAt) {
       const ms = Date.now() - new Date(publishedAt).getTime();
@@ -191,7 +174,7 @@ export async function getNewsletterDueCard(): Promise<NewsletterDueCard> {
       ok: true,
       daysSinceLast,
       lastSentAt: publishedAt,
-      lastSubject: (f.Subject as string) || (f.Title as string) || null,
+      lastSubject: latest.subject || latest.title || null,
       due: daysSinceLast === null || daysSinceLast >= 28,
     };
   } catch (err) {
@@ -224,21 +207,35 @@ export interface SponsorActivityCard {
 
 export async function getSponsorActivityCard(): Promise<SponsorActivityCard> {
   try {
-    const formula = encodeURIComponent(
-      `AND({Status}="Active", IS_AFTER({SponsorshipStartDate}, DATEADD(TODAY(), -7, 'days')))`
-    );
-    const data = await atGet<AirtableList>(
-      `/${encodeURIComponent(SPONSORSHIPS_TABLE)}?filterByFormula=${formula}&maxRecords=20&sort%5B0%5D%5Bfield%5D=SponsorshipStartDate&sort%5B0%5D%5Bdirection%5D=desc`
-    );
-    const newRecent = data.records.map(rec => {
-      const f = rec.fields as Record<string, unknown>;
-      return {
-        id: rec.id,
-        sponsorName: (f.SponsorName as string) || (f.SponsorEmail as string) || 'Unknown sponsor',
-        childDisplayName: (f.ChildDisplayName as string) || 'Unknown child',
-        sponsorshipStartDate: (f.SponsorshipStartDate as string) || null,
-      };
-    });
+    const cutoff = new Date();
+    cutoff.setUTCDate(cutoff.getUTCDate() - 7);
+    const cutoffDate = cutoff.toISOString().slice(0, 10);
+
+    const rows = await db
+      .select({
+        id: sponsorships.id,
+        sponsorName: sponsorships.sponsorName,
+        sponsorEmail: sponsorships.sponsorEmail,
+        childDisplayName: sponsorships.childDisplayName,
+        sponsorshipStartDate: sponsorships.sponsorshipStartDate,
+      })
+      .from(sponsorships)
+      .where(
+        and(
+          eq(sponsorships.status, 'Active'),
+          isNotNull(sponsorships.sponsorshipStartDate),
+          sql`${sponsorships.sponsorshipStartDate} > ${cutoffDate}`
+        )
+      )
+      .orderBy(desc(sponsorships.sponsorshipStartDate))
+      .limit(20);
+
+    const newRecent = rows.map(r => ({
+      id: r.id,
+      sponsorName: r.sponsorName || r.sponsorEmail || 'Unknown sponsor',
+      childDisplayName: r.childDisplayName || 'Unknown child',
+      sponsorshipStartDate: r.sponsorshipStartDate ?? null,
+    }));
     return { ok: true, newThisWeek: newRecent.length, newRecent };
   } catch (err) {
     return {
@@ -268,15 +265,24 @@ export interface RosterGapsCard {
 
 export async function getRosterGapsCard(): Promise<RosterGapsCard> {
   try {
-    // Pull everything (canonical kids only — exclude cycle records and
-    // the empty stubs). Canonical kids have ShirtNumber 1–53 and a real
-    // ChildID. Paginated because Airtable caps pageSize at 100 and we
-    // have ~165 child records (canonical + cycles + stubs).
-    const records = await atListAll(
-      CHILDREN_TABLE,
-      'fields%5B%5D=ShirtNumber&fields%5B%5D=ProfilePhoto&fields%5B%5D=NameMeaning&fields%5B%5D=FamilyContext&fields%5B%5D=Loves&fields%5B%5D=Notes&fields%5B%5D=ChildID&fields%5B%5D=DisplayName&fields%5B%5D=FirstName'
-    );
-    const data = { records };
+    // Canonical-kid-only: positive shirt_number AND a real name. In
+    // the Airtable world we had to dedupe by-name ghost duplicates
+    // from the legacy webhook seeding; the Postgres `children` rows
+    // are canonical from the migrator so no dedup needed.
+    const rows = await db
+      .select({
+        shirtNumber: children.shirtNumber,
+        displayName: children.displayName,
+        firstName: children.firstName,
+        profilePhotoUrl: children.profilePhotoUrl,
+        nameMeaning: children.nameMeaning,
+        familyContext: children.familyContext,
+        loves: children.loves,
+        notes: children.notes,
+      })
+      .from(children)
+      .where(isNotNull(children.shirtNumber));
+
     let totalKids = 0;
     let missingPhoto = 0;
     let missingNameMeaning = 0;
@@ -284,44 +290,17 @@ export async function getRosterGapsCard(): Promise<RosterGapsCard> {
     let missingLoves = 0;
     let missingNotes = 0;
     let fullyComplete = 0;
-
-    // First pass — same shape as the roster grid query: collect any
-    // record with a positive shirt number and a name, then dedupe
-    // ghost duplicates (no photo, name copied from a lower kid).
-    type Row = {
-      f: Record<string, unknown>;
-      n: number;
-      displayName: string;
-      hasPhoto: boolean;
-    };
-    const raw: Row[] = [];
-    for (const rec of data.records) {
-      const f = rec.fields as Record<string, unknown>;
-      const n = f.ShirtNumber as number | undefined;
-      if (typeof n !== 'number' || n < 1) continue;
-      const displayName =
-        ((f.DisplayName as string) || (f.FirstName as string) || '').trim();
+    for (const r of rows) {
+      const displayName = (r.displayName || r.firstName || '').trim();
       if (!displayName) continue;
-      const hasPhoto = Array.isArray(f.ProfilePhoto) && (f.ProfilePhoto as unknown[]).length > 0;
-      raw.push({ f, n, displayName, hasPhoto });
-    }
-    raw.sort((a, b) => a.n - b.n);
-    const seen = new Set<string>();
-    const real: Row[] = [];
-    for (const row of raw) {
-      const key = row.displayName.toLowerCase();
-      if (!row.hasPhoto && seen.has(key)) continue;
-      seen.add(key);
-      real.push(row);
-    }
-
-    for (const row of real) {
-      const { f, hasPhoto } = row;
+      const n = r.shirtNumber;
+      if (typeof n !== 'number' || n < 1) continue;
       totalKids++;
-      const hasNameMeaning = !!(f.NameMeaning as string);
-      const hasFamily = !!(f.FamilyContext as string);
-      const hasLoves = !!(f.Loves as string);
-      const hasNotes = !!(f.Notes as string);
+      const hasPhoto = !!r.profilePhotoUrl;
+      const hasNameMeaning = !!r.nameMeaning;
+      const hasFamily = !!r.familyContext;
+      const hasLoves = !!r.loves;
+      const hasNotes = !!r.notes;
       if (!hasPhoto) missingPhoto++;
       if (!hasNameMeaning) missingNameMeaning++;
       if (!hasFamily) missingFamilyContext++;
@@ -376,41 +355,52 @@ export async function getThisMonthCard(): Promise<ThisMonthCard> {
       .toISOString()
       .split('T')[0];
 
-    const [newSubs, donations, activeSubs] = await Promise.all([
-      atGet<AirtableList>(
-        `/${encodeURIComponent(SPONSORSHIPS_TABLE)}?filterByFormula=${encodeURIComponent(
-          `AND({Status}="Active", IS_AFTER({SponsorshipStartDate}, "${monthStart}"))`
-        )}&maxRecords=200&fields%5B%5D=SponsorshipStartDate`
-      ),
-      atGet<AirtableList>(
-        `/${encodeURIComponent(DONATIONS_TABLE)}?filterByFormula=${encodeURIComponent(
-          `AND({Payment Status}="Succeeded", IS_AFTER({Donation Date}, "${monthStart}"))`
-        )}&maxRecords=500&fields%5B%5D=Donation%20Amount`
-      ),
-      atGet<AirtableList>(
-        `/${encodeURIComponent(SPONSORSHIPS_TABLE)}?filterByFormula=${encodeURIComponent(
-          `{Status}="Active"`
-        )}&maxRecords=1000&fields%5B%5D=MonthlyAmount`
-      ),
+    const [newSubs, donationsRows, activeSubs] = await Promise.all([
+      db
+        .select({ id: sponsorships.id })
+        .from(sponsorships)
+        .where(
+          and(
+            eq(sponsorships.status, 'Active'),
+            isNotNull(sponsorships.sponsorshipStartDate),
+            sql`${sponsorships.sponsorshipStartDate} > ${monthStart}`
+          )
+        ),
+      db
+        .select({
+          donationAmount: donations.donationAmount,
+        })
+        .from(donations)
+        .where(
+          and(
+            eq(donations.paymentStatus, 'Succeeded'),
+            isNotNull(donations.donationDate),
+            sql`${donations.donationDate} > ${monthStart}`
+          )
+        ),
+      db
+        .select({
+          monthlyAmount: sponsorships.monthlyAmount,
+        })
+        .from(sponsorships)
+        .where(eq(sponsorships.status, 'Active')),
     ]);
 
-    const donationsThisMonthCents = donations.records.reduce((sum, rec) => {
-      const f = rec.fields as Record<string, unknown>;
-      const amount = (f['Donation Amount'] as number) || 0;
+    const donationsThisMonthCents = donationsRows.reduce((sum, rec) => {
+      const amount = Number(rec.donationAmount ?? 0);
       return sum + Math.round(amount * 100);
     }, 0);
 
-    const monthlyRecurringCents = activeSubs.records.reduce((sum, rec) => {
-      const f = rec.fields as Record<string, unknown>;
-      const amount = (f.MonthlyAmount as number) || 25;
+    const monthlyRecurringCents = activeSubs.reduce((sum, rec) => {
+      const amount = Number(rec.monthlyAmount ?? 25);
       return sum + Math.round(amount * 100);
     }, 0);
 
     return {
       ok: true,
-      newSponsorshipsThisMonth: newSubs.records.length,
+      newSponsorshipsThisMonth: newSubs.length,
       donationsThisMonthCents,
-      activeSponsorships: activeSubs.records.length,
+      activeSponsorships: activeSubs.length,
       monthlyRecurringCents,
     };
   } catch (err) {
@@ -512,115 +502,116 @@ export interface RosterKid {
   departureRequestedAt: string | null;
   departureRequestedNote: string;
   // Last time any structured field was touched. Best-effort via the
-  // Airtable record's createdTime when there's no LastModified field.
+  // row's updated_at column.
   lastModified: string;
 }
 
+/** Coerce the children.pending_fields JSON column into a flat
+ *  string array. Accepts either a JSON-array column value or a
+ *  string (legacy multipleSelect-style with comma separation). */
+function asStringArray(raw: unknown): string[] {
+  if (!raw) return [];
+  if (Array.isArray(raw)) {
+    return raw
+      .map(v => (typeof v === 'string' ? v : (v as { name?: string })?.name || ''))
+      .filter(Boolean);
+  }
+  if (typeof raw === 'string') {
+    return raw
+      .split(',')
+      .map(s => s.trim())
+      .filter(Boolean);
+  }
+  return [];
+}
+
+function asIsoOrNull(d: Date | string | null | undefined): string | null {
+  if (!d) return null;
+  return typeof d === 'string' ? d : d.toISOString();
+}
+
+/** Map a Drizzle children row → RosterKid. Pulled out so getRoster()
+ *  and getRosterKidByNumber() share one shape. */
+function rowToRosterKid(row: typeof children.$inferSelect): RosterKid {
+  const displayName = (row.displayName || row.firstName || '').trim();
+  const hasPhoto = !!row.profilePhotoUrl;
+  const studentOfMonthMonth = (row.studentOfMonthMonth || '').trim();
+  return {
+    recordId: row.id,
+    childId: row.childId || '',
+    shirtNumber: row.shirtNumber ?? 0,
+    displayName,
+    firstName: row.firstName || '',
+    gradeClass: row.gradeClass || null,
+    photoUrl: row.profilePhotoUrl || null,
+    has: {
+      photo: hasPhoto,
+      nameMeaning: !!row.nameMeaning,
+      familyContext: !!row.familyContext,
+      loves: !!row.loves,
+      childQuote: !!row.childQuote,
+      notes: !!row.notes,
+    },
+    hasPendingIntake: !!row.intakeFromCampus,
+    lastEditedBySimon: asIsoOrNull(row.lastEditedBySimon),
+    pendingFields: asStringArray(row.pendingFields),
+    pendingDraft: parsePendingDraft(
+      typeof row.pendingDraft === 'string'
+        ? row.pendingDraft
+        : row.pendingDraft
+          ? JSON.stringify(row.pendingDraft)
+          : ''
+    ),
+    publicValues: {
+      nameMeaning: row.nameMeaning || '',
+      familyContext: row.familyContext || '',
+      loves: row.loves || '',
+      childQuote: row.childQuote || '',
+      notes: row.notes || '',
+    },
+    hasReportCards:
+      Array.isArray(row.reportCardUrls) && (row.reportCardUrls as unknown[]).length > 0,
+    hasLetters:
+      Array.isArray(row.letterUrls) && (row.letterUrls as unknown[]).length > 0,
+    // Prefer the dedicated month-label column; fall back to the legacy
+    // boolean (loaded from Airtable's checkbox) rendered as a generic
+    // "Current" label so the gold star still shows for migrated rows.
+    studentOfMonth: studentOfMonthMonth || (row.studentOfMonth ? 'Current' : ''),
+    studentOfMonthReason: row.studentOfMonthReason || '',
+    pendingSOTMMonth: row.pendingSOTMMonth || '',
+    pendingSOTMReason: row.pendingSOTMReason || '',
+    deletionRequestedAt: asIsoOrNull(row.deletionRequestedAt),
+    departedAt: asIsoOrNull(row.departedAt),
+    departureNote: row.departureNote || '',
+    departureRequestedAt: asIsoOrNull(row.departureRequestedAt),
+    departureRequestedNote: row.departureRequestedNote || '',
+    lastModified: row.updatedAt
+      ? new Date(row.updatedAt).toISOString()
+      : new Date(row.createdAt).toISOString(),
+  };
+}
+
 export async function getRoster(): Promise<RosterKid[]> {
-  const records = await atListAll(CHILDREN_TABLE);
-
-  // Pull every record with a positive shirt number and a non-empty
-  // name. The data is messy: most kids exist under multiple shirt
-  // numbers (one canonical record at #1–53 plus extra rows the legacy
-  // Stripe webhook seeded at higher numbers when shirts in those
-  // ranges sold). For Simon's roster Kevin only wants ONE card per
-  // real kid — they all click through to the same editor anyway.
-  const raw: Array<{
-    rec: { id: string; createdTime: string; fields: Record<string, unknown> };
-    n: number;
-    displayName: string;
-    hasPhoto: boolean;
-  }> = [];
-  for (const rec of records) {
-    const f = rec.fields as Record<string, unknown>;
-    const n = f.ShirtNumber as number | undefined;
-    if (typeof n !== 'number' || n < 1) continue;
-    const displayName =
-      ((f.DisplayName as string) || (f.FirstName as string) || '').trim();
-    if (!displayName) continue;
-    const photoArr = (f.ProfilePhoto as Array<unknown>) || [];
-    raw.push({ rec, n, displayName, hasPhoto: photoArr.length > 0 });
-  }
-
-  // Pick one canonical record per unique name. Photo-bearing records
-  // beat photo-less ghosts; among photo-bearing records the lowest
-  // shirt number wins (the canonical #1-53 entry over a webhook copy
-  // at #54+). The result: each real kid shows once, linked to their
-  // primary record.
-  raw.sort((a, b) => {
-    if (a.hasPhoto !== b.hasPhoto) return a.hasPhoto ? -1 : 1;
-    return a.n - b.n;
-  });
-  const byName = new Map<string, typeof raw[number]>();
-  for (const r of raw) {
-    const key = r.displayName.toLowerCase();
-    if (!byName.has(key)) byName.set(key, r);
-  }
+  // Pull every canonical kid with a positive shirt number and a name.
+  // Postgres rows are already canonical (the migrator deduplicated
+  // ghost copies) so no by-name dedup needed.
+  const rows = await db
+    .select()
+    .from(children)
+    .where(isNotNull(children.shirtNumber));
 
   const kids: RosterKid[] = [];
-  for (const { rec, n, displayName, hasPhoto } of byName.values()) {
-    const f = rec.fields as Record<string, unknown>;
-    const photoArr = (f.ProfilePhoto as Array<{ url: string; thumbnails?: { large?: { url: string } } }>) || [];
-    const photoUrl = photoArr[0]?.thumbnails?.large?.url || photoArr[0]?.url || null;
-    kids.push({
-      recordId: rec.id,
-      childId: (f.ChildID as string) || '',
-      shirtNumber: n,
-      displayName,
-      firstName: (f.FirstName as string) || '',
-      gradeClass: (f.GradeClass as string) || null,
-      photoUrl,
-      has: {
-        photo: hasPhoto,
-        nameMeaning: !!(f.NameMeaning as string),
-        familyContext: !!(f.FamilyContext as string),
-        loves: !!(f.Loves as string),
-        childQuote: !!(f.ChildQuote as string),
-        notes: !!(f.Notes as string),
-      },
-      hasPendingIntake: !!(f.IntakeFromCampus as string),
-      lastEditedBySimon: (f.LastEditedBySimon as string) || null,
-      pendingFields: parsePendingFields(f.PendingFields),
-      pendingDraft: parsePendingDraft(f.PendingDraft),
-      publicValues: {
-        nameMeaning: (f.NameMeaning as string) || '',
-        familyContext: (f.FamilyContext as string) || '',
-        loves: (f.Loves as string) || '',
-        childQuote: (f.ChildQuote as string) || '',
-        notes: (f.Notes as string) || '',
-      },
-      hasReportCards: Array.isArray(f.ReportCards) && (f.ReportCards as unknown[]).length > 0,
-      hasLetters: Array.isArray(f.Letters) && (f.Letters as unknown[]).length > 0,
-      studentOfMonth: (f.StudentOfMonth as string) || '',
-      studentOfMonthReason: (f.StudentOfMonthReason as string) || '',
-      pendingSOTMMonth: (f.PendingSOTMMonth as string) || '',
-      pendingSOTMReason: (f.PendingSOTMReason as string) || '',
-      deletionRequestedAt: (f.DeletionRequestedAt as string) || null,
-      departedAt: (f.DepartedAt as string) || null,
-      departureNote: (f.DepartureNote as string) || '',
-      departureRequestedAt: (f.DepartureRequestedAt as string) || null,
-      departureRequestedNote: (f.DepartureRequestedNote as string) || '',
-      lastModified: rec.createdTime,
-    });
+  for (const row of rows) {
+    const displayName = (row.displayName || row.firstName || '').trim();
+    const n = row.shirtNumber;
+    if (!displayName) continue;
+    if (typeof n !== 'number' || n < 1) continue;
+    kids.push(rowToRosterKid(row));
   }
   // Alphabetical by display name — reads like a class roster.
   kids.sort((a, b) => a.displayName.localeCompare(b.displayName));
   return kids;
 }
-
-/** Airtable returns multipleSelects as either an array of strings or
- *  an array of `{ name }` objects depending on the API call. Normalize
- *  to a flat string[]. */
-function parsePendingFields(raw: unknown): string[] {
-  if (!Array.isArray(raw)) return [];
-  return raw
-    .map(v => (typeof v === 'string' ? v : (v as { name?: string })?.name || ''))
-    .filter(Boolean);
-}
-
-// parsePendingDraft is imported at the top of the file from
-// ./pending-draft so the save endpoint, approve endpoint, and this
-// queries module all read PendingDraft through one definition.
 
 export interface RosterKidAttachment {
   id: string;
@@ -644,28 +635,73 @@ export interface RosterKidDetail extends RosterKid {
   letters: RosterKidAttachment[];
   /** Every ProfilePhoto attached to this kid. Used by the editor to
    *  list them with delete controls, and by the public profile
-   *  carousel. The single `photoUrl` (large thumbnail of the first)
-   *  remains on the base RosterKid for the grid card. */
+   *  carousel. */
   photos: RosterKidAttachment[];
   /** Raw intake notes from Simon / YDO team. Kevin polishes these
    *  into the public fields, then clears the field. */
   intakeFromCampus: string;
 }
 
-export async function getRosterKidByNumber(shirtNumber: number): Promise<RosterKidDetail | null> {
-  const formula = encodeURIComponent(`{ShirtNumber}=${shirtNumber}`);
-  const data = await atGet<AirtableList>(
-    `/${encodeURIComponent(CHILDREN_TABLE)}?filterByFormula=${formula}&maxRecords=1`
-  );
-  const rec = data.records[0];
-  if (!rec) return null;
-  const f = rec.fields as Record<string, unknown>;
-  const photoArr = (f.ProfilePhoto as Array<{ url: string; thumbnails?: { large?: { url: string } } }>) || [];
-  const photoUrl = photoArr[0]?.thumbnails?.large?.url || photoArr[0]?.url || null;
+/** Coerce a jsonb attachment array into the RosterKidAttachment
+ *  shape. Tolerates plain URL strings (older rows) and object-shape
+ *  entries (current). */
+function mapAttachmentArray(
+  raw: unknown,
+  fieldKey: string
+): RosterKidAttachment[] {
+  if (!Array.isArray(raw)) return [];
+  const out: RosterKidAttachment[] = [];
+  for (let idx = 0; idx < raw.length; idx++) {
+    const entry: unknown = raw[idx];
+    if (typeof entry === 'string') {
+      const url = entry;
+      const filename = url.split('/').pop() || `${fieldKey}-${idx + 1}`;
+      out.push({
+        id: `${fieldKey}-${idx}`,
+        url,
+        filename,
+        thumbnailUrl: null,
+      });
+      continue;
+    }
+    if (entry && typeof entry === 'object') {
+      const e = entry as {
+        id?: string;
+        url?: string;
+        filename?: string;
+        size?: number;
+        type?: string;
+        thumbnailUrl?: string | null;
+      };
+      if (!e.url) continue;
+      out.push({
+        id: e.id || `${fieldKey}-${idx}`,
+        url: e.url,
+        filename: e.filename || e.url.split('/').pop() || `${fieldKey}-${idx + 1}`,
+        size: e.size,
+        type: e.type,
+        thumbnailUrl: e.thumbnailUrl ?? null,
+      });
+    }
+  }
+  return out;
+}
 
-  // Compute age from DateOfBirth if present (matches /[number] logic).
+export async function getRosterKidByNumber(
+  shirtNumber: number
+): Promise<RosterKidDetail | null> {
+  const rows = await db
+    .select()
+    .from(children)
+    .where(eq(children.shirtNumber, shirtNumber))
+    .limit(1);
+  const row = rows[0];
+  if (!row) return null;
+  const base = rowToRosterKid(row);
+
+  // Compute age from dateOfBirth if present (matches /[number] logic).
   let ageStr: string | null = null;
-  const dob = f.DateOfBirth as string | undefined;
+  const dob = row.dateOfBirth;
   if (dob) {
     const birth = new Date(dob);
     const today = new Date();
@@ -675,83 +711,33 @@ export async function getRosterKidByNumber(shirtNumber: number): Promise<RosterK
     ageStr = String(Math.max(0, years));
   }
 
-  // Helper to normalize Airtable attachment arrays for the editor.
-  const mapAttachments = (key: string): RosterKidAttachment[] => {
-    const raw = (f[key] as Array<{
-      id: string;
-      url: string;
-      filename: string;
-      size?: number;
-      type?: string;
-      thumbnails?: { large?: { url: string }; small?: { url: string } };
-    }>) || [];
-    // Airtable returns oldest first; reverse for most-recent-first.
-    return raw
-      .slice()
-      .reverse()
-      .map(a => ({
-        id: a.id,
-        url: a.url,
-        filename: a.filename,
-        size: a.size,
-        type: a.type,
-        thumbnailUrl: a.thumbnails?.large?.url || a.thumbnails?.small?.url || null,
-      }));
-  };
+  // Photos: combine the canonical profile_photo_url with the
+  // additional photo_urls array. Profile photo first so it stays the
+  // primary card image.
+  const photos: RosterKidAttachment[] = [];
+  if (row.profilePhotoUrl) {
+    photos.push({
+      id: 'profile',
+      url: row.profilePhotoUrl,
+      filename: row.profilePhotoUrl.split('/').pop() || 'profile',
+      thumbnailUrl: null,
+    });
+  }
+  photos.push(...mapAttachmentArray(row.photoUrls, 'photo'));
 
   return {
-    recordId: rec.id,
-    childId: (f.ChildID as string) || '',
-    shirtNumber: f.ShirtNumber as number,
-    displayName: (f.DisplayName as string) || (f.FirstName as string) || `Kid #${shirtNumber}`,
-    firstName: (f.FirstName as string) || '',
-    gradeClass: (f.GradeClass as string) || null,
-    photoUrl,
-    has: {
-      photo: photoArr.length > 0,
-      nameMeaning: !!(f.NameMeaning as string),
-      familyContext: !!(f.FamilyContext as string),
-      loves: !!(f.Loves as string),
-      childQuote: !!(f.ChildQuote as string),
-      notes: !!(f.Notes as string),
-    },
-    hasPendingIntake: !!(f.IntakeFromCampus as string),
-    lastEditedBySimon: (f.LastEditedBySimon as string) || null,
-    pendingFields: parsePendingFields(f.PendingFields),
-    pendingDraft: parsePendingDraft(f.PendingDraft),
-    publicValues: {
-      nameMeaning: (f.NameMeaning as string) || '',
-      familyContext: (f.FamilyContext as string) || '',
-      loves: (f.Loves as string) || '',
-      childQuote: (f.ChildQuote as string) || '',
-      notes: (f.Notes as string) || '',
-    },
-    hasReportCards: Array.isArray(f.ReportCards) && (f.ReportCards as unknown[]).length > 0,
-    hasLetters: Array.isArray(f.Letters) && (f.Letters as unknown[]).length > 0,
-    studentOfMonth: (f.StudentOfMonth as string) || '',
-    studentOfMonthReason: (f.StudentOfMonthReason as string) || '',
-    pendingSOTMMonth: (f.PendingSOTMMonth as string) || '',
-    pendingSOTMReason: (f.PendingSOTMReason as string) || '',
-    deletionRequestedAt: (f.DeletionRequestedAt as string) || null,
-    departedAt: (f.DepartedAt as string) || null,
-    departureNote: (f.DepartureNote as string) || '',
-    departureRequestedAt: (f.DepartureRequestedAt as string) || null,
-    departureRequestedNote: (f.DepartureRequestedNote as string) || '',
-    lastModified: rec.createdTime,
-    nameMeaning: (f.NameMeaning as string) || '',
-    familyContext: (f.FamilyContext as string) || '',
-    loves: (f.Loves as string) || '',
-    childQuote: (f.ChildQuote as string) || '',
-    notes: (f.Notes as string) || '',
+    ...base,
+    nameMeaning: row.nameMeaning || '',
+    familyContext: row.familyContext || '',
+    loves: row.loves || '',
+    childQuote: row.childQuote || '',
+    notes: row.notes || '',
     age: ageStr,
-    homeVillage: (f.HomeVillage as string) || null,
-    reportCards: mapAttachments('ReportCards'),
-    letters: mapAttachments('Letters'),
-    // mapAttachments reverses order (most-recent first). For photos
-    // we want oldest first so the carousel ordering matches what
-    // Kevin sees in the editor.
-    photos: mapAttachments('ProfilePhoto').slice().reverse(),
-    intakeFromCampus: (f.IntakeFromCampus as string) || '',
+    homeVillage: row.homeVillage || null,
+    reportCards: mapAttachmentArray(row.reportCardUrls, 'report-card'),
+    letters: mapAttachmentArray(row.letterUrls, 'letter'),
+    photos,
+    intakeFromCampus: row.intakeFromCampus || '',
   };
 }
 

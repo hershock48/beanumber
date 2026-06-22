@@ -4,25 +4,23 @@
  * GET /api/admin/roster/reassign?shirtNumber=N
  *   Returns context for the reassign UI:
  *     - the kid currently at that shirt #
- *     - the sponsorships linked to that kid
- *     - replacement candidates (same grade, no active sponsorship,
- *       not departed) ranked youngest-first
+ *     - the sponsorships linked to that kid (UUID + legacy ChildID)
+ *     - replacement candidates, same grade preferred
  *
  * POST /api/admin/roster/reassign
  *   Body: {
- *     fromShirtNumber: number,        // the departed kid's number
- *     toReplacementRecordId: string,  // the new kid's record ID
+ *     fromShirtNumber: number,
+ *     toReplacementRecordId: string  // uuid of the new kid
  *   }
  *
  *   Atomic-ish transfer:
- *     1. Move departed kid's ShirtNumber → ArchivedShirtNumber, clear ShirtNumber.
- *     2. If replacement had an existing ShirtNumber, move it to their
- *        ArchivedShirtNumber. Set replacement's ShirtNumber = departed's old #.
- *     3. For each active Sponsorship linked to the departed kid:
- *          - Append departed kid's ChildID to PreviousChildIDs
- *          - Swap Children link: departed → replacement
- *          - Set LastReassignedAt = now
- *          - Clear ChildRevealedAt so the reveal overlay fires next visit
+ *     1. Departed kid: shirt_number → archived_shirt_number, clear shirt_number.
+ *     2. Replacement: archive their old shirt_number (if any), take departing's number.
+ *     3. For each Active/Holder/Awaiting Sponsorship linked to departing:
+ *          - Append departing's ChildID to previousChildIds (CSV)
+ *          - Swap childId / childIdLegacy to the replacement
+ *          - Set lastReassignedAt = now
+ *          - Clear childRevealedAt so the reveal fires next visit
  *
  *   Admin only.
  */
@@ -31,165 +29,75 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdminToken } from '@/lib/auth';
 import { getAdminRole } from '@/lib/admin-session';
 import { normalizeGrade } from '@/lib/admin/grade';
+import { db } from '@/lib/db/client';
+import { children, sponsorships } from '@/lib/db/schema';
+import { and, eq, inArray, isNull, or } from 'drizzle-orm';
 
-const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID || '';
-const AIRTABLE_API_KEY =
-  process.env.AIRTABLE_PAT || process.env.AIRTABLE_API_KEY || '';
-const CHILDREN_TABLE = process.env.AIRTABLE_CHILDREN_TABLE || 'Children';
-const SPONSORSHIPS_TABLE =
-  process.env.AIRTABLE_SPONSORSHIPS_TABLE || 'Sponsorships';
-
-const F_CHILDREN = {
-  shirtNumber: 'fldFLnW4dMCjyKFkO',
-  archivedShirtNumber: 'fld01whJoezADPNB6',
-};
-const F_SPONSORSHIPS = {
-  children: 'fld5hJJWvO9E2qVFg',
-  previousChildIDs: 'fldM0JVmkm6ezr4Vc',
-  lastReassignedAt: 'fldAggq3BvZKaIFDi',
-  childRevealedAt: 'fldxnWrpn1QMFQUOf',
-};
-
-function atHeaders() {
-  return {
-    Authorization: `Bearer ${AIRTABLE_API_KEY}`,
-    'Content-Type': 'application/json',
-  };
+async function findKidByShirtNumber(n: number) {
+  const rows = await db
+    .select()
+    .from(children)
+    .where(eq(children.shirtNumber, n))
+    .limit(1);
+  return rows[0] || null;
 }
 
-interface ChildFields {
-  ChildID?: string;
-  ShirtNumber?: number;
-  DisplayName?: string;
-  FirstName?: string;
-  GradeClass?: string;
-  ProfilePhoto?: Array<{ url: string; thumbnails?: { large?: { url: string } } }>;
-  DepartedAt?: string;
-}
-
-interface ChildRecord {
-  id: string;
-  fields: ChildFields;
-}
-
-interface SponsorshipFields {
-  Status?: { name?: string } | string;
-  SponsorEmail?: string;
-  SponsorName?: string;
-  Children?: string[];
-  PreviousChildIDs?: string;
-}
-
-interface SponsorshipRecord {
-  id: string;
-  fields: SponsorshipFields;
-}
-
-async function findKidByShirtNumber(n: number): Promise<ChildRecord | null> {
-  const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(
-    CHILDREN_TABLE
-  )}?filterByFormula=${encodeURIComponent(`{ShirtNumber}=${n}`)}&maxRecords=1`;
-  const res = await fetch(url, { headers: atHeaders(), cache: 'no-store' });
-  if (!res.ok) return null;
-  const data = await res.json();
-  return (data.records?.[0] as ChildRecord) || null;
-}
-
-async function getKidByRecordId(id: string): Promise<ChildRecord | null> {
-  const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(
-    CHILDREN_TABLE
-  )}/${id}`;
-  const res = await fetch(url, { headers: atHeaders(), cache: 'no-store' });
-  if (!res.ok) return null;
-  return (await res.json()) as ChildRecord;
+async function getKidByRecordId(id: string) {
+  const rows = await db.select().from(children).where(eq(children.id, id)).limit(1);
+  return rows[0] || null;
 }
 
 async function findSponsorshipsForKid(
-  childRecordId: string
-): Promise<SponsorshipRecord[]> {
-  const formula = `AND(
-    FIND("${childRecordId}", ARRAYJOIN({Children}))>0,
-    OR({Status}="Active", {Status}="Awaiting Sponsor")
-  )`.replace(/\s+/g, ' ');
-  const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(
-    SPONSORSHIPS_TABLE
-  )}?filterByFormula=${encodeURIComponent(formula)}&pageSize=50`;
-  const res = await fetch(url, { headers: atHeaders(), cache: 'no-store' });
-  if (!res.ok) return [];
-  const data = await res.json();
-  return (data.records || []) as SponsorshipRecord[];
+  childRecordId: string,
+  childIdLegacy: string | null
+) {
+  // Dual-key kid match — UUID FK OR legacy ChildID — so transition-state
+  // rows that carry only the legacy id still get reassigned.
+  return db
+    .select()
+    .from(sponsorships)
+    .where(
+      and(
+        or(
+          eq(sponsorships.childId, childRecordId),
+          childIdLegacy ? eq(sponsorships.childIdLegacy, childIdLegacy) : eq(sponsorships.childIdLegacy, '__NEVER__')
+        ),
+        inArray(sponsorships.status, ['Active', 'Holder', 'Awaiting Sponsor'])
+      )
+    );
 }
 
-async function listEligibleReplacements(
-  departedKid: ChildRecord
-): Promise<
-  Array<{
-    recordId: string;
-    shirtNumber: number;
-    displayName: string;
-    photoUrl: string | null;
-    gradeClass: string;
-    gradeKey: string;
-    /** True when this candidate is in the same grade as the
-     *  departed kid. Used by the UI to put same-grade candidates
-     *  first; not a filter. */
-    sameGrade: boolean;
-  }>
-> {
-  const targetGradeKey = normalizeGrade(departedKid.fields.GradeClass).key;
-  // Pull all active kids.
-  const out: ChildRecord[] = [];
-  let offset: string | undefined;
-  do {
-    const params = new URLSearchParams();
-    params.set('pageSize', '100');
-    if (offset) params.set('offset', offset);
-    const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(
-      CHILDREN_TABLE
-    )}?${params.toString()}`;
-    const res = await fetch(url, { headers: atHeaders(), cache: 'no-store' });
-    if (!res.ok) break;
-    const data = await res.json();
-    out.push(...((data.records || []) as ChildRecord[]));
-    offset = data.offset;
-  } while (offset);
-
-  return out
-    .filter(r => {
-      const f = r.fields;
-      // Sponsorships pool — multiple sponsors per kid is fine. The
-      // only exclusions are records that genuinely can't accept a
-      // reassignment: the departed kid themselves, records with no
-      // shirt number (incomplete), and other departed kids.
-      if (r.id === departedKid.id) return false;
-      if (typeof f.ShirtNumber !== 'number' || f.ShirtNumber < 1) return false;
-      if (f.DepartedAt) return false;
-      return true;
-    })
+async function listEligibleReplacements(departed: { id: string; gradeClass: string | null }) {
+  // All kids except the departed one, with a shirt number and not
+  // departed.
+  const rows = await db
+    .select()
+    .from(children)
+    .where(and(isNull(children.departedAt)));
+  const targetGradeKey = normalizeGrade(departed.gradeClass).key;
+  return rows
+    .filter(r => r.id !== departed.id)
+    .filter(r => typeof r.shirtNumber === 'number' && (r.shirtNumber ?? 0) >= 1)
     .map(r => {
-      const f = r.fields;
-      const photoArr = f.ProfilePhoto || [];
-      const gradeKey = normalizeGrade(f.GradeClass).key;
+      const gradeKey = normalizeGrade(r.gradeClass).key;
       return {
         recordId: r.id,
-        shirtNumber: f.ShirtNumber!,
-        displayName: f.DisplayName || f.FirstName || `Kid #${f.ShirtNumber}`,
-        photoUrl:
-          photoArr[0]?.thumbnails?.large?.url || photoArr[0]?.url || null,
-        gradeClass: f.GradeClass || '',
+        shirtNumber: r.shirtNumber!,
+        displayName:
+          r.displayName || r.firstName || `Kid #${r.shirtNumber}`,
+        photoUrl: r.profilePhotoUrl || null,
+        gradeClass: r.gradeClass || '',
         gradeKey,
         sameGrade: gradeKey === targetGradeKey,
       };
     })
     .sort((a, b) => {
-      // Same-grade kids first (they're the obvious fit), then by
-      // shirt number ascending.
       if (a.sameGrade !== b.sameGrade) return a.sameGrade ? -1 : 1;
       return a.shirtNumber - b.shirtNumber;
     });
 }
 
-// ─── GET — context for the reassign UI ───────────────────────────
+// ─── GET ─────────────────────────────────────────────────────────
 
 export async function GET(request: NextRequest) {
   if (!verifyAdminToken(request)) {
@@ -197,10 +105,7 @@ export async function GET(request: NextRequest) {
   }
   const role = (await getAdminRole()) || 'admin';
   if (role !== 'admin') {
-    return NextResponse.json(
-      { error: 'Admin only' },
-      { status: 403 }
-    );
+    return NextResponse.json({ error: 'Admin only' }, { status: 403 });
   }
 
   const url = new URL(request.url);
@@ -221,37 +126,32 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const sponsorships = await findSponsorshipsForKid(kid.id);
+  const sponsorshipsForKid = await findSponsorshipsForKid(kid.id, kid.childId);
   const replacements = await listEligibleReplacements(kid);
 
   return NextResponse.json({
     ok: true,
     kid: {
       recordId: kid.id,
-      shirtNumber: kid.fields.ShirtNumber,
+      shirtNumber: kid.shirtNumber,
       displayName:
-        kid.fields.DisplayName ||
-        kid.fields.FirstName ||
-        `Kid #${shirtNumber}`,
-      gradeClass: kid.fields.GradeClass || '',
-      gradeKey: normalizeGrade(kid.fields.GradeClass).key,
-      gradeLabel: normalizeGrade(kid.fields.GradeClass).label,
-      departedAt: kid.fields.DepartedAt || null,
+        kid.displayName || kid.firstName || `Kid #${shirtNumber}`,
+      gradeClass: kid.gradeClass || '',
+      gradeKey: normalizeGrade(kid.gradeClass).key,
+      gradeLabel: normalizeGrade(kid.gradeClass).label,
+      departedAt: kid.departedAt ? new Date(kid.departedAt).toISOString() : null,
     },
-    sponsorships: sponsorships.map(s => ({
+    sponsorships: sponsorshipsForKid.map(s => ({
       recordId: s.id,
-      sponsorName: s.fields.SponsorName || '(unnamed sponsor)',
-      sponsorEmail: s.fields.SponsorEmail || '',
-      status:
-        typeof s.fields.Status === 'string'
-          ? s.fields.Status
-          : s.fields.Status?.name || '',
+      sponsorName: s.sponsorName || '(unnamed sponsor)',
+      sponsorEmail: s.sponsorEmail || '',
+      status: s.status || '',
     })),
     replacements,
   });
 }
 
-// ─── POST — execute the transfer ────────────────────────────────
+// ─── POST ────────────────────────────────────────────────────────
 
 export async function POST(request: NextRequest) {
   if (!verifyAdminToken(request)) {
@@ -265,10 +165,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  let body: {
-    fromShirtNumber?: number;
-    toReplacementRecordId?: string;
-  };
+  let body: { fromShirtNumber?: number; toReplacementRecordId?: string };
   try {
     body = await request.json();
   } catch {
@@ -286,7 +183,7 @@ export async function POST(request: NextRequest) {
       { status: 400 }
     );
   }
-  if (!toReplacementRecordId || !toReplacementRecordId.startsWith('rec')) {
+  if (!toReplacementRecordId) {
     return NextResponse.json(
       { error: 'toReplacementRecordId required' },
       { status: 400 }
@@ -313,115 +210,75 @@ export async function POST(request: NextRequest) {
       { status: 400 }
     );
   }
-  if (replacement.fields.DepartedAt) {
+  if (replacement.departedAt) {
     return NextResponse.json(
       { error: 'Replacement kid is marked departed — pick a different one' },
       { status: 400 }
     );
   }
 
-  const departedChildId = departing.fields.ChildID || '';
-  const sponsorships = await findSponsorshipsForKid(departing.id);
+  const departingChildIdLegacy = departing.childId;
+  const sponsorshipsForKid = await findSponsorshipsForKid(
+    departing.id,
+    departingChildIdLegacy
+  );
 
   try {
-    // Step 1: move shirt #s. Replacement's old number (if any) goes
-    // into their archive slot; replacement takes departing's number;
-    // departing's number lands in their own archive slot.
-    const replacementOldShirt = replacement.fields.ShirtNumber;
-    // Patch the replacement first — set new ShirtNumber + archive
-    // the old one if they had one.
-    {
-      const fields: Record<string, unknown> = {
-        [F_CHILDREN.shirtNumber]: fromShirtNumber,
-      };
-      if (typeof replacementOldShirt === 'number') {
-        fields[F_CHILDREN.archivedShirtNumber] = replacementOldShirt;
-      }
-      const res = await fetch(
-        `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(
-          CHILDREN_TABLE
-        )}/${replacement.id}`,
-        {
-          method: 'PATCH',
-          headers: atHeaders(),
-          body: JSON.stringify({ fields, typecast: true }),
-        }
-      );
-      if (!res.ok) {
-        return NextResponse.json(
-          { error: `Replacement update failed: ${res.status} ${await res.text()}` },
-          { status: 502 }
-        );
-      }
-    }
-    // Patch the departing kid — archive their (now-stolen) number
-    // and clear it. Two separate PATCHes since Airtable enforces a
-    // unique constraint... actually no it doesn't, but doing them
-    // in this order avoids any race-condition collision.
-    {
-      const fields: Record<string, unknown> = {
-        [F_CHILDREN.archivedShirtNumber]: fromShirtNumber,
-        [F_CHILDREN.shirtNumber]: null,
-      };
-      const res = await fetch(
-        `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(
-          CHILDREN_TABLE
-        )}/${departing.id}`,
-        {
-          method: 'PATCH',
-          headers: atHeaders(),
-          body: JSON.stringify({ fields, typecast: true }),
-        }
-      );
-      if (!res.ok) {
-        return NextResponse.json(
-          { error: `Departing update failed: ${res.status} ${await res.text()}` },
-          { status: 502 }
-        );
-      }
-    }
+    // Step 1: shirt-number transfer.
+    // Replacement first — they take departing's number; their old
+    // number lands in archive.
+    const replacementOldShirt = replacement.shirtNumber;
+    await db
+      .update(children)
+      .set({
+        shirtNumber: fromShirtNumber,
+        archivedShirtNumber:
+          typeof replacementOldShirt === 'number'
+            ? replacementOldShirt
+            : replacement.archivedShirtNumber,
+        updatedAt: new Date(),
+      })
+      .where(eq(children.id, replacement.id));
 
-    // Step 2: update each sponsorship.
-    const now = new Date().toISOString();
-    for (const s of sponsorships) {
-      const existingHistory = (s.fields.PreviousChildIDs as string) || '';
-      const updatedHistory = existingHistory
-        ? `${existingHistory}\n${departedChildId}`
-        : departedChildId;
-      const res = await fetch(
-        `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(
-          SPONSORSHIPS_TABLE
-        )}/${s.id}`,
-        {
-          method: 'PATCH',
-          headers: atHeaders(),
-          body: JSON.stringify({
-            fields: {
-              [F_SPONSORSHIPS.children]: [replacement.id],
-              [F_SPONSORSHIPS.previousChildIDs]: updatedHistory,
-              [F_SPONSORSHIPS.lastReassignedAt]: now,
-              [F_SPONSORSHIPS.childRevealedAt]: null,
-            },
-            typecast: true,
-          }),
-        }
-      );
-      if (!res.ok) {
-        console.warn(
-          `[reassign] sponsorship ${s.id} update failed:`,
-          await res.text()
-        );
-      }
+    // Departing — archive its (now-stolen) number, clear the live one.
+    await db
+      .update(children)
+      .set({
+        archivedShirtNumber: fromShirtNumber,
+        shirtNumber: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(children.id, departing.id));
+
+    // Step 2: rewrite each sponsorship.
+    const now = new Date();
+    for (const s of sponsorshipsForKid) {
+      const existingHistory = s.previousChildIds || '';
+      const updatedHistory = departingChildIdLegacy
+        ? existingHistory
+          ? `${existingHistory}\n${departingChildIdLegacy}`
+          : departingChildIdLegacy
+        : existingHistory;
+
+      await db
+        .update(sponsorships)
+        .set({
+          childId: replacement.id,
+          childIdLegacy: replacement.childId,
+          previousChildIds: updatedHistory,
+          lastReassignedAt: now,
+          childRevealedAt: null,
+          updatedAt: now,
+        })
+        .where(eq(sponsorships.id, s.id));
     }
 
     return NextResponse.json({
       ok: true,
-      transferredSponsorships: sponsorships.length,
+      transferredSponsorships: sponsorshipsForKid.length,
       newShirtNumberForReplacement: fromShirtNumber,
       replacementName:
-        replacement.fields.DisplayName ||
-        replacement.fields.FirstName ||
-        'kid',
+        replacement.displayName || replacement.firstName || 'kid',
     });
   } catch (err) {
     return NextResponse.json(

@@ -2,129 +2,42 @@
  * Admin · Student of the Month — nominate / approve / clear.
  *
  * POST /api/admin/sotm
- *   Body: { action: 'nominate' | 'approve' | 'clear', shirtNumber?: number }
+ *   Body: { action: 'nominate' | 'approve' | 'clear', shirtNumber?: number, reason?: string }
  *
  *   - nominate (Simon or Kevin):
- *       Sets the picked kid's PendingSOTMMonth to the current month
- *       label ("May 2026"). Clears any other kid's pending pick so
- *       only one nomination is live at a time. Doesn't touch the
- *       published StudentOfMonth field — Kevin still needs to
- *       approve.
- *
+ *       Sets the picked kid's pendingSOTMMonth to the current month
+ *       label ("May 2026"). Clears any other same-grade kid's pending
+ *       pick so only one nomination is live per grade. Doesn't touch
+ *       the published studentOfMonthMonth field — Kevin still approves.
  *   - approve (Kevin only):
- *       Promotes the picked kid's pending pick to the published
- *       StudentOfMonth field, clearing pending. Also clears any
- *       other kid's StudentOfMonth so there's a single published
- *       winner per month. Simon's clients can call this if they want
- *       to override their own pick (treated same as nominate).
- *
+ *       Promotes the pending pick to studentOfMonthMonth, clearing
+ *       same-grade other winners' published award.
  *   - clear (Kevin only):
- *       Clears both the published award and the pending pick for
- *       the specified kid. Used by the "remove award" link.
+ *       Clears both published and pending for all kids.
  *
- * Auth: cookie or X-Admin-Token; getAdminRole determines what
- * actions are allowed.
+ * Auth: cookie or X-Admin-Token.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdminToken } from '@/lib/auth';
 import { getAdminRole } from '@/lib/admin-session';
 import { normalizeGrade } from '@/lib/admin/grade';
-
-const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID || '';
-const AIRTABLE_API_KEY =
-  process.env.AIRTABLE_PAT || process.env.AIRTABLE_API_KEY || '';
-const CHILDREN_TABLE = process.env.AIRTABLE_CHILDREN_TABLE || 'Children';
-
-const F = {
-  shirtNumber: 'fldFLnW4dMCjyKFkO',
-  studentOfMonth: 'fldQrcXzw32aOZWZ3',
-  studentOfMonthReason: 'fldT6JM5iRo4AhtBf',
-  pendingSOTMMonth: 'fld1RuoP2O5xD1vkl',
-  pendingSOTMReason: 'fldy1HU5aSK8aqJ1K',
-};
-
-function atHeaders() {
-  return {
-    Authorization: `Bearer ${AIRTABLE_API_KEY}`,
-    'Content-Type': 'application/json',
-  };
-}
+import { db } from '@/lib/db/client';
+import { children } from '@/lib/db/schema';
+import { eq, isNotNull } from 'drizzle-orm';
 
 function currentMonthLabel(): string {
   const d = new Date();
   return `${d.toLocaleString('en-US', { month: 'long' })} ${d.getFullYear()}`;
 }
 
-/** Find one Child record by shirt number. Returns id + fields so the
- *  approve flow can read the existing pending reason. */
-async function findChildByShirtNumber(
-  n: number
-): Promise<{ id: string; fields: Record<string, unknown> } | null> {
-  const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(
-    CHILDREN_TABLE
-  )}?filterByFormula=${encodeURIComponent(`{ShirtNumber}=${n}`)}&maxRecords=1`;
-  const res = await fetch(url, { headers: atHeaders(), cache: 'no-store' });
-  if (!res.ok) return null;
-  const data = await res.json();
-  const rec = data.records?.[0];
-  return rec ? { id: rec.id, fields: rec.fields || {} } : null;
-}
-
-/** Find every Child record where the given fieldName is non-empty.
- *  Returns id + GradeClass so the caller can scope clears to a
- *  single grade (one SOTM winner per grade per month). */
-async function findKidsWithField(
-  fieldName: string
-): Promise<Array<{ id: string; gradeClass: string }>> {
-  const params = new URLSearchParams();
-  params.set('filterByFormula', `{${fieldName}} != ""`);
-  params.set('pageSize', '100');
-  params.append('fields[]', 'GradeClass');
-  const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(
-    CHILDREN_TABLE
-  )}?${params.toString()}`;
-  const res = await fetch(url, { headers: atHeaders(), cache: 'no-store' });
-  if (!res.ok) return [];
-  const data = await res.json();
-  return (data.records || []).map(
-    (r: { id: string; fields?: { GradeClass?: string } }) => ({
-      id: r.id,
-      gradeClass: r.fields?.GradeClass || '',
-    })
-  );
-}
-
-/** Batch-patch a set of records to clear a specific field. Airtable
- *  accepts up to 10 records per PATCH so we chunk if needed. */
-async function clearFieldOnRecords(records: Array<{ id: string }>, fieldId: string): Promise<void> {
-  if (records.length === 0) return;
-  for (let i = 0; i < records.length; i += 10) {
-    const batch = records.slice(i, i + 10);
-    const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(CHILDREN_TABLE)}`;
-    await fetch(url, {
-      method: 'PATCH',
-      headers: atHeaders(),
-      body: JSON.stringify({
-        records: batch.map(r => ({
-          id: r.id,
-          fields: { [fieldId]: null },
-        })),
-      }),
-    });
-  }
-}
-
-/** Patch a single record with a set of field updates. */
-async function patchOne(recordId: string, fields: Record<string, unknown>): Promise<Response> {
-  const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(
-    CHILDREN_TABLE
-  )}/${recordId}`;
-  return fetch(url, {
-    method: 'PATCH',
-    headers: atHeaders(),
-    body: JSON.stringify({ fields }),
-  });
+async function findChildByShirtNumber(n: number) {
+  const rows = await db
+    .select()
+    .from(children)
+    .where(eq(children.shirtNumber, n))
+    .limit(1);
+  return rows[0] || null;
 }
 
 export async function POST(request: NextRequest) {
@@ -167,15 +80,30 @@ export async function POST(request: NextRequest) {
 
   try {
     if (action === 'clear') {
-      // Clear all four fields on every record that has them set.
-      const withPublished = await findKidsWithField('StudentOfMonth');
-      const withPublishedReason = await findKidsWithField('StudentOfMonthReason');
-      const withPending = await findKidsWithField('PendingSOTMMonth');
-      const withPendingReason = await findKidsWithField('PendingSOTMReason');
-      await clearFieldOnRecords(withPublished, F.studentOfMonth);
-      await clearFieldOnRecords(withPublishedReason, F.studentOfMonthReason);
-      await clearFieldOnRecords(withPending, F.pendingSOTMMonth);
-      await clearFieldOnRecords(withPendingReason, F.pendingSOTMReason);
+      // Wipe all four fields on every row that has any of them set.
+      // Single statement that nulls every kid is fine — these columns
+      // default to null and the dataset is small.
+      await db
+        .update(children)
+        .set({
+          studentOfMonthMonth: null,
+          studentOfMonthReason: null,
+          pendingSOTMMonth: null,
+          pendingSOTMReason: null,
+          updatedAt: new Date(),
+        })
+        .where(
+          isNotNull(children.studentOfMonthMonth) // any row with at least one set
+        );
+      // Also clear the pending fields for rows where only pending is set.
+      await db
+        .update(children)
+        .set({
+          pendingSOTMMonth: null,
+          pendingSOTMReason: null,
+          updatedAt: new Date(),
+        })
+        .where(isNotNull(children.pendingSOTMMonth));
       return NextResponse.json({ ok: true, cleared: true });
     }
 
@@ -187,71 +115,94 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Target's grade — used to scope clears to one winner per grade.
-    const targetGradeKey = normalizeGrade(
-      target.fields?.GradeClass as string | undefined
-    ).key;
+    const targetGradeKey = normalizeGrade(target.gradeClass).key;
 
     if (action === 'nominate') {
-      // Clear other nominations IN THE SAME GRADE only. Each of the
-      // 7 grades runs its own SOTM, so a P3 nomination doesn't
-      // touch P1's pending pick.
-      const allPending = await findKidsWithField('PendingSOTMMonth');
-      const others = allPending.filter(
-        r => r.id !== target.id && normalizeGrade(r.gradeClass).key === targetGradeKey
-      );
-      await clearFieldOnRecords(others, F.pendingSOTMMonth);
-      await clearFieldOnRecords(others, F.pendingSOTMReason);
-      // Stamp the target with the month + Simon's reason text.
-      const stamp: Record<string, unknown> = {
-        [F.pendingSOTMMonth]: month,
-      };
-      stamp[F.pendingSOTMReason] = reason || null;
-      const res = await patchOne(target.id, stamp);
-      if (!res.ok) {
-        return NextResponse.json(
-          { error: `Nominate failed: ${res.status} ${await res.text()}` },
-          { status: 502 }
-        );
+      // Clear other same-grade pending picks.
+      const allPending = await db
+        .select({ id: children.id, gradeClass: children.gradeClass })
+        .from(children)
+        .where(isNotNull(children.pendingSOTMMonth));
+      const otherIds = allPending
+        .filter(
+          r =>
+            r.id !== target.id && normalizeGrade(r.gradeClass).key === targetGradeKey
+        )
+        .map(r => r.id);
+      for (const id of otherIds) {
+        await db
+          .update(children)
+          .set({
+            pendingSOTMMonth: null,
+            pendingSOTMReason: null,
+            updatedAt: new Date(),
+          })
+          .where(eq(children.id, id));
       }
+      await db
+        .update(children)
+        .set({
+          pendingSOTMMonth: month,
+          pendingSOTMReason: reason || null,
+          updatedAt: new Date(),
+        })
+        .where(eq(children.id, target.id));
       return NextResponse.json({ ok: true, action, shirtNumber, month, reason });
     }
 
-    // approve — published award goes to the target. We carry over
-    // whatever pending reason was set (Simon's wording) unless Kevin
-    // supplies an override. We clear previous winners IN THE SAME
-    // GRADE only (each grade has its own SOTM). Pending nominations
-    // in this grade also clear since the slot is now filled.
-    const existingPendingReason =
-      typeof target.fields?.PendingSOTMReason === 'string'
-        ? (target.fields.PendingSOTMReason as string)
-        : '';
+    // approve — same-grade winner cleanup.
+    const existingPendingReason = target.pendingSOTMReason || '';
     const reasonToPublish = reason || existingPendingReason;
 
-    const allPublished = await findKidsWithField('StudentOfMonth');
-    const samePublishedOthers = allPublished.filter(
-      r => r.id !== target.id && normalizeGrade(r.gradeClass).key === targetGradeKey
-    );
-    await clearFieldOnRecords(samePublishedOthers, F.studentOfMonth);
-    await clearFieldOnRecords(samePublishedOthers, F.studentOfMonthReason);
-    const allPending = await findKidsWithField('PendingSOTMMonth');
-    const samePending = allPending.filter(
-      r => normalizeGrade(r.gradeClass).key === targetGradeKey
-    );
-    await clearFieldOnRecords(samePending, F.pendingSOTMMonth);
-    await clearFieldOnRecords(samePending, F.pendingSOTMReason);
-    const res = await patchOne(target.id, {
-      [F.studentOfMonth]: month,
-      [F.studentOfMonthReason]: reasonToPublish || null,
-      [F.pendingSOTMMonth]: null,
-      [F.pendingSOTMReason]: null,
-    });
-    if (!res.ok) {
-      return NextResponse.json(
-        { error: `Approve failed: ${res.status} ${await res.text()}` },
-        { status: 502 }
-      );
+    const allPublished = await db
+      .select({ id: children.id, gradeClass: children.gradeClass })
+      .from(children)
+      .where(isNotNull(children.studentOfMonthMonth));
+    const samePublishedOtherIds = allPublished
+      .filter(
+        r =>
+          r.id !== target.id && normalizeGrade(r.gradeClass).key === targetGradeKey
+      )
+      .map(r => r.id);
+    for (const id of samePublishedOtherIds) {
+      await db
+        .update(children)
+        .set({
+          studentOfMonthMonth: null,
+          studentOfMonthReason: null,
+          updatedAt: new Date(),
+        })
+        .where(eq(children.id, id));
     }
+    // Clear same-grade pending nominations (slot is filled).
+    const allPending = await db
+      .select({ id: children.id, gradeClass: children.gradeClass })
+      .from(children)
+      .where(isNotNull(children.pendingSOTMMonth));
+    const samePendingIds = allPending
+      .filter(r => normalizeGrade(r.gradeClass).key === targetGradeKey)
+      .map(r => r.id);
+    for (const id of samePendingIds) {
+      await db
+        .update(children)
+        .set({
+          pendingSOTMMonth: null,
+          pendingSOTMReason: null,
+          updatedAt: new Date(),
+        })
+        .where(eq(children.id, id));
+    }
+    await db
+      .update(children)
+      .set({
+        studentOfMonth: true,
+        studentOfMonthMonth: month,
+        studentOfMonthReason: reasonToPublish || null,
+        pendingSOTMMonth: null,
+        pendingSOTMReason: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(children.id, target.id));
     return NextResponse.json({ ok: true, action, shirtNumber, month });
   } catch (err) {
     return NextResponse.json(

@@ -1,6 +1,6 @@
 /**
- * Admin · Approve pending edits — promote Simon&rsquo;s PendingDraft text
- * fields to the live public fields, OR dismiss them without writing.
+ * Admin · Approve pending edits — promote Simon's pendingDraft text
+ * fields to the live public columns, OR dismiss them.
  *
  * POST /api/admin/roster/approve
  * Body: {
@@ -8,51 +8,34 @@
  *   action: 'approveAll' | { field: string, decision: 'accept' | 'dismiss' }
  * }
  *
- * approveAll  — copies every pending field from PendingDraft to its
- *               public field, then clears PendingDraft, PendingFields,
- *               and LastEditedBySimon.
- * accept      — copies just the named field to public, removes that
- *               key from PendingDraft + PendingFields. If PendingFields
- *               empties, clears LastEditedBySimon too.
- * dismiss     — removes the named field from PendingDraft +
- *               PendingFields without touching public. Same
- *               LastEditedBySimon cleanup if pending empties.
+ * approveAll — copies every pending field to its public column, then
+ *              clears pendingDraft, pendingFields, lastEditedBySimon.
+ * accept     — copies just that field to public, removes its key
+ *              from pendingDraft + pendingFields. If pendingFields
+ *              empties, clears lastEditedBySimon too.
+ * dismiss    — removes the named field from pendingDraft + pendingFields
+ *              without touching public.
  *
- * Admin role required. Simon hitting this should bounce — only Kevin
+ * Admin only. Simon hitting this should bounce — only Kevin
  * approves his own pending writes.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdminToken } from '@/lib/auth';
 import { getAdminRole } from '@/lib/admin-session';
-import { parsePendingDraft } from '@/lib/admin/pending-draft';
+import { parsePendingDraft, type PendingDraft } from '@/lib/admin/pending-draft';
+import { db } from '@/lib/db/client';
+import { children } from '@/lib/db/schema';
+import { eq } from 'drizzle-orm';
 
-const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID || '';
-const AIRTABLE_API_KEY =
-  process.env.AIRTABLE_PAT || process.env.AIRTABLE_API_KEY || '';
-const CHILDREN_TABLE = process.env.AIRTABLE_CHILDREN_TABLE || 'Children';
-
-const F = {
-  nameMeaning: 'flddhwxv3FT9DJqaF',
-  familyContext: 'fldmN80uNieMZx64U',
-  loves: 'fldwBn2AyXKt4vgi5',
-  childQuote: 'flds9uA6MCoEbc2dJ',
-  notes: 'fldbQuWFgNXnlZIVX',
-  lastEditedBySimon: 'fldHeGgc5op4WpqAq',
-  pendingFields: 'fldHnJHD0jv2lPgyU',
+const GATED_KEY_TO_COLUMN: Record<keyof PendingDraft, string> = {
+  nameMeaning: 'nameMeaning',
+  familyContext: 'familyContext',
+  loves: 'loves',
+  childQuote: 'childQuote',
+  notes: 'notes',
 };
-
-const PENDING_DRAFT_FIELD = 'PendingDraft';
-
-const KEY_TO_FIELD_ID: Record<string, string> = {
-  nameMeaning: F.nameMeaning,
-  familyContext: F.familyContext,
-  loves: F.loves,
-  childQuote: F.childQuote,
-  notes: F.notes,
-};
-
-const KEY_TO_PENDING_OPTION: Record<string, string> = {
+const KEY_TO_PENDING_OPTION: Record<keyof PendingDraft, string> = {
   nameMeaning: 'NameMeaning',
   familyContext: 'FamilyContext',
   loves: 'Loves',
@@ -60,20 +43,10 @@ const KEY_TO_PENDING_OPTION: Record<string, string> = {
   notes: 'Notes',
 };
 
-function atHeaders() {
-  return {
-    Authorization: `Bearer ${AIRTABLE_API_KEY}`,
-    'Content-Type': 'application/json',
-  };
-}
-
 export async function POST(request: NextRequest) {
   if (!verifyAdminToken(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
-
-  // Approval is admin-only. Simon shouldn't be able to self-approve
-  // his own drafts.
   const role = await getAdminRole();
   if (role !== 'admin') {
     return NextResponse.json(
@@ -103,54 +76,46 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const lookupUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(
-      CHILDREN_TABLE
-    )}?filterByFormula=${encodeURIComponent(`{ShirtNumber}=${shirtNumber}`)}&maxRecords=1`;
-    const lookupRes = await fetch(lookupUrl, {
-      headers: atHeaders(),
-      cache: 'no-store',
-    });
-    if (!lookupRes.ok) {
-      return NextResponse.json(
-        { error: `Airtable lookup failed: ${lookupRes.status}` },
-        { status: 502 }
-      );
-    }
-    const lookupData = await lookupRes.json();
-    const record = lookupData.records?.[0];
-    if (!record) {
+    const kid = (
+      await db
+        .select()
+        .from(children)
+        .where(eq(children.shirtNumber, shirtNumber))
+        .limit(1)
+    )[0];
+    if (!kid) {
       return NextResponse.json(
         { error: `No child for shirt #${shirtNumber}` },
         { status: 404 }
       );
     }
 
-    const existingFields = (record.fields || {}) as Record<string, unknown>;
-    const draft = parsePendingDraft(existingFields[PENDING_DRAFT_FIELD]);
-    const currentPending = Array.isArray(existingFields.PendingFields)
-      ? (existingFields.PendingFields as Array<string | { name?: string }>)
-          .map(v => (typeof v === 'string' ? v : v?.name || ''))
-          .filter(Boolean)
-      : [];
+    const draft: PendingDraft = parsePendingDraft(
+      typeof kid.pendingDraft === 'string'
+        ? kid.pendingDraft
+        : kid.pendingDraft
+          ? JSON.stringify(kid.pendingDraft)
+          : ''
+    );
+    const currentPending = ((kid.pendingFields as string[] | null) || []).filter(
+      Boolean
+    );
     const nextPending = new Set(currentPending);
-
-    const patchFields: Record<string, unknown> = {};
+    const patch: Record<string, unknown> = {};
 
     if (body.action === 'approveAll') {
-      // Promote every draft entry to its public field.
       let promoted = 0;
-      for (const [key, fieldId] of Object.entries(KEY_TO_FIELD_ID)) {
-        const draftValue = (draft as Record<string, string>)[key];
-        if (typeof draftValue === 'string') {
-          patchFields[fieldId] = draftValue;
+      for (const key of Object.keys(GATED_KEY_TO_COLUMN) as Array<keyof PendingDraft>) {
+        const value = (draft as Record<string, string>)[key];
+        if (typeof value === 'string') {
+          patch[GATED_KEY_TO_COLUMN[key]] = value;
           promoted++;
         }
-        const option = KEY_TO_PENDING_OPTION[key];
-        if (option) nextPending.delete(option);
+        nextPending.delete(KEY_TO_PENDING_OPTION[key]);
       }
-      patchFields[PENDING_DRAFT_FIELD] = null;
-      patchFields[F.pendingFields] = [];
-      patchFields[F.lastEditedBySimon] = null;
+      patch.pendingDraft = null;
+      patch.pendingFields = [];
+      patch.lastEditedBySimon = null;
       if (promoted === 0 && currentPending.length === 0) {
         return NextResponse.json({ ok: true, note: 'Nothing pending' });
       }
@@ -160,7 +125,8 @@ export async function POST(request: NextRequest) {
       typeof body.action.field === 'string'
     ) {
       const { field, decision } = body.action;
-      if (!KEY_TO_FIELD_ID[field]) {
+      const fieldKey = field as keyof PendingDraft;
+      if (!GATED_KEY_TO_COLUMN[fieldKey]) {
         return NextResponse.json(
           { error: `Unknown field: ${field}` },
           { status: 400 }
@@ -172,22 +138,17 @@ export async function POST(request: NextRequest) {
           { status: 400 }
         );
       }
-      const draftValue = (draft as Record<string, string>)[field];
+      const draftValue = (draft as Record<string, string>)[fieldKey];
       if (decision === 'accept' && typeof draftValue === 'string') {
-        patchFields[KEY_TO_FIELD_ID[field]] = draftValue;
+        patch[GATED_KEY_TO_COLUMN[fieldKey]] = draftValue;
       }
-      // Strip this field from the draft + pending tracking either way.
-      delete (draft as Record<string, unknown>)[field];
-      const option = KEY_TO_PENDING_OPTION[field];
-      if (option) nextPending.delete(option);
+      delete (draft as Record<string, unknown>)[fieldKey];
+      nextPending.delete(KEY_TO_PENDING_OPTION[fieldKey]);
 
-      const hasAnyDraft = Object.keys(draft).length > 0;
-      patchFields[PENDING_DRAFT_FIELD] = hasAnyDraft
-        ? JSON.stringify(draft)
-        : null;
-      patchFields[F.pendingFields] = Array.from(nextPending);
+      patch.pendingDraft = Object.keys(draft).length > 0 ? draft : null;
+      patch.pendingFields = Array.from(nextPending);
       if (nextPending.size === 0) {
-        patchFields[F.lastEditedBySimon] = null;
+        patch.lastEditedBySimon = null;
       }
     } else {
       return NextResponse.json(
@@ -196,23 +157,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const patchUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(
-      CHILDREN_TABLE
-    )}/${record.id}`;
-    const patchRes = await fetch(patchUrl, {
-      method: 'PATCH',
-      headers: atHeaders(),
-      body: JSON.stringify({ fields: patchFields, typecast: true }),
-    });
-    if (!patchRes.ok) {
-      const text = await patchRes.text();
-      return NextResponse.json(
-        { error: `Airtable patch failed: ${patchRes.status} ${text}` },
-        { status: 502 }
-      );
-    }
+    patch.updatedAt = new Date();
+    await db.update(children).set(patch).where(eq(children.id, kid.id));
 
-    return NextResponse.json({ ok: true, recordId: record.id });
+    return NextResponse.json({ ok: true, recordId: kid.id });
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : 'Unexpected error' },

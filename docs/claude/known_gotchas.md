@@ -169,11 +169,13 @@ Some product copy on `/shirts` frames the $25/month in ways that may overstate w
 
 **Fix when revisiting:** grep the repo for `ChildID`, plan the refactor before touching records, run a dry-run against a copy of the Airtable base, then flip. Don't start this without explicit greenlight.
 
-### Donation Source singleSelect is missing options
+### Donation Source singleSelect — resolved 2026-05-13, normalizer kept as safety net
 
-Options in Airtable: `Website`, `Manual Entry`, `Event`, `Other`. The code wants to set `Sponsorship`, `Shirt`, `Shirt + Monthly`. The normalizer in `upsertDonation` currently routes invalid values to `Website` and prefixes the real label onto `Donation Note` as `[Sponsorship]`, `[Shirt]`, etc. This is a workaround, not a fix.
+**Status: resolved for current code paths.** All labels the code actually writes are valid options in Airtable's `Donation Source` singleSelect: `Website`, `Manual Entry`, `Event`, `Other`, `Portal Repeat`, `Sponsorship`, `Shirt Order`, `Shirt + Monthly`. The webhook&rsquo;s `VALID_SOURCES` set mirrors that list.
 
-**Fix when revisiting:** Kevin opens Airtable, edits the Donation Source field, adds `Sponsorship`, `Shirt`, `Shirt + Monthly`. Then we remove the normalizer from `upsertDonation`. Airtable's metadata API is blocked by the sandbox proxy, so I cannot do this from code.
+The normalizer in `upsertDonation` stays in place as a safety net for any future label the code might pass before the corresponding Airtable option is added (e.g., `Founder's Series`, `Gift Shirt`, `Gift Sponsorship`). It routes unknown values to `Website` and prefixes the real label onto `Donation Note` as `[Real Label]`.
+
+In the Postgres world (`donations.donation_source` is `text`, not an enum), the singleSelect constraint doesn&rsquo;t apply — but we keep writing the canonical labels to stay consistent with the Airtable shadow data and the `webhook-bridge` mirror code. See `airtable_schema.md` Trap 1 for the resolved version of this story.
 
 ### Airtable metadata API is blocked by sandbox proxy
 

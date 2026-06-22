@@ -5,9 +5,7 @@
  *
  * Body: { title, subject, bodyHtml, author?, status?, sendDate? }
  *
- * Defaults Status to Draft. Status=Scheduled is allowed but caller must
- * also supply sendDate; otherwise the cron will pick it up immediately
- * (since IS_BEFORE(BLANK, NOW) is true).
+ * Defaults Status to Draft. Status='Scheduled' requires sendDate.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -19,7 +17,8 @@ import {
 } from '@/lib/errors';
 import { requireAdminAuth } from '@/lib/auth';
 import { parseRequestBody } from '@/lib/validation';
-import { createNewsletter } from '@/lib/airtable';
+import { db } from '@/lib/db/client';
+import { newsletters } from '@/lib/db/schema';
 
 async function handler(request: NextRequest): Promise<NextResponse> {
   const method = 'POST';
@@ -40,50 +39,42 @@ async function handler(request: NextRequest): Promise<NextResponse> {
     author?: string;
     status?: 'Draft' | 'Scheduled';
     sendDate?: string;
-    teaser?: string;
   };
 
-  if (!body.title?.trim()) {
-    throw new ValidationError('title is required');
-  }
-  if (!body.subject?.trim()) {
-    throw new ValidationError('subject is required');
-  }
-  if (!body.bodyHtml?.trim()) {
-    throw new ValidationError('bodyHtml is required');
-  }
+  if (!body.title?.trim()) throw new ValidationError('title is required');
+  if (!body.subject?.trim()) throw new ValidationError('subject is required');
+  if (!body.bodyHtml?.trim()) throw new ValidationError('bodyHtml is required');
 
-  // Defensive: if caller asks for Scheduled, require sendDate so we don't
-  // accidentally send to everyone the moment cron next runs.
   const status = body.status ?? 'Draft';
   if (status === 'Scheduled' && !body.sendDate) {
     throw new ValidationError('sendDate is required when status is Scheduled');
   }
 
-  const fields: Record<string, unknown> = {
-    Title: body.title.trim(),
-    Subject: body.subject.trim(),
-    BodyHTML: body.bodyHtml,
-    Status: status,
-  };
-  if (body.author?.trim()) fields.Author = body.author.trim();
-  if (body.sendDate) fields.SendDate = body.sendDate;
-  if (typeof body.teaser === 'string') fields.Teaser = body.teaser;
-
-  const created = await createNewsletter(fields);
+  const inserted = await db
+    .insert(newsletters)
+    .values({
+      title: body.title.trim(),
+      subject: body.subject.trim(),
+      bodyHtml: body.bodyHtml,
+      status,
+      author: body.author?.trim() || null,
+      sendDate: body.sendDate ? new Date(body.sendDate) : null,
+    })
+    .returning();
+  const created = inserted[0];
 
   logger.info('Admin created newsletter', {
     id: created.id,
-    title: body.title,
-    status,
+    title: created.title,
+    status: created.status,
   });
 
   logger.apiResponse(method, path, 200);
   return createSuccessResponse(
     {
       id: created.id,
-      title: created.fields.Title,
-      status: created.fields.Status,
+      title: created.title,
+      status: created.status,
     },
     'Newsletter created'
   );

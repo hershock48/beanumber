@@ -13,17 +13,15 @@
 
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
+import { inArray } from 'drizzle-orm';
 import { AdminShell } from '../_components/AdminShell';
 import { getAdminRole } from '@/lib/admin-session';
 import { listBatches, resolveShirtToKid } from '@/lib/cycle';
+import { db } from '@/lib/db/client';
+import { children } from '@/lib/db/schema';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
-
-const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID || '';
-const AIRTABLE_API_KEY =
-  process.env.AIRTABLE_PAT || process.env.AIRTABLE_API_KEY || '';
-const CHILDREN_TABLE = process.env.AIRTABLE_CHILDREN_TABLE || 'Children';
 
 async function fetchKidNames(
   recordIds: string[]
@@ -33,32 +31,60 @@ async function fetchKidNames(
     { displayName: string; shirtNumber: number | null }
   >();
   if (recordIds.length === 0) return map;
-  // Batch the fetches to avoid hammering Airtable.
-  await Promise.all(
-    recordIds.map(async id => {
-      const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(
-        CHILDREN_TABLE
-      )}/${id}`;
-      try {
-        const res = await fetch(url, {
-          headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` },
-          cache: 'no-store',
-        });
-        if (!res.ok) return;
-        const data = await res.json();
-        const f = data.fields || {};
-        map.set(id, {
-          displayName:
-            (f.DisplayName as string) ||
-            (f.FirstName as string) ||
-            '(unnamed)',
-          shirtNumber: (f.ShirtNumber as number) ?? null,
-        });
-      } catch {
-        // skip
-      }
+  // One query, indexed by the children PK. Snapshot record IDs may be
+  // either the new Postgres UUIDs or the legacy Airtable record IDs
+  // depending on when the batch was seeded — try the UUID path first,
+  // fall back to airtable_id for older snapshots.
+  const rows = await db
+    .select({
+      id: children.id,
+      airtableId: children.airtableId,
+      displayName: children.displayName,
+      firstName: children.firstName,
+      shirtNumber: children.shirtNumber,
     })
-  );
+    .from(children)
+    .where(inArray(children.id, recordIds));
+
+  // Index rows we found by id.
+  const byId = new Map<string, (typeof rows)[number]>();
+  for (const r of rows) byId.set(r.id, r);
+
+  // Anything that didn't match by UUID — try airtable_id (legacy
+  // snapshot IDs left over from before the migration). The legacy
+  // record IDs look like "rec…"; UUIDs are dash-formatted. Filter
+  // before re-querying to skip rows already resolved.
+  const missing = recordIds.filter(id => !byId.has(id));
+  if (missing.length > 0) {
+    const legacyRows = await db
+      .select({
+        id: children.id,
+        airtableId: children.airtableId,
+        displayName: children.displayName,
+        firstName: children.firstName,
+        shirtNumber: children.shirtNumber,
+      })
+      .from(children)
+      .where(inArray(children.airtableId, missing));
+    const legacyById = new Map(
+      legacyRows
+        .filter(r => r.airtableId)
+        .map(r => [r.airtableId as string, r])
+    );
+    for (const id of missing) {
+      const row = legacyById.get(id);
+      if (row) byId.set(id, row);
+    }
+  }
+
+  for (const recordId of recordIds) {
+    const row = byId.get(recordId);
+    if (!row) continue;
+    map.set(recordId, {
+      displayName: row.displayName || row.firstName || '(unnamed)',
+      shirtNumber: row.shirtNumber ?? null,
+    });
+  }
   return map;
 }
 

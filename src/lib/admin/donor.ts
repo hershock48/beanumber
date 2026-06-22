@@ -1,77 +1,31 @@
 /**
- * Admin · Donor profile queries.
+ * Admin · Donor profile queries (Postgres edition).
  *
- * The single fetcher that powers `/admin/donor/<id>`. Pulls the donor
- * record, every linked sponsorship + child, every donation, every
- * logged interaction, and any fulfillment rows matched by email.
- * Assembles them into a single reverse-chronological timeline plus
- * the structured sections the profile page renders (header, stats,
- * sponsoring cards, drip status, notes).
+ * `listDonors()` powers /admin/donors and `getDonorById()` powers
+ * /admin/donor/[id]. The latter assembles a full profile: the donor
+ * header, every linked sponsorship, every donation, every logged
+ * communication, plus any fulfillment rows matched by email. From
+ * those rows we build a reverse-chronological timeline the profile
+ * page renders.
  *
- * Designed to run server-side from the page render. No caching —
- * Kevin will reload the page after taking actions and expects fresh
- * data.
+ * Postgres reads via Drizzle. Errors throw — page-level error
+ * boundary handles them. No caching: Kevin reloads after admin
+ * actions and expects fresh data.
+ *
+ * Function signatures and types are preserved from the Airtable-era
+ * module so callers don't need to change.
  */
 
-const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID || '';
-const AIRTABLE_API_KEY =
-  process.env.AIRTABLE_PAT || process.env.AIRTABLE_API_KEY || '';
-
-const DONORS_TABLE = process.env.AIRTABLE_DONORS_TABLE || 'Donors';
-const DONATIONS_TABLE = process.env.AIRTABLE_DONATIONS_TABLE || 'Donations';
-const SPONSORSHIPS_TABLE =
-  process.env.AIRTABLE_SPONSORSHIPS_TABLE || 'Sponsorships';
-const CHILDREN_TABLE = process.env.AIRTABLE_CHILDREN_TABLE || 'Children';
-const FULFILLMENT_TABLE = process.env.AIRTABLE_FULFILLMENT_TABLE || 'Fulfillment';
-const INTERACTIONS_TABLE =
-  process.env.AIRTABLE_INTERACTIONS_TABLE || 'Interactions';
-
-function atHeaders() {
-  return {
-    Authorization: `Bearer ${AIRTABLE_API_KEY}`,
-    'Content-Type': 'application/json',
-  };
-}
-
-interface AirtableRecord<F = Record<string, unknown>> {
-  id: string;
-  createdTime: string;
-  fields: F;
-}
-
-interface AirtableList<F = Record<string, unknown>> {
-  records: AirtableRecord<F>[];
-  offset?: string;
-}
-
-async function atGet<F = Record<string, unknown>>(
-  table: string,
-  query = ''
-): Promise<AirtableList<F>> {
-  const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(
-    table
-  )}${query ? `?${query}` : ''}`;
-  const res = await fetch(url, { headers: atHeaders(), cache: 'no-store' });
-  if (!res.ok) {
-    throw new Error(`Airtable ${res.status}: ${await res.text()}`);
-  }
-  return res.json() as Promise<AirtableList<F>>;
-}
-
-async function atGetById<F = Record<string, unknown>>(
-  table: string,
-  id: string
-): Promise<AirtableRecord<F> | null> {
-  const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(
-    table
-  )}/${id}`;
-  const res = await fetch(url, { headers: atHeaders(), cache: 'no-store' });
-  if (res.status === 404) return null;
-  if (!res.ok) {
-    throw new Error(`Airtable ${res.status}: ${await res.text()}`);
-  }
-  return res.json() as Promise<AirtableRecord<F>>;
-}
+import { and, desc, eq, sql } from 'drizzle-orm';
+import { db } from '@/lib/db/client';
+import {
+  children,
+  communications,
+  donations,
+  donors,
+  fulfillments,
+  sponsorships,
+} from '@/lib/db/schema';
 
 // ─── Public types ───────────────────────────────────────────────
 
@@ -79,7 +33,7 @@ export interface DonorSponsorship {
   recordId: string;
   status: string | null;
   startDate: string | null;
-  monthlyAmount: number; // dollars (Airtable currency)
+  monthlyAmount: number; // dollars
   childRecordId: string | null;
   childShirtNumber: number | null;
   childName: string | null;
@@ -127,7 +81,7 @@ export interface DonorProfile {
   sponsorships: DonorSponsorship[];
   totalSponsorships: number;
   activeSponsorshipCount: number;
-  monthlySponsorshipTotal: number; // dollars
+  monthlySponsorshipTotal: number;
 
   lastContactAt: string | null;
   lastContactSummary: string | null;
@@ -144,136 +98,86 @@ function formatMoney(dollars: number): string {
   })}`;
 }
 
-function pickStr(v: unknown): string | null {
-  if (typeof v !== 'string') return null;
-  const t = v.trim();
-  return t || null;
+function asIsoOrNull(d: Date | string | null | undefined): string | null {
+  if (!d) return null;
+  return typeof d === 'string' ? d : d.toISOString();
 }
 
 // ─── Main fetch ──────────────────────────────────────────────────
 
-interface DonorFields {
-  'Donor Name'?: string;
-  'Organization Name'?: string;
-  'Email Address'?: string;
-  'Phone Number'?: string;
-  'Mailing Address'?: string;
-  'Total Lifetime Giving'?: number;
-  'First Donation Date'?: string;
-  'Most Recent Donation'?: string;
-  'Donor Status'?: { name?: string } | string;
-  'Recurring Supporter'?: boolean;
-  Notes?: string;
-  DripPipeline?: { name?: string } | string;
-  DripStage?: number;
-  DripNextSend?: string;
-  DripChildName?: string;
-  DripShirtNumber?: string;
-  Donations?: string[];
-  Sponsorships?: string[];
-}
-
-interface DonationFields {
-  'Donation Date'?: string;
-  'Donation Amount'?: number;
-  'Payment Status'?: { name?: string } | string;
-  'Donation Source'?: { name?: string } | string;
-  'Recurring Donation'?: boolean;
-  'Donation Note'?: string;
-}
-
-interface SponsorshipFields {
-  Status?: { name?: string } | string;
-  SponsorshipStartDate?: string;
-  MonthlyAmount?: number;
-  Children?: string[]; // record IDs
-  ChildDisplayName?: string;
-  ChildPhoto?: Array<{ url: string; thumbnails?: { large?: { url: string } } }>;
-}
-
-interface ChildFields {
-  ShirtNumber?: number;
-  DisplayName?: string;
-  FirstName?: string;
-  ProfilePhoto?: Array<{ url: string; thumbnails?: { large?: { url: string } } }>;
-}
-
-interface FulfillmentFields {
-  'Order #'?: number;
-  'Order Date'?: string;
-  Shipping?: { name?: string } | string;
-  Production?: { name?: string } | string;
-  Tracking?: string;
-  Email?: string;
-  Buyer?: string;
-  Size?: { name?: string } | string;
-  'Shirt Color'?: { name?: string } | string;
-}
-
-interface InteractionFields {
-  Subject?: string;
-  Direction?: { name?: string } | string;
-  Channel?: { name?: string } | string;
-  Notes?: string;
-  At?: string;
-  LoggedBy?: string;
-}
-
-function asName(v: unknown): string | null {
-  if (typeof v === 'string') return v;
-  if (v && typeof v === 'object' && 'name' in v) {
-    return (v as { name?: string }).name || null;
-  }
-  return null;
-}
-
 export async function getDonorById(donorRecordId: string): Promise<DonorProfile | null> {
-  const donor = await atGetById<DonorFields>(DONORS_TABLE, donorRecordId);
+  const donorRows = await db
+    .select()
+    .from(donors)
+    .where(eq(donors.id, donorRecordId))
+    .limit(1);
+  const donor = donorRows[0];
   if (!donor) return null;
-  const f = donor.fields;
 
-  const email = pickStr(f['Email Address']);
+  const email = donor.email?.trim() || null;
+  const emailLower = email ? email.toLowerCase() : null;
 
-  // Parallel fetches for everything linked or matching this donor.
-  const [donations, sponsorships, interactions, fulfillment] = await Promise.all([
-    fetchDonationsForDonor(donorRecordId),
-    fetchSponsorshipsForDonor(donorRecordId),
-    fetchInteractionsForDonor(donorRecordId),
-    email ? fetchFulfillmentForEmail(email) : Promise.resolve([]),
-  ]);
+  // Parallel fetches for everything linked to this donor. Email is
+  // the only string key that crosses table boundaries (fulfillments
+  // / sponsorships don't FK to donors); we always compare via
+  // lower(email) = lower(X), never plain eq, to match the project's
+  // case-insensitive convention.
+  const [donationRows, sponsorshipRows, communicationRows, fulfillmentRows] =
+    await Promise.all([
+      db
+        .select()
+        .from(donations)
+        .where(eq(donations.donorId, donor.id))
+        .orderBy(desc(donations.donationDate)),
+      emailLower
+        ? db
+            .select({
+              s: sponsorships,
+              c: children,
+            })
+            .from(sponsorships)
+            .leftJoin(children, eq(children.id, sponsorships.childId))
+            .where(
+              sql`lower(${sponsorships.sponsorEmail}) = ${emailLower}`
+            )
+            .orderBy(desc(sponsorships.createdAt))
+        : Promise.resolve(
+            [] as Array<{
+              s: typeof sponsorships.$inferSelect;
+              c: typeof children.$inferSelect | null;
+            }>
+          ),
+      db
+        .select()
+        .from(communications)
+        .where(eq(communications.relatedDonorId, donor.id))
+        .orderBy(desc(communications.sendDate)),
+      emailLower
+        ? db
+            .select()
+            .from(fulfillments)
+            .where(
+              sql`lower(${fulfillments.buyerEmail}) = ${emailLower}`
+            )
+            .orderBy(desc(fulfillments.orderDate))
+        : Promise.resolve([] as Array<typeof fulfillments.$inferSelect>),
+    ]);
 
-  // Resolve child records for each sponsorship.
-  const childIds = new Set<string>();
-  for (const s of sponsorships) {
-    const linked = (s.fields.Children as string[]) || [];
-    for (const id of linked) childIds.add(id);
-  }
-  const childMap = await fetchChildrenByIds(Array.from(childIds));
-
-  const sponsorshipsOut: DonorSponsorship[] = sponsorships.map(s => {
-    const sf = s.fields;
-    const childId = (sf.Children as string[])?.[0] || null;
-    const child = childId ? childMap.get(childId) : null;
-    const photoFromSponsorship = sf.ChildPhoto?.[0];
-    const photoFromChild = child?.fields.ProfilePhoto?.[0];
-    const photoUrl =
-      photoFromChild?.thumbnails?.large?.url ||
-      photoFromChild?.url ||
-      photoFromSponsorship?.thumbnails?.large?.url ||
-      photoFromSponsorship?.url ||
-      null;
+  // Sponsorships → DonorSponsorship. Hydrated kid comes from the
+  // LEFT JOIN; legacy-keyed rows with no UUID FK fall back to the
+  // denormalized fields on the sponsorship itself.
+  const sponsorshipsOut: DonorSponsorship[] = sponsorshipRows.map(({ s, c }) => {
+    const photoUrl = c?.profilePhotoUrl || null;
+    const childName =
+      c?.displayName || c?.firstName || s.childDisplayName || null;
     return {
       recordId: s.id,
-      status: asName(sf.Status),
-      startDate: pickStr(sf.SponsorshipStartDate),
-      monthlyAmount: (sf.MonthlyAmount as number) || 0,
-      childRecordId: childId,
-      childShirtNumber: (child?.fields.ShirtNumber as number) || null,
-      childName:
-        child?.fields.DisplayName ||
-        child?.fields.FirstName ||
-        sf.ChildDisplayName ||
-        null,
+      status: s.status ?? null,
+      startDate: s.sponsorshipStartDate ?? null,
+      monthlyAmount: Number(s.monthlyAmount ?? 0),
+      childRecordId: c?.id ?? null,
+      childShirtNumber: c?.shirtNumber ?? null,
+      childName,
       childPhotoUrl: photoUrl,
     };
   });
@@ -291,20 +195,21 @@ export async function getDonorById(donorRecordId: string): Promise<DonorProfile 
   const timeline: TimelineEvent[] = [];
 
   // Donations
-  for (const d of donations) {
-    const df = d.fields;
-    const at = pickStr(df['Donation Date']) || d.createdTime;
-    const amount = (df['Donation Amount'] as number) || 0;
-    const source = asName(df['Donation Source']);
-    const recurring = !!df['Recurring Donation'];
-    const note = pickStr(df['Donation Note']);
+  for (const d of donationRows) {
+    const at = d.donationDate
+      ? new Date(d.donationDate).toISOString()
+      : new Date(d.createdAt).toISOString();
+    const amount = Number(d.donationAmount ?? 0);
+    const source = d.donationSource;
+    const recurring = !!d.recurringDonation;
+    const note = d.donationNote?.trim() || undefined;
     timeline.push({
       at,
       kind: 'donation',
       summary: `${formatMoney(amount)}${recurring ? ' recurring' : ''}${
         source ? ' · ' + source : ''
       }`,
-      detail: note || undefined,
+      detail: note,
       amount,
     });
   }
@@ -322,7 +227,9 @@ export async function getDonorById(donorRecordId: string): Promise<DonorProfile 
     }
     if ((s.status || '').toLowerCase() === 'cancelled') {
       timeline.push({
-        at: s.startDate || donor.createdTime,
+        at:
+          s.startDate ||
+          (donor.createdAt ? new Date(donor.createdAt).toISOString() : new Date().toISOString()),
         kind: 'sponsorship_ended',
         summary: `Sponsorship of ${s.childName || 'a kid'} ended`,
       });
@@ -330,12 +237,11 @@ export async function getDonorById(donorRecordId: string): Promise<DonorProfile 
   }
 
   // Shirts (Fulfillment) — order placed + shipped
-  for (const o of fulfillment) {
-    const of = o.fields;
-    const orderDate = pickStr(of['Order Date']);
-    const orderNum = (of['Order #'] as number) || null;
-    const color = asName(of['Shirt Color']);
-    const size = asName(of['Size']);
+  for (const o of fulfillmentRows) {
+    const orderDate = o.orderDate ? new Date(o.orderDate).toISOString() : null;
+    const orderNum = o.orderNumber ?? null;
+    const color = o.shirtColor;
+    const size = o.size;
     if (orderDate) {
       timeline.push({
         at: orderDate,
@@ -345,39 +251,44 @@ export async function getDonorById(donorRecordId: string): Promise<DonorProfile 
         }${size ? ' ' + size : ''}`,
       });
     }
-    if (asName(of.Shipping) === 'Shipped' && orderDate) {
-      // We don't have a ship date field — best-effort: use order date.
-      // (Once Fulfillment gets a ShippedDate field this would be exact.)
+    if (o.shipping === 'Shipped' && orderDate) {
+      // We don't have a ship date column — best-effort: use order
+      // date. (Once Fulfillment grows a shipped_at column this would
+      // be exact.)
       timeline.push({
         at: orderDate,
         kind: 'shirt_shipped',
         summary: `Shirt${orderNum ? ' #' + orderNum : ''} shipped${
-          of.Tracking ? ' · ' + of.Tracking : ''
+          o.tracking ? ' · ' + o.tracking : ''
         }`,
       });
     }
   }
 
-  // Interactions
+  // Communications — Postgres-native equivalent of the Airtable
+  // Interactions table. The Airtable version split direction +
+  // channel into singleSelects; Postgres just stores an email_type
+  // and treats every row as outbound (we don't ingest inbound yet).
   let lastContactAt: string | null = null;
   let lastContactSummary: string | null = null;
-  for (const i of interactions) {
-    const ifd = i.fields;
-    const at = pickStr(ifd.At) || i.createdTime;
-    const direction = (asName(ifd.Direction) || 'outbound') as 'outbound' | 'inbound';
-    const channel = asName(ifd.Channel) || 'email';
-    const subject = pickStr(ifd.Subject) || (direction === 'outbound' ? 'Reached out' : 'Heard from them');
+  for (const c of communicationRows) {
+    const at = c.sendDate
+      ? new Date(c.sendDate).toISOString()
+      : new Date(c.createdAt).toISOString();
+    const direction: 'outbound' | 'inbound' = 'outbound';
+    const channel = (c.emailType || 'email').toString();
+    const subject = c.subject?.trim() || 'Reached out';
     timeline.push({
       at,
       kind: 'interaction',
       summary: subject,
-      detail: pickStr(ifd.Notes) || undefined,
+      detail: undefined,
       direction,
       channel,
     });
     if (!lastContactAt || new Date(at).getTime() > new Date(lastContactAt).getTime()) {
       lastContactAt = at;
-      lastContactSummary = `${direction === 'outbound' ? 'Kevin' : 'They'} · ${channel} · ${subject}`;
+      lastContactSummary = `Kevin · ${channel} · ${subject}`;
     }
   }
 
@@ -386,23 +297,23 @@ export async function getDonorById(donorRecordId: string): Promise<DonorProfile 
 
   return {
     recordId: donor.id,
-    name: pickStr(f['Donor Name']) || 'Unknown donor',
-    organization: pickStr(f['Organization Name']),
+    name: donor.name?.trim() || 'Unknown donor',
+    organization: donor.organizationName?.trim() || null,
     email,
-    phone: pickStr(f['Phone Number']),
-    address: pickStr(f['Mailing Address']),
-    status: asName(f['Donor Status']),
-    recurringSupporter: !!f['Recurring Supporter'],
-    donorSince: pickStr(f['First Donation Date']),
-    mostRecentDonation: pickStr(f['Most Recent Donation']),
-    lifetimeGiving: (f['Total Lifetime Giving'] as number) || 0,
-    notes: pickStr(f.Notes) || '',
+    phone: donor.phoneNumber?.trim() || null,
+    address: donor.mailingAddress?.trim() || null,
+    status: donor.donorStatus ?? null,
+    recurringSupporter: !!donor.recurringSupporter,
+    donorSince: donor.firstDonationDate ?? null,
+    mostRecentDonation: donor.mostRecentDonation ?? null,
+    lifetimeGiving: Number(donor.totalLifetimeGiving ?? 0),
+    notes: donor.notes?.trim() || '',
 
-    dripPipeline: asName(f.DripPipeline),
-    dripStage: (f.DripStage as number) ?? null,
-    dripNextSend: pickStr(f.DripNextSend),
-    dripChildName: pickStr(f.DripChildName),
-    dripShirtNumber: pickStr(f.DripShirtNumber),
+    dripPipeline: donor.dripPipeline ?? null,
+    dripStage: donor.dripStage ?? null,
+    dripNextSend: donor.dripNextSend ?? null,
+    dripChildName: donor.dripChildName ?? null,
+    dripShirtNumber: donor.dripShirtNumber ?? null,
 
     sponsorships: sponsorshipsOut,
     totalSponsorships: sponsorshipsOut.length,
@@ -416,88 +327,7 @@ export async function getDonorById(donorRecordId: string): Promise<DonorProfile 
   };
 }
 
-// ─── Linked-fetch helpers ───────────────────────────────────────
-
-async function fetchDonationsForDonor(
-  donorRecordId: string
-): Promise<AirtableRecord<DonationFields>[]> {
-  // FIND on the linked-record field's record-ID rendering.
-  const formula = `FIND("${donorRecordId}", ARRAYJOIN({Donor})) > 0`;
-  const params = new URLSearchParams();
-  params.set('filterByFormula', formula);
-  params.set('pageSize', '100');
-  const out: AirtableRecord<DonationFields>[] = [];
-  let offset: string | undefined;
-  do {
-    if (offset) params.set('offset', offset);
-    else params.delete('offset');
-    const page = await atGet<DonationFields>(DONATIONS_TABLE, params.toString());
-    out.push(...page.records);
-    offset = page.offset;
-  } while (offset);
-  return out;
-}
-
-async function fetchSponsorshipsForDonor(
-  donorRecordId: string
-): Promise<AirtableRecord<SponsorshipFields>[]> {
-  const formula = `FIND("${donorRecordId}", ARRAYJOIN({Donor})) > 0`;
-  const params = new URLSearchParams();
-  params.set('filterByFormula', formula);
-  params.set('pageSize', '100');
-  const page = await atGet<SponsorshipFields>(SPONSORSHIPS_TABLE, params.toString());
-  return page.records;
-}
-
-async function fetchInteractionsForDonor(
-  donorRecordId: string
-): Promise<AirtableRecord<InteractionFields>[]> {
-  const formula = `FIND("${donorRecordId}", ARRAYJOIN({Donor})) > 0`;
-  const params = new URLSearchParams();
-  params.set('filterByFormula', formula);
-  params.set('pageSize', '100');
-  try {
-    const page = await atGet<InteractionFields>(INTERACTIONS_TABLE, params.toString());
-    return page.records;
-  } catch {
-    // Table may not exist yet on first deploy.
-    return [];
-  }
-}
-
-async function fetchFulfillmentForEmail(
-  email: string
-): Promise<AirtableRecord<FulfillmentFields>[]> {
-  const safe = email.replace(/"/g, '\\"');
-  const formula = `LOWER({Email})="${safe.toLowerCase()}"`;
-  const params = new URLSearchParams();
-  params.set('filterByFormula', formula);
-  params.set('pageSize', '100');
-  try {
-    const page = await atGet<FulfillmentFields>(FULFILLMENT_TABLE, params.toString());
-    return page.records;
-  } catch {
-    return [];
-  }
-}
-
-async function fetchChildrenByIds(
-  ids: string[]
-): Promise<Map<string, AirtableRecord<ChildFields>>> {
-  const map = new Map<string, AirtableRecord<ChildFields>>();
-  if (ids.length === 0) return map;
-  // Airtable doesn't have an "IN" operator that works cleanly with
-  // record IDs, but each record can be GET-ed cheaply.
-  await Promise.all(
-    ids.map(async id => {
-      const rec = await atGetById<ChildFields>(CHILDREN_TABLE, id);
-      if (rec) map.set(id, rec);
-    })
-  );
-  return map;
-}
-
-// ─── Donor list (for the temporary directory page) ──────────────
+// ─── Donor list (for the directory page) ────────────────────────
 
 export interface DonorListEntry {
   recordId: string;
@@ -512,30 +342,56 @@ export interface DonorListEntry {
 }
 
 export async function listDonors(): Promise<DonorListEntry[]> {
-  const params = new URLSearchParams();
-  params.set('pageSize', '100');
-  const out: DonorListEntry[] = [];
-  let offset: string | undefined;
-  do {
-    if (offset) params.set('offset', offset);
-    else params.delete('offset');
-    const page = await atGet<DonorFields>(DONORS_TABLE, params.toString());
-    for (const rec of page.records) {
-      const f = rec.fields;
-      out.push({
-        recordId: rec.id,
-        name: pickStr(f['Donor Name']) || 'Unknown',
-        email: pickStr(f['Email Address']),
-        lifetimeGiving: (f['Total Lifetime Giving'] as number) || 0,
-        recurringSupporter: !!f['Recurring Supporter'],
-        status: asName(f['Donor Status']),
-        sponsorshipCount: (f.Sponsorships as string[])?.length || 0,
-        donorSince: pickStr(f['First Donation Date']),
-        mostRecentDonation: pickStr(f['Most Recent Donation']),
-      });
-    }
-    offset = page.offset;
-  } while (offset);
+  // One query per donor would be N+1; instead aggregate sponsorship
+  // counts per email in a single grouped subquery, then join.
+  const sponsorshipCountByEmail = db
+    .select({
+      sponsorEmailLower: sql<string>`lower(${sponsorships.sponsorEmail})`.as(
+        'sponsor_email_lower'
+      ),
+      total: sql<number>`count(*)::int`.as('total'),
+    })
+    .from(sponsorships)
+    .where(
+      and(
+        sql`${sponsorships.sponsorEmail} IS NOT NULL`,
+        sql`${sponsorships.sponsorEmail} <> ''`
+      )
+    )
+    .groupBy(sql`lower(${sponsorships.sponsorEmail})`)
+    .as('sc');
+
+  const rows = await db
+    .select({
+      id: donors.id,
+      name: donors.name,
+      email: donors.email,
+      lifetimeGiving: donors.totalLifetimeGiving,
+      recurring: donors.recurringSupporter,
+      status: donors.donorStatus,
+      donorSince: donors.firstDonationDate,
+      mostRecentDonation: donors.mostRecentDonation,
+      sponsorshipCount: sql<number | null>`coalesce(${sponsorshipCountByEmail.total}, 0)`,
+    })
+    .from(donors)
+    .leftJoin(
+      sponsorshipCountByEmail,
+      sql`${sponsorshipCountByEmail.sponsorEmailLower} = lower(${donors.email})`
+    );
+
+  const out: DonorListEntry[] = rows.map(r => ({
+    recordId: r.id,
+    name: r.name?.trim() || 'Unknown',
+    email: r.email?.trim() || null,
+    lifetimeGiving: Number(r.lifetimeGiving ?? 0),
+    recurringSupporter: !!r.recurring,
+    status: r.status ?? null,
+    sponsorshipCount: Number(r.sponsorshipCount ?? 0),
+    donorSince: r.donorSince ? asIsoOrNull(r.donorSince) : null,
+    mostRecentDonation: r.mostRecentDonation
+      ? asIsoOrNull(r.mostRecentDonation)
+      : null,
+  }));
   // Most recent activity first.
   out.sort((a, b) => {
     const ad = a.mostRecentDonation || a.donorSince || '';

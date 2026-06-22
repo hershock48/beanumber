@@ -5,10 +5,8 @@
  *
  * Body: { id, title?, subject?, bodyHtml?, author?, status?, sendDate? }
  *
- * Only changed fields need to be sent.
- *
- * Refuses to mutate newsletters that have already been Sent or are
- * actively Sending — those are immutable from the editor.
+ * Only changed fields need to be sent. Refuses to mutate newsletters
+ * already Sent or actively Sending — those are immutable.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -20,7 +18,9 @@ import {
 } from '@/lib/errors';
 import { requireAdminAuth } from '@/lib/auth';
 import { parseRequestBody } from '@/lib/validation';
-import { getNewsletterById, updateNewsletter } from '@/lib/airtable';
+import { db } from '@/lib/db/client';
+import { newsletters } from '@/lib/db/schema';
+import { eq } from 'drizzle-orm';
 
 async function handler(request: NextRequest): Promise<NextResponse> {
   const method = 'POST';
@@ -42,54 +42,61 @@ async function handler(request: NextRequest): Promise<NextResponse> {
     author?: string;
     status?: 'Draft' | 'Scheduled';
     sendDate?: string | null;
-    teaser?: string;
   };
 
   if (!body.id) throw new ValidationError('id is required');
 
-  const existing = await getNewsletterById(body.id);
+  const existing = (
+    await db.select().from(newsletters).where(eq(newsletters.id, body.id)).limit(1)
+  )[0];
   if (!existing) throw new ValidationError('Newsletter not found');
 
-  const currentStatus = existing.fields.Status;
-  if (currentStatus === 'Sent' || currentStatus === 'Sending') {
+  if (existing.status === 'Sent' || existing.status === 'Sending') {
     throw new ValidationError(
-      `Cannot edit a newsletter with status "${currentStatus}". Create a new draft instead.`
+      `Cannot edit a newsletter with status "${existing.status}". Create a new draft instead.`
     );
   }
 
-  // Build patch object — only include fields the caller actually provided.
-  const fields: Record<string, unknown> = {};
-  if (body.title !== undefined) fields.Title = body.title.trim();
-  if (body.subject !== undefined) fields.Subject = body.subject.trim();
-  if (body.bodyHtml !== undefined) fields.BodyHTML = body.bodyHtml;
-  if (body.author !== undefined) fields.Author = body.author.trim();
-  if (body.status !== undefined) fields.Status = body.status;
-  if (body.teaser !== undefined) fields.Teaser = body.teaser;
-  // Allow nulling out send date by passing null explicitly.
-  if (body.sendDate !== undefined) fields.SendDate = body.sendDate;
+  const patch: Record<string, unknown> = {};
+  if (body.title !== undefined) patch.title = body.title.trim();
+  if (body.subject !== undefined) patch.subject = body.subject.trim();
+  if (body.bodyHtml !== undefined) patch.bodyHtml = body.bodyHtml;
+  if (body.author !== undefined) patch.author = body.author.trim();
+  if (body.status !== undefined) patch.status = body.status;
+  if (body.sendDate !== undefined) {
+    patch.sendDate = body.sendDate ? new Date(body.sendDate) : null;
+  }
 
-  // Same defensive guard as create: scheduled with no date is dangerous.
-  const finalStatus = (fields.Status as string | undefined) ?? currentStatus;
+  const finalStatus = (patch.status as string | undefined) ?? existing.status;
   const finalSendDate =
-    fields.SendDate !== undefined ? fields.SendDate : existing.fields.SendDate;
+    patch.sendDate !== undefined ? patch.sendDate : existing.sendDate;
   if (finalStatus === 'Scheduled' && !finalSendDate) {
     throw new ValidationError('sendDate is required when status is Scheduled');
   }
 
-  if (Object.keys(fields).length === 0) {
+  if (Object.keys(patch).length === 0) {
     throw new ValidationError('Nothing to update');
   }
+  patch.updatedAt = new Date();
 
-  const updated = await updateNewsletter(body.id, fields);
+  const updatedRows = await db
+    .update(newsletters)
+    .set(patch)
+    .where(eq(newsletters.id, body.id))
+    .returning();
+  const updated = updatedRows[0];
 
-  logger.info('Admin updated newsletter', { id: body.id, fieldKeys: Object.keys(fields) });
+  logger.info('Admin updated newsletter', {
+    id: body.id,
+    fieldKeys: Object.keys(patch).filter(k => k !== 'updatedAt'),
+  });
 
   logger.apiResponse(method, path, 200);
   return createSuccessResponse(
     {
       id: updated.id,
-      title: updated.fields.Title,
-      status: updated.fields.Status,
+      title: updated.title,
+      status: updated.status,
     },
     'Newsletter updated'
   );

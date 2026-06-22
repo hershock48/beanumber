@@ -205,10 +205,60 @@ export const children = pgTable(
     // fields. See src/lib/admin/pending-draft.ts for the schema.
     pendingDraft: jsonb('pending_draft'),
 
+    // Subset of structured-field names with unreviewed Simon edits.
+    // Allowed entries mirror Airtable's PendingFields multiSelect:
+    // "NameMeaning" | "FamilyContext" | "Loves" | "ChildQuote" | "Notes".
+    // Empty array when nothing pending. Drives per-field red dots in
+    // the admin grid and review queue.
+    pendingFields: jsonb('pending_fields').$type<string[]>().default([]),
+
+    // ISO timestamp of Simon's most recent save. Cleared by Kevin's
+    // "Mark as reviewed" or by approving the last pending field.
+    lastEditedBySimon: timestamp('last_edited_by_simon', {
+      withTimezone: true,
+    }),
+
+    // Raw intake notes from Simon / YDO team — Kevin polishes these
+    // into the structured public fields, then clears.
+    intakeFromCampus: text('intake_from_campus'),
+
+    // ISO timestamp set when someone requests this kid be deleted.
+    // Null means no pending request. Admin reviews via editor banner
+    // and approves (hard delete) or rejects (clears).
+    deletionRequestedAt: timestamp('deletion_requested_at', {
+      withTimezone: true,
+    }),
+
     // Student of the month, set when Simon nominates and Kevin
-    // approves.
+    // approves. Legacy boolean (loaded from Airtable's checkbox);
+    // kept for backwards compat with the migration. The admin OS
+    // uses studentOfMonthMonth (a label like "May 2026") as the
+    // canonical award state.
     studentOfMonth: boolean('student_of_month').default(false),
+    studentOfMonthMonth: text('student_of_month_month'),
     studentOfMonthReason: text('student_of_month_reason'),
+
+    // Simon's pending SOTM nomination awaiting Kevin's approval. Same
+    // month-label format as studentOfMonthMonth. Drives the red star
+    // on the admin roster card and the SOTM picker.
+    pendingSOTMMonth: text('pending_sotm_month'),
+    pendingSOTMReason: text('pending_sotm_reason'),
+
+    // Extra ProfilePhoto attachments beyond the primary
+    // profile_photo_url. Stored as an ordered array of Supabase
+    // Storage URLs (oldest first). Used by the editor's photo
+    // carousel + the public profile.
+    photoUrls: jsonb('photo_urls').$type<string[]>().default([]),
+
+    // Attachments uploaded into the admin editor's two slots. Each is
+    // an array of {url, filename, size, type} objects — matches the
+    // RosterKidAttachment shape the editor consumes.
+    reportCardUrls: jsonb('report_card_urls')
+      .$type<Array<{ url: string; filename: string; size?: number; type?: string }>>()
+      .default([]),
+    letterUrls: jsonb('letter_urls')
+      .$type<Array<{ url: string; filename: string; size?: number; type?: string }>>()
+      .default([]),
 
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
@@ -852,6 +902,39 @@ export const auditLog = pgTable(
       table.recordId
     ),
     occurredAtIdx: index('audit_log_occurred_at_idx').on(table.occurredAt),
+  })
+);
+
+// ─────────────────────────────────────────────────────────────────
+//  Settings (app-wide key/value config)
+// ─────────────────────────────────────────────────────────────────
+
+/**
+ * Singleton-style key/value store for settings that don't deserve
+ * their own table — Gmail OAuth refresh token, authorized email,
+ * signature, etc. One row per dotted-namespace key.
+ *
+ * Reads and writes go through src/lib/admin/settings.ts so the rest
+ * of the app doesn't need to know about the underlying table.
+ */
+export const settings = pgTable(
+  'settings',
+  {
+    id: uuid('id')
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    key: text('key').notNull(),
+    value: text('value'),
+    notes: text('notes'),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+  },
+  table => ({
+    keyIdx: uniqueIndex('settings_key_idx').on(table.key),
   })
 );
 

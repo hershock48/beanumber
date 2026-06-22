@@ -8,12 +8,11 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { logger } from '@/lib/logger';
-import {
-  createSuccessResponse,
-  withErrorHandling,
-} from '@/lib/errors';
+import { createSuccessResponse, withErrorHandling } from '@/lib/errors';
 import { requireAdminAuth } from '@/lib/auth';
-import { listAllNewsletters } from '@/lib/airtable';
+import { db } from '@/lib/db/client';
+import { newsletters } from '@/lib/db/schema';
+import { desc } from 'drizzle-orm';
 
 async function handler(request: NextRequest): Promise<NextResponse> {
   const method = 'GET';
@@ -22,30 +21,31 @@ async function handler(request: NextRequest): Promise<NextResponse> {
 
   requireAdminAuth(request);
 
-  const records = await listAllNewsletters();
+  const rows = await db
+    .select()
+    .from(newsletters)
+    .orderBy(desc(newsletters.createdAt));
 
-  // Strip down to what the UI needs — keeps payload light and makes it
-  // obvious what fields the editor expects.
-  const newsletters = records.map((r) => ({
+  const out = rows.map(r => ({
     id: r.id,
-    createdTime: r.createdTime,
-    title: r.fields.Title || '',
-    subject: r.fields.Subject || '',
-    bodyHtml: r.fields.BodyHTML || '',
-    status: r.fields.Status || 'Draft',
-    sendDate: r.fields.SendDate || null,
-    publishedAt: r.fields.PublishedAt || null,
-    recipientCount: r.fields.RecipientCount ?? 0,
-    sentCount: r.fields.SentCount ?? 0,
-    failedCount: r.fields.FailedCount ?? 0,
-    sendNotes: r.fields.SendNotes || '',
-    author: r.fields.Author || '',
-    heroPhoto: r.fields.HeroPhoto?.[0]?.url || null,
-    teaser: r.fields.Teaser || '',
+    createdTime: r.createdAt ? new Date(r.createdAt).toISOString() : null,
+    title: r.title || '',
+    subject: r.subject || '',
+    bodyHtml: r.bodyHtml || '',
+    status: r.status || 'Draft',
+    sendDate: r.sendDate ? new Date(r.sendDate).toISOString() : null,
+    publishedAt: r.publishedAt ? new Date(r.publishedAt).toISOString() : null,
+    recipientCount: r.recipientCount ?? 0,
+    sentCount: r.sentCount ?? 0,
+    failedCount: r.failedCount ?? 0,
+    sendNotes: r.sendNotes || '',
+    author: r.author || '',
+    heroPhoto: r.heroPhotoUrl || null,
+    teaser: '', // teaser column not in Postgres schema; preserved as empty for UI compat
   }));
 
   logger.apiResponse(method, path, 200);
-  return createSuccessResponse({ newsletters, count: newsletters.length });
+  return createSuccessResponse({ newsletters: out, count: out.length });
 }
 
 export const GET = withErrorHandling(handler, 'GET', '/api/admin/newsletter/list');

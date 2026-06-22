@@ -5,35 +5,24 @@
  * Body: {
  *   newsletterId: string,
  *   filename: string,
- *   contentType: string,    // e.g. "image/jpeg"
- *   data: string,           // base64-encoded file (no data: prefix)
+ *   contentType: string,
+ *   data: string (base64, no data: prefix)
  * }
  *
- * Posts the image to Airtable's HeroPhoto field on the given newsletter
- * record via the content upload endpoint. Replaces any existing hero
- * (Newsletters.HeroPhoto is multipleAttachments but we treat it as
- * single — the editor only shows the first one).
+ * Uploads the image to Supabase Storage and writes the permanent
+ * public URL to newsletters.heroPhotoUrl.
  *
- * Auth: admin session cookie or X-Admin-Token header.
+ * Auth: cookie or X-Admin-Token.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdminToken } from '@/lib/auth';
-
-const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID || '';
-const AIRTABLE_API_KEY =
-  process.env.AIRTABLE_PAT || process.env.AIRTABLE_API_KEY || '';
-
-const FIELD_ID_HERO_PHOTO = 'fld3pQyWeRgfCOoaJ';
+import { db } from '@/lib/db/client';
+import { newsletters } from '@/lib/db/schema';
+import { eq } from 'drizzle-orm';
+import { uploadAttachment } from '@/lib/storage';
 
 const MAX_BASE64_BYTES = 5 * 1024 * 1024;
-
-function airtableHeaders() {
-  return {
-    Authorization: `Bearer ${AIRTABLE_API_KEY}`,
-    'Content-Type': 'application/json',
-  };
-}
 
 export async function POST(request: NextRequest) {
   if (!verifyAdminToken(request)) {
@@ -67,25 +56,23 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const uploadUrl = `https://content.airtable.com/v0/${AIRTABLE_BASE_ID}/${newsletterId}/${FIELD_ID_HERO_PHOTO}/uploadAttachment`;
-    const uploadRes = await fetch(uploadUrl, {
-      method: 'POST',
-      headers: airtableHeaders(),
-      body: JSON.stringify({
-        contentType,
-        filename,
-        file: data,
-      }),
+    const result = await uploadAttachment({
+      kind: 'newsletter-hero',
+      scope: newsletterId,
+      filename,
+      contentType,
+      data,
     });
-    if (!uploadRes.ok) {
-      const t = await uploadRes.text();
-      return NextResponse.json(
-        { error: `Upload to Airtable failed: ${uploadRes.status} ${t}` },
-        { status: 502 }
-      );
-    }
-    const result = await uploadRes.json();
-    return NextResponse.json({ ok: true, result });
+
+    await db
+      .update(newsletters)
+      .set({ heroPhotoUrl: result.publicUrl, updatedAt: new Date() })
+      .where(eq(newsletters.id, newsletterId));
+
+    return NextResponse.json({
+      ok: true,
+      result: { url: result.publicUrl, path: result.path },
+    });
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : 'Unexpected error' },

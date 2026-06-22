@@ -3,106 +3,81 @@
  *   Body: { shirtNumber: number, action: 'request' | 'delete' | 'reject' }
  *
  * Two-step delete workflow:
- *   - action='request' (anyone): Marks DeletionRequestedAt = now on
- *     the kid's record. Kevin sees this as a red banner on the
- *     editor and a trash badge on the roster grid. Simon uses this
- *     when he wants to clean up a test entry.
- *   - action='delete' (admin only): Hard-deletes the Airtable
- *     record. Used when Kevin approves a Simon request, OR when
- *     Kevin removes a kid directly.
- *   - action='reject' (admin only): Clears DeletionRequestedAt
- *     without deleting — Kevin rejects Simon's request.
+ *   - request (anyone): stamps deletionRequestedAt = now. Kevin sees
+ *     a banner on the editor + trash badge on the grid. Simon uses
+ *     this to clean up test entries.
+ *   - delete (admin only): hard-delete the children row.
+ *   - reject (admin only): clear deletionRequestedAt without deleting.
  *
  * Safety checks (fire on every 'delete' regardless of who requested):
- *   - Refuse if Airtable shows a shirt was already assigned/shipped.
- *   - Refuse if ShirtBuyerEmail is set.
+ *   - Refuse if a shirt was already assigned/shipped.
+ *   - Refuse if shirtBuyerEmail is set.
  *   - Refuse if any non-trivial Sponsorship row links to this kid.
  *
  * Errors:
  *   401 unauthorized
  *   400 bad request
- *   403 Simon tried to delete or reject directly
+ *   403 Simon tried to delete or reject
  *   409 safety check blocked the delete
  *   404 kid not found
- *   502 Airtable failed
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdminToken } from '@/lib/auth';
 import { getAdminRole } from '@/lib/admin-session';
-
-const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID || '';
-const AIRTABLE_API_KEY =
-  process.env.AIRTABLE_PAT || process.env.AIRTABLE_API_KEY || '';
-const CHILDREN_TABLE = process.env.AIRTABLE_CHILDREN_TABLE || 'Children';
-const SPONSORSHIPS_TABLE =
-  process.env.AIRTABLE_SPONSORSHIPS_TABLE || 'Sponsorships';
-
-const F_DELETION_REQUESTED_AT = 'fldV97l354M63GCDN';
-
-function atHeaders() {
-  return {
-    Authorization: `Bearer ${AIRTABLE_API_KEY}`,
-    'Content-Type': 'application/json',
-  };
-}
-
-interface ChildFields {
-  ShirtNumber?: number;
-  DisplayName?: string;
-  FirstName?: string;
-  ShirtAssignedAt?: string;
-  ShirtBuyerEmail?: string;
-  DeletionRequestedAt?: string;
-}
+import { db } from '@/lib/db/client';
+import { children, sponsorships } from '@/lib/db/schema';
+import { and, eq, inArray, or } from 'drizzle-orm';
 
 async function findKid(shirtNumber: number) {
-  const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(
-    CHILDREN_TABLE
-  )}?filterByFormula=${encodeURIComponent(`{ShirtNumber}=${shirtNumber}`)}&maxRecords=1`;
-  const res = await fetch(url, { headers: atHeaders(), cache: 'no-store' });
-  if (!res.ok) return null;
-  const data = await res.json();
-  return (data.records?.[0] as { id: string; fields: ChildFields }) || null;
+  const rows = await db
+    .select()
+    .from(children)
+    .where(eq(children.shirtNumber, shirtNumber))
+    .limit(1);
+  return rows[0] || null;
 }
 
-async function safetyCheck(recordId: string, displayName: string, fields: ChildFields):
-  Promise<{ ok: true } | { ok: false; reason: string }>
-{
-  if (fields.ShirtAssignedAt) {
+async function safetyCheck(
+  kid: Awaited<ReturnType<typeof findKid>>
+): Promise<{ ok: true } | { ok: false; reason: string }> {
+  if (!kid) return { ok: false, reason: 'Kid not found' };
+  const displayName = kid.displayName || kid.firstName || `Kid #${kid.shirtNumber}`;
+  if (kid.shirtAssignedAt) {
     return {
       ok: false,
-      reason: `${displayName} has a shirt assigned already (someone bought their number). Clear ShirtAssignedAt in Airtable first if you really want to delete.`,
+      reason: `${displayName} has a shirt assigned already (someone bought their number). Clear shirtAssignedAt first if you really want to delete.`,
     };
   }
-  if (fields.ShirtBuyerEmail) {
+  if (kid.shirtBuyerEmail) {
     return {
       ok: false,
-      reason: `${displayName} has a shirt buyer email on file. Clear ShirtBuyerEmail in Airtable first if you really want to delete.`,
+      reason: `${displayName} has a shirt buyer email on file. Clear shirtBuyerEmail first if you really want to delete.`,
     };
   }
-  // Linked sponsorships
-  const formula = `FIND("${recordId}", ARRAYJOIN({Children}))>0`;
-  const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(
-    SPONSORSHIPS_TABLE
-  )}?filterByFormula=${encodeURIComponent(formula)}&pageSize=10&fields%5B%5D=Status`;
-  const res = await fetch(url, { headers: atHeaders(), cache: 'no-store' });
-  if (res.ok) {
-    const data = await res.json();
-    const liveStatuses = ['Active', 'Awaiting Sponsor', 'Pending Review', 'Published'];
-    const live = (data.records || []).filter((r: { fields?: { Status?: { name?: string } | string } }) => {
-      const status =
-        typeof r.fields?.Status === 'string' ? r.fields.Status : r.fields?.Status?.name;
-      return status && liveStatuses.includes(status);
-    });
-    if (live.length > 0) {
-      return {
-        ok: false,
-        reason: `${displayName} is linked to ${live.length} sponsorship${
-          live.length === 1 ? '' : 's'
-        }. Cancel ${live.length === 1 ? 'it' : 'them'} in Airtable before deleting.`,
-      };
-    }
+  const live = await db
+    .select({ id: sponsorships.id })
+    .from(sponsorships)
+    .where(
+      and(
+        or(eq(sponsorships.childId, kid.id), eq(sponsorships.childIdLegacy, kid.childId)),
+        inArray(sponsorships.status, [
+          'Active',
+          'Holder',
+          'Awaiting Sponsor',
+          'Pending Review',
+          'Published',
+        ])
+      )
+    )
+    .limit(10);
+  if (live.length > 0) {
+    return {
+      ok: false,
+      reason: `${displayName} is linked to ${live.length} sponsorship${
+        live.length === 1 ? '' : 's'
+      }. Cancel ${live.length === 1 ? 'it' : 'them'} before deleting.`,
+    };
   }
   return { ok: true };
 }
@@ -148,82 +123,50 @@ export async function POST(request: NextRequest) {
       { status: 404 }
     );
   }
-  const fields = kid.fields;
-  const displayName =
-    fields.DisplayName || fields.FirstName || `Kid #${shirtNumber}`;
+  const displayName = kid.displayName || kid.firstName || `Kid #${shirtNumber}`;
 
-  // ─── REQUEST ────────────────────────────────────────────────────
-  if (action === 'request') {
-    if (fields.DeletionRequestedAt) {
-      return NextResponse.json({ ok: true, alreadyRequested: true });
+  try {
+    // ─── REQUEST ────────────────────────────────────────────────
+    if (action === 'request') {
+      if (kid.deletionRequestedAt) {
+        return NextResponse.json({ ok: true, alreadyRequested: true });
+      }
+      const safe = await safetyCheck(kid);
+      if (!safe.ok) {
+        return NextResponse.json({ error: safe.reason }, { status: 409 });
+      }
+      await db
+        .update(children)
+        .set({ deletionRequestedAt: new Date(), updatedAt: new Date() })
+        .where(eq(children.id, kid.id));
+      return NextResponse.json({ ok: true, action: 'request', name: displayName });
     }
-    // Run the same safety checks before we even let the request
-    // sit on Kevin's queue — no point queuing a deletion that can't
-    // happen.
-    const safe = await safetyCheck(kid.id, displayName, fields);
+
+    // ─── REJECT ─────────────────────────────────────────────────
+    if (action === 'reject') {
+      await db
+        .update(children)
+        .set({ deletionRequestedAt: null, updatedAt: new Date() })
+        .where(eq(children.id, kid.id));
+      return NextResponse.json({ ok: true, action: 'reject', name: displayName });
+    }
+
+    // ─── DELETE (admin only) ────────────────────────────────────
+    const safe = await safetyCheck(kid);
     if (!safe.ok) {
       return NextResponse.json({ error: safe.reason }, { status: 409 });
     }
-    const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(
-      CHILDREN_TABLE
-    )}/${kid.id}`;
-    const res = await fetch(url, {
-      method: 'PATCH',
-      headers: atHeaders(),
-      body: JSON.stringify({
-        fields: { [F_DELETION_REQUESTED_AT]: new Date().toISOString() },
-      }),
+    await db.delete(children).where(eq(children.id, kid.id));
+    return NextResponse.json({
+      ok: true,
+      action: 'delete',
+      name: displayName,
+      shirtNumber,
     });
-    if (!res.ok) {
-      return NextResponse.json(
-        { error: `Request failed: ${res.status} ${await res.text()}` },
-        { status: 502 }
-      );
-    }
-    return NextResponse.json({ ok: true, action: 'request', name: displayName });
-  }
-
-  // ─── REJECT ─────────────────────────────────────────────────────
-  if (action === 'reject') {
-    const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(
-      CHILDREN_TABLE
-    )}/${kid.id}`;
-    const res = await fetch(url, {
-      method: 'PATCH',
-      headers: atHeaders(),
-      body: JSON.stringify({ fields: { [F_DELETION_REQUESTED_AT]: null } }),
-    });
-    if (!res.ok) {
-      return NextResponse.json(
-        { error: `Reject failed: ${res.status} ${await res.text()}` },
-        { status: 502 }
-      );
-    }
-    return NextResponse.json({ ok: true, action: 'reject', name: displayName });
-  }
-
-  // ─── DELETE (admin only — already guarded above) ────────────────
-  const safe = await safetyCheck(kid.id, displayName, fields);
-  if (!safe.ok) {
-    return NextResponse.json({ error: safe.reason }, { status: 409 });
-  }
-  const deleteUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(
-    CHILDREN_TABLE
-  )}/${kid.id}`;
-  const deleteRes = await fetch(deleteUrl, {
-    method: 'DELETE',
-    headers: atHeaders(),
-  });
-  if (!deleteRes.ok) {
+  } catch (err) {
     return NextResponse.json(
-      { error: `Delete failed: ${deleteRes.status} ${await deleteRes.text()}` },
-      { status: 502 }
+      { error: err instanceof Error ? err.message : 'Unexpected error' },
+      { status: 500 }
     );
   }
-  return NextResponse.json({
-    ok: true,
-    action: 'delete',
-    name: displayName,
-    shirtNumber,
-  });
 }

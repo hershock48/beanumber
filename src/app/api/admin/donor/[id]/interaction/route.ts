@@ -11,38 +11,20 @@
  *     relatedTodayItem?: string,
  *   }
  *
- * Creates an Interactions row linked to the donor. All fields
- * optional — minimum is just the donor id from the URL, which means
- * a one-click "Mark contacted" call defaults to:
- *   - direction = outbound
- *   - channel = email
- *   - subject = "Reached out"
- *   - at = now
+ * Postgres model: there's no dedicated Interactions table — the
+ * communications table absorbs every donor-side touch. We tag with
+ * EmailType="Interaction · <channel>" and stuff direction + notes
+ * into the subject so it's queryable. relatedDonorId points at the
+ * Donor row.
  *
- * The "Add interaction" form provides explicit values.
- *
- * Auth: cookie or X-Admin-Token (admin only).
+ * Auth: cookie or X-Admin-Token (admin).
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdminToken } from '@/lib/auth';
-
-const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID || '';
-const AIRTABLE_API_KEY =
-  process.env.AIRTABLE_PAT || process.env.AIRTABLE_API_KEY || '';
-const INTERACTIONS_TABLE =
-  process.env.AIRTABLE_INTERACTIONS_TABLE || 'Interactions';
-
-const F = {
-  subject: 'fldlqqv1NK1oTU6FV',
-  donor: 'fldnII8EQzgZBUksB',
-  direction: 'fldp59ikGDl16VtRN',
-  channel: 'fldskE86vHE2dKPSL',
-  notes: 'fldao80pSvvtzS5MF',
-  at: 'fldN6i1VRSq1e9rRS',
-  loggedBy: 'fldvuxp4H8PgnHY1Q',
-  relatedTodayItem: 'fldueKWnzK6Zl9P4c',
-};
+import { db } from '@/lib/db/client';
+import { communications, donors } from '@/lib/db/schema';
+import { eq } from 'drizzle-orm';
 
 const ALLOWED_DIRECTIONS = new Set(['outbound', 'inbound']);
 const ALLOWED_CHANNELS = new Set(['email', 'phone', 'text', 'event', 'other']);
@@ -55,7 +37,7 @@ export async function POST(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
   const { id } = await params;
-  if (!id || !id.startsWith('rec')) {
+  if (!id) {
     return NextResponse.json({ error: 'Invalid donor id' }, { status: 400 });
   }
 
@@ -86,45 +68,54 @@ export async function POST(
         ? 'Reached out'
         : 'Heard from them';
   const notes = typeof body.notes === 'string' ? body.notes : '';
-  const at = body.at && !Number.isNaN(Date.parse(body.at)) ? body.at : new Date().toISOString();
-  const relatedTodayItem =
-    typeof body.relatedTodayItem === 'string' ? body.relatedTodayItem : '';
+  const at =
+    body.at && !Number.isNaN(Date.parse(body.at))
+      ? new Date(body.at)
+      : new Date();
 
-  const fields: Record<string, unknown> = {
-    [F.subject]: subject,
-    [F.donor]: [id],
-    [F.direction]: direction,
-    [F.channel]: channel,
-    [F.at]: at,
-    [F.loggedBy]: 'Kevin',
-  };
-  if (notes) fields[F.notes] = notes;
-  if (relatedTodayItem) fields[F.relatedTodayItem] = relatedTodayItem;
+  try {
+    // Verify the donor exists and pull email so we can populate
+    // recipientEmail (helps reverse-lookup queries).
+    const donor = (
+      await db
+        .select({ id: donors.id, email: donors.email })
+        .from(donors)
+        .where(eq(donors.id, id))
+        .limit(1)
+    )[0];
+    if (!donor) {
+      return NextResponse.json({ error: 'Donor not found' }, { status: 404 });
+    }
 
-  const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(
-    INTERACTIONS_TABLE
-  )}`;
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${AIRTABLE_API_KEY}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ fields, typecast: true }),
-  });
-  if (!res.ok) {
+    // Append a notes line into the subject so it persists in a single
+    // column. communications has no body column.
+    const noteSuffix = notes ? ` — ${notes.slice(0, 240)}` : '';
+    const fullSubject = `[${direction}] ${subject}${noteSuffix}`;
+
+    const inserted = await db
+      .insert(communications)
+      .values({
+        subject: fullSubject,
+        emailType: `Interaction · ${channel}`,
+        status: 'Logged',
+        sendDate: at.toISOString().slice(0, 10),
+        recipientEmail: donor.email,
+        relatedDonorId: donor.id,
+      })
+      .returning({ id: communications.id });
+
+    return NextResponse.json({
+      ok: true,
+      interactionId: inserted[0].id,
+      subject,
+      direction,
+      channel,
+      at: at.toISOString(),
+    });
+  } catch (err) {
     return NextResponse.json(
-      { error: `Airtable create failed: ${res.status} ${await res.text()}` },
-      { status: 502 }
+      { error: err instanceof Error ? err.message : 'Unexpected error' },
+      { status: 500 }
     );
   }
-  const created = await res.json();
-  return NextResponse.json({
-    ok: true,
-    interactionId: created.id,
-    subject,
-    direction,
-    channel,
-    at,
-  });
 }

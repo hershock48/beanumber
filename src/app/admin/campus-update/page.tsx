@@ -11,15 +11,12 @@
  * minimum surface Simon needs: write what happened, attach a photo.
  */
 
+import { eq } from 'drizzle-orm';
 import { AdminShell } from '../_components/AdminShell';
 import { getAdminRole } from '@/lib/admin-session';
 import { CampusUpdateEditor } from './CampusUpdateEditor';
-
-const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID || '';
-const AIRTABLE_API_KEY =
-  process.env.AIRTABLE_PAT || process.env.AIRTABLE_API_KEY || '';
-const NEWSLETTERS_TABLE =
-  process.env.AIRTABLE_NEWSLETTERS_TABLE || 'Newsletters';
+import { db } from '@/lib/db/client';
+import { newsletters } from '@/lib/db/schema';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -38,30 +35,33 @@ async function loadThisMonth(): Promise<{
 }> {
   const title = buildMonthTitle(new Date());
   const empty = { exists: false, title, body: '', heroPhotoUrl: null, lastEditedBySimon: null };
-  if (!AIRTABLE_BASE_ID || !AIRTABLE_API_KEY) return empty;
 
-  const formula = encodeURIComponent(`{Title}="${title.replace(/"/g, '\\"')}"`);
-  const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(
-    NEWSLETTERS_TABLE
-  )}?filterByFormula=${formula}&maxRecords=1`;
-  const res = await fetch(url, {
-    headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` },
-    cache: 'no-store',
-  });
-  if (!res.ok) return empty;
-  const data = await res.json();
-  const rec = data.records?.[0];
-  if (!rec) return empty;
-  const f = rec.fields || {};
-  const heroArr = (f.HeroPhoto as Array<{ url: string; thumbnails?: { large?: { url: string } } }>) || [];
-  const heroUrl = heroArr[0]?.thumbnails?.large?.url || heroArr[0]?.url || null;
-  return {
-    exists: true,
-    title: (f.Title as string) || title,
-    body: (f.BodyHTML as string) || '',
-    heroPhotoUrl: heroUrl,
-    lastEditedBySimon: (f.LastEditedBySimon as string) || null,
-  };
+  try {
+    const rows = await db
+      .select({
+        title: newsletters.title,
+        bodyHtml: newsletters.bodyHtml,
+        heroPhotoUrl: newsletters.heroPhotoUrl,
+      })
+      .from(newsletters)
+      .where(eq(newsletters.title, title))
+      .limit(1);
+    const row = rows[0];
+    if (!row) return empty;
+    return {
+      exists: true,
+      title: row.title || title,
+      body: row.bodyHtml || '',
+      heroPhotoUrl: row.heroPhotoUrl || null,
+      // LastEditedBySimon is an Airtable-era field that hasn't been
+      // mirrored into the Postgres newsletters schema. The page
+      // doesn't surface this value directly today (the editor renders
+      // off `body` + `heroPhotoUrl`), so leaving it null is safe.
+      lastEditedBySimon: null,
+    };
+  } catch {
+    return empty;
+  }
 }
 
 export default async function CampusUpdatePage() {

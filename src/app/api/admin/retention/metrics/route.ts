@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import type Stripe from 'stripe';
+import { db } from '@/lib/db/client';
+import { children, donations, donationChildren } from '@/lib/db/schema';
+import { eq } from 'drizzle-orm';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -14,11 +17,6 @@ async function getStripe() {
   if (!secretKey) throw new Error('STRIPE_SECRET_KEY is not set');
   return new StripeModule(secretKey, { apiVersion: '2025-12-15.clover' });
 }
-
-const AIRTABLE_API_KEY = process.env.AIRTABLE_API_KEY;
-const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID;
-const AIRTABLE_CHILDREN_TABLE = process.env.AIRTABLE_CHILDREN_TABLE || 'Children';
-const AIRTABLE_DONATIONS_TABLE = process.env.AIRTABLE_DONATIONS_TABLE || 'Donations';
 
 function verifyAdminToken(request: NextRequest): boolean {
   const adminToken = process.env.ADMIN_API_TOKEN;
@@ -97,9 +95,6 @@ interface MetricsResponse {
 
 async function fetchAllSubscriptions(stripe: Stripe): Promise<Stripe.Subscription[]> {
   const all: Stripe.Subscription[] = [];
-  // status: 'all' includes canceled, incomplete, past_due, etc. — we need them
-  // all to compute retention curves accurately. Expand the customer so we
-  // have emails available for activation matching (see computeActivation).
   for await (const sub of stripe.subscriptions.list({
     status: 'all',
     limit: 100,
@@ -124,8 +119,6 @@ function customerEmail(
 }
 
 async function fetchShirtCheckouts(stripe: Stripe): Promise<Stripe.Checkout.Session[]> {
-  // We need completed shirt checkouts. Stripe doesn't let us filter on metadata
-  // at list time, so pull everything completed and filter client-side.
   const all: Stripe.Checkout.Session[] = [];
   for await (const session of stripe.checkout.sessions.list({ limit: 100 })) {
     if (session.status !== 'complete') continue;
@@ -136,56 +129,41 @@ async function fetchShirtCheckouts(stripe: Stripe): Promise<Stripe.Checkout.Sess
 }
 
 // ---------------------------------------------------------------------------
-// Airtable helpers
+// Postgres helpers
 // ---------------------------------------------------------------------------
 
-async function airtableList<T>(endpoint: string): Promise<T[]> {
-  if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) return [];
-  const all: T[] = [];
-  let offset: string | undefined = undefined;
-  do {
-    const url = new URL(`https://api.airtable.com/v0/${AIRTABLE_BASE_ID}${endpoint}`);
-    url.searchParams.set('pageSize', '100');
-    if (offset) url.searchParams.set('offset', offset);
-    const res = await fetch(url.toString(), {
-      headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` },
-      cache: 'no-store',
-    });
-    if (!res.ok) {
-      console.error('[retention/metrics] Airtable error', res.status, await res.text().catch(() => ''));
-      return all;
-    }
-    const data = (await res.json()) as { records: T[]; offset?: string };
-    all.push(...data.records);
-    offset = data.offset;
-  } while (offset);
-  return all;
+interface ChildLite {
+  id: string;
+  childId: string;
+  reservedForAuction: boolean | null;
 }
 
-interface AirtableDonationRecord {
-  id: string;
-  fields: {
-    'Stripe Checkout Session ID'?: string;
-    Amount?: number;
-    'Donation Type'?: string;
-    Status?: string;
-    Child?: string[];
-    CreatedTime?: string;
-    Created?: string;
-  };
-  createdTime: string;
+interface DonationLinkLite {
+  /** kid record id (uuid) */
+  childRecordId: string;
 }
 
-interface AirtableChildRecord {
-  id: string;
-  fields: {
-    ChildID?: string;
-    DisplayName?: string;
-    FirstName?: string;
-    ShirtNumber?: number;
-    Status?: string;
-    ReservedForAuction?: boolean;
-  };
+async function loadChildren(): Promise<ChildLite[]> {
+  return db
+    .select({
+      id: children.id,
+      childId: children.childId,
+      reservedForAuction: children.reservedForAuction,
+    })
+    .from(children);
+}
+
+async function loadDonationLinks(): Promise<DonationLinkLite[]> {
+  // We only need the kid-side of the relationship for coverage counting.
+  // Filter to succeeded donations so we don't credit failed attempts.
+  const rows = await db
+    .select({
+      childRecordId: donationChildren.childId,
+    })
+    .from(donationChildren)
+    .innerJoin(donations, eq(donations.id, donationChildren.donationId))
+    .where(eq(donations.paymentStatus, 'Succeeded'));
+  return rows;
 }
 
 // ---------------------------------------------------------------------------
@@ -211,39 +189,12 @@ function monthsAgo(n: number): string {
   return monthKey(d);
 }
 
-/**
- * Activation = shirt buyers who went on to start a subscription.
- *
- * Three-tier attribution, in order of reliability:
- *
- *   1. Deterministic: subscription.metadata.referring_shirt_session_id ==
- *      shirt_session.id. Set when the sponsor arrives via the shirt success
- *      page (we thread the id through the URL → checkout body → metadata).
- *      100% accurate when present.
- *
- *   2. Stripe customer id match. Same customer who bought the shirt later
- *      subscribed. Breaks when the shirt was bought as a guest OR when
- *      Stripe created a new customer for the subscription (different email,
- *      same human).
- *
- *   3. Email match. Lowercased customer_details.email on the shirt session
- *      == email on the subscription's expanded customer. Catches cross-device
- *      returns where the same email was used but Stripe didn't reuse the
- *      customer record.
- *
- * For each shirt session we take the EARLIEST subscription that matches via
- * any tier. That lets a single sponsor be attributed to their shirt even if
- * they later started additional subscriptions.
- */
 function computeActivation(
   shirtSessions: Stripe.Checkout.Session[],
   subscriptions: Stripe.Subscription[]
 ): ActivationRow[] {
-  // Tier 1: session id → earliest matching subscription start
   const subStartByShirtSession = new Map<string, number>();
-  // Tier 2: customer id → earliest subscription start
   const subStartByCustomer = new Map<string, number>();
-  // Tier 3: email (lowercased) → earliest subscription start
   const subStartByEmail = new Map<string, number>();
 
   for (const sub of subscriptions) {
@@ -268,7 +219,6 @@ function computeActivation(
     }
   }
 
-  // Cohort by shirt-purchase month
   const byCohort = new Map<
     string,
     { shirts: number; conv30: number; conv60: number; purchaseTimes: number[] }
@@ -281,8 +231,6 @@ function computeActivation(
     row.shirts += 1;
     row.purchaseTimes.push(session.created);
 
-    // Three-tier lookup. Take the earliest match across tiers so we don't
-    // penalize a legitimate match if the metadata breadcrumb is missing.
     const candidates: number[] = [];
     const deterministic = subStartByShirtSession.get(session.id);
     if (deterministic) candidates.push(deterministic);
@@ -300,9 +248,6 @@ function computeActivation(
       if (byEmail) candidates.push(byEmail);
     }
 
-    // Best match = earliest subscription that started AFTER the shirt
-    // purchase. We exclude subs that existed before the shirt (those are
-    // pre-existing sponsors, not new activations).
     const afterShirt = candidates.filter(t => t >= session.created);
     if (afterShirt.length > 0) {
       const subStart = Math.min(...afterShirt);
@@ -318,8 +263,6 @@ function computeActivation(
   return [...byCohort.entries()]
     .sort((a, b) => (a[0] < b[0] ? -1 : 1))
     .map(([cohort, row]) => {
-      // If the cohort month is less than 30 days old on average, report null
-      // for conv30 (avoid showing misleading partial data).
       const avgPurchase = row.purchaseTimes.reduce((s, t) => s + t, 0) / row.purchaseTimes.length;
       const ageDays = (nowSecs - avgPurchase) / 86400;
       return {
@@ -331,23 +274,12 @@ function computeActivation(
     });
 }
 
-/**
- * Classic subscription cohort retention.
- * For each cohort month C, for each offset n in 0..MAX,
- * count subscriptions that were still "active-equivalent" at C+n months.
- *
- * "Active at offset n" means: the subscription was created in or before
- * C+n and is either still active now, or was canceled/ended at some point
- * after C+n. We use canceled_at (or ended_at) as the end of life; a null
- * canceled_at with status != 'canceled' means still alive.
- */
 function computeRetention(subscriptions: Stripe.Subscription[]): CohortRow[] {
   const MAX_OFFSET = 6;
   const nowKey = monthKey(new Date());
 
   const byCohort = new Map<string, Stripe.Subscription[]>();
   for (const sub of subscriptions) {
-    // Ignore incompletes — they never actually started.
     if (sub.status === 'incomplete' || sub.status === 'incomplete_expired') continue;
     const cohort = monthKey(sub.created);
     const list = byCohort.get(cohort) || [];
@@ -362,25 +294,19 @@ function computeRetention(subscriptions: Stripe.Subscription[]): CohortRow[] {
       const maxElapsed = monthsBetween(cohort, nowKey);
       for (let offset = 0; offset <= MAX_OFFSET; offset++) {
         if (offset > maxElapsed) {
-          counts.push(null); // month hasn't happened yet
+          counts.push(null);
           continue;
         }
         let alive = 0;
         for (const sub of subs) {
-          // Determine effective end month
           const endedSecs = sub.canceled_at || sub.ended_at || null;
           const endedKey = endedSecs ? monthKey(endedSecs) : null;
-          // Target month = cohort + offset
           const [y, m] = cohort.split('-').map(Number);
           const target = new Date(Date.UTC(y, m - 1 + offset, 1));
           const targetKey = monthKey(target);
           if (!endedKey || monthsBetween(targetKey, endedKey) > 0 || (endedKey === targetKey && !endedSecs)) {
             alive += 1;
           } else if (endedKey && monthsBetween(targetKey, endedKey) >= 0) {
-            // Subscription was still active during target month (ended in target month or later)
-            // Only count if ended strictly after target month starts
-            // (We treat the subscription as "alive at offset n" if it was
-            // present during any part of that month.)
             if (monthsBetween(targetKey, endedKey) > 0) alive += 1;
           }
         }
@@ -390,14 +316,9 @@ function computeRetention(subscriptions: Stripe.Subscription[]): CohortRow[] {
     });
 }
 
-/**
- * Month-over-month MRR, plus new/churned subscriber counts per month.
- * MRR is expressed in the subscription's effective monthly amount.
- */
 function computeMrr(subscriptions: Stripe.Subscription[]): MrrRow[] {
   const rows = new Map<string, MrrRow>();
 
-  // Seed the last 12 months so empty months show up as 0 (not missing)
   for (let i = 11; i >= 0; i--) {
     const m = monthsAgo(i);
     rows.set(m, { month: m, mrrCents: 0, activeSubscribers: 0, newSubscribers: 0, churnedSubscribers: 0 });
@@ -420,7 +341,6 @@ function computeMrr(subscriptions: Stripe.Subscription[]): MrrRow[] {
     return Math.round(total);
   }
 
-  // Walk each month and ask: which subs were alive during that month?
   const monthKeys = [...rows.keys()];
   for (const m of monthKeys) {
     const [y, mo] = m.split('-').map(Number);
@@ -446,40 +366,38 @@ function computeMrr(subscriptions: Stripe.Subscription[]): MrrRow[] {
   return [...rows.values()];
 }
 
-/**
- * Story coverage: how many children have at least one connection (shirt
- * purchase or donation) and how many have an active monthly sponsor right now.
- * This is an operational metric — NOT surfaced to sponsors — because it
- * informs content production (whose letters do we send this month).
- */
 function computeStoryCoverage(
-  children: AirtableChildRecord[],
-  donations: AirtableDonationRecord[],
+  kids: ChildLite[],
+  donationLinks: DonationLinkLite[],
   subscriptions: Stripe.Subscription[]
 ): StoryCoverage {
   const connectionsByChild = new Map<string, number>();
   const activeSponsorsByChild = new Map<string, number>();
 
-  // Active sponsor = subscription status in {active, trialing, past_due} —
-  // essentially "currently expected to pay." We tie subscriptions to children
-  // via metadata.child_id if present.
   const activeStatuses = new Set(['active', 'trialing', 'past_due']);
+  // Stripe subs may carry either a UUID (child_record_id) or the legacy
+  // ChildID string. Match both.
+  const childIdByLegacy = new Map<string, string>();
+  for (const c of kids) childIdByLegacy.set(c.childId, c.id);
+
   for (const sub of subscriptions) {
     if (!activeStatuses.has(sub.status)) continue;
-    const childId = sub.metadata?.child_id;
-    if (!childId) continue;
-    activeSponsorsByChild.set(childId, (activeSponsorsByChild.get(childId) || 0) + 1);
+    const meta = sub.metadata || {};
+    const childRecordId = meta.child_record_id || meta.childRecordId || '';
+    const childIdLegacy = meta.child_id || meta.childId || '';
+    const id = childRecordId || childIdByLegacy.get(childIdLegacy) || '';
+    if (!id) continue;
+    activeSponsorsByChild.set(id, (activeSponsorsByChild.get(id) || 0) + 1);
   }
 
-  for (const d of donations) {
-    const links = d.fields.Child || [];
-    for (const linkedId of links) {
-      connectionsByChild.set(linkedId, (connectionsByChild.get(linkedId) || 0) + 1);
-    }
+  for (const link of donationLinks) {
+    connectionsByChild.set(
+      link.childRecordId,
+      (connectionsByChild.get(link.childRecordId) || 0) + 1
+    );
   }
 
-  // Filter out reserved-for-auction slots (they're placeholders, not real kids)
-  const realChildren = children.filter(c => !c.fields.ReservedForAuction);
+  const realChildren = kids.filter(c => !c.reservedForAuction);
 
   let childrenWithAnyConnection = 0;
   let childrenWithActiveSponsor = 0;
@@ -487,15 +405,8 @@ function computeStoryCoverage(
   const buckets = { '0': 0, '1': 0, '2': 0, '3': 0, '4': 0, '5+': 0 };
 
   for (const child of realChildren) {
-    const childId = child.fields.ChildID;
-    const conns =
-      (childId ? connectionsByChild.get(childId) : 0) ||
-      connectionsByChild.get(child.id) ||
-      0;
-    const activeSponsors =
-      (childId ? activeSponsorsByChild.get(childId) : 0) ||
-      activeSponsorsByChild.get(child.id) ||
-      0;
+    const conns = connectionsByChild.get(child.id) || 0;
+    const activeSponsors = activeSponsorsByChild.get(child.id) || 0;
     if (conns > 0) childrenWithAnyConnection += 1;
     if (activeSponsors > 0) childrenWithActiveSponsor += 1;
     if (conns > maxConnectionsOnOneChild) maxConnectionsOnOneChild = conns;
@@ -548,16 +459,18 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const [children, donations] = await Promise.all([
-    airtableList<AirtableChildRecord>(`/${encodeURIComponent(AIRTABLE_CHILDREN_TABLE)}`),
-    airtableList<AirtableDonationRecord>(`/${encodeURIComponent(AIRTABLE_DONATIONS_TABLE)}`),
-  ]);
-
-  if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) {
-    warnings.push('Airtable is not configured. Children and donation data are empty.');
+  let kids: ChildLite[] = [];
+  let donationLinks: DonationLinkLite[] = [];
+  try {
+    [kids, donationLinks] = await Promise.all([loadChildren(), loadDonationLinks()]);
+  } catch (e) {
+    warnings.push(
+      'Postgres data could not be loaded — ' +
+        (e instanceof Error ? e.message : 'unknown error') +
+        '. Children + donation coverage will be empty.'
+    );
   }
 
-  // Active = subscription status currently expected to pay
   const activeStatuses = new Set(['active', 'trialing', 'past_due']);
   const activeSubs = subscriptions.filter(s => activeStatuses.has(s.status));
   const mrrByMonth = computeMrr(subscriptions);
@@ -565,7 +478,7 @@ export async function GET(request: NextRequest) {
 
   const activation = computeActivation(shirtSessions, subscriptions);
   const retention = computeRetention(subscriptions);
-  const storyCoverage = computeStoryCoverage(children, donations, subscriptions);
+  const storyCoverage = computeStoryCoverage(kids, donationLinks, subscriptions);
 
   const dataState: MetricsResponse['dataState'] =
     subscriptions.length === 0 && shirtSessions.length === 0

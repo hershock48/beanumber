@@ -1,35 +1,31 @@
-import { NextRequest, NextResponse } from 'next/server';
-
 /**
  * GET /api/admin/backfill-subscriptions
  *
- * Finds all donation records with "+monthly" in the note that are missing
- * Sponsorship and/or Subscription records, then creates them.
+ * For each Donation whose note contains "+monthly", ensures:
+ *   - a Stripe subscription exists for the buyer (creates one if not)
+ *   - a Sponsorship row exists in Postgres
+ *   - a Subscription row exists in Postgres
  *
  * Root cause: cart checkout used mode:'payment' without customer_creation:'always',
  * so Stripe never created a customer. The webhook silently skipped subscription
  * creation because stripeCustomerId was null.
  *
- * This endpoint:
- * 1. Scans Donations for notes containing "+monthly"
- * 2. For each, checks if the donor has a Stripe Customer ID
- * 3. If not, looks up the checkout session in Stripe to find the customer
- * 4. If Stripe has no customer for the session, creates one from the saved payment method
- * 5. Creates a Stripe subscription for the customer
- * 6. Creates Sponsorship and Subscription records in Airtable
+ * Idempotent. ?dry=1 to preview without writing.
  *
- * Protected by CRON_SECRET header check (same as other admin endpoints).
+ * Auth: ADMIN_API_TOKEN / ADMIN_PASSWORD / CRON_SECRET.
  */
 
-const AIRTABLE_API_KEY = process.env.AIRTABLE_API_KEY;
-const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID;
-
-function getAirtableHeaders() {
-  return {
-    Authorization: `Bearer ${AIRTABLE_API_KEY}`,
-    'Content-Type': 'application/json',
-  };
-}
+import { NextRequest, NextResponse } from 'next/server';
+import type Stripe from 'stripe';
+import { db } from '@/lib/db/client';
+import {
+  donations,
+  donors,
+  sponsorships,
+  children,
+} from '@/lib/db/schema';
+import { eq, sql, and, or, isNull } from 'drizzle-orm';
+import { upsertSubscription, createSponsorship } from '@/lib/db/mutations';
 
 async function getStripe() {
   const StripeModule = (await import('stripe')).default;
@@ -58,8 +54,6 @@ interface BackfillResult {
 }
 
 export async function GET(request: NextRequest) {
-  // Auth: accept query param ?token=, X-Admin-Token header, or Bearer token.
-  // Checks against ADMIN_API_TOKEN, ADMIN_PASSWORD, or CRON_SECRET.
   const token =
     request.nextUrl.searchParams.get('token') ||
     request.headers.get('X-Admin-Token') ||
@@ -71,11 +65,10 @@ export async function GET(request: NextRequest) {
     process.env.CRON_SECRET,
   ].filter(Boolean);
   if (validTokens.length > 0 && (!token || !validTokens.includes(token))) {
-    return NextResponse.json({ error: 'Unauthorized. Pass ?token=YOUR_ADMIN_TOKEN in the URL.' }, { status: 401 });
-  }
-
-  if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) {
-    return NextResponse.json({ error: 'Airtable not configured' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Unauthorized. Pass ?token=YOUR_ADMIN_TOKEN in the URL.' },
+      { status: 401 }
+    );
   }
 
   const dryRun = request.nextUrl.searchParams.get('dry') === '1';
@@ -84,11 +77,9 @@ export async function GET(request: NextRequest) {
   try {
     const stripe = await getStripe();
 
-    // Create (or reuse) a Stripe Product for the monthly sponsorship.
-    // subscriptions.create's items[].price_data requires an existing
-    // `product` ID — it does NOT accept inline `product_data` like
-    // Checkout sessions do. Without this we hit:
-    //   "Received unknown parameter: items[0][price_data][product_data]."
+    // Stripe Product for the monthly sponsorship. price_data on
+    // subscriptions.create requires a product ID; it doesn't accept
+    // inline product_data like Checkout does.
     let sponsorshipProductId: string;
     try {
       const product = await stripe.products.create({
@@ -96,59 +87,53 @@ export async function GET(request: NextRequest) {
         metadata: { source: 'backfill' },
       });
       sponsorshipProductId = product.id;
-    } catch (productErr: any) {
-      console.error('[Backfill] Failed to create Stripe Product:', productErr?.message);
+    } catch (productErr) {
+      const msg = productErr instanceof Error ? productErr.message : String(productErr);
+      console.error('[Backfill] Failed to create Stripe Product:', msg);
       return NextResponse.json(
-        { error: 'Failed to create Stripe Product for sponsorship: ' + productErr?.message },
+        { error: 'Failed to create Stripe Product for sponsorship: ' + msg },
         { status: 500 }
       );
     }
 
-    // Step 1: Find all donations with "+monthly" in the note
-    const formula = `FIND("+monthly", {Donation Note})`;
-    const donationsRes = await fetch(
-      `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/Donations?filterByFormula=${encodeURIComponent(formula)}&fields%5B%5D=Donation%20Note&fields%5B%5D=Stripe%20Checkout%20Session%20ID&fields%5B%5D=Stripe%20Payment%20Intent%20ID&fields%5B%5D=Donor&fields%5B%5D=Donor%20Email%20at%20Donation&fields%5B%5D=Stripe%20Customer%20ID`,
-      { headers: getAirtableHeaders() }
-    );
-    if (!donationsRes.ok) {
-      return NextResponse.json({ error: 'Failed to query donations', detail: await donationsRes.text() }, { status: 500 });
-    }
-    const donationsData = await donationsRes.json();
-    const donations = donationsData.records || [];
+    // Find donations with +monthly in the note.
+    const monthlyDonations = await db
+      .select()
+      .from(donations)
+      .where(sql`${donations.donationNote} ILIKE '%+monthly%'`);
 
-    console.log(`[Backfill] Found ${donations.length} donations with +monthly`);
+    console.log(`[Backfill] Found ${monthlyDonations.length} donations with +monthly`);
 
-    for (const donation of donations) {
-      const fields = donation.fields || {};
-      const note = fields['Donation Note'] || '';
-      const sessionId = fields['Stripe Checkout Session ID'] || '';
-      const email = fields['Donor Email at Donation'] || '';
-      const donorLinks = fields.Donor || [];
-      const donorRecordId = donorLinks[0]?.id || donorLinks[0] || '';
+    for (const donation of monthlyDonations) {
+      const note = donation.donationNote || '';
+      const sessionId = donation.stripeCheckoutSessionId || '';
+      const piId = donation.stripePaymentIntentId || '';
+      const email = (donation.donorEmailAtDonation || '').toLowerCase();
 
-      // Parse which items are +monthly from the note
-      // Format: "ShirtName / Color / Size → #N (ChildName) +monthly"
-      const monthlyLines = note.split('\n').filter((l: string) => l.includes('+monthly'));
-
+      // Parse +monthly lines (one per shirt/kid).
+      const monthlyLines = note.split('\n').filter(l => l.includes('+monthly'));
       if (monthlyLines.length === 0) continue;
 
-      // Get donor info
-      let donorName = '';
-      let donorStripeId = '';
-      if (donorRecordId) {
-        const donorRes = await fetch(
-          `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/Donors/${donorRecordId}?fields%5B%5D=Donor%20Name&fields%5B%5D=Stripe%20Customer%20ID&fields%5B%5D=Email%20Address`,
-          { headers: getAirtableHeaders() }
-        );
-        if (donorRes.ok) {
-          const donorData = await donorRes.json();
-          donorName = donorData.fields?.['Donor Name'] || '';
-          donorStripeId = donorData.fields?.['Stripe Customer ID'] || '';
-        }
-      }
+      // Hydrate the donor.
+      let donor =
+        (donation.donorId
+          ? (await db.select().from(donors).where(eq(donors.id, donation.donorId)).limit(1))[0]
+          : null) ||
+        (email
+          ? (
+              await db
+                .select()
+                .from(donors)
+                .where(sql`lower(${donors.email}) = ${email}`)
+                .limit(1)
+            )[0]
+          : null) ||
+        null;
+
+      const donorName = donor?.name || '';
+      let donorStripeId = donor?.stripeCustomerId || '';
 
       for (const line of monthlyLines) {
-        // Parse: "ShirtName / Color / Size → #N (ChildName) +monthly"
         const shirtMatch = line.match(/→ #(\d+) \(([^)]+)\)/);
         const shirtNumber = shirtMatch?.[1] || null;
         const childName = shirtMatch?.[2] || null;
@@ -167,71 +152,41 @@ export async function GET(request: NextRequest) {
         };
 
         try {
-          // Check if sponsorship already exists for this child+donor
-          if (shirtNumber) {
-            const spFormula = `AND({SponsorEmail} = "${email}", {ChildDisplayName} = "${childName}")`;
-            const spRes = await fetch(
-              `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/Sponsorships?filterByFormula=${encodeURIComponent(spFormula)}&maxRecords=1`,
-              { headers: getAirtableHeaders() }
-            );
-            if (spRes.ok) {
-              const spData = await spRes.json();
-              if (spData.records?.length > 0) {
-                result.sponsorshipCreated = false;
-                result.stripeSubscriptionId = spData.records[0].fields?.StripeSubscriptionID || null;
-                // Sponsorship exists, check if subscription exists in Stripe
-                if (result.stripeSubscriptionId) {
-                  results.push(result);
-                  continue; // Already fully backfilled
-                }
-              }
-            }
-          }
-
-          // Get or create Stripe customer
+          // Get or create the Stripe customer.
           let customerId = donorStripeId;
 
           if (!customerId && sessionId) {
-            // Look up the checkout session to find/create customer
             try {
               const session = await stripe.checkout.sessions.retrieve(sessionId);
               if (session.customer) {
-                customerId = typeof session.customer === 'string'
-                  ? session.customer
-                  : session.customer.id;
+                customerId =
+                  typeof session.customer === 'string'
+                    ? session.customer
+                    : session.customer.id;
               }
-            } catch (e: any) {
-              console.log('[Backfill] Could not retrieve session:', sessionId, e.message);
-            }
+            } catch {}
           }
 
-          if (!customerId) {
-            // Create a new Stripe customer from the payment intent's payment method
-            const piId = fields['Stripe Payment Intent ID'] || '';
-            if (piId) {
-              try {
-                const pi = await stripe.paymentIntents.retrieve(piId);
-                const pmId = typeof pi.payment_method === 'string'
+          if (!customerId && piId) {
+            try {
+              const pi = await stripe.paymentIntents.retrieve(piId);
+              const pmId =
+                typeof pi.payment_method === 'string'
                   ? pi.payment_method
                   : pi.payment_method?.id;
-
-                if (pmId) {
-                  const customer = await stripe.customers.create({
-                    email,
-                    name: donorName,
-                    payment_method: pmId,
-                    invoice_settings: { default_payment_method: pmId },
-                    metadata: { backfilled: 'true', original_pi: piId },
-                  });
-                  customerId = customer.id;
-                  console.log('[Backfill] Created Stripe customer:', customerId, 'for', email);
-
-                  // Attach payment method to customer
-                  await stripe.paymentMethods.attach(pmId, { customer: customerId });
-                }
-              } catch (e: any) {
-                console.error('[Backfill] Failed to create customer from PI:', piId, e.message);
+              if (pmId) {
+                const customer = await stripe.customers.create({
+                  email,
+                  name: donorName,
+                  payment_method: pmId,
+                  invoice_settings: { default_payment_method: pmId },
+                  metadata: { backfilled: 'true', original_pi: piId },
+                });
+                customerId = customer.id;
+                await stripe.paymentMethods.attach(pmId, { customer: customerId });
               }
+            } catch (e) {
+              console.error('[Backfill] Failed to create customer from PI:', piId, e);
             }
           }
 
@@ -240,49 +195,35 @@ export async function GET(request: NextRequest) {
             results.push(result);
             continue;
           }
-
           result.stripeCustomerId = customerId;
 
-          // Update donor record with Stripe Customer ID if missing
-          if (!donorStripeId && donorRecordId && !dryRun) {
-            await fetch(
-              `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/Donors/${donorRecordId}`,
-              {
-                method: 'PATCH',
-                headers: getAirtableHeaders(),
-                body: JSON.stringify({ fields: { 'Stripe Customer ID': customerId } }),
-              }
-            );
+          // Backfill donor.stripeCustomerId if missing.
+          if (donor && !donor.stripeCustomerId && !dryRun) {
+            await db
+              .update(donors)
+              .set({ stripeCustomerId: customerId, updatedAt: new Date() })
+              .where(eq(donors.id, donor.id));
             donorStripeId = customerId;
           }
 
-          // Check if subscription already exists in Stripe for this customer
+          // Look for an existing matching Stripe subscription.
           const existingSubs = await stripe.subscriptions.list({
             customer: customerId,
             status: 'all',
             limit: 10,
           });
-
           let subId = '';
-          const existingSub = existingSubs.data.find(s =>
-            s.metadata?.child_display_name === childName ||
-            s.metadata?.referring_cart_session_id === sessionId
+          const existingSub = existingSubs.data.find(
+            s =>
+              s.metadata?.child_display_name === childName ||
+              s.metadata?.referring_cart_session_id === sessionId
           );
 
           if (existingSub) {
             subId = existingSub.id;
-            console.log('[Backfill] Found existing subscription:', subId);
           } else if (!dryRun) {
-            // Find a saved payment method on the customer. The cart
-            // checkout enables both 'card' and 'link' (Stripe Link
-            // wallet), so the saved PM type may be either. We also fall
-            // back to the original PaymentIntent's payment_method if
-            // the customer has nothing attached directly (sometimes
-            // setup_future_usage saves the PM but doesn't attach it
-            // to the customer until first use).
+            // Find a saved PM on the customer.
             let pmId: string | null = null;
-
-            // Try every payment method type the cart checkout supports.
             for (const pmType of ['card', 'link'] as const) {
               const list = await stripe.paymentMethods.list({
                 customer: customerId,
@@ -290,39 +231,30 @@ export async function GET(request: NextRequest) {
               });
               if (list.data[0]) {
                 pmId = list.data[0].id;
-                console.log('[Backfill] Found PM on customer:', pmId, 'type=' + pmType);
                 break;
               }
             }
-
-            // Fallback: pull the PM from the original PaymentIntent.
-            if (!pmId) {
-              const piId = fields['Stripe Payment Intent ID'] || '';
-              if (piId) {
-                try {
-                  const pi = await stripe.paymentIntents.retrieve(piId);
-                  const piPm = typeof pi.payment_method === 'string'
+            if (!pmId && piId) {
+              try {
+                const pi = await stripe.paymentIntents.retrieve(piId);
+                const piPm =
+                  typeof pi.payment_method === 'string'
                     ? pi.payment_method
                     : pi.payment_method?.id;
-                  if (piPm) {
-                    pmId = piPm;
-                    console.log('[Backfill] Found PM on PI fallback:', pmId);
-                    // Attach to the customer so the subscription can use it.
-                    try {
-                      await stripe.paymentMethods.attach(pmId, { customer: customerId });
-                    } catch (attachErr: any) {
-                      // Already attached → fine. Anything else, surface.
-                      if (!String(attachErr?.message || '').includes('already')) {
-                        console.warn('[Backfill] PM attach warn:', attachErr?.message);
-                      }
+                if (piPm) {
+                  pmId = piPm;
+                  try {
+                    await stripe.paymentMethods.attach(pmId, { customer: customerId });
+                  } catch (attachErr) {
+                    const m =
+                      attachErr instanceof Error ? attachErr.message : String(attachErr);
+                    if (!m.includes('already')) {
+                      console.warn('[Backfill] PM attach warn:', m);
                     }
                   }
-                } catch (e: any) {
-                  console.log('[Backfill] PI retrieve fallback failed:', piId, e.message);
                 }
-              }
+              } catch {}
             }
-
             if (!pmId) {
               result.error = 'No payment method on file for customer ' + customerId;
               results.push(result);
@@ -332,14 +264,16 @@ export async function GET(request: NextRequest) {
             const billingAnchor = Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60;
             const sub = await stripe.subscriptions.create({
               customer: customerId,
-              items: [{
-                price_data: {
-                  currency: 'usd',
-                  product: sponsorshipProductId,
-                  unit_amount: 2500,
-                  recurring: { interval: 'month' },
-                } as any,
-              }],
+              items: [
+                {
+                  price_data: {
+                    currency: 'usd',
+                    product: sponsorshipProductId,
+                    unit_amount: 2500,
+                    recurring: { interval: 'month' },
+                  } as Stripe.SubscriptionCreateParams.Item['price_data'],
+                },
+              ],
               default_payment_method: pmId,
               billing_cycle_anchor: billingAnchor,
               proration_behavior: 'none',
@@ -352,156 +286,99 @@ export async function GET(request: NextRequest) {
               },
             });
             subId = sub.id;
-            console.log('[Backfill] Created subscription:', subId, 'for', email, childName);
           }
-
           result.stripeSubscriptionId = subId || null;
           result.subscriptionCreated = !!subId;
 
-          // Per core_model.md §0: NO MATCHING. If we just created a
-          // Stripe sub and there's already a Sponsorship row for this
-          // donor that doesn't yet have a sub ID, link them. This
-          // catches the stockpile case (shirt purchased, sponsorship
-          // exists in Airtable from prior manual fix, sub now exists in
-          // Stripe — they need to be glued together).
-          if (subId && !dryRun) {
-            try {
-              const linkFormula = `AND(LOWER({SponsorEmail})="${email.toLowerCase()}",{StripeSubscriptionID}="")`;
-              const linkRes = await fetch(
-                `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/Sponsorships?filterByFormula=${encodeURIComponent(linkFormula)}&maxRecords=1`,
-                { headers: getAirtableHeaders() }
-              );
-              if (linkRes.ok) {
-                const linkData = await linkRes.json();
-                const candidate = linkData.records?.[0];
-                if (candidate?.id) {
-                  await fetch(
-                    `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/Sponsorships/${candidate.id}`,
-                    {
-                      method: 'PATCH',
-                      headers: getAirtableHeaders(),
-                      body: JSON.stringify({
-                        fields: { StripeSubscriptionID: subId },
-                      }),
-                    }
-                  );
-                  console.log('[Backfill] Linked sub', subId, '→ existing Sponsorship', candidate.id);
-                }
-              }
-            } catch (linkErr: any) {
-              console.warn('[Backfill] Failed to link sub to existing Sponsorship:', linkErr?.message);
+          // If sub was created and there's an orphan Sponsorship row
+          // for this email without a sub, claim it.
+          if (subId && !dryRun && email) {
+            const claim = await db
+              .select()
+              .from(sponsorships)
+              .where(
+                and(
+                  sql`lower(${sponsorships.sponsorEmail}) = ${email}`,
+                  or(
+                    isNull(sponsorships.stripeSubscriptionId),
+                    eq(sponsorships.stripeSubscriptionId, '')
+                  )
+                )
+              )
+              .limit(1);
+            const candidate = claim[0];
+            if (candidate) {
+              await db
+                .update(sponsorships)
+                .set({
+                  stripeSubscriptionId: subId,
+                  status: 'Active',
+                  updatedAt: new Date(),
+                })
+                .where(eq(sponsorships.id, candidate.id));
             }
           }
 
-          // Find child record by shirt number
-          let childRecordId = '';
-          let childId = '';
+          // Find the kid record by shirt number.
+          let childRecordId: string | null = null;
+          let childIdLegacy: string | null = null;
           if (shirtNumber) {
-            const childFormula = `{ShirtNumber} = ${shirtNumber}`;
-            const childRes = await fetch(
-              `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/Children?filterByFormula=${encodeURIComponent(childFormula)}&maxRecords=1`,
-              { headers: getAirtableHeaders() }
-            );
-            if (childRes.ok) {
-              const childData = await childRes.json();
-              const childRec = childData.records?.[0];
-              if (childRec) {
-                childRecordId = childRec.id;
-                childId = childRec.fields?.ChildID || '';
-              }
+            const kid = await db
+              .select({ id: children.id, childId: children.childId })
+              .from(children)
+              .where(eq(children.shirtNumber, Number(shirtNumber)))
+              .limit(1);
+            if (kid[0]) {
+              childRecordId = kid[0].id;
+              childIdLegacy = kid[0].childId;
             }
           }
 
-          // Create Sponsorship record if missing
-          if (childRecordId && !dryRun) {
-            // Double-check it doesn't exist
-            const spCheck = `AND({SponsorEmail} = "${email}", {Children} = "${childRecordId}")`;
-            const spCheckRes = await fetch(
-              `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/Sponsorships?filterByFormula=${encodeURIComponent(spCheck)}&maxRecords=1`,
-              { headers: getAirtableHeaders() }
-            );
-            let sponsorshipExists = false;
-            if (spCheckRes.ok) {
-              const spCheckData = await spCheckRes.json();
-              sponsorshipExists = (spCheckData.records?.length || 0) > 0;
-            }
-
-            if (!sponsorshipExists) {
-              const sponsorCode = generateSponsorCode();
-              const today = new Date().toISOString().split('T')[0];
-              const spFields: Record<string, unknown> = {
-                SponsorCode: sponsorCode,
-                SponsorEmail: email,
-                ChildID: childId,
-                ChildDisplayName: childName || '',
-                AuthStatus: 'Active',
-                Status: 'Active',
-                VisibleToSponsor: true,
-                SponsorshipStartDate: today,
-                Children: [childRecordId],
-                Donor: [donorRecordId],
-                MonthlyAmount: 25,
-                SponsorName: donorName,
-              };
-              if (subId) spFields.StripeSubscriptionID = subId;
-
-              const spCreateRes = await fetch(
-                `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/Sponsorships`,
-                {
-                  method: 'POST',
-                  headers: getAirtableHeaders(),
-                  body: JSON.stringify({ fields: spFields }),
-                }
-              );
-
-              if (spCreateRes.ok) {
-                result.sponsorshipCreated = true;
-                console.log('[Backfill] Created sponsorship for', email, childName);
-              } else {
-                const errText = await spCreateRes.text();
-                result.error = 'Sponsorship create failed: ' + errText.slice(0, 200);
-                console.error('[Backfill] Sponsorship create failed:', errText);
-              }
+          // Create Sponsorship if missing (lookup by email + child).
+          if (childRecordId && !dryRun && email) {
+            const existing = await db
+              .select({ id: sponsorships.id })
+              .from(sponsorships)
+              .where(
+                and(
+                  sql`lower(${sponsorships.sponsorEmail}) = ${email}`,
+                  or(
+                    eq(sponsorships.childId, childRecordId),
+                    childIdLegacy ? eq(sponsorships.childIdLegacy, childIdLegacy) : sql`false`
+                  )
+                )
+              )
+              .limit(1);
+            if (existing.length === 0) {
+              await createSponsorship({
+                sponsorCode: generateSponsorCode(),
+                sponsorEmail: email,
+                sponsorName: donorName,
+                childId: childRecordId,
+                childIdLegacy,
+                childDisplayName: childName || null,
+                monthlyAmount: 25,
+                status: 'Active',
+                stripeSubscriptionId: subId || null,
+                sponsorshipStartDate: new Date().toISOString().slice(0, 10),
+              });
+              result.sponsorshipCreated = true;
             }
           }
 
-          // Create Subscription record in Airtable if missing
-          if (subId && !dryRun) {
-            const subFormula = `{Subscription ID} = "${subId}"`;
-            const subCheckRes = await fetch(
-              `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/Subscriptions?filterByFormula=${encodeURIComponent(subFormula)}&maxRecords=1`,
-              { headers: getAirtableHeaders() }
-            );
-            let subExists = false;
-            if (subCheckRes.ok) {
-              const subCheckData = await subCheckRes.json();
-              subExists = (subCheckData.records?.length || 0) > 0;
-            }
-
-            if (!subExists) {
-              const subFields: Record<string, unknown> = {
-                'Subscription ID': subId,
-                Status: 'active',
-                Amount: 25,
-                Frequency: 'Monthly',
-                'Start Date': new Date().toISOString().split('T')[0],
-              };
-              if (donorRecordId) subFields.Donor = [donorRecordId];
-
-              await fetch(
-                `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/Subscriptions`,
-                {
-                  method: 'POST',
-                  headers: getAirtableHeaders(),
-                  body: JSON.stringify({ fields: subFields }),
-                }
-              );
-              console.log('[Backfill] Created Airtable Subscription record for', subId);
-            }
+          // Mirror the Subscription row.
+          if (subId && !dryRun && donor) {
+            await upsertSubscription({
+              stripeSubscriptionId: subId,
+              donorId: donor.id,
+              status: 'active',
+              amount: 25,
+              frequency: 'monthly',
+              startDate: new Date().toISOString().slice(0, 10),
+            });
           }
-
-        } catch (err: any) {
-          result.error = String(err?.message || err).slice(0, 300);
+        } catch (err) {
+          result.error = (err instanceof Error ? err.message : String(err)).slice(0, 300);
           console.error('[Backfill] Error for', email, childName, ':', result.error);
         }
 
@@ -514,8 +391,9 @@ export async function GET(request: NextRequest) {
       total: results.length,
       results,
     });
-  } catch (err: any) {
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
     console.error('[Backfill] Fatal error:', err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

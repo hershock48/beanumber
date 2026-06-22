@@ -1,19 +1,20 @@
 /**
- * Admin · AppSettings key/value store.
+ * Admin · App settings key/value store (Postgres edition).
  *
  * Singleton-style storage for things that don't deserve their own
- * Airtable table — the Gmail OAuth refresh token, the authorized
- * email, the signature, etc. Each setting is one row in the
- * AppSettings table, keyed by a dotted-namespace string.
+ * table — the Gmail OAuth refresh token, the authorized email, the
+ * signature, etc. Each setting is one row in the `settings` table,
+ * keyed by a dotted-namespace string.
  *
- * Server-side only. All reads/writes go through Airtable directly.
+ * Server-side only. Reads + writes go through Drizzle. Function
+ * signatures are preserved from the Airtable-era module so callers
+ * (Gmail send path, /admin/connect-gmail page, OAuth callback) don't
+ * need to change.
  */
 
-const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID || '';
-const AIRTABLE_API_KEY =
-  process.env.AIRTABLE_PAT || process.env.AIRTABLE_API_KEY || '';
-const SETTINGS_TABLE =
-  process.env.AIRTABLE_APP_SETTINGS_TABLE || 'AppSettings';
+import { eq } from 'drizzle-orm';
+import { db } from '@/lib/db/client';
+import { settings } from '@/lib/db/schema';
 
 export const SETTING_KEYS = {
   gmailRefreshToken: 'gmail.refresh_token',
@@ -21,37 +22,13 @@ export const SETTING_KEYS = {
   gmailSignature: 'gmail.signature',
 } as const;
 
-function atHeaders() {
-  return {
-    Authorization: `Bearer ${AIRTABLE_API_KEY}`,
-    'Content-Type': 'application/json',
-  };
-}
-
-interface SettingRecord {
-  id: string;
-  fields: {
-    Key?: string;
-    Value?: string;
-    UpdatedAt?: string;
-    Notes?: string;
-  };
-}
-
-async function findSetting(key: string): Promise<SettingRecord | null> {
-  const formula = encodeURIComponent(`{Key}="${key.replace(/"/g, '\\"')}"`);
-  const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(
-    SETTINGS_TABLE
-  )}?filterByFormula=${formula}&maxRecords=1`;
-  const res = await fetch(url, { headers: atHeaders(), cache: 'no-store' });
-  if (!res.ok) return null;
-  const data = await res.json();
-  return data.records?.[0] || null;
-}
-
 export async function getSetting(key: string): Promise<string | null> {
-  const rec = await findSetting(key);
-  return rec?.fields.Value || null;
+  const rows = await db
+    .select({ value: settings.value })
+    .from(settings)
+    .where(eq(settings.key, key))
+    .limit(1);
+  return rows[0]?.value ?? null;
 }
 
 export async function setSetting(
@@ -59,46 +36,28 @@ export async function setSetting(
   value: string,
   notes?: string
 ): Promise<void> {
-  const existing = await findSetting(key);
-  const fields: Record<string, string> = {
-    Key: key,
-    Value: value,
-    UpdatedAt: new Date().toISOString(),
-  };
-  if (notes) fields.Notes = notes;
-
-  if (existing) {
-    const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(
-      SETTINGS_TABLE
-    )}/${existing.id}`;
-    const res = await fetch(url, {
-      method: 'PATCH',
-      headers: atHeaders(),
-      body: JSON.stringify({ fields }),
+  // Postgres upsert via ON CONFLICT on the unique key index. Returns
+  // the affected row but we don't need it — callers just want
+  // success/failure.
+  const now = new Date();
+  await db
+    .insert(settings)
+    .values({
+      key,
+      value,
+      notes: notes ?? null,
+      updatedAt: now,
+    })
+    .onConflictDoUpdate({
+      target: settings.key,
+      set: {
+        value,
+        notes: notes ?? null,
+        updatedAt: now,
+      },
     });
-    if (!res.ok) {
-      throw new Error(`AppSettings PATCH failed: ${res.status} ${await res.text()}`);
-    }
-    return;
-  }
-  const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(
-    SETTINGS_TABLE
-  )}`;
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: atHeaders(),
-    body: JSON.stringify({ fields }),
-  });
-  if (!res.ok) {
-    throw new Error(`AppSettings POST failed: ${res.status} ${await res.text()}`);
-  }
 }
 
 export async function deleteSetting(key: string): Promise<void> {
-  const existing = await findSetting(key);
-  if (!existing) return;
-  const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(
-    SETTINGS_TABLE
-  )}/${existing.id}`;
-  await fetch(url, { method: 'DELETE', headers: atHeaders() });
+  await db.delete(settings).where(eq(settings.key, key));
 }

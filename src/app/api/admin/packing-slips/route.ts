@@ -2,70 +2,36 @@
  * Packing Slips — printable page, one slip per shirt order
  *
  * GET /api/admin/packing-slips?token=ADMIN_API_TOKEN
- *   status=pending  → Production=Pending (default — shirts being made)
- *   status=ready    → Production=Done AND Shipping=Not Shipped
- *   status=all      → every record
+ *   status=not-shipped (default — Kevin's production queue)
+ *   status=ready       → Production=Done AND Shipping=Not Shipped
+ *   status=pending     → Production=Pending
+ *   status=all         → every row
  *
- * Opens in browser → Ctrl+P → print. Slips are sorted by size so they
- * match the order Kevin works through the pile. Each slip has buyer name,
- * address, shirt spec, vinyl spec, child number, and order number.
+ * Opens in browser → Ctrl+P → print. Sorted by size so slips match
+ * the order Kevin works through the pile.
  *
- * Auth: query param ?token= must match ADMIN_API_TOKEN env var.
+ * Auth: ?token=.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getEnv } from '@/lib/env';
+import { db } from '@/lib/db/client';
+import { fulfillments } from '@/lib/db/schema';
+import { and, eq } from 'drizzle-orm';
 
-const FULFILLMENT_TABLE_ID = 'tblkSZBRrMiHhT3MP';
-
-const F = {
-  orderNum:    'fldsUZIXLFesyzg8u',
-  design:      'fldsWHbE3yq7Xoyn4',
-  shirtColor:  'fldaVW0nkpBjz0Gm7',
-  size:        'fldicYGUVXRbCP4ze',
-  vinylFront:  'fldwFBqD55i4G5yBf',
-  vinylBack:   'fldp3RObd3abl3O7w',
-  buyer:       'fldbGofwASSXDYj9R',
-  email:       'fldUakXkAhW2hYLxL',
-  shipName:    'fldOhzT4xrR1jaJYC',
-  shipStreet1: 'fldaNij76IbSJwf8l',
-  shipStreet2: 'fldIptRN8o5c1JYZV',
-  shipCity:    'fldklictYmJe4rW5C',
-  shipState:   'fldqXjndiZ1dOoIZj',
-  shipZip:     'fld4TPxLBb9jaAa14',
-  production:  'fldbBZtOLYVVDS28X',
-  shipping:    'fldJ6ehpDkpindHtO',
-  childName:   'fldkACkyAtFQCOPFL',
-  orderDate:   'fldnXiHlwBtEWP3io',
-  notes:       'fldoX0697ASTKcDvD',
-} as const;
-
-// Size sort order — small to large
 const SIZE_ORDER: Record<string, number> = {
-  'YS': 0, 'YM': 1, 'YL': 2,
-  'S': 3, 'M': 4, 'L': 5, 'XL': 6, '2XL': 7, '3XL': 8, '4XL': 9,
+  YS: 0, YM: 1, YL: 2,
+  S: 3, M: 4, L: 5, XL: 6, '2XL': 7, '3XL': 8, '4XL': 9,
 };
 
-interface AirtableRecord {
-  id: string;
-  fields: Record<string, unknown>;
-}
-
-function fieldVal(rec: AirtableRecord, fieldId: string): string {
-  const v = rec.fields[fieldId];
-  if (!v) return '';
-  if (typeof v === 'object' && v !== null && 'name' in v) return (v as { name: string }).name;
-  return String(v);
-}
-
 function esc(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 }
 
 export async function GET(request: NextRequest) {
-  const env = getEnv();
-
-  // Auth via query param so Kevin can open this in a browser
   const token = request.nextUrl.searchParams.get('token');
   const adminToken = process.env.ADMIN_API_TOKEN;
   const adminPassword = process.env.ADMIN_PASSWORD;
@@ -75,75 +41,46 @@ export async function GET(request: NextRequest) {
 
   const status = request.nextUrl.searchParams.get('status') || 'not-shipped';
 
-  // Build Airtable formula filter
-  let formula = '';
-  if (status === 'not-shipped') {
-    // Default: everything that hasn't shipped yet — Kevin's production queue
-    formula = `{Shipping}="Not Shipped"`;
-  } else if (status === 'ready') {
-    formula = `AND({Production}="Done",{Shipping}="Not Shipped")`;
-  } else if (status === 'pending') {
-    formula = `{Production}="Pending"`;
-  }
+  const where =
+    status === 'not-shipped'
+      ? eq(fulfillments.shipping, 'Not Shipped')
+      : status === 'ready'
+        ? and(eq(fulfillments.production, 'Done'), eq(fulfillments.shipping, 'Not Shipped'))
+        : status === 'pending'
+          ? eq(fulfillments.production, 'Pending')
+          : undefined;
 
-  // Fetch records
-  const allRecords: AirtableRecord[] = [];
-  let offset: string | undefined;
+  const rows = where
+    ? await db.select().from(fulfillments).where(where)
+    : await db.select().from(fulfillments);
 
-  do {
-    const params = new URLSearchParams();
-    if (formula) params.set('filterByFormula', formula);
-    params.set('pageSize', '100');
-    params.set('returnFieldsByFieldId', 'true');
-    if (offset) params.set('offset', offset);
-
-    const url = `https://api.airtable.com/v0/${env.AIRTABLE_BASE_ID}/${FULFILLMENT_TABLE_ID}?${params}`;
-    const res = await fetch(url, {
-      headers: { Authorization: `Bearer ${env.AIRTABLE_API_KEY}` },
-    });
-
-    if (!res.ok) {
-      const err = await res.text();
-      return NextResponse.json({ error: 'Airtable fetch failed', detail: err }, { status: 502 });
-    }
-
-    const data = await res.json();
-    allRecords.push(...(data.records || []));
-    offset = data.offset;
-  } while (offset);
-
-  // Sort by size (primary), then order number (secondary)
-  allRecords.sort((a, b) => {
-    const sizeA = SIZE_ORDER[fieldVal(a, F.size)] ?? 99;
-    const sizeB = SIZE_ORDER[fieldVal(b, F.size)] ?? 99;
-    if (sizeA !== sizeB) return sizeA - sizeB;
-    const numA = Number(a.fields[F.orderNum]) || 0;
-    const numB = Number(b.fields[F.orderNum]) || 0;
-    return numA - numB;
+  rows.sort((a, b) => {
+    const sa = SIZE_ORDER[a.size || ''] ?? 99;
+    const sb = SIZE_ORDER[b.size || ''] ?? 99;
+    if (sa !== sb) return sa - sb;
+    return (a.orderNumber ?? 0) - (b.orderNumber ?? 0);
   });
 
-  // Group by size for section headers
   let currentSize = '';
   const slipsHtml: string[] = [];
 
-  for (const rec of allRecords) {
-    const size = fieldVal(rec, F.size);
-    const orderNum = fieldVal(rec, F.orderNum);
-    const design = fieldVal(rec, F.design);
-    const color = fieldVal(rec, F.shirtColor);
-    const vinylFront = fieldVal(rec, F.vinylFront);
-    const vinylBack = fieldVal(rec, F.vinylBack);
-    const buyer = fieldVal(rec, F.buyer);
-    const email = fieldVal(rec, F.email);
-    const shipName = fieldVal(rec, F.shipName) || buyer;
-    const street1 = fieldVal(rec, F.shipStreet1);
-    const street2 = fieldVal(rec, F.shipStreet2);
-    const city = fieldVal(rec, F.shipCity);
-    const state = fieldVal(rec, F.shipState);
-    const zip = fieldVal(rec, F.shipZip);
-    const childName = fieldVal(rec, F.childName);
+  for (const rec of rows) {
+    const size = rec.size || '';
+    const orderNum = String(rec.orderNumber ?? '');
+    const design = rec.design || '';
+    const color = rec.shirtColor || '';
+    const vinylFront = rec.vinylFront || '';
+    const vinylBack = rec.vinylBack || '';
+    const buyer = rec.buyerName || '';
+    const email = rec.buyerEmail || '';
+    const shipName = rec.shipName || buyer;
+    const street1 = rec.shipStreet1 || '';
+    const street2 = rec.shipStreet2 || '';
+    const city = rec.shipCity || '';
+    const state = rec.shipState || '';
+    const zip = rec.shipZip || '';
+    const childName = rec.childName || '';
 
-    // Size section header
     if (size !== currentSize) {
       currentSize = size;
       slipsHtml.push(`<div class="size-header">SIZE: ${esc(size)}</div>`);
@@ -180,7 +117,14 @@ export async function GET(request: NextRequest) {
     `);
   }
 
-  const statusLabel = status === 'pending' ? 'Pending Production' : status === 'ready' ? 'Ready to Ship' : 'All Orders';
+  const statusLabel =
+    status === 'pending'
+      ? 'Pending Production'
+      : status === 'ready'
+        ? 'Ready to Ship'
+        : status === 'all'
+          ? 'All Orders'
+          : 'Not Shipped';
   const dateStr = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
   const html = `<!DOCTYPE html>
@@ -236,10 +180,7 @@ export async function GET(request: NextRequest) {
       border-bottom: 1px solid #e8e0d4;
     }
 
-    .order-num {
-      font-size: 20px;
-      font-weight: 700;
-    }
+    .order-num { font-size: 20px; font-weight: 700; }
 
     .child-name {
       font-size: 13px;
@@ -268,7 +209,6 @@ export async function GET(request: NextRequest) {
     }
     .buyer-info { font-size: 11px; color: #999; }
 
-    /* Print styles */
     @media print {
       body { background: white; padding: 0; margin: 0; }
       .header { margin-bottom: 12px; }
@@ -305,7 +245,7 @@ export async function GET(request: NextRequest) {
 
   <div class="header">
     <h1>BE A NUMBER — Packing Slips</h1>
-    <div class="meta">${esc(statusLabel)} · ${allRecords.length} orders · ${esc(dateStr)}</div>
+    <div class="meta">${esc(statusLabel)} · ${rows.length} orders · ${esc(dateStr)}</div>
   </div>
 
   ${slipsHtml.join('\n')}

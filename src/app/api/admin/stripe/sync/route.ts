@@ -1,27 +1,23 @@
 /**
  * POST /api/admin/stripe/sync
  *
- * Reconciles Stripe → Airtable. For every active (and trialing /
- * past_due) Stripe subscription, ensures there's a Donor + a
- * Sponsorship record that matches. Returns a detailed report so
- * Kevin can see exactly what was created vs. already in sync.
- *
- * This is a backfill tool. Going forward the Stripe webhook keeps
- * everything in sync — but subs that predate the webhook handler
- * never got Airtable rows. Running this once fixes that.
+ * Reconciles Stripe → Postgres. For every Stripe subscription (any
+ * status), ensures there's a Donor + Sponsorship + Subscription row.
+ * Mirrors the webhook's writes so subs that predated the webhook (or
+ * that the webhook dropped due to a signature failure) still land in
+ * the local store.
  *
  * Matching strategy:
- *   1. Donor lookup by Stripe Customer ID. Fallback: by email.
+ *   1. Donor lookup by stripe_customer_id. Fallback: lower(email).
  *      If neither hits, create a new Donor row.
- *   2. Sponsorship lookup by StripeSubscriptionID. If not found,
- *      try to claim an existing Active-or-Pending Sponsorship for
- *      this donor that doesn't yet have a subscription ID linked
- *      (legacy backfill case). Otherwise, create a fresh row with
- *      Status=Active.
- *   3. Always upsert: Status, MonthlyAmount, Donor link, sub ID,
- *      sponsor email/name from Stripe customer.
- *   4. If subscription metadata includes a child_record_id and the
- *      Sponsorship has no Children linked, link the kid too.
+ *   2. Sponsorship lookup by stripe_subscription_id. If not found,
+ *      try to claim an existing Active/Pending row for this donor
+ *      that doesn't yet have a sub linked (legacy backfill case).
+ *      Otherwise, create a fresh Active row.
+ *   3. Always upsert status, monthly amount, sponsor email/name.
+ *   4. If sub.metadata.child_record_id is set and the Sponsorship has
+ *      no child linked, link the kid.
+ *   5. Mirror the Subscription row as well via upsertSubscription.
  *
  * Admin-only auth.
  */
@@ -29,208 +25,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import type Stripe from 'stripe';
 import { verifyAdminToken } from '@/lib/auth';
+import { db } from '@/lib/db/client';
+import { donors, sponsorships, children } from '@/lib/db/schema';
+import { and, eq, isNull, or, sql } from 'drizzle-orm';
+import {
+  upsertDonorByEmail,
+  createSponsorship,
+  upsertSubscription,
+} from '@/lib/db/mutations';
 
-const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID || '';
-const AIRTABLE_API_KEY =
-  process.env.AIRTABLE_PAT || process.env.AIRTABLE_API_KEY || '';
-const DONORS_TABLE = process.env.AIRTABLE_DONORS_TABLE || 'Donors';
-const SPONSORSHIPS_TABLE =
-  process.env.AIRTABLE_SPONSORSHIPS_TABLE || 'Sponsorships';
-
-function atHeaders() {
-  return {
-    Authorization: `Bearer ${AIRTABLE_API_KEY}`,
-    'Content-Type': 'application/json',
-  };
-}
-
-interface AirtableRecord<F = Record<string, unknown>> {
-  id: string;
-  fields: F;
-}
-
-async function findDonorByStripeCustomer(
-  customerId: string
-): Promise<AirtableRecord | null> {
-  const formula = `{Stripe Customer ID}="${customerId}"`;
-  const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(
-    DONORS_TABLE
-  )}?filterByFormula=${encodeURIComponent(formula)}&maxRecords=1`;
-  const res = await fetch(url, { headers: atHeaders(), cache: 'no-store' });
-  if (!res.ok) return null;
-  const data = await res.json();
-  return data.records?.[0] || null;
-}
-
-async function findDonorByEmail(email: string): Promise<AirtableRecord | null> {
-  const safe = email.replace(/"/g, '\\"').toLowerCase();
-  const formula = `LOWER({Email Address})="${safe}"`;
-  const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(
-    DONORS_TABLE
-  )}?filterByFormula=${encodeURIComponent(formula)}&maxRecords=1`;
-  const res = await fetch(url, { headers: atHeaders(), cache: 'no-store' });
-  if (!res.ok) return null;
-  const data = await res.json();
-  return data.records?.[0] || null;
-}
-
-async function createDonor(input: {
-  email: string;
-  name: string;
-  customerId: string;
-  phone?: string;
-}): Promise<AirtableRecord> {
-  const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(
-    DONORS_TABLE
-  )}`;
-  const fields: Record<string, unknown> = {
-    'Donor Name': input.name || input.email,
-    'Email Address': input.email,
-    'Stripe Customer ID': input.customerId,
-    'Recurring Supporter': true,
-  };
-  if (input.phone) fields['Phone Number'] = input.phone;
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: atHeaders(),
-    body: JSON.stringify({ fields, typecast: true }),
-  });
-  if (!res.ok) {
-    throw new Error(`Donor create failed: ${res.status} ${await res.text()}`);
-  }
-  return res.json();
-}
-
-async function updateDonor(
-  recordId: string,
-  fields: Record<string, unknown>
-): Promise<void> {
-  const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(
-    DONORS_TABLE
-  )}/${recordId}`;
-  const res = await fetch(url, {
-    method: 'PATCH',
-    headers: atHeaders(),
-    body: JSON.stringify({ fields, typecast: true }),
-  });
-  if (!res.ok) {
-    throw new Error(`Donor update failed: ${res.status} ${await res.text()}`);
-  }
-}
-
-async function findSponsorshipBySubscriptionId(
-  subId: string
-): Promise<AirtableRecord | null> {
-  const formula = `{StripeSubscriptionID}="${subId}"`;
-  const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(
-    SPONSORSHIPS_TABLE
-  )}?filterByFormula=${encodeURIComponent(formula)}&maxRecords=1`;
-  const res = await fetch(url, { headers: atHeaders(), cache: 'no-store' });
-  if (!res.ok) return null;
-  const data = await res.json();
-  return data.records?.[0] || null;
-}
-
-async function findClaimableSponsorshipForDonor(
-  donorId: string,
-  sponsorEmail: string
-): Promise<AirtableRecord | null> {
-  // Active or Pending Review row for this donor that has NO Stripe
-  // subscription ID linked yet. Indicates a legacy sponsorship we
-  // can adopt rather than creating a duplicate.
-  //
-  // We check TWO matching paths:
-  //   (a) Donor link contains donorId. Standard case for rows the
-  //       webhook wrote.
-  //   (b) SponsorEmail matches AND Donor link is empty. Catches
-  //       manually-created legacy rows (e.g. Kevin staging a
-  //       sponsorship before the buyer subscribed via Stripe) that
-  //       never got their Donor link populated.
-  //
-  // Either path is sufficient; we OR them together. Without (b),
-  // running the sync produces duplicate Sponsorship rows every
-  // time a customer with a manual stub gets a real Stripe sub.
-  const safeEmail = sponsorEmail.replace(/"/g, '\\"');
-  const formula = `AND(
-    OR(
-      FIND("${donorId}", ARRAYJOIN({Donor}))>0,
-      AND(
-        LOWER({SponsorEmail})="${safeEmail.toLowerCase()}",
-        ARRAYJOIN({Donor})=""
-      )
-    ),
-    OR({Status}="Active", {Status}="Pending Review"),
-    {StripeSubscriptionID}=""
-  )`;
-  const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(
-    SPONSORSHIPS_TABLE
-  )}?filterByFormula=${encodeURIComponent(formula.replace(/\s+/g, ' '))}&maxRecords=1`;
-  const res = await fetch(url, { headers: atHeaders(), cache: 'no-store' });
-  if (!res.ok) return null;
-  const data = await res.json();
-  return data.records?.[0] || null;
-}
-
-function generateSponsorCode(): string {
-  const year = new Date().getFullYear();
-  const rand = Math.floor(Math.random() * 900 + 100); // 3 digits
-  return `BAN-${year}-${rand}`;
-}
-
-async function createSponsorship(input: {
-  donorId: string;
-  subId: string;
-  sponsorEmail: string;
-  sponsorName: string;
-  monthlyAmount: number;
-  startDate: string;
-  childRecordId?: string;
-}): Promise<AirtableRecord> {
-  const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(
-    SPONSORSHIPS_TABLE
-  )}`;
-  const fields: Record<string, unknown> = {
-    SponsorCode: generateSponsorCode(),
-    SponsorEmail: input.sponsorEmail,
-    SponsorName: input.sponsorName,
-    Status: 'Active',
-    AuthStatus: 'Active',
-    VisibleToSponsor: true,
-    SponsorshipStartDate: input.startDate,
-    Donor: [input.donorId],
-    MonthlyAmount: input.monthlyAmount,
-    StripeSubscriptionID: input.subId,
-  };
-  if (input.childRecordId) fields.Children = [input.childRecordId];
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: atHeaders(),
-    body: JSON.stringify({ fields, typecast: true }),
-  });
-  if (!res.ok) {
-    throw new Error(`Sponsorship create failed: ${res.status} ${await res.text()}`);
-  }
-  return res.json();
-}
-
-async function updateSponsorship(
-  recordId: string,
-  fields: Record<string, unknown>
-): Promise<void> {
-  const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(
-    SPONSORSHIPS_TABLE
-  )}/${recordId}`;
-  const res = await fetch(url, {
-    method: 'PATCH',
-    headers: atHeaders(),
-    body: JSON.stringify({ fields, typecast: true }),
-  });
-  if (!res.ok) {
-    throw new Error(`Sponsorship update failed: ${res.status} ${await res.text()}`);
-  }
-}
-
-/** Map Stripe subscription status → Airtable Sponsorship Status. */
 function mapStatus(stripeStatus: string): 'Active' | 'Cancelled' | null {
   switch (stripeStatus) {
     case 'active':
@@ -242,8 +45,14 @@ function mapStatus(stripeStatus: string): 'Active' | 'Cancelled' | null {
     case 'incomplete_expired':
       return 'Cancelled';
     default:
-      return null; // skip unknown / incomplete / paused
+      return null;
   }
+}
+
+function generateSponsorCode(): string {
+  const year = new Date().getFullYear();
+  const rand = Math.floor(Math.random() * 900 + 100);
+  return `BAN-${year}-${rand}`;
 }
 
 interface SyncReport {
@@ -278,12 +87,6 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
-  if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) {
-    return NextResponse.json(
-      { error: 'Airtable not configured' },
-      { status: 500 }
-    );
-  }
 
   const StripeModule = (await import('stripe')).default;
   const stripe = new StripeModule(stripeSecretKey, {
@@ -301,7 +104,6 @@ export async function POST(request: NextRequest) {
   };
   const emailSet = new Set<string>();
 
-  // Pull every subscription (all statuses) — paginated.
   let hasMore = true;
   let startingAfter: string | undefined;
   const allSubs: Stripe.Subscription[] = [];
@@ -357,132 +159,211 @@ export async function POST(request: NextRequest) {
       continue;
     }
 
-    // 1. Donor
-    let donor = await findDonorByStripeCustomer(customerId);
-    let donorAction: 'created' | 'matched';
-    if (donor) {
-      donorAction = 'matched';
-      report.donors.matched++;
-    } else {
-      // Try email match (legacy donor row without Stripe Customer ID set).
-      donor = await findDonorByEmail(customerEmail);
+    try {
+      // 1. Donor — find by stripe_customer_id, then by lowered email,
+      //    then create.
+      const emailLower = customerEmail.toLowerCase();
+      let donor =
+        (
+          await db
+            .select()
+            .from(donors)
+            .where(eq(donors.stripeCustomerId, customerId))
+            .limit(1)
+        )[0] || null;
+      let donorAction: 'created' | 'matched';
       if (donor) {
         donorAction = 'matched';
         report.donors.matched++;
-        // Backfill the Stripe Customer ID so future syncs are faster.
-        if (!donor.fields['Stripe Customer ID']) {
-          await updateDonor(donor.id, {
-            'Stripe Customer ID': customerId,
-            'Recurring Supporter': true,
+      } else {
+        donor =
+          (
+            await db
+              .select()
+              .from(donors)
+              .where(sql`lower(${donors.email}) = ${emailLower}`)
+              .limit(1)
+          )[0] || null;
+        if (donor) {
+          donorAction = 'matched';
+          report.donors.matched++;
+          // Backfill stripe customer id and recurring flag if missing.
+          const patch: Record<string, unknown> = {};
+          if (!donor.stripeCustomerId) patch.stripeCustomerId = customerId;
+          if (!donor.recurringSupporter) patch.recurringSupporter = true;
+          if (Object.keys(patch).length > 0) {
+            patch.updatedAt = new Date();
+            await db.update(donors).set(patch).where(eq(donors.id, donor.id));
+          }
+        } else {
+          donor = await upsertDonorByEmail({
+            email: customerEmail,
+            name: customerName || customerEmail,
+            phoneNumber: customerPhone || null,
+            stripeCustomerId: customerId,
           });
+          // upsertDonorByEmail doesn't set recurringSupporter directly;
+          // do it post-create.
+          await db
+            .update(donors)
+            .set({ recurringSupporter: true, updatedAt: new Date() })
+            .where(eq(donors.id, donor.id));
+          donorAction = 'created';
+          report.donors.created++;
         }
-      } else {
-        donor = await createDonor({
-          email: customerEmail,
-          name: customerName || customerEmail,
-          customerId,
-          phone: customerPhone || undefined,
-        });
-        donorAction = 'created';
-        report.donors.created++;
       }
-    }
 
-    // 2. Sponsorship
-    const amount =
-      (sub.items.data[0]?.price?.unit_amount || 2500) / 100;
-    const startDate = new Date(sub.start_date * 1000)
-      .toISOString()
-      .split('T')[0];
-    const meta = (sub.metadata || {}) as Record<string, string>;
-    const childRecordIdFromMeta =
-      meta.child_record_id || meta.childRecordId || '';
+      // 2. Sponsorship
+      const amount = (sub.items.data[0]?.price?.unit_amount || 2500) / 100;
+      const startDate = new Date(sub.start_date * 1000).toISOString().slice(0, 10);
+      const meta = (sub.metadata || {}) as Record<string, string>;
+      const childRecordIdFromMeta =
+        meta.child_record_id || meta.childRecordId || '';
+      const childIdLegacyFromMeta = meta.child_id || meta.childId || '';
 
-    let sponsorship = await findSponsorshipBySubscriptionId(sub.id);
-    let sponsorshipAction: 'created' | 'updated' | 'claimed';
-    if (sponsorship) {
-      sponsorshipAction = 'updated';
-      report.sponsorships.updated++;
-      const patch: Record<string, unknown> = {
-        Status: mappedStatus,
-        MonthlyAmount: amount,
-        SponsorEmail: customerEmail,
-      };
-      if (customerName && !sponsorship.fields.SponsorName) {
-        patch.SponsorName = customerName;
+      // Resolve child UUID if only legacy id was supplied.
+      let resolvedChildId: string | null = childRecordIdFromMeta || null;
+      if (!resolvedChildId && childIdLegacyFromMeta) {
+        const c = await db
+          .select({ id: children.id })
+          .from(children)
+          .where(eq(children.childId, childIdLegacyFromMeta))
+          .limit(1);
+        resolvedChildId = c[0]?.id || null;
       }
-      const existingDonor = (sponsorship.fields.Donor as string[]) || [];
-      if (!existingDonor.includes(donor.id)) {
-        patch.Donor = [donor.id];
-      }
-      const existingChildren = (sponsorship.fields.Children as string[]) || [];
-      if (childRecordIdFromMeta && existingChildren.length === 0) {
-        patch.Children = [childRecordIdFromMeta];
-      }
-      await updateSponsorship(sponsorship.id, patch);
-    } else {
-      // Try to claim an existing legacy sponsorship that has no sub ID.
-      sponsorship = await findClaimableSponsorshipForDonor(
-        donor.id,
-        customerEmail
-      );
-      if (sponsorship) {
-        sponsorshipAction = 'claimed';
-        report.sponsorships.claimed++;
+
+      let existingSponsorship =
+        (
+          await db
+            .select()
+            .from(sponsorships)
+            .where(eq(sponsorships.stripeSubscriptionId, sub.id))
+            .limit(1)
+        )[0] || null;
+
+      let sponsorshipAction: 'created' | 'updated' | 'claimed';
+      let hasChild = false;
+      if (existingSponsorship) {
+        sponsorshipAction = 'updated';
+        report.sponsorships.updated++;
         const patch: Record<string, unknown> = {
-          StripeSubscriptionID: sub.id,
-          Status: mappedStatus,
-          MonthlyAmount: amount,
-          SponsorEmail: customerEmail,
-        };
-        if (customerName && !sponsorship.fields.SponsorName) {
-          patch.SponsorName = customerName;
-        }
-        // Backfill the Donor link when missing — this is the path
-        // (b) claim case (email match, no donor linked yet).
-        // Writing the link here makes future syncs hit path (a)
-        // directly.
-        const existingDonor = (sponsorship.fields.Donor as string[]) || [];
-        if (existingDonor.length === 0) {
-          patch.Donor = [donor.id];
-        }
-        const existingChildren = (sponsorship.fields.Children as string[]) || [];
-        if (childRecordIdFromMeta && existingChildren.length === 0) {
-          patch.Children = [childRecordIdFromMeta];
-        }
-        await updateSponsorship(sponsorship.id, patch);
-      } else {
-        await createSponsorship({
-          donorId: donor.id,
-          subId: sub.id,
+          status: mappedStatus,
+          monthlyAmount: String(amount),
           sponsorEmail: customerEmail,
-          sponsorName: customerName || customerEmail,
-          monthlyAmount: amount,
-          startDate,
-          childRecordId: childRecordIdFromMeta || undefined,
-        });
-        sponsorshipAction = 'created';
-        report.sponsorships.created++;
+          updatedAt: new Date(),
+        };
+        if (customerName && !existingSponsorship.sponsorName) {
+          patch.sponsorName = customerName;
+        }
+        if (resolvedChildId && !existingSponsorship.childId) {
+          patch.childId = resolvedChildId;
+          if (childIdLegacyFromMeta) patch.childIdLegacy = childIdLegacyFromMeta;
+        }
+        await db
+          .update(sponsorships)
+          .set(patch)
+          .where(eq(sponsorships.id, existingSponsorship.id));
+        hasChild = !!(existingSponsorship.childId || resolvedChildId);
+      } else {
+        // Try to claim a legacy sponsorship that has no sub yet.
+        // Path (a): sponsorEmail matches AND no sub linked.
+        // We don't have a Donor FK on sponsorships, so we match on
+        // email instead.
+        const claimable =
+          (
+            await db
+              .select()
+              .from(sponsorships)
+              .where(
+                and(
+                  sql`lower(${sponsorships.sponsorEmail}) = ${emailLower}`,
+                  or(isNull(sponsorships.stripeSubscriptionId), eq(sponsorships.stripeSubscriptionId, '')),
+                  or(eq(sponsorships.status, 'Active'), eq(sponsorships.status, 'New'))
+                )
+              )
+              .limit(1)
+          )[0] || null;
+
+        if (claimable) {
+          sponsorshipAction = 'claimed';
+          report.sponsorships.claimed++;
+          const patch: Record<string, unknown> = {
+            stripeSubscriptionId: sub.id,
+            status: mappedStatus,
+            monthlyAmount: String(amount),
+            sponsorEmail: customerEmail,
+            updatedAt: new Date(),
+          };
+          if (customerName && !claimable.sponsorName) {
+            patch.sponsorName = customerName;
+          }
+          if (resolvedChildId && !claimable.childId) {
+            patch.childId = resolvedChildId;
+            if (childIdLegacyFromMeta) patch.childIdLegacy = childIdLegacyFromMeta;
+          }
+          await db
+            .update(sponsorships)
+            .set(patch)
+            .where(eq(sponsorships.id, claimable.id));
+          hasChild = !!(claimable.childId || resolvedChildId);
+        } else {
+          await createSponsorship({
+            sponsorCode: generateSponsorCode(),
+            sponsorEmail: customerEmail,
+            sponsorName: customerName || customerEmail,
+            childId: resolvedChildId || '',
+            childIdLegacy: childIdLegacyFromMeta || null,
+            monthlyAmount: amount,
+            status: 'Active',
+            stripeSubscriptionId: sub.id,
+            sponsorshipStartDate: startDate,
+          });
+          sponsorshipAction = 'created';
+          report.sponsorships.created++;
+          hasChild = !!resolvedChildId;
+        }
       }
-    }
 
-    if (mappedStatus === 'Active') {
-      emailSet.add(customerEmail.toLowerCase());
-    }
+      // 3. Mirror the Subscription row.
+      const currentPeriodEnd = (() => {
+        // Stripe SDK types vary across versions — older drops
+        // current_period_end at the top level, newer at items[0].
+        const top = (sub as unknown as { current_period_end?: number }).current_period_end;
+        const item = (sub.items?.data?.[0] as unknown as { current_period_end?: number } | undefined)
+          ?.current_period_end;
+        const epoch = top || item || null;
+        return epoch ? new Date(epoch * 1000).toISOString().slice(0, 10) : null;
+      })();
+      await upsertSubscription({
+        stripeSubscriptionId: sub.id,
+        donorId: donor.id,
+        status: sub.status,
+        amount,
+        frequency: 'monthly',
+        startDate,
+        currentPeriodEnd,
+      });
 
-    report.rows.push({
-      subId: sub.id,
-      customer: customerId,
-      email: customerEmail,
-      name: customerName || '(no name)',
-      amount,
-      status: sub.status,
-      donorAction,
-      sponsorshipAction,
-      hasChild:
-        !!childRecordIdFromMeta ||
-        ((sponsorship?.fields?.Children as string[])?.length || 0) > 0,
-    });
+      if (mappedStatus === 'Active') {
+        emailSet.add(emailLower);
+      }
+
+      report.rows.push({
+        subId: sub.id,
+        customer: customerId,
+        email: customerEmail,
+        name: customerName || '(no name)',
+        amount,
+        status: sub.status,
+        donorAction,
+        sponsorshipAction,
+        hasChild,
+      });
+    } catch (err) {
+      report.warnings.push(
+        `Sub ${sub.id} (${customerEmail}) failed: ${err instanceof Error ? err.message : String(err)}`
+      );
+    }
   }
 
   report.uniqueSponsorEmails = emailSet.size;

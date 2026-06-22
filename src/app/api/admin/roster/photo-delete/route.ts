@@ -1,109 +1,92 @@
 /**
  * POST /api/admin/roster/photo-delete
- *   Body: { shirtNumber: number, attachmentId: string }
+ *   Body: { shirtNumber: number, photoUrl: string }
  *
- * Removes one attachment from a kid's ProfilePhoto field. Airtable
- * doesn't expose a per-attachment delete endpoint, so we PATCH the
- * field with the surviving subset (everything except the one we're
- * dropping).
+ * Removes one photo from a kid. The URL is matched against
+ * profilePhotoUrl + every entry in photoUrls. If it's the primary
+ * profile photo and there are extras, the next one in photoUrls is
+ * promoted. If photos remain in the array, the primary stays as-is.
  *
- * Auth: cookie or X-Admin-Token. Both Kevin and Simon can delete
- * individual photos (low-risk relative to deleting a whole kid).
+ * Body still accepts `attachmentId` for client compat — it's treated
+ * as a URL substring match against the stored URLs.
+ *
+ * Auth: cookie or X-Admin-Token. Both Kevin and Simon can delete a
+ * single photo (low-risk relative to deleting a kid).
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdminToken } from '@/lib/auth';
-
-const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID || '';
-const AIRTABLE_API_KEY =
-  process.env.AIRTABLE_PAT || process.env.AIRTABLE_API_KEY || '';
-const CHILDREN_TABLE = process.env.AIRTABLE_CHILDREN_TABLE || 'Children';
-
-const F_PROFILE_PHOTO = 'fldRejXxPKpuihgPa';
-
-function atHeaders() {
-  return {
-    Authorization: `Bearer ${AIRTABLE_API_KEY}`,
-    'Content-Type': 'application/json',
-  };
-}
+import { db } from '@/lib/db/client';
+import { children } from '@/lib/db/schema';
+import { eq } from 'drizzle-orm';
 
 export async function POST(request: NextRequest) {
   if (!verifyAdminToken(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  let body: { shirtNumber?: number; attachmentId?: string };
+  let body: { shirtNumber?: number; photoUrl?: string; attachmentId?: string };
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
   const shirtNumber = body.shirtNumber;
-  const attachmentId = body.attachmentId;
+  // Accept either photoUrl (new) or attachmentId (old caller). Both
+  // are matched as substrings against the stored URLs since the
+  // editor's `id` is now derived from the URL.
+  const target = (body.photoUrl || body.attachmentId || '').trim();
   if (typeof shirtNumber !== 'number' || !Number.isInteger(shirtNumber)) {
     return NextResponse.json({ error: 'shirtNumber required' }, { status: 400 });
   }
-  if (!attachmentId || typeof attachmentId !== 'string') {
-    return NextResponse.json({ error: 'attachmentId required' }, { status: 400 });
+  if (!target) {
+    return NextResponse.json({ error: 'photoUrl or attachmentId required' }, { status: 400 });
   }
 
   try {
-    // Look up kid.
-    const lookupUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(
-      CHILDREN_TABLE
-    )}?filterByFormula=${encodeURIComponent(`{ShirtNumber}=${shirtNumber}`)}&maxRecords=1`;
-    const lookupRes = await fetch(lookupUrl, {
-      headers: atHeaders(),
-      cache: 'no-store',
-    });
-    if (!lookupRes.ok) {
-      return NextResponse.json(
-        { error: `Lookup failed: ${lookupRes.status}` },
-        { status: 502 }
-      );
-    }
-    const lookupData = await lookupRes.json();
-    const record = lookupData.records?.[0];
-    if (!record) {
+    const kid = (
+      await db
+        .select()
+        .from(children)
+        .where(eq(children.shirtNumber, shirtNumber))
+        .limit(1)
+    )[0];
+    if (!kid) {
       return NextResponse.json(
         { error: `No kid for shirt #${shirtNumber}` },
         { status: 404 }
       );
     }
-    const currentPhotos =
-      (record.fields?.ProfilePhoto as Array<{ id: string }>) || [];
-    const survivors = currentPhotos.filter(p => p.id !== attachmentId);
-    if (survivors.length === currentPhotos.length) {
+
+    const photos = (kid.photoUrls || []) as string[];
+    const primary = kid.profilePhotoUrl || null;
+
+    const matchesPrimary = primary && (primary === target || primary.includes(target));
+    const photosFiltered = photos.filter(u => !(u === target || u.includes(target)));
+    const removedFromArray = photosFiltered.length !== photos.length;
+
+    if (!matchesPrimary && !removedFromArray) {
       return NextResponse.json(
-        { error: 'That photo isn\'t on this kid (already deleted?).' },
+        { error: "That photo isn't on this kid (already deleted?)." },
         { status: 404 }
       );
     }
 
-    // PATCH with the surviving subset. Airtable expects an array of
-    // { id } objects for existing attachments to keep.
-    const patchUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(
-      CHILDREN_TABLE
-    )}/${record.id}`;
-    const patchRes = await fetch(patchUrl, {
-      method: 'PATCH',
-      headers: atHeaders(),
-      body: JSON.stringify({
-        fields: {
-          [F_PROFILE_PHOTO]: survivors.map(s => ({ id: s.id })),
-        },
-      }),
-    });
-    if (!patchRes.ok) {
-      return NextResponse.json(
-        { error: `Delete failed: ${patchRes.status} ${await patchRes.text()}` },
-        { status: 502 }
-      );
+    const patch: Record<string, unknown> = {
+      photoUrls: photosFiltered,
+      updatedAt: new Date(),
+    };
+    if (matchesPrimary) {
+      // Promote the next available photo to primary, or null out if
+      // none remain.
+      patch.profilePhotoUrl = photosFiltered[0] ?? null;
     }
+
+    await db.update(children).set(patch).where(eq(children.id, kid.id));
+
     return NextResponse.json({
       ok: true,
-      remaining: survivors.length,
+      remaining: photosFiltered.length + (matchesPrimary ? 0 : primary ? 1 : 0),
     });
   } catch (err) {
     return NextResponse.json(

@@ -2,78 +2,34 @@
  * POST /api/admin/roster/depart
  *   Body: { shirtNumber: number, action: 'request' | 'approve' | 'reject' | 'restore', note?: string }
  *
- * Two-step departure workflow (same pattern as delete + SOTM):
+ * Two-step departure workflow:
+ *   - request (anyone): stamps departureRequestedAt = now, saves note.
+ *   - approve (admin): promotes the request → departedAt = now,
+ *     departureNote = note (or fallback to requested note). Calls
+ *     markChildDeparted from mutations.ts so the shirt number is
+ *     archived and the audit log gets a row.
+ *   - reject (admin): wipes departureRequestedAt + note.
+ *   - restore (admin): undoes an approved departure (departedAt = null,
+ *     status flips back to Active).
  *
- *   - request (anyone, typically Simon): Stamps DepartureRequestedAt
- *     = now and saves Simon's note. Kevin sees a banner on the
- *     editor + small badge on the roster card.
- *   - approve (admin only): Promotes the request — DepartedAt = now,
- *     DepartureNote = supplied note (Kevin's polished version) or
- *     falls back to the requested note. Clears the request fields.
- *   - reject (admin only): Wipes DepartureRequestedAt + note. Kid
- *     stays active.
- *   - restore (admin only): Undoes a previously approved departure.
- *     Clears DepartedAt + DepartureNote. The kid is active again.
- *
- * Unlike delete, this never removes the Airtable row — it's
- * reversible. Sponsorships and shirt assignments stay linked; the
- * record stays queryable. The public profile reframes when
- * DepartedAt is set.
- *
- * Auth: cookie or X-Admin-Token. Role-aware via getAdminRole.
+ * Auth: cookie or X-Admin-Token. Role-aware.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdminToken } from '@/lib/auth';
 import { getAdminRole } from '@/lib/admin-session';
-
-const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID || '';
-const AIRTABLE_API_KEY =
-  process.env.AIRTABLE_PAT || process.env.AIRTABLE_API_KEY || '';
-const CHILDREN_TABLE = process.env.AIRTABLE_CHILDREN_TABLE || 'Children';
-
-const F = {
-  departedAt: 'fldyPllTKOrSRFfvG',
-  departureNote: 'flda1f6iP31kgsJAR',
-  departureRequestedAt: 'fldjzepJdOAK3tw2f',
-  departureRequestedNote: 'fldMVUY1dV7gh5wVy',
-};
-
-function atHeaders() {
-  return {
-    Authorization: `Bearer ${AIRTABLE_API_KEY}`,
-    'Content-Type': 'application/json',
-  };
-}
-
-interface ChildFields {
-  DisplayName?: string;
-  FirstName?: string;
-  DepartedAt?: string;
-  DepartureNote?: string;
-  DepartureRequestedAt?: string;
-  DepartureRequestedNote?: string;
-}
+import { db } from '@/lib/db/client';
+import { children } from '@/lib/db/schema';
+import { eq } from 'drizzle-orm';
+import { markChildDeparted } from '@/lib/db/mutations';
 
 async function findKid(shirtNumber: number) {
-  const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(
-    CHILDREN_TABLE
-  )}?filterByFormula=${encodeURIComponent(`{ShirtNumber}=${shirtNumber}`)}&maxRecords=1`;
-  const res = await fetch(url, { headers: atHeaders(), cache: 'no-store' });
-  if (!res.ok) return null;
-  const data = await res.json();
-  return (data.records?.[0] as { id: string; fields: ChildFields }) || null;
-}
-
-async function patchKid(recordId: string, fields: Record<string, unknown>): Promise<Response> {
-  const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(
-    CHILDREN_TABLE
-  )}/${recordId}`;
-  return fetch(url, {
-    method: 'PATCH',
-    headers: atHeaders(),
-    body: JSON.stringify({ fields }),
-  });
+  const rows = await db
+    .select()
+    .from(children)
+    .where(eq(children.shirtNumber, shirtNumber))
+    .limit(1);
+  return rows[0] || null;
 }
 
 export async function POST(request: NextRequest) {
@@ -119,74 +75,76 @@ export async function POST(request: NextRequest) {
       { status: 404 }
     );
   }
-  const fields = kid.fields;
-  const displayName =
-    fields.DisplayName || fields.FirstName || `Kid #${shirtNumber}`;
+  const displayName = kid.displayName || kid.firstName || `Kid #${shirtNumber}`;
 
   try {
     if (action === 'request') {
-      if (fields.DepartedAt) {
+      if (kid.departedAt) {
         return NextResponse.json(
           { error: `${displayName} is already marked departed.` },
           { status: 409 }
         );
       }
-      const res = await patchKid(kid.id, {
-        [F.departureRequestedAt]: new Date().toISOString(),
-        [F.departureRequestedNote]: note || null,
-      });
-      if (!res.ok) {
-        return NextResponse.json(
-          { error: `Request failed: ${res.status} ${await res.text()}` },
-          { status: 502 }
-        );
-      }
+      await db
+        .update(children)
+        .set({
+          departureRequestedAt: new Date(),
+          departureRequestedNote: note || null,
+          updatedAt: new Date(),
+        })
+        .where(eq(children.id, kid.id));
       return NextResponse.json({ ok: true, action, name: displayName });
     }
 
     if (action === 'reject') {
-      const res = await patchKid(kid.id, {
-        [F.departureRequestedAt]: null,
-        [F.departureRequestedNote]: null,
-      });
-      if (!res.ok) {
-        return NextResponse.json(
-          { error: `Reject failed: ${res.status} ${await res.text()}` },
-          { status: 502 }
-        );
-      }
+      await db
+        .update(children)
+        .set({
+          departureRequestedAt: null,
+          departureRequestedNote: null,
+          updatedAt: new Date(),
+        })
+        .where(eq(children.id, kid.id));
       return NextResponse.json({ ok: true, action, name: displayName });
     }
 
     if (action === 'restore') {
-      const res = await patchKid(kid.id, {
-        [F.departedAt]: null,
-        [F.departureNote]: null,
-        [F.departureRequestedAt]: null,
-        [F.departureRequestedNote]: null,
-      });
-      if (!res.ok) {
-        return NextResponse.json(
-          { error: `Restore failed: ${res.status} ${await res.text()}` },
-          { status: 502 }
-        );
-      }
+      // Bring back the kid: clear departure fields, restore shirt
+      // number from archive if available, flip status back to Active.
+      await db
+        .update(children)
+        .set({
+          departedAt: null,
+          departureNote: null,
+          departureRequestedAt: null,
+          departureRequestedNote: null,
+          status: 'Active',
+          shirtNumber: kid.shirtNumber ?? kid.archivedShirtNumber,
+          archivedShirtNumber: kid.shirtNumber ? kid.archivedShirtNumber : null,
+          updatedAt: new Date(),
+        })
+        .where(eq(children.id, kid.id));
       return NextResponse.json({ ok: true, action, name: displayName });
     }
 
-    // approve — promote the request into the official fields.
-    const noteToPublish =
-      note || fields.DepartureRequestedNote || '';
-    const res = await patchKid(kid.id, {
-      [F.departedAt]: new Date().toISOString(),
-      [F.departureNote]: noteToPublish || null,
-      [F.departureRequestedAt]: null,
-      [F.departureRequestedNote]: null,
-    });
-    if (!res.ok) {
+    // approve — promote request to official departure via mutations.markChildDeparted.
+    // mutations.markChildDeparted archives shirt_number, sets status='Departed',
+    // departedAt = now, and writes an audit log row.
+    const noteToPublish = note || kid.departureRequestedNote || undefined;
+    const updated = await markChildDeparted(kid.id, { note: noteToPublish });
+    // Clear the request fields after promotion.
+    await db
+      .update(children)
+      .set({
+        departureRequestedAt: null,
+        departureRequestedNote: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(children.id, kid.id));
+    if (!updated) {
       return NextResponse.json(
-        { error: `Approve failed: ${res.status} ${await res.text()}` },
-        { status: 502 }
+        { error: 'Failed to mark kid departed' },
+        { status: 500 }
       );
     }
     return NextResponse.json({ ok: true, action, name: displayName });

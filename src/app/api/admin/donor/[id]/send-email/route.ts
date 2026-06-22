@@ -2,84 +2,24 @@
  * POST /api/admin/donor/<id>/send-email
  *   Body: { subject: string, body: string, appendSignature?: boolean }
  *
- * Sends a real email via the Gmail API using the stored refresh
- * token, from Kevin's authorized Gmail account, to the donor's
- * Email Address. The signature stored in AppSettings is appended
- * by default.
+ * Sends a real email via the Gmail API using the stored refresh token,
+ * from Kevin's authorized Gmail account, to the donor's email. Logs
+ * the send as a communications row (EmailType="Interaction · email"
+ * outbound) so the donor profile timeline stays in sync.
  *
- * Also logs an outbound interaction in the same call so the donor
- * profile timeline stays in sync.
- *
- * Errors fall into a few buckets:
+ * Errors:
  *   401  not signed into the admin
- *   400  bad request (missing donor email, blank subject/body)
- *   502  Gmail send failed (token revoked, rate limit, etc.) —
- *         Kevin sees the message and can reconnect via
- *         /admin/connect-gmail
+ *   400  bad request (no donor email, blank subject/body)
+ *   404  donor not found
+ *   502  Gmail send failed
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdminToken } from '@/lib/auth';
 import { sendEmailViaGmail } from '@/lib/gmail/send';
-
-const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID || '';
-const AIRTABLE_API_KEY =
-  process.env.AIRTABLE_PAT || process.env.AIRTABLE_API_KEY || '';
-const DONORS_TABLE = process.env.AIRTABLE_DONORS_TABLE || 'Donors';
-const INTERACTIONS_TABLE =
-  process.env.AIRTABLE_INTERACTIONS_TABLE || 'Interactions';
-
-const I_F = {
-  subject: 'fldlqqv1NK1oTU6FV',
-  donor: 'fldnII8EQzgZBUksB',
-  direction: 'fldp59ikGDl16VtRN',
-  channel: 'fldskE86vHE2dKPSL',
-  notes: 'fldao80pSvvtzS5MF',
-  at: 'fldN6i1VRSq1e9rRS',
-  loggedBy: 'fldvuxp4H8PgnHY1Q',
-};
-
-function atHeaders() {
-  return {
-    Authorization: `Bearer ${AIRTABLE_API_KEY}`,
-    'Content-Type': 'application/json',
-  };
-}
-
-async function getDonorEmail(donorId: string): Promise<string | null> {
-  const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(
-    DONORS_TABLE
-  )}/${donorId}`;
-  const res = await fetch(url, { headers: atHeaders(), cache: 'no-store' });
-  if (!res.ok) return null;
-  const data = await res.json();
-  const email = data.fields?.['Email Address'];
-  return typeof email === 'string' && email.trim() ? email.trim() : null;
-}
-
-async function logInteraction(opts: {
-  donorId: string;
-  subject: string;
-  bodyPreview: string;
-}): Promise<void> {
-  const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(
-    INTERACTIONS_TABLE
-  )}`;
-  const fields: Record<string, unknown> = {
-    [I_F.subject]: opts.subject,
-    [I_F.donor]: [opts.donorId],
-    [I_F.direction]: 'outbound',
-    [I_F.channel]: 'email',
-    [I_F.at]: new Date().toISOString(),
-    [I_F.loggedBy]: 'Kevin',
-    [I_F.notes]: opts.bodyPreview,
-  };
-  await fetch(url, {
-    method: 'POST',
-    headers: atHeaders(),
-    body: JSON.stringify({ fields, typecast: true }),
-  });
-}
+import { db } from '@/lib/db/client';
+import { donors, communications } from '@/lib/db/schema';
+import { eq } from 'drizzle-orm';
 
 export async function POST(
   request: NextRequest,
@@ -89,7 +29,7 @@ export async function POST(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
   const { id } = await params;
-  if (!id || !id.startsWith('rec')) {
+  if (!id) {
     return NextResponse.json({ error: 'Invalid donor id' }, { status: 400 });
   }
 
@@ -108,19 +48,23 @@ export async function POST(
   const appendSignature = body.appendSignature !== false;
 
   if (!subject) {
-    return NextResponse.json(
-      { error: 'Subject is required.' },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: 'Subject is required.' }, { status: 400 });
   }
   if (!text) {
-    return NextResponse.json(
-      { error: 'Email body is required.' },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: 'Email body is required.' }, { status: 400 });
   }
 
-  const toEmail = await getDonorEmail(id);
+  const donor = (
+    await db
+      .select({ id: donors.id, email: donors.email })
+      .from(donors)
+      .where(eq(donors.id, id))
+      .limit(1)
+  )[0];
+  if (!donor) {
+    return NextResponse.json({ error: 'Donor not found.' }, { status: 404 });
+  }
+  const toEmail = donor.email?.trim();
   if (!toEmail) {
     return NextResponse.json(
       { error: 'This donor has no email on file.' },
@@ -135,11 +79,17 @@ export async function POST(
       body: text,
       appendSignature,
     });
-    // Best-effort: log the interaction. If this fails we don't
-    // unwind the send — the email already went out.
+    // Best-effort interaction log. Doesn't unwind on failure.
     try {
-      const preview = text.length > 300 ? text.slice(0, 300) + '…' : text;
-      await logInteraction({ donorId: id, subject, bodyPreview: preview });
+      const preview = text.length > 240 ? text.slice(0, 240) + '...' : text;
+      await db.insert(communications).values({
+        subject: `[outbound] ${subject} — ${preview}`,
+        emailType: 'Interaction · email',
+        status: 'Sent',
+        sendDate: new Date().toISOString().slice(0, 10),
+        recipientEmail: toEmail,
+        relatedDonorId: donor.id,
+      });
     } catch (err) {
       console.warn('[donor/send-email] interaction log failed (non-fatal):', err);
     }

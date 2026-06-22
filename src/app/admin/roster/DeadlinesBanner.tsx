@@ -14,11 +14,9 @@
  * page (no extra Airtable call).
  */
 
-const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID || '';
-const AIRTABLE_API_KEY =
-  process.env.AIRTABLE_PAT || process.env.AIRTABLE_API_KEY || '';
-const NEWSLETTERS_TABLE =
-  process.env.AIRTABLE_NEWSLETTERS_TABLE || 'Newsletters';
+import { eq } from 'drizzle-orm';
+import { db } from '@/lib/db/client';
+import { newsletters } from '@/lib/db/schema';
 
 function buildMonthTitle(d: Date): string {
   const month = d.toLocaleString('en-US', { month: 'long' });
@@ -85,22 +83,16 @@ function toneClasses(t: 'gray' | 'amber' | 'red' | 'green'): string {
 }
 
 async function fetchThisMonthUpdate(): Promise<{ exists: boolean; wordCount: number }> {
-  if (!AIRTABLE_BASE_ID || !AIRTABLE_API_KEY) return { exists: false, wordCount: 0 };
   const title = buildMonthTitle(new Date());
-  const formula = encodeURIComponent(`{Title}="${title.replace(/"/g, '\\"')}"`);
-  const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(
-    NEWSLETTERS_TABLE
-  )}?filterByFormula=${formula}&maxRecords=1`;
   try {
-    const res = await fetch(url, {
-      headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` },
-      cache: 'no-store',
-    });
-    if (!res.ok) return { exists: false, wordCount: 0 };
-    const data = await res.json();
-    const rec = data.records?.[0];
-    if (!rec) return { exists: false, wordCount: 0 };
-    const body = (rec.fields?.BodyHTML as string) || '';
+    const rows = await db
+      .select({ bodyHtml: newsletters.bodyHtml })
+      .from(newsletters)
+      .where(eq(newsletters.title, title))
+      .limit(1);
+    const row = rows[0];
+    if (!row) return { exists: false, wordCount: 0 };
+    const body = row.bodyHtml || '';
     const wordCount = body
       .replace(/<[^>]+>/g, ' ')
       .split(/\s+/)

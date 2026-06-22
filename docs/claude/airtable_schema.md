@@ -315,33 +315,52 @@ Fields like `Address Line 1`, `City`, `State`, `Postal Code`, `Country` do not e
 
 Field names in the codebase don't always match the actual Airtable field names. Examples: the doc used to say `Name` but the field is `Donor Name`; used to say `Email` but the field is `Email Address`; Sponsorships uses `StripeSubscriptionID` not `Stripe Subscription ID`. **Always verify with `get_table_schema` before writing.** Copy field names exactly.
 
-### Trap 3.5: Cycle records — shirts #54+ mirror real kids #2-53
+### Trap 3.5: Cycle records — shirts #54+ resolve via the Batches table
+
+**Source of truth: `core_model.md` §2.** This entry exists only to
+note the historical formulas so a future Claude reading old code
+isn't surprised. Cycle resolution lives in `src/lib/cycle.ts`
+(`resolveShirtToKid`), backed by the Postgres `batches` table.
 
 BAN has roughly 53 unique children at the YDO campus. Shirt numbers
-go higher than 53 because shirts are an outreach product, not a
-child-count cap. Numbers from 54 onward are **cycle records** in the
-Children table: each new number is a sparse stub linked by name to a
-real kid from the original roster, on a 52-wide cycle that starts at
-shirt #54 = kid #2.
+go higher because shirts are an outreach product, not a child-count
+cap. Each Batches row covers a contiguous range of shirt numbers and
+locks an ordered `RosterSnapshot` of kids' ChildIDs. Inside a batch:
 
-Mapping formula (for `n >= 54`): canonical kid `((n - 54) % 52) + 2`.
+    shirt N → batch B where B.start ≤ N ≤ B.end
+           → kid = B.snapshot[(N - B.start) mod B.snapshot.length]
 
-So #54 = kid 2 (Marvin), #67 = kid 15 (Isaiah), #105 = kid 53
-(Amarorwot), #106 = kid 2 (Marvin again, next cycle).
+In the Postgres world, the snapshot stores ChildID text values
+(`HSP/BAN-001` etc.) directly. The kid page (`/children/[N]`) and
+the `/api/children` API both call `resolveShirtToKid(N)`, then
+hydrate the canonical kid via `getChildByChildId(...)`. The cycle
+record's identity stays bound to the requested shirt N — synthesized
+on the fly with `id=''`, `shirtNumber=N`, `childId=HSP/BAN-NNN` —
+while presentation fields (ProfilePhoto, HomeVillage, FamilyContext,
+ChildQuote, etc.) come from the canonical kid. Sponsorships and
+donations link by the cycle-record ChildID, not the canonical UUID.
 
-Cycle records typically carry only ShirtNumber, FirstName,
-DisplayName, ChildID, Status. They do NOT have photos, structured
-intake fields, DateOfBirth, or Notes. The `/[number]` page handles
-this transparently: when it detects a sparse cycle record, it
-fetches the canonical kid's record and merges presentation fields
-(ProfilePhoto, HomeVillage, FamilyContext, Loves, ChildQuote,
-TeacherQuote, Notes) onto the cycle record's identity. The cycle
-record's ShirtNumber + ChildID stay authoritative for sponsorship
-and donation links.
+**Historical formulas** (still hardcoded as a safety-net fallback in
+`canonicalShirtNumber()` for any shirt not yet covered by a Batches
+row):
 
-**Operational implication:** when assigning new shirt numbers, just
-follow the cycle. The actual people, photos, bios stay maintained on
-records 1-53 only.
+  - Era 1 (#54–150): `((N - 54) % 52) + 2` → kid 2–53. Naume (#1)
+    excluded from the original cycle. #54 = kid 2 (Marvin),
+    #67 = kid 15 (Isaiah), #105 = kid 53 (Amarorwot), #106 = kid 2
+    (Marvin again, next loop), #150 = kid 46.
+  - Era 2 (#151+): `((N - 151) % 53) + 1` → kid 1–53. Naume is in.
+
+These formulas matched what was in the Airtable-era Batches; the
+Postgres `batches` table is loaded with `RosterSnapshot` strings that
+make `resolveShirtToKid` return the same results. New batches Kevin
+opens past the current end (#150 as of 2026-06-22) won't follow these
+formulas — they'll follow whatever roster is locked into the new
+batch's snapshot.
+
+**Operational implication:** the people, photos, bios are maintained
+on records 1–53 only. Higher shirt numbers don't need their own
+Children rows in Postgres — `resolveShirtToKid` reads the canonical
+kid and the kid page synthesizes a cycle record at render time.
 
 ### Trap 4: ChildID vs ShirtNumber
 
