@@ -25,12 +25,97 @@ import { AlreadySponsoringBanner } from './AlreadySponsoringBanner';
 import { RecentKidsTracker } from '@/components/RecentKidsTracker';
 import { RecentKidsStrip } from '@/components/RecentKidsStrip';
 import { SESSION } from '@/lib/constants';
+import {
+  getChildByShirtNumber as getChildByShirtNumberFromDb,
+  getChildByChildId,
+  getDonorByStripeCustomerId,
+} from '@/lib/db/queries';
+import { db } from '@/lib/db/client';
+import {
+  children as childrenTable,
+  sponsorships as sponsorshipsTable,
+  donations as donationsTable,
+  childUpdates as childUpdatesTable,
+  type Child,
+  type Sponsorship,
+} from '@/lib/db/schema';
+import { and, desc, eq, ilike, isNotNull, or, sql as drizzleSql } from 'drizzle-orm';
 
 // Never statically optimize or cache this page. Sponsorship status and child
 // data changes over time, and a stale empty cache entry would manifest as a
 // false 404 on active numbers.
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
+
+// ─── Postgres → Airtable-shape adapters ────────────────────────────
+//
+// The page's render code was written for Airtable's PascalCase field
+// shape (`f.ChildID`, `f.ProfilePhoto[0].url`, etc.). Rather than
+// rewriting hundreds of lines of JSX, we project Postgres rows into
+// the same shape and hand the existing code untouched objects.
+
+function childToAirtableFields(c: Child): AirtableChildRecord['fields'] {
+  return {
+    ChildID: c.childId ?? undefined,
+    DisplayName: c.displayName ?? undefined,
+    FirstName: c.firstName ?? undefined,
+    LastInitial: c.lastInitial ?? undefined,
+    ShirtNumber: c.shirtNumber ?? undefined,
+    GradeClass: c.gradeClass ?? undefined,
+    ProfilePhoto: c.profilePhotoUrl
+      ? [{ url: c.profilePhotoUrl, filename: '' }]
+      : undefined,
+    Notes: c.notes ?? undefined,
+    Status: c.status ?? undefined,
+    DateOfBirth: c.dateOfBirth ?? undefined,
+    ReservedForAuction: c.reservedForAuction ?? undefined,
+    ShirtAssignedAt: c.shirtAssignedAt
+      ? new Date(c.shirtAssignedAt).toISOString()
+      : undefined,
+    HomeVillage: c.homeVillage ?? undefined,
+    FamilyContext: c.familyContext ?? undefined,
+    Loves: c.loves ?? undefined,
+    ChildQuote: c.childQuote ?? undefined,
+    TeacherName: c.teacherName ?? undefined,
+    TeacherQuote: c.teacherQuote ?? undefined,
+    NameMeaning: c.nameMeaning ?? undefined,
+    StudentOfMonth: c.studentOfMonth ? 'true' : undefined,
+    StudentOfMonthReason: c.studentOfMonthReason ?? undefined,
+    DepartedAt: c.departedAt ? new Date(c.departedAt).toISOString() : undefined,
+    DepartureNote: c.departureNote ?? undefined,
+    // ReportCards and Letters aren't in the migrated schema (no
+    // Airtable attachment column was preserved). The render code
+    // tolerates empty arrays.
+    ReportCards: [],
+    Letters: [],
+  };
+}
+
+function sponsorshipToAirtableFields(
+  s: Sponsorship,
+  child?: Child | null
+): AirtableSponsorshipRecord['fields'] {
+  return {
+    ChildID: s.childIdLegacy ?? child?.childId ?? undefined,
+    ChildDisplayName: s.childDisplayName ?? child?.displayName ?? undefined,
+    ChildAge: s.childAge ?? undefined,
+    ChildLocation: s.childLocation ?? undefined,
+    ChildPhoto: child?.profilePhotoUrl
+      ? [{ url: child.profilePhotoUrl, filename: '' }]
+      : undefined,
+    Status: s.status ?? undefined,
+    SponsorCode: s.sponsorCode ?? undefined,
+    SponsorshipStartDate: s.sponsorshipStartDate ?? undefined,
+    MonthlyAmount: s.monthlyAmount ? Number(s.monthlyAmount) : undefined,
+    ChildRevealedAt: s.childRevealedAt
+      ? new Date(s.childRevealedAt).toISOString()
+      : undefined,
+    LastReassignedAt: s.lastReassignedAt
+      ? new Date(s.lastReassignedAt).toISOString()
+      : undefined,
+    PreviousChildIDs: s.previousChildIds ?? undefined,
+  };
+}
 
 interface ChildPageProps {
   params: Promise<{ number: string }>;
@@ -138,39 +223,31 @@ async function findSponsorshipByEmailForChild(
   email: string,
   childId: string
 ): Promise<AirtableSponsorshipRecord['fields'] | null> {
-  const apiKey = process.env.AIRTABLE_API_KEY;
-  const baseId = process.env.AIRTABLE_BASE_ID;
-  const sponsorshipsTable =
-    process.env.AIRTABLE_SPONSORSHIPS_TABLE || 'Sponsorships';
-  if (!apiKey || !baseId) return null;
-  if (!childId) return null;
-  const safeEmail = email.toLowerCase().replace(/"/g, '\\"');
-  const safeChildId = childId.replace(/"/g, '\\"');
-  // Dual-OR: ChildID equality OR FIND on Children link with
-  // comma-bracketing. Equality covers freshly-written rows (the
-  // webhook + Holder writer both denormalize ChildID at write time),
-  // FIND-on-link covers legacy or hand-edited rows where ChildID is
-  // empty. ARRAYJOIN of a linked-record field joins the linked
-  // record's primary field — which for Children IS ChildID — so the
-  // FIND path is structurally correct without depending on
-  // denormalization having happened.
-  const formula = encodeURIComponent(
-    `AND(LOWER({SponsorEmail})="${safeEmail}", OR({Status}="Active",{Status}="Holder"), OR({ChildID}="${safeChildId}", FIND("," & "${safeChildId}" & ",", "," & ARRAYJOIN({Children}, ",") & ",")))`
-  );
+  if (!email || !childId) return null;
   try {
-    const res = await fetch(
-      `https://api.airtable.com/v0/${baseId}/${encodeURIComponent(
-        sponsorshipsTable
-      )}?filterByFormula=${formula}&maxRecords=1`,
-      {
-        headers: { Authorization: `Bearer ${apiKey}` },
-        cache: 'no-store',
-      }
-    );
-    if (!res.ok) return null;
-    const data = await res.json();
-    const record = data.records?.[0];
-    return record?.fields || null;
+    // Find the child row (UUID + legacy ChildID) so we can dual-match.
+    const child = await getChildByChildId(childId);
+    const childUuid = child?.id;
+
+    const rows = await db
+      .select()
+      .from(sponsorshipsTable)
+      .where(
+        and(
+          ilike(sponsorshipsTable.sponsorEmail, email),
+          or(
+            eq(sponsorshipsTable.status, 'Active'),
+            eq(sponsorshipsTable.status, 'Holder')
+          ),
+          or(
+            childUuid ? eq(sponsorshipsTable.childId, childUuid) : drizzleSql`false`,
+            eq(sponsorshipsTable.childIdLegacy, childId)
+          )
+        )
+      )
+      .limit(1);
+    if (!rows[0]) return null;
+    return sponsorshipToAirtableFields(rows[0], child ?? null);
   } catch {
     return null;
   }
@@ -218,22 +295,23 @@ async function resolveBuyerContext(
   isShirtMonthly: boolean;
 } | null> {
   if (!sessionId.startsWith('cs_')) return null;
-  const donationsTable = process.env.AIRTABLE_DONATIONS_TABLE || 'Donations';
   try {
-    const formula = encodeURIComponent(`{Stripe Checkout Session ID} = "${sessionId}"`);
-    const res = await airtableRequest<{ records: Array<{ id: string; fields: Record<string, any> }> }>(
-      `/${encodeURIComponent(donationsTable)}?filterByFormula=${formula}&maxRecords=1`
-    );
-    if (!res.records.length) return null;
-    const donation = res.records[0];
-    const fields = donation.fields || {};
-    const donorLink: string[] = fields['Donor'] || [];
-    const source = (fields['Donation Source'] as string | undefined) || '';
-    const isRecurring = Boolean(fields['Recurring Donation']);
+    const rows = await db
+      .select()
+      .from(donationsTable)
+      .where(eq(donationsTable.stripeCheckoutSessionId, sessionId))
+      .limit(1);
+    if (!rows[0]) return null;
+    const donation = rows[0];
+    const source = donation.donationSource || '';
+    const isRecurring = Boolean(donation.recurringDonation);
     return {
-      customerId: (fields['Stripe Customer ID'] as string | undefined) || null,
-      email: (fields['Donor Email at Donation'] as string | undefined) || null,
-      donorRecordId: donorLink[0] || null,
+      customerId: donation.stripeCustomerId,
+      email: donation.donorEmailAtDonation,
+      // The render code only checks truthiness of donorRecordId. We pass
+      // the Postgres donor UUID; downstream code uses it to look up
+      // "donor already has an active sponsorship?" via the same id.
+      donorRecordId: donation.donorId,
       isShirtMonthly: source === 'Shirt + Monthly' && isRecurring,
     };
   } catch (err) {
@@ -254,26 +332,32 @@ async function getLatestChildUpdate(childRecordId: string): Promise<{
   photos: Array<{ url: string; filename?: string }>;
   updateDate?: string;
 } | null> {
-  const updatesTable = 'tblrmtVBVzL7zCQDE'; // Child Updates
+  if (!childRecordId) return null;
   try {
-    // We filter by the linked Child record ID using FIND across
-    // ARRAYJOIN({Child}). Same pattern as donorHasActiveSponsorship.
-    const formula = encodeURIComponent(
-      `AND(FIND("${childRecordId}", ARRAYJOIN({Child}, ",")), {VisibleToSponsor}=TRUE())`
-    );
-    const res = await airtableRequest<{
-      records: Array<{ id: string; fields: Record<string, any> }>;
-    }>(
-      `/${encodeURIComponent(updatesTable)}?filterByFormula=${formula}&sort%5B0%5D%5Bfield%5D=UpdateDate&sort%5B0%5D%5Bdirection%5D=desc&maxRecords=1`
-    );
-    const r = res.records?.[0];
+    const rows = await db
+      .select({
+        title: childUpdatesTable.title,
+        content: childUpdatesTable.content,
+        photoUrls: childUpdatesTable.photoUrls,
+        updateDate: childUpdatesTable.updateDate,
+      })
+      .from(childUpdatesTable)
+      .where(
+        and(
+          eq(childUpdatesTable.childId, childRecordId),
+          eq(childUpdatesTable.visibleToSponsor, true)
+        )
+      )
+      .orderBy(desc(childUpdatesTable.updateDate))
+      .limit(1);
+    const r = rows[0];
     if (!r) return null;
-    const f = r.fields;
+    const photos = (r.photoUrls as string[] | null) ?? [];
     return {
-      title: (f.Title as string) || '',
-      content: (f.Content as string) || '',
-      photos: (f.Photos as Array<{ url: string; filename?: string }> | undefined) || [],
-      updateDate: f.UpdateDate as string | undefined,
+      title: r.title || '',
+      content: r.content || '',
+      photos: photos.map(url => ({ url })),
+      updateDate: r.updateDate ?? undefined,
     };
   } catch (err) {
     console.warn('[children/page] Child Update fetch failed', err);
@@ -323,55 +407,54 @@ function computeSponsorStats(startDate: string | undefined, monthlyAmount = 25):
  * Shirt + Stay buyer. Multi-child sponsorship is still supported via
  * the normal sponsor button.
  */
+/**
+ * The Postgres sponsorships table doesn&rsquo;t carry a direct donor FK
+ * (we kept the Airtable era&rsquo;s denormalized model: each sponsorship
+ * stores the SPONSOR EMAIL, and donors are joined by email). To
+ * answer &ldquo;does this donor have any active sponsorship?&rdquo; we look up
+ * the donor&rsquo;s email by id, then search sponsorships by that email.
+ *
+ * `donorRecordId` here is the Postgres donors.id UUID (passed
+ * through from resolveBuyerContext).
+ */
+/**
+ * The Postgres sponsorships table doesn&rsquo;t carry a direct donor FK
+ * (we kept the Airtable era&rsquo;s denormalized model: each sponsorship
+ * stores the SPONSOR EMAIL, and donors are joined by email). To
+ * answer &ldquo;does this donor have any active sponsorship?&rdquo; we look up
+ * the donor&rsquo;s email by id, then search sponsorships by that email.
+ *
+ * `donorRecordId` here is the Postgres donors.id UUID, passed through
+ * from resolveBuyerContext.
+ */
 async function donorHasActiveSponsorship(donorRecordId: string): Promise<boolean> {
-  const sponsorshipsTable = process.env.AIRTABLE_SPONSORSHIPS_TABLE || 'Sponsorships';
+  if (!donorRecordId) return false;
   try {
-    const formula = encodeURIComponent(
-      `AND(FIND("${donorRecordId}", ARRAYJOIN({Donor}, ",")), {Status}="Active")`
+    const donor = await db.execute(
+      drizzleSql`select email from donors where id = ${donorRecordId} limit 1`
     );
-    const res = await airtableRequest<{ records: Array<{ id: string }> }>(
-      `/${encodeURIComponent(sponsorshipsTable)}?filterByFormula=${formula}&maxRecords=1`
-    );
-    return res.records.length > 0;
+    const donorRows = (donor as unknown as { rows?: Array<{ email: string }> }).rows
+      ?? (donor as unknown as Array<{ email: string }>);
+    const email = donorRows?.[0]?.email;
+    if (!email) return false;
+
+    const rows = await db
+      .select({ id: sponsorshipsTable.id })
+      .from(sponsorshipsTable)
+      .where(
+        and(
+          ilike(sponsorshipsTable.sponsorEmail, email),
+          eq(sponsorshipsTable.status, 'Active')
+        )
+      )
+      .limit(1);
+    return rows.length > 0;
   } catch (err) {
     console.warn('[children/page] Donor sponsorship check failed', err);
     // Fail closed: if we can't check, don't show the claim card —
     // better to under-prompt than to let a second-claim race in.
     return true;
   }
-}
-
-async function airtableRequest<T>(endpoint: string): Promise<T> {
-  const apiKey = process.env.AIRTABLE_API_KEY;
-  const baseId = process.env.AIRTABLE_BASE_ID;
-  if (!apiKey || !baseId) {
-    console.error('[children/page] Airtable not configured', {
-      hasKey: !!apiKey,
-      hasBase: !!baseId,
-    });
-    throw new Error('Airtable not configured');
-  }
-
-  const url = `https://api.airtable.com/v0/${baseId}${endpoint}`;
-  const response = await fetch(url, {
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    // Always fetch fresh. A stale empty response would surface as a false 404.
-    cache: 'no-store',
-  });
-
-  if (!response.ok) {
-    const body = await response.text().catch(() => '');
-    console.error('[children/page] Airtable error', {
-      url,
-      status: response.status,
-      body: body.slice(0, 500),
-    });
-    throw new Error(`Airtable error: ${response.status}`);
-  }
-  return response.json();
 }
 
 /**
@@ -410,35 +493,29 @@ function canonicalShirtNumber(n: number): number | null {
 
 // React cache() deduplicates calls within a single server request.
 // Both generateMetadata() and the page component call this function,
-// so without cache() the page would hit Airtable 4× instead of 2×.
+// so without cache() the page would hit Postgres twice per kid render.
 const getChildByShirtNumber = cache(async function getChildByShirtNumber(shirtNumber: number) {
-  const childrenTable = process.env.AIRTABLE_CHILDREN_TABLE || 'Children';
-
   try {
-    const formula = encodeURIComponent(`{ShirtNumber}=${shirtNumber}`);
-    const childRes = await airtableRequest<{ records: AirtableChildRecord[] }>(
-      `/${encodeURIComponent(childrenTable)}?filterByFormula=${formula}&maxRecords=1`
-    );
+    const childRow = await getChildByShirtNumberFromDb(shirtNumber);
 
-    if (!childRes.records.length) {
+    if (!childRow) {
       console.warn('[children/page] No child record found for shirt number', {
         shirtNumber,
-        table: childrenTable,
       });
       return null;
     }
 
-    const childRecord = childRes.records[0];
-    const baseChild = childRecord.fields;
-    const recordId = childRecord.id;
+    const recordId = childRow.id;
+    const baseChild = childToAirtableFields(childRow);
 
     // Cycle-record fallback: if this is a cycle number and the
     // current record lacks photo + structured fields, fetch the
     // canonical kid's record and merge their profile fields onto
-    // ours. Identity fields (ShirtNumber, ChildID, DisplayName)
-    // come from the cycle record; presentation fields (ProfilePhoto,
+    // ours. Identity fields (ShirtNumber, ChildID, DisplayName) stay
+    // with the cycle record; presentation fields (ProfilePhoto,
     // HomeVillage, FamilyContext, ChildQuote, etc.) come from the
-    // canonical kid.
+    // canonical kid. Almost always a no-op in the Postgres world
+    // because every children row carries its own data.
     const canonicalNum = canonicalShirtNumber(shirtNumber);
     const isSparse = !(baseChild.ProfilePhoto?.length) &&
       !baseChild.HomeVillage &&
@@ -451,13 +528,8 @@ const getChildByShirtNumber = cache(async function getChildByShirtNumber(shirtNu
     let canonicalChildFields: AirtableChildRecord['fields'] | null = null;
     if (canonicalNum && isSparse) {
       try {
-        const canonFormula = encodeURIComponent(`{ShirtNumber}=${canonicalNum}`);
-        const canonRes = await airtableRequest<{ records: AirtableChildRecord[] }>(
-          `/${encodeURIComponent(childrenTable)}?filterByFormula=${canonFormula}&maxRecords=1`
-        );
-        if (canonRes.records.length) {
-          canonicalChildFields = canonRes.records[0].fields;
-        }
+        const canonRow = await getChildByShirtNumberFromDb(canonicalNum);
+        if (canonRow) canonicalChildFields = childToAirtableFields(canonRow);
       } catch {
         // Best effort — fall through to whatever the cycle record has.
       }
@@ -505,15 +577,21 @@ const getChildByShirtNumber = cache(async function getChildByShirtNumber(shirtNu
     let sponsorship: AirtableSponsorshipRecord['fields'] | null = null;
     const sponsorshipPromise = childId
       ? (async () => {
-          const sponsorshipTable = process.env.AIRTABLE_SPONSORSHIPS_TABLE || 'Sponsorships';
-          const sFormula = encodeURIComponent(`{ChildID}="${childId}"`);
           try {
-            const sRes = await airtableRequest<{ records: AirtableSponsorshipRecord[] }>(
-              `/${encodeURIComponent(sponsorshipTable)}?filterByFormula=${sFormula}&maxRecords=1`
-            );
-            if (sRes.records.length) return sRes.records[0].fields;
+            const rows = await db
+              .select()
+              .from(sponsorshipsTable)
+              .where(
+                or(
+                  eq(sponsorshipsTable.childIdLegacy, childId),
+                  eq(sponsorshipsTable.childId, recordId)
+                )
+              )
+              .orderBy(desc(sponsorshipsTable.createdAt))
+              .limit(1);
+            if (rows[0]) return sponsorshipToAirtableFields(rows[0], childRow);
           } catch {
-            // Sponsorship lookup is optional
+            // Sponsorship lookup is optional.
           }
           return null;
         })()
@@ -624,26 +702,9 @@ const getChildByShirtNumber = cache(async function getChildByShirtNumber(shirtNu
       const mostRecentPreviousId = previousIds[previousIds.length - 1];
       if (mostRecentPreviousId) {
         try {
-          const safe = mostRecentPreviousId.replace(/"/g, '\\"');
-          const url =
-            `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID || ''}` +
-            `/${encodeURIComponent(process.env.AIRTABLE_CHILDREN_TABLE || 'Children')}` +
-            `?filterByFormula=${encodeURIComponent(`{ChildID}="${safe}"`)}&maxRecords=1`;
-          const lookupRes = await fetch(url, {
-            headers: {
-              Authorization: `Bearer ${process.env.AIRTABLE_PAT || process.env.AIRTABLE_API_KEY || ''}`,
-            },
-            cache: 'no-store',
-          });
-          if (lookupRes.ok) {
-            const lookupData = await lookupRes.json();
-            const prev = lookupData.records?.[0];
-            if (prev) {
-              previousKidName =
-                (prev.fields?.DisplayName as string) ||
-                (prev.fields?.FirstName as string) ||
-                null;
-            }
+          const prev = await getChildByChildId(mostRecentPreviousId);
+          if (prev) {
+            previousKidName = prev.displayName || prev.firstName || null;
           }
         } catch {
           // Best-effort: if the lookup fails we just don't mention

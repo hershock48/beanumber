@@ -38,10 +38,19 @@ import {
 import { BANNavigation } from '@/components/BANNavigation';
 import { BANFooter } from '@/components/BANFooter';
 import { RecentKidsStrip } from '@/components/RecentKidsStrip';
+import { getChildByRecordId } from '@/lib/db/queries';
+import { db } from '@/lib/db/client';
+import { children as childrenTable, type Child } from '@/lib/db/schema';
+import { eq } from 'drizzle-orm';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
+/**
+ * Shape the render code consumes &mdash; preserved from the Airtable
+ * era so the JSX downstream stays unchanged. We adapt a Postgres
+ * row into this shape inside fetchChild().
+ */
 interface AirtableChildRecord {
   id: string;
   fields: {
@@ -67,25 +76,65 @@ interface AirtableChildRecord {
   };
 }
 
-const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID || '';
-const AIRTABLE_API_KEY = process.env.AIRTABLE_API_KEY || '';
-const CHILDREN_TABLE = process.env.AIRTABLE_CHILDREN_TABLE || 'Children';
+/**
+ * Adapt a Postgres children row into the PascalCase "fields" shape
+ * the page&rsquo;s JSX already references. Keeps the render code
+ * untouched while the data source flips underneath.
+ */
+function toAirtableShape(row: Child): AirtableChildRecord {
+  return {
+    id: row.id,
+    fields: {
+      ChildID: row.childId ?? undefined,
+      DisplayName: row.displayName ?? undefined,
+      FirstName: row.firstName ?? undefined,
+      LastInitial: row.lastInitial ?? undefined,
+      DateOfBirth: row.dateOfBirth ?? undefined,
+      GradeClass: row.gradeClass ?? undefined,
+      ProfilePhoto: row.profilePhotoUrl
+        ? [{ url: row.profilePhotoUrl, filename: '' }]
+        : undefined,
+      Notes: row.notes ?? undefined,
+      Loves: row.loves ?? undefined,
+      ChildQuote: row.childQuote ?? undefined,
+      FamilyContext: row.familyContext ?? undefined,
+      HomeVillage: row.homeVillage ?? undefined,
+      NameMeaning: row.nameMeaning ?? undefined,
+      TeacherName: row.teacherName ?? undefined,
+      TeacherQuote: row.teacherQuote ?? undefined,
+      Status: row.status ?? undefined,
+      DepartedAt: row.departedAt
+        ? new Date(row.departedAt).toISOString()
+        : undefined,
+      DepartureNote: row.departureNote ?? undefined,
+      ReservedForAuction: row.reservedForAuction ?? undefined,
+    },
+  };
+}
 
+/**
+ * Look up a kid by the URL param. Historically the param was an
+ * Airtable record ID ("rec..."); the canonical id is now a Postgres
+ * UUID. We support both during the migration window &mdash; "rec*"
+ * params fall through to a lookup on the legacy airtable_id column
+ * so old shared links keep working.
+ */
 async function fetchChild(childId: string): Promise<AirtableChildRecord | null> {
-  if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) return null;
-  if (!childId || !childId.startsWith('rec')) return null;
+  if (!childId) return null;
   try {
-    const res = await fetch(
-      `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(
-        CHILDREN_TABLE
-      )}/${childId}`,
-      {
-        headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` },
-        cache: 'no-store',
-      }
-    );
-    if (!res.ok) return null;
-    return await res.json();
+    let row: Child | null = null;
+    if (childId.startsWith('rec')) {
+      const rows = await db
+        .select()
+        .from(childrenTable)
+        .where(eq(childrenTable.airtableId, childId))
+        .limit(1);
+      row = rows[0] ?? null;
+    } else {
+      row = await getChildByRecordId(childId);
+    }
+    if (!row) return null;
+    return toAirtableShape(row);
   } catch {
     return null;
   }

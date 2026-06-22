@@ -43,6 +43,10 @@ import {
   getRecentCampusNewsletters,
   type CampusNewsletterEntry,
 } from '@/lib/newsletter-feed';
+import {
+  listAllChildren,
+  getViewerSponsorships,
+} from '@/lib/db/queries';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -69,22 +73,6 @@ interface CampusChild {
   photoUrl?: string;
 }
 
-interface AirtableChildRecord {
-  id: string;
-  fields: {
-    ChildID?: string;
-    DisplayName?: string;
-    FirstName?: string;
-    DateOfBirth?: string;
-    HomeVillage?: string;
-    Loves?: string;
-    ProfilePhoto?: Array<{ url: string }>;
-    ShirtNumber?: number;
-    Status?: string;
-    ReservedForAuction?: boolean;
-  };
-}
-
 interface ViewerKid {
   recordId: string;
   firstName: string;
@@ -92,16 +80,11 @@ interface ViewerKid {
 
 // ── Constants ─────────────────────────────────────────────────────
 
-const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID || '';
-const AIRTABLE_API_KEY = process.env.AIRTABLE_API_KEY || '';
-const CHILDREN_TABLE = process.env.AIRTABLE_CHILDREN_TABLE || 'Children';
-const SPONSORSHIPS_TABLE =
-  process.env.AIRTABLE_SPONSORSHIPS_TABLE || 'Sponsorships';
 const CAMPUS_CAPACITY = 380;
 
 // ── Helpers: age, status, shuffle ─────────────────────────────────
 
-function computeAge(dob?: string): number | undefined {
+function computeAge(dob?: string | null): number | undefined {
   if (!dob) return undefined;
   const birth = new Date(dob);
   if (isNaN(birth.getTime())) return undefined;
@@ -110,17 +93,6 @@ function computeAge(dob?: string): number | undefined {
   const m = today.getMonth() - birth.getMonth();
   if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) years -= 1;
   return years >= 0 ? years : undefined;
-}
-
-/**
- * Status values in Airtable have inconsistent casing ("active" vs
- * "Active") &mdash; mirror /api/children&rsquo;s permissive normalizer.
- */
-function isVisibleStatus(status?: string): boolean {
-  if (!status) return false;
-  const s = status.trim().toLowerCase();
-  if (s === 'graduated' || s === 'archived' || s === 'inactive') return false;
-  return true;
 }
 
 /**
@@ -155,39 +127,28 @@ function daySeed(): number {
 
 // ── Data fetching ─────────────────────────────────────────────────
 
+/**
+ * Pull every kid currently on the campus from Postgres. Same scope
+ * as the old Airtable call: visible status, not reserved-for-auction.
+ * listAllChildren() already filters to Active/active/New and excludes
+ * departed kids; we apply the auction-reservation filter here.
+ */
 async function fetchAllChildren(): Promise<CampusChild[]> {
-  if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) return [];
   try {
-    // Same scope as /api/children GET — kids with a ShirtNumber, not
-    // reserved-for-auction, not in a hidden status.
-    const formula = encodeURIComponent('NOT({ShirtNumber}=BLANK())');
-    const res = await fetch(
-      `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(
-        CHILDREN_TABLE
-      )}?filterByFormula=${formula}&pageSize=100`,
-      {
-        headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` },
-        cache: 'no-store',
-      }
-    );
-    if (!res.ok) return [];
-    const data = (await res.json()) as { records: AirtableChildRecord[] };
-    return data.records
-      .filter(r => !r.fields.ReservedForAuction)
-      .filter(r => isVisibleStatus(r.fields.Status))
-      .map<CampusChild>(r => {
-        const f = r.fields;
-        return {
-          recordId: r.id,
-          firstName:
-            f.FirstName || f.DisplayName?.split(' ')[0] || 'Child',
-          displayName: f.DisplayName || f.FirstName || 'Child',
-          age: computeAge(f.DateOfBirth),
-          homeVillage: f.HomeVillage,
-          loves: f.Loves,
-          photoUrl: f.ProfilePhoto?.[0]?.url,
-        };
-      });
+    const rows = await listAllChildren();
+    return rows
+      .filter(r => !r.reservedForAuction)
+      .filter(r => typeof r.shirtNumber === 'number')
+      .map<CampusChild>(r => ({
+        recordId: r.id,
+        firstName:
+          r.firstName || r.displayName?.split(' ')[0] || 'Child',
+        displayName: r.displayName || r.firstName || 'Child',
+        age: computeAge(r.dateOfBirth),
+        homeVillage: r.homeVillage ?? undefined,
+        loves: r.loves ?? undefined,
+        photoUrl: r.profilePhotoUrl ?? undefined,
+      }));
   } catch {
     return [];
   }
@@ -200,35 +161,18 @@ async function fetchAllChildren(): Promise<CampusChild[]> {
  * aren&rsquo;t shown to themselves as strangers.
  */
 async function fetchViewerKids(email: string): Promise<ViewerKid[]> {
-  if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) return [];
   try {
-    const safe = email.replace(/"/g, '\\"');
-    const formula = encodeURIComponent(
-      `AND(LOWER({SponsorEmail})="${safe}", OR({Status}="Active",{Status}="Holder"))`
-    );
-    const res = await fetch(
-      `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(
-        SPONSORSHIPS_TABLE
-      )}?filterByFormula=${formula}&pageSize=100`,
-      {
-        headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` },
-        cache: 'no-store',
-      }
-    );
-    if (!res.ok) return [];
-    const data = (await res.json()) as {
-      records: Array<{
-        fields: { Children?: string[]; ChildDisplayName?: string };
-      }>;
-    };
+    const rows = await getViewerSponsorships(email);
     const out: ViewerKid[] = [];
     const seen = new Set<string>();
-    for (const r of data.records) {
-      const rid = r.fields.Children?.[0];
+    for (const r of rows) {
+      const rid = r.childRecordId;
       if (!rid || seen.has(rid)) continue;
       seen.add(rid);
       const first =
-        (r.fields.ChildDisplayName || '').split(' ')[0] || 'them';
+        r.childFirstName ||
+        (r.childDisplayName || '').split(' ')[0] ||
+        'them';
       out.push({ recordId: rid, firstName: first });
     }
     return out;

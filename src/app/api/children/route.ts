@@ -1,32 +1,14 @@
 import { NextResponse } from 'next/server';
+import {
+  getChildByShirtNumber,
+  listAllChildren,
+} from '@/lib/db/queries';
+import type { Child } from '@/lib/db/schema';
 
 // Never cache. The enrolled roster changes and we don't want the homepage grid
 // or the fallback child lookup serving stale data.
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
-
-interface AirtableChildRecord {
-  id: string;
-  createdTime?: string;
-  fields: {
-    ChildID?: string;
-    DisplayName?: string;
-    FirstName?: string;
-    LastInitial?: string;
-    DateOfBirth?: string;
-    GradeClass?: string;
-    ProfilePhoto?: Array<{ url: string; filename: string }>;
-    Notes?: string;
-    Loves?: string;
-    ChildQuote?: string;
-    FamilyContext?: string;
-    HomeVillage?: string;
-    Status?: string;
-    ShirtNumber?: number;
-    EnrollmentDate?: string;
-    ReservedForAuction?: boolean;
-  };
-}
 
 interface OutgoingChild {
   id: string;
@@ -45,39 +27,7 @@ interface OutgoingChild {
   shirt_number_end?: number;
 }
 
-async function airtableRequest<T>(endpoint: string): Promise<T> {
-  const apiKey = process.env.AIRTABLE_API_KEY;
-  const baseId = process.env.AIRTABLE_BASE_ID;
-  if (!apiKey || !baseId) {
-    console.error('[api/children] Airtable not configured', {
-      hasKey: !!apiKey,
-      hasBase: !!baseId,
-    });
-    throw new Error('Airtable not configured');
-  }
-
-  const url = `https://api.airtable.com/v0/${baseId}${endpoint}`;
-  const response = await fetch(url, {
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    cache: 'no-store',
-  });
-
-  if (!response.ok) {
-    const body = await response.text().catch(() => '');
-    console.error('[api/children] Airtable error', {
-      url,
-      status: response.status,
-      body: body.slice(0, 500),
-    });
-    throw new Error(`Airtable error: ${response.status}`);
-  }
-  return response.json();
-}
-
-function computeAge(dateOfBirth?: string): number | undefined {
+function computeAge(dateOfBirth?: string | null): number | undefined {
   if (!dateOfBirth) return undefined;
   const birth = new Date(dateOfBirth);
   if (isNaN(birth.getTime())) return undefined;
@@ -90,46 +40,45 @@ function computeAge(dateOfBirth?: string): number | undefined {
   return years >= 0 ? years : undefined;
 }
 
-function toOutgoing(record: AirtableChildRecord): OutgoingChild {
-  const f = record.fields;
-  const firstName = f.FirstName || f.DisplayName?.split(' ')[0] || 'Child';
-  const photo = f.ProfilePhoto?.[0]?.url;
-  const age = computeAge(f.DateOfBirth);
-
+function toOutgoing(child: Child): OutgoingChild {
+  const firstName =
+    child.firstName || child.displayName?.split(' ')[0] || 'Child';
   return {
-    id: record.id,
-    child_id: f.ChildID || record.id,
+    // Preserve the legacy contract: `id` was Airtable record id; we now use
+    // Postgres UUID. Callers should not treat this as a routing key.
+    id: child.id,
+    child_id: child.childId || child.id,
     first_name: firstName,
-    last_initial: f.LastInitial,
-    display_name: f.DisplayName,
-    age,
-    grade_class: f.GradeClass,
-    photo_url: photo,
-    fun_fact: f.Loves || undefined,
-    child_quote: f.ChildQuote || undefined,
-    family_context: f.FamilyContext || undefined,
-    home_village: f.HomeVillage || undefined,
-    shirt_number_start: typeof f.ShirtNumber === 'number' ? f.ShirtNumber : undefined,
-    shirt_number_end: typeof f.ShirtNumber === 'number' ? f.ShirtNumber : undefined,
+    last_initial: child.lastInitial ?? undefined,
+    display_name: child.displayName ?? undefined,
+    age: computeAge(child.dateOfBirth),
+    grade_class: child.gradeClass ?? undefined,
+    photo_url: child.profilePhotoUrl ?? undefined,
+    fun_fact: child.loves ?? undefined,
+    child_quote: child.childQuote ?? undefined,
+    family_context: child.familyContext ?? undefined,
+    home_village: child.homeVillage ?? undefined,
+    shirt_number_start: child.shirtNumber ?? undefined,
+    shirt_number_end: child.shirtNumber ?? undefined,
   };
 }
 
-// Status values in Airtable have inconsistent casing ("active" vs "Active").
+// Status values from Airtable have inconsistent casing ("active" vs "Active").
 // Treat any non-graduated status as visible on the homepage.
-function isVisibleStatus(status?: string): boolean {
+function isVisibleStatus(status?: string | null): boolean {
   if (!status) return false;
   const normalized = status.trim().toLowerCase();
   if (!normalized) return false;
   if (normalized === 'graduated') return false;
   if (normalized === 'archived') return false;
   if (normalized === 'inactive') return false;
+  if (normalized === 'departed') return false;
   return true;
 }
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const numberParam = searchParams.get('number');
-  const childrenTable = process.env.AIRTABLE_CHILDREN_TABLE || 'Children';
 
   try {
     // Single-child lookup by shirt number (used by legacy callers).
@@ -141,41 +90,27 @@ export async function GET(request: Request) {
           { status: 400 }
         );
       }
-
-      const formula = encodeURIComponent(`{ShirtNumber}=${num}`);
-      const res = await airtableRequest<{ records: AirtableChildRecord[] }>(
-        `/${encodeURIComponent(childrenTable)}?filterByFormula=${formula}&maxRecords=1`
-      );
-
-      if (!res.records.length) {
+      const child = await getChildByShirtNumber(num);
+      if (!child) {
         return NextResponse.json(
           { error: 'Child not found', child: null },
           { status: 404 }
         );
       }
-
-      return NextResponse.json({ child: toOutgoing(res.records[0]) });
+      return NextResponse.json({ child: toOutgoing(child) });
     }
 
-    // Full roster for the homepage grid. Fetch everything that has a shirt
-    // number assigned, then filter out graduated/inactive in code (Airtable's
-    // formula engine is case-sensitive on singleSelect names, and we have
-    // "active" and "Active" both in the data).
-    const formula = encodeURIComponent('NOT({ShirtNumber}=BLANK())');
-    const res = await airtableRequest<{ records: AirtableChildRecord[] }>(
-      `/${encodeURIComponent(childrenTable)}?filterByFormula=${formula}&pageSize=100`
-    );
-
-    const children = res.records
-      // Hide reserved-for-auction slots from the public roster. They exist as
-      // Child records so the system can hold the number, but they aren't real
-      // kids waiting for sponsorship.
-      .filter(r => !r.fields.ReservedForAuction)
-      .filter(r => isVisibleStatus(r.fields.Status))
+    // Full roster for the homepage grid. Filter at the DB level; further
+    // refine here to hide reserved-for-auction holds.
+    const rows = await listAllChildren();
+    const children = rows
+      .filter(c => !c.reservedForAuction)
+      .filter(c => isVisibleStatus(c.status))
       .map(toOutgoing)
-      // Oldest enrolled first, so shirts assigned in enrollment order surface
-      // earliest children to new visitors.
-      .sort((a, b) => (a.shirt_number_start ?? 0) - (b.shirt_number_start ?? 0));
+      .sort(
+        (a, b) =>
+          (a.shirt_number_start ?? 0) - (b.shirt_number_start ?? 0)
+      );
 
     return NextResponse.json({ children });
   } catch (error) {

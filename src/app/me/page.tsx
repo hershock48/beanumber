@@ -19,6 +19,10 @@ import { BANFooter } from '@/components/BANFooter';
 import { RecentKidsStrip } from '@/components/RecentKidsStrip';
 import { SESSION } from '@/lib/constants';
 import { getRecentCampusNewsletters } from '@/lib/newsletter-feed';
+import {
+  getViewerSponsorships,
+  getLatestUpdateForChild,
+} from '@/lib/db/queries';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -47,96 +51,10 @@ interface SponsorshipRow {
   latestUpdate?: ChildUpdateSnapshot | null;
 }
 
-const CHILD_UPDATES_TABLE =
-  process.env.AIRTABLE_CHILD_UPDATES_TABLE || 'Child Updates';
-
 interface ChildUpdateSnapshot {
   title: string;
   publishedAt: string;
   photoUrl?: string;
-}
-
-/**
- * Fetch the most recent published, sponsor-visible Child Update for
- * a given kid. Used by the /me digest so each kid card surfaces
- * something fresh from the campus instead of being a static roster.
- *
- * Matches on the Child Updates table&rsquo;s own ChildID text field rather
- * than on the Child linked-record field. Same gotcha as the
- * sponsorship recognition formula we fixed in 2df11df:
- * ARRAYJOIN({Child}, ",") joins the linked records&rsquo; primary-field
- * values (the kid&rsquo;s ChildID strings, e.g. "HSP/BAN-002"), not
- * record IDs &mdash; so FIND(recordId, ...) silently misses every
- * legitimate update. ChildID equality on the Child Updates row is
- * direct and reliable.
- *
- * Returns null when there are no eligible updates yet &mdash; the kid
- * card renders without the digest row, no "nothing yet" placeholder.
- */
-async function fetchLatestUpdateForChild(
-  childId: string
-): Promise<ChildUpdateSnapshot | null> {
-  if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) return null;
-  if (!childId) return null;
-  try {
-    const safeChildId = childId.replace(/"/g, '\\"');
-    // Two paths to find a match, OR'd together:
-    //   1. {ChildID}="HSP/BAN-002" — the Child Updates row has its
-    //      own denormalized ChildID text field. All current writers
-    //      (admin updates, sponsor messages, sponsor update requests)
-    //      populate this at write time.
-    //   2. FIND(",HSP/BAN-002,", "," & ARRAYJOIN({Child}, ",") & ",")
-    //      — match via the Child linked-record field. The Children
-    //      table's primary field IS ChildID, so ARRAYJOIN of the
-    //      link yields a comma-separated string of ChildIDs.
-    //      Bracketing the search term and the joined string with
-    //      commas prevents prefix collisions (e.g., "HSP/BAN-2"
-    //      matching inside "HSP/BAN-20" if zero-padding ever drifts).
-    //
-    // Either path alone would catch the common case. OR-ing them is
-    // the future-proof play: rows created by a non-current writer
-    // (Airtable UI, future code paths, data import) still match
-    // through the link field even if they leave ChildID empty.
-    const formula = encodeURIComponent(
-      `AND({VisibleToSponsor}=TRUE(), NOT({PublishedAt}=BLANK()), OR({ChildID}="${safeChildId}", FIND("," & "${safeChildId}" & ",", "," & ARRAYJOIN({Child}, ",") & ",")))`
-    );
-    const url =
-      `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(
-        CHILD_UPDATES_TABLE
-      )}` +
-      `?filterByFormula=${formula}` +
-      `&sort%5B0%5D%5Bfield%5D=PublishedAt&sort%5B0%5D%5Bdirection%5D=desc` +
-      `&maxRecords=1`;
-    const res = await fetch(url, {
-      headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` },
-      cache: 'no-store',
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
-    const record = data.records?.[0];
-    if (!record) return null;
-    const f = record.fields || {};
-    // Prefer the explicit Title; fall back to PositiveHighlight or
-    // Summary so kid cards still get a useful one-liner from older
-    // updates that didn't fill in Title.
-    const title =
-      (f.Title as string | undefined) ||
-      (f.PositiveHighlight as string | undefined) ||
-      (f.Summary as string | undefined) ||
-      'A note from the campus';
-    const publishedAt = f.PublishedAt as string | undefined;
-    if (!publishedAt) return null;
-    const photo = Array.isArray(f.Photos)
-      ? (f.Photos as Array<{ url: string }>)
-      : undefined;
-    return {
-      title,
-      publishedAt,
-      photoUrl: photo?.[0]?.url,
-    };
-  } catch {
-    return null;
-  }
 }
 
 async function getViewerEmail(): Promise<string | null> {
@@ -153,97 +71,44 @@ async function getViewerEmail(): Promise<string | null> {
   }
 }
 
-const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID || '';
-const AIRTABLE_API_KEY = process.env.AIRTABLE_API_KEY || '';
-const SPONSORSHIPS_TABLE = process.env.AIRTABLE_SPONSORSHIPS_TABLE || 'Sponsorships';
-const CHILDREN_TABLE = process.env.AIRTABLE_CHILDREN_TABLE || 'Children';
-
+/**
+ * Pull all active/holder sponsorships for this viewer&rsquo;s email
+ * from Postgres, hydrated with each linked kid&rsquo;s display fields.
+ * The JOIN shape from queries.ts is flattened here into the
+ * SponsorshipRow shape the page&rsquo;s render code expects.
+ */
 async function fetchSponsorshipsForEmail(email: string): Promise<SponsorshipRow[]> {
-  if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) return [];
-  const safe = email.toLowerCase().replace(/"/g, '\\"');
-  const formula = encodeURIComponent(
-    `AND(LOWER({SponsorEmail})="${safe}", OR({Status}="Active",{Status}="Holder"))`
-  );
   try {
-    const res = await fetch(
-      `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(
-        SPONSORSHIPS_TABLE
-      )}?filterByFormula=${formula}&pageSize=100`,
-      { headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` }, cache: 'no-store' }
-    );
-    if (!res.ok) return [];
-    const data = await res.json();
-    const sponsorshipRecords: Array<{
-      id: string;
-      fields: {
-        SponsorCode?: string;
-        Status?: string;
-        MonthlyAmount?: number;
-        SponsorshipStartDate?: string;
-        Children?: string[];
-        ChildDisplayName?: string;
-        StripeSubscriptionID?: string;
+    const rows = await getViewerSponsorships(email);
+    return rows.map(r => {
+      const monthlyAmount = Number(r.monthlyAmount ?? 0);
+      const monthlyOrHolder: 'monthly' | 'holder' =
+        r.status === 'Active' && monthlyAmount > 0 ? 'monthly' : 'holder';
+      const displayName =
+        r.childDisplayName || r.childFirstName || 'A kid at the campus';
+      const firstName =
+        r.childFirstName || displayName.split(' ')[0] || 'them';
+      return {
+        recordId: r.sponsorshipId,
+        sponsorCode: r.sponsorCode ?? '',
+        status: r.status ?? '',
+        monthlyAmount,
+        monthlyOrHolder,
+        startDate: r.sponsorshipStartDate ?? undefined,
+        child: {
+          recordId: r.childRecordId ?? '',
+          childId: r.childIdLegacy ?? '',
+          shirtNumber:
+            typeof r.childShirtNumber === 'number'
+              ? r.childShirtNumber
+              : undefined,
+          displayName,
+          firstName,
+          photoUrl: r.childPhotoUrl ?? undefined,
+          departed: !!r.childDepartedAt,
+        },
       };
-    }> = data.records || [];
-
-    // Hydrate each sponsorship with its linked Child record in
-    // parallel. Previously this used a serial for-loop, which made
-    // /me wait ~150 ms per kid in series — a 6-kid sponsor paid
-    // ~900 ms of round-trip time just for child lookups. Promise.all
-    // collapses that to one round-trip&rsquo;s wall-clock latency.
-    const rows: SponsorshipRow[] = await Promise.all(
-      sponsorshipRecords.map(async sp => {
-        const f = sp.fields;
-        const childRecordId = f.Children?.[0];
-        let childInfo = {
-          recordId: childRecordId || '',
-          // Falls back to the Sponsorship row's ChildID for cases
-          // where we can't fetch the linked Children record; the
-          // row stores a copy via a denormalized lookup.
-          childId: (f as { ChildID?: string }).ChildID || '',
-          shirtNumber: undefined as number | undefined,
-          displayName: f.ChildDisplayName || 'A kid at the campus',
-          firstName: (f.ChildDisplayName || '').split(' ')[0] || 'them',
-          photoUrl: undefined as string | undefined,
-          departed: false,
-        };
-        if (childRecordId) {
-          try {
-            const childRes = await fetch(
-              `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(
-                CHILDREN_TABLE
-              )}/${childRecordId}`,
-              { headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` }, cache: 'no-store' }
-            );
-            if (childRes.ok) {
-              const c = await childRes.json();
-              const cf = c.fields || {};
-              childInfo = {
-                recordId: c.id,
-                childId: (cf.ChildID as string) || childInfo.childId,
-                shirtNumber: typeof cf.ShirtNumber === 'number' ? cf.ShirtNumber : undefined,
-                displayName: cf.DisplayName || cf.FirstName || childInfo.displayName,
-                firstName: cf.FirstName || childInfo.firstName,
-                photoUrl: cf.ProfilePhoto?.[0]?.url,
-                departed: !!cf.DepartedAt,
-              };
-            }
-          } catch {}
-        }
-        const monthlyOrHolder: 'monthly' | 'holder' =
-          f.Status === 'Active' && (f.MonthlyAmount || 0) > 0 ? 'monthly' : 'holder';
-        return {
-          recordId: sp.id,
-          sponsorCode: f.SponsorCode || '',
-          status: f.Status || '',
-          monthlyAmount: typeof f.MonthlyAmount === 'number' ? f.MonthlyAmount : 0,
-          monthlyOrHolder,
-          startDate: f.SponsorshipStartDate,
-          child: childInfo,
-        };
-      })
-    );
-    return rows;
+    });
   } catch {
     return [];
   }
@@ -292,7 +157,14 @@ export default async function MePage() {
   // leaves that card without a digest line and renders normally.
   await Promise.all(
     rows.map(async r => {
-      r.latestUpdate = await fetchLatestUpdateForChild(r.child.childId);
+      try {
+        r.latestUpdate = await getLatestUpdateForChild({
+          id: r.child.recordId,
+          childId: r.child.childId,
+        });
+      } catch {
+        r.latestUpdate = null;
+      }
     })
   );
 
