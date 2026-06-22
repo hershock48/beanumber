@@ -217,7 +217,7 @@ export async function sendSponsorWelcomeEmail(
   const html = wrapTransactionalEmail(`
     <p style="margin-top: 0;">Hey ${firstName},</p>
 
-    <p>Your sponsorship of ${childName} is active. That means ${childName} goes to school at the YDO campus, eats two meals a day, and has the on-site clinic when they need it.</p>
+    <p>Your sponsorship of ${childName} is active. That means ${childName} goes to school at the campus, eats two meals a day, and has the on-site clinic when they need it.</p>
 
     ${pageLine}
 
@@ -697,7 +697,7 @@ export async function sendRecurringDonationThankYouEmail(
     : 'beanumber.org';
 
   const bodyMiddle = isSponsor
-    ? `<p>Your monthly sponsorship of $${formattedAmount} was processed on ${dateStr}. That keeps ${childName} in school at the YDO campus, eating two meals a day, with the on-site clinic when they need it.</p>
+    ? `<p>Your monthly sponsorship of $${formattedAmount} was processed on ${dateStr}. That keeps ${childName} in school at the campus, eating two meals a day, with the on-site clinic when they need it.</p>
 
     <p>${childName === 'your child' ? 'Your kid&rsquo;s' : `${childName}&rsquo;s`} page at <a href="${childUrl}" style="color: #D4A843;">${childUrlLabel}</a> is your place for them. When something new lands &mdash; a photo, a letter, a note from the teachers &mdash; I&rsquo;ll email you so you know to look. If you ever can&rsquo;t get back to the page, or you need to change or cancel your monthly for any reason, reply to this email or write me at <a href="mailto:Kevin@beanumber.org" style="color: #D4A843;">Kevin@beanumber.org</a> and I&rsquo;ll take care of it.</p>`
     : `<p>Your monthly donation of $${formattedAmount} was processed on ${dateStr}. It goes to the same place as last month: a six-acre campus in Northern Uganda with a school built for 380 kids, a medical clinic that has treated 700+ patients, and vocational training where 60 women are learning trades.</p>

@@ -710,7 +710,7 @@ export default function ShirtsPageContent() {
           <p className="text-lg text-[#777] max-w-xl mx-auto leading-relaxed">
             Heavyweight cotton, screen-printed, handmade to order. Every
             Shirt ships with a unique Number pressed on the back &mdash;
-            and that Number is matched to a real Child at the YDO campus
+            and that Number is matched to a real Child at the campus
             in Northern Uganda.
           </p>
         </div>
@@ -737,7 +737,7 @@ export default function ShirtsPageContent() {
             </h2>
             <p className="text-[#777] leading-relaxed max-w-lg mx-auto">
               Every Shirt carries a unique Number connected to a real Child in Northern Uganda.
-              $25 starts their year at the YDO campus &mdash; school, meals, medical care.
+              $25 starts their year at the campus &mdash; school, meals, medical care.
               When the Shirt arrives, come here, enter your Number, and meet them.
               $25/month finishes their year and keeps you in their story.
             </p>
@@ -759,11 +759,11 @@ export default function ShirtsPageContent() {
             {[
               {
                 q: 'What actually happens when I buy a Shirt?',
-                a: 'You pick your color and size, and we ship you a hand-printed Shirt with a unique Number pressed on the back. That Number belongs to a real Child enrolled in our program in Northern Uganda. When the Shirt arrives, you flip it over, read your Number off the back, come back to the site, enter it, and meet them: their name, their face, their story. $25 supports school, meals, and medical care at the YDO campus. $25/month keeps you in their story all year: a monthly campus newsletter, photos of your matched Child, a handwritten letter from them, and a year-end report card.',
+                a: 'You pick your color and size, and we ship you a hand-printed Shirt with a unique Number pressed on the back. That Number belongs to a real Child enrolled in our program in Northern Uganda. When the Shirt arrives, you flip it over, read your Number off the back, come back to the site, enter it, and meet them: their name, their face, their story. $25 supports school, meals, and medical care at the campus. $25/month keeps you in their story all year: a monthly campus newsletter, photos of your matched Child, a handwritten letter from them, and a year-end report card.',
               },
               {
                 q: 'Where does the $25 actually go?',
-                a: 'Your $25/month supports the YDO campus where your matched child goes to school, eats two meals a day, and gets medical care through the on-site clinic. The campus runs on the combined support of every sponsor — that\'s what also keeps the 60 women in vocational training, the medical outreach that has served 700+ patients, and the construction apprenticeships going. You\'re not paying line items on one child\'s bill. You\'re supporting the ecosystem that keeps them in school.',
+                a: 'Your $25/month supports the campus where your matched child goes to school, eats two meals a day, and gets medical care through the on-site clinic. The campus runs on the combined support of every sponsor — that\'s what also keeps the 60 women in vocational training, the medical outreach that has served 700+ patients, and the construction apprenticeships going. You\'re not paying line items on one child\'s bill. You\'re supporting the ecosystem that keeps them in school.',
               },
               {
                 q: 'Can I pick my Number?',

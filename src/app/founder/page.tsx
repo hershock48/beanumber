@@ -143,7 +143,7 @@ export default function Founder() {
             >
               Simon Peter Wilobo
             </h2>
-            <p className="text-sm text-[#999] uppercase tracking-wider mb-6">Founder &amp; Head of YDO &nbsp;&middot;&nbsp; Omoro District, Northern Uganda</p>
+            <p className="text-sm text-[#999] uppercase tracking-wider mb-6">Founder &amp; Head of Youth Development Organisation Uganda &nbsp;&middot;&nbsp; Omoro District, Northern Uganda</p>
 
             <p className="text-[#555] leading-relaxed text-lg">
               Simon is Acholi. He grew up in Northern Uganda during the LRA conflict, in the same generation whose childhoods the war swallowed, the same years tens of thousands of Acholi children were abducted and turned into soldiers. The rest of the world eventually stopped watching. Simon didn&rsquo;t have that option; this was home. He came out the other side determined to rebuild what had been broken, not through an outside organization but from within his own community.

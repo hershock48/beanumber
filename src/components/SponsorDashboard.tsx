@@ -896,7 +896,7 @@ export function SponsorDashboard({ sponsorCode, email }: SponsorDashboardProps) 
                   />
                 </div>
                 <p className="text-xs text-[#aaa] mt-5">
-                  ${sponsorship.monthlyAmount}/mo supports breakfast and lunch at the campus, school fees, basic medical care, and mentorship through the YDO team.
+                  ${sponsorship.monthlyAmount}/mo supports breakfast and lunch at the campus, school fees, basic medical care, and mentorship through the campus team.
                 </p>
               </>
             );
@@ -961,7 +961,7 @@ export function SponsorDashboard({ sponsorCode, email }: SponsorDashboardProps) 
             <div className="bg-[#FFF8F0] border border-[#e8e0d4] p-4 text-sm text-[#444]">
               <p className="font-medium text-[#0d0d0d] mb-1">Request submitted.</p>
               <p className="text-[#666]">
-                Our team on the ground at YDO will put together a fresh update about {firstName}.
+                Our team on the ground will put together a fresh update about {firstName}.
                 You&rsquo;ll see it here when it&rsquo;s ready.
               </p>
             </div>
@@ -969,8 +969,8 @@ export function SponsorDashboard({ sponsorCode, email }: SponsorDashboardProps) 
             <>
               <p className="text-sm text-[#666] leading-relaxed mb-4">
                 {canRequestUpdate
-                  ? `Ask our field team at YDO for a new update about ${firstName}. Photos, a note from their teacher, how they're doing in class.`
-                  : `You can request your next update in ${daysUntilCanRequest} days. We space requests so the YDO team can focus on the kids.`}
+                  ? `Ask our field team for a new update about ${firstName}. Photos, a note from their teacher, how they're doing in class.`
+                  : `You can request your next update in ${daysUntilCanRequest} days. We space requests so the team can focus on the kids.`}
               </p>
               <button
                 onClick={handleRequestUpdate}

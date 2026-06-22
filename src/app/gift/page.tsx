@@ -6,7 +6,7 @@ import { BANFooter } from '@/components/BANFooter';
 export const metadata: Metadata = {
   title: 'Gift a Sponsorship | Be A Number',
   description:
-    'Sponsor a child in someone else’s honor. They meet a real kid at the YDO campus in Northern Uganda — a name, a face, a story. No pressure to continue, just an invitation.',
+    'Sponsor a child in someone else’s honor. They meet a real kid at the campus in Northern Uganda — a name, a face, a story. No pressure to continue, just an invitation.',
 };
 
 export default function GiftLandingPage() {
@@ -24,7 +24,7 @@ export default function GiftLandingPage() {
             Give someone a child to know.
           </h1>
           <p className="text-lg text-[#666] max-w-2xl mx-auto leading-relaxed">
-            A real kid at the YDO campus in Northern Uganda. A name, a face, a year you walk through together.
+            A real kid at the campus in Northern Uganda. A name, a face, a year you walk through together.
             Choose how it arrives.
           </p>
         </div>
@@ -45,7 +45,7 @@ export default function GiftLandingPage() {
               Gift a sponsorship.
             </h2>
             <p className="text-[#666] leading-relaxed mb-6">
-              $25 supports a child&rsquo;s first month at the YDO campus. The person you&rsquo;re gifting to
+              $25 supports a child&rsquo;s first month at the campus. The person you&rsquo;re gifting to
               gets an email introducing them to their matched child. They can stay at $25/month if they want
               to &mdash; entirely their choice, no obligation.
             </p>

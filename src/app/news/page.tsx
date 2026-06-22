@@ -27,11 +27,11 @@ export const revalidate = 0;
 export const metadata: Metadata = {
   title: 'Campus news | Be A Number',
   description:
-    'Monthly updates from the YDO campus in Omoro District, Northern Uganda — what the school, clinic, and kids are doing this month.',
+    'Monthly updates from the campus in Omoro District, Northern Uganda — what the school, clinic, and kids are doing this month.',
   openGraph: {
     title: 'Campus news | Be A Number',
     description:
-      'Monthly updates from the YDO campus in Omoro District, Northern Uganda.',
+      'Monthly updates from the campus in Omoro District, Northern Uganda.',
   },
 };
 
@@ -91,7 +91,7 @@ export default async function NewsPage() {
             What&rsquo;s happening on the ground.
           </h1>
           <p className="text-lg text-[#555] leading-relaxed">
-            One letter a month from Kevin and the YDO team in Omoro
+            One letter a month from Kevin and the team in Omoro
             District. The school, the clinic, the cooks, the kids
             &mdash; what&rsquo;s actually moving in Northern Uganda
             right now.

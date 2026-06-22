@@ -45,7 +45,7 @@ export default function Impact() {
       <section className="relative w-full h-[55vh] min-h-[440px] bg-[#0d0d0d]">
         <Image
           src="/images/impact-page/lead-image.jpg"
-          alt="The YDO campus in Northern Uganda"
+          alt="The campus in Northern Uganda"
           fill
           className="object-cover opacity-60"
           priority
@@ -62,7 +62,7 @@ export default function Impact() {
               Six acres. One year.<br />Here&rsquo;s what happened.
             </h1>
             <p className="text-[#FFF8F0]/70 text-lg max-w-xl">
-              Measured outcomes from the YDO campus in Omoro District, Northern Uganda.
+              Measured outcomes from the campus in Omoro District, Northern Uganda.
             </p>
           </div>
         </div>

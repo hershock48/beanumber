@@ -44,7 +44,7 @@ export function CampusNewsfeed({ newsletters }: CampusNewsfeedProps) {
           The monthly newsfeed.
         </h2>
         <p className="text-sm md:text-base text-[#777] mt-2 max-w-xl leading-relaxed">
-          One letter a month from Kevin and the YDO team. Tap any cover
+          One letter a month from Kevin and the team. Tap any cover
           to read it.
         </p>
       </div>

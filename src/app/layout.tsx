@@ -85,7 +85,7 @@ export default function RootLayout({
               url: 'https://www.beanumber.org',
               logo: 'https://www.beanumber.org/icon.svg',
               description:
-                'US 501(c)(3) funding education, meals, medical care, and mentorship for children at the YDO campus in Omoro District, Northern Uganda.',
+                'US 501(c)(3) funding education, meals, medical care, and mentorship for children at a school in Omoro District, Northern Uganda.',
               foundingDate: '2023',
               founder: {
                 '@type': 'Person',

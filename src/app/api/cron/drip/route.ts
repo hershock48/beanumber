@@ -248,14 +248,14 @@ function sponsorOnboardEmail(
           <p style="margin-top: 0;">Hey ${firstName},</p>
           <p>Your sponsorship is active, and I wanted to make sure you have everything you need to get started.</p>
           ${displayChildName
-            ? `<p>Your $25 a month supports school fees, two meals a day, and medical care at the YDO campus where ${displayChildName} goes to school. For a lot of the kids on campus, those meals are the only ones they get all day, so this matters starting right now.</p>`
-            : `<p>Your $25 a month supports school fees, two meals a day, and medical care at the YDO campus where your matched child goes to school. For a lot of the kids on campus, those meals are the only ones they get all day, so this matters starting right now.</p>`
+            ? `<p>Your $25 a month supports school fees, two meals a day, and medical care at the campus where ${displayChildName} goes to school. For a lot of the kids on campus, those meals are the only ones they get all day, so this matters starting right now.</p>`
+            : `<p>Your $25 a month supports school fees, two meals a day, and medical care at the campus where your matched child goes to school. For a lot of the kids on campus, those meals are the only ones they get all day, so this matters starting right now.</p>`
           }
           ${firstNumber
             ? `<p><strong>${displayChildName ? `${displayChildName}’s` : 'Your'} page is at <a href="${childUrl}" style="color: #D4A843; font-weight: bold;">${childUrlLabel}</a>.</strong> Bookmark it. That&rsquo;s where updates, photos, and letters from the campus show up. Your browser remembers you after your first visit, so there&rsquo;s no separate login to keep track of.</p>`
             : `<p><strong>Updates, photos, and letters from the campus show up on your kid&rsquo;s page at <a href="${SITE_URL}" style="color: #D4A843; font-weight: bold;">beanumber.org</a>.</strong></p>`
           }
-          <p>If you ever want to write to ${displayChildName || 'your child'}, just reply to this email. The YDO team on the ground handles delivery and translation. And if you ever can&rsquo;t get back to your page, write me at <a href="mailto:Kevin@beanumber.org" style="color: #D4A843; font-weight: bold;">Kevin@beanumber.org</a> and I&rsquo;ll sort it out.</p>
+          <p>If you ever want to write to ${displayChildName || 'your child'}, just reply to this email. The team on the ground handles delivery and translation. And if you ever can&rsquo;t get back to your page, write me at <a href="mailto:Kevin@beanumber.org" style="color: #D4A843; font-weight: bold;">Kevin@beanumber.org</a> and I&rsquo;ll sort it out.</p>
           <p>Kevin</p>
         `),
       };
@@ -266,8 +266,8 @@ function sponsorOnboardEmail(
         html: wrapEmail(`
           <p style="margin-top: 0;">Hey ${firstName},</p>
           <p>Just wanted to give you a heads up on what to expect over the next few weeks.</p>
-          <p>The YDO team on the ground in Uganda sends regular updates from the campus. ${displayChildName ? `You&rsquo;ll hear about ${displayChildName} specifically` : 'You&rsquo;ll hear about your child specifically'}: what they&rsquo;re studying, how they&rsquo;re doing in class, sometimes a photo or a handwritten letter. Those updates show up on ${displayChildName ? `${displayChildName}&rsquo;s page` : 'your kid&rsquo;s page'} at <a href="${childUrl}" style="color: #D4A843; font-weight: bold;">${childUrlLabel}</a> and by email, and the first one usually comes within your first month.</p>
-          <p>If you want to write to ${displayChildName || 'your child'} yourself, go for it. Just reply to any email. The YDO team reads every note, translates when needed, and makes sure it actually gets to them.</p>
+          <p>The team on the ground in Uganda sends regular updates from the campus. ${displayChildName ? `You&rsquo;ll hear about ${displayChildName} specifically` : 'You&rsquo;ll hear about your child specifically'}: what they&rsquo;re studying, how they&rsquo;re doing in class, sometimes a photo or a handwritten letter. Those updates show up on ${displayChildName ? `${displayChildName}&rsquo;s page` : 'your kid&rsquo;s page'} at <a href="${childUrl}" style="color: #D4A843; font-weight: bold;">${childUrlLabel}</a> and by email, and the first one usually comes within your first month.</p>
+          <p>If you want to write to ${displayChildName || 'your child'} yourself, go for it. Just reply to any email. The team reads every note, translates when needed, and makes sure it actually gets to them.</p>
           <p>Kevin</p>
         `),
       };
@@ -304,7 +304,7 @@ function donorConvertEmail(
         html: wrapEmail(`
           <p style="margin-top: 0;">Hey ${firstName},</p>
           <p>I wanted to follow up and let you know where your donation actually went, because I think that matters.</p>
-          <p>It went to the YDO campus in Northern Uganda. One campus, one team on the ground. The budget supports school fees, meals, and medical care for the children there &mdash; you can know any of them by name. We&rsquo;re small on purpose, which means I can tell you exactly where your money ends up.</p>
+          <p>It went to the campus in Northern Uganda. One campus, one team on the ground. The budget supports school fees, meals, and medical care for the children there &mdash; you can know any of them by name. We&rsquo;re small on purpose, which means I can tell you exactly where your money ends up.</p>
           <p>Thank you for trusting us with it.</p>
           <p>Kevin</p>
         `),
@@ -398,7 +398,7 @@ function shirtSponsorEmail(
           <p style="margin-top: 0;">Hey ${firstName},</p>
           <p>You&rsquo;ve been sponsoring for about two weeks now, and I wanted to give you a picture of what that looks like on the ground.</p>
           <p>Your $25 this month went toward school fees, breakfast and lunch every day, and a nurse on campus whenever the kids needed one. That&rsquo;s what sponsorship looks like in practice, and it happens every month you&rsquo;re here.</p>
-          <p>Your first update from the campus should be coming soon. The YDO team sends photos, report cards, and sometimes handwritten letters from the kids, and they show up on your kid's page at <a href="${SITE_URL}" style="color: #D4A843; font-weight: bold;">beanumber.org</a> and by email.</p>
+          <p>Your first update from the campus should be coming soon. The team sends photos, report cards, and sometimes handwritten letters from the kids, and they show up on your kid's page at <a href="${SITE_URL}" style="color: #D4A843; font-weight: bold;">beanumber.org</a> and by email.</p>
           <p>Kevin</p>
         `),
       };
@@ -435,7 +435,7 @@ function monthlyDonorEmail(
         html: wrapEmail(`
           <p style="margin-top: 0;">Hey ${firstName},</p>
           <p>I wanted to reach out and let you know where your monthly donation goes.</p>
-          <p>It goes to the YDO campus in Northern Uganda. One campus, one team on the ground. We built a school for 380 kids, a medical clinic that has treated more than 700 patients, and vocational programs where 60 women are learning trades. Your gift each month supports meals for kids who might not eat otherwise, school fees that keep them in class, and a medical clinic that serves the whole community.</p>
+          <p>It goes to the campus in Northern Uganda. One campus, one team on the ground. We built a school for 380 kids, a medical clinic that has treated more than 700 patients, and vocational programs where 60 women are learning trades. Your gift each month supports meals for kids who might not eat otherwise, school fees that keep them in class, and a medical clinic that serves the whole community.</p>
           <p>I&rsquo;ll keep you in the loop on what&rsquo;s happening at the campus.</p>
           <p>Kevin</p>
         `),

@@ -41,7 +41,7 @@ export default function GiftSuccessPage() {
         </div>
 
         <p className="text-sm text-[#888] leading-relaxed mb-8">
-          On behalf of the team at the YDO campus &mdash; thank you. This gift just gave a child
+          On behalf of the team at the campus &mdash; thank you. This gift just gave a child
           their first month of school, meals, and medical care.
         </p>
 

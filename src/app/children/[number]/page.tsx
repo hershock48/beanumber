@@ -886,18 +886,18 @@ export async function generateMetadata({ params }: ChildPageProps) {
   return {
     title: 'Be A Number · Meet your child',
     description:
-      'A real Child at YDO in Gulu, Uganda. Enter your Shirt Number to meet them and keep their story going for $25/month.',
+      'A real Child at the campus in Northern Uganda. Enter your Shirt Number to meet them and keep their story going for $25/month.',
     openGraph: {
       title: 'Be A Number',
       description:
-        'A real Child at YDO in Gulu, Uganda. Enter your Shirt Number to meet them.',
+        'A real Child at the campus in Northern Uganda. Enter your Shirt Number to meet them.',
       images: undefined,
     },
     twitter: {
       card: 'summary',
       title: 'Be A Number',
       description:
-        'A real Child at YDO in Gulu, Uganda. Enter your Shirt Number to meet them.',
+        'A real Child at the campus in Northern Uganda. Enter your Shirt Number to meet them.',
     },
   };
 }

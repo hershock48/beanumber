@@ -968,7 +968,7 @@ async function sendShirtConfirmationEmail(orderData: {
               <p>This one ships with <strong>#${orderData.shirtNumber || ''}</strong> pressed on the back &mdash; the same number you already know, matched to ${orderData.childDisplayName || 'your child'}. Free shipping, no new sponsorship started, your monthly is unchanged.</p>
     `
     : `
-              <p>When it arrives, look at the back of the shirt. There&rsquo;s a number pressed below the main design, and that number belongs to a real child at the YDO campus in Northern Uganda. Go to <a href="${siteUrl}" style="color: #D4A843; font-weight: bold;">beanumber.org</a>, enter your number, and meet them &mdash; their name, their face, their story.</p>
+              <p>When it arrives, look at the back of the shirt. There&rsquo;s a number pressed below the main design, and that number belongs to a real child at the campus in Northern Uganda. Go to <a href="${siteUrl}" style="color: #D4A843; font-weight: bold;">beanumber.org</a>, enter your number, and meet them &mdash; their name, their face, their story.</p>
               <p>Your $25 today supports school, meals, and medical care for the kids on that campus. The number on the shirt is your way in.</p>
     `;
 
@@ -981,7 +981,7 @@ async function sendShirtConfirmationEmail(orderData: {
 
               <p style="color: #D4A843; font-weight: bold; font-size: 13px; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 8px;">Your monthly sponsorship is active</p>
 
-              <p>You opted to keep sponsoring after this shirt, so another $25 will be charged each month going forward. It goes straight to school, meals, and medical care at the YDO campus.</p>
+              <p>You opted to keep sponsoring after this shirt, so another $25 will be charged each month going forward. It goes straight to school, meals, and medical care at the campus.</p>
 
               <p>Once your shirt ships and you&rsquo;ve had a chance to meet the child on the back, I&rsquo;ll send you your sponsor code and portal access. That&rsquo;s where updates, photos, and letters will live going forward.</p>
 
@@ -1182,7 +1182,7 @@ async function sendGiftCardEmail(data: {
         </h1>
 
         <p style="text-align: center; color: #777; margin: 0 0 28px 0; font-size: 15px;">
-          A real kid at the YDO campus in Northern Uganda.<br>
+          A real kid at the campus in Northern Uganda.<br>
           Hey ${escapeHtml(recipientFirst)} — they&rsquo;re waiting for you to meet them.
         </p>
 
@@ -1288,7 +1288,7 @@ async function sendGifterConfirmationEmail(data: {
         </p>
 
         <p>
-          On behalf of the team at the YDO campus &mdash; thank you. This is the kind of gift
+          On behalf of the team at the campus &mdash; thank you. This is the kind of gift
           we don&rsquo;t take lightly.
         </p>
 
@@ -1564,7 +1564,7 @@ async function sendSponsorWelcomeEmail(data: {
             <body style="font-family: Georgia, 'Times New Roman', serif; line-height: 1.7; color: #333; max-width: 560px; margin: 0 auto; padding: 30px 20px;">
               <p style="margin-top: 0;">Hey ${firstName},</p>
 
-              <p>You're officially sponsoring <strong>${data.childDisplayName}</strong>. Your $${data.amount.toFixed(2)}/month supports the YDO campus where they go to school, eat two meals a day, and get medical care.</p>
+              <p>You're officially sponsoring <strong>${data.childDisplayName}</strong>. Your $${data.amount.toFixed(2)}/month supports the campus where they go to school, eat two meals a day, and get medical care.</p>
 
               <p><strong>${data.childDisplayName}'s page is at <a href="${childUrl}" style="color: #D4A843;">${childUrlLabel}</a>.</strong> Bookmark it. That's where photos, updates, and letters from the campus will show up over the year, and where you can pick up gear with their number on it. Your browser will remember you, so most of the time you'll just land on your page when you visit.</p>
 

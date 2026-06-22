@@ -136,7 +136,7 @@ export async function POST(request: NextRequest) {
             currency: 'usd',
             product_data: {
               name: `Sponsor ${childDisplayName || 'a child'} / Be A Number`,
-              description: `Monthly sponsorship of ${childDisplayName || 'a child in Northern Uganda'}. Supports school, meals, medical care, and mentorship at the YDO campus. Cancel anytime.`,
+              description: `Monthly sponsorship of ${childDisplayName || 'a child in Northern Uganda'}. Supports school, meals, medical care, and mentorship at the campus. Cancel anytime.`,
             },
             unit_amount: SPONSORSHIP_AMOUNT * 100,
             recurring: { interval: 'month' },

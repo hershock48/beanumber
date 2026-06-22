@@ -396,8 +396,7 @@ function HomePageInner() {
                 specific kid&rsquo;s page is buying a shirt. */}
             <div className="mt-10 md:mt-12 text-center">
               <p className="text-base md:text-lg text-[#444] max-w-2xl mx-auto leading-relaxed">
-                These are real children at the YDO campus in Omoro District,
-                Northern Uganda.{' '}
+                These are real children at a small school in Northern Uganda.{' '}
                 <Link
                   href="/shirts"
                   className="text-[#D4A843] font-bold hover:underline whitespace-nowrap"

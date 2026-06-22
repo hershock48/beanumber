@@ -157,14 +157,14 @@ function ShippingConfirmation({
 
         <p className="text-lg text-[#555] leading-relaxed max-w-md mx-auto mb-4">
           {multi
-            ? <>Expect them within 5&ndash;7 business days. When they arrive, look at the back of each shirt &mdash; there&rsquo;s a number pressed below the main design, and every number belongs to a real child at the YDO campus in Northern Uganda.</>
-            : <>Expect it within 5&ndash;7 business days. When it arrives, look at the back of the shirt &mdash; there&rsquo;s a number pressed below the main design, and that number belongs to a real child at the YDO campus in Northern Uganda.</>}
+            ? <>Expect them within 5&ndash;7 business days. When they arrive, look at the back of each shirt &mdash; there&rsquo;s a number pressed below the main design, and every number belongs to a real child at the campus in Northern Uganda.</>
+            : <>Expect it within 5&ndash;7 business days. When it arrives, look at the back of the shirt &mdash; there&rsquo;s a number pressed below the main design, and that number belongs to a real child at the campus in Northern Uganda.</>}
         </p>
 
         <p className="text-[#777] leading-relaxed max-w-md mx-auto">
           {alreadySponsoring
-            ? 'Your purchase and your sponsorship both support school, meals, and medical care at the YDO campus. You just started something real.'
-            : 'Every shirt supports school, meals, and medical care at the YDO campus in Northern Uganda. You just started something real.'}
+            ? 'Your purchase and your sponsorship both support school, meals, and medical care at the campus. You just started something real.'
+            : 'Every shirt supports school, meals, and medical care at the campus in Northern Uganda. You just started something real.'}
         </p>
 
         {shirt && (
@@ -190,7 +190,7 @@ function ShippingConfirmation({
           </h3>
           <p className="text-[#666] text-sm leading-relaxed mb-3">
             Another $25 will be charged each month going forward, and it
-            supports school, meals, and medical care at the YDO campus
+            supports school, meals, and medical care at the campus
             in Northern Uganda.
           </p>
           <p className="text-[#666] text-sm leading-relaxed mb-3">

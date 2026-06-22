@@ -64,7 +64,7 @@ export default function RepPageContent() {
         <div className="relative w-full h-[50vh] min-h-[400px] bg-[#0d0d0d]">
           <Image
             src="/images/homepage/hero-community-group.jpg"
-            alt="Community members gathered at the YDO campus in Northern Uganda"
+            alt="Community members gathered at the campus in Northern Uganda"
             fill
             className="object-cover opacity-60"
             priority
@@ -168,7 +168,7 @@ export default function RepPageContent() {
                 4. Go
               </h3>
               <p className="text-[#555] leading-relaxed">
-                {TRIP_DATE}. You walk onto the YDO campus and the kids already know your
+                {TRIP_DATE}. You walk onto the campus and the kids already know your
                 name because Kevin told them you were coming. You sit in their classrooms,
                 eat meals together, play football on the same pitch they play on every day.
                 You see what your network built, in person, with the children standing right
@@ -185,7 +185,7 @@ export default function RepPageContent() {
           <div className="relative aspect-[4/3] bg-[#f5f0e8] overflow-hidden">
             <Image
               src="/images/story/kids-hugging.png"
-              alt="Children at the YDO campus"
+              alt="Children at the campus"
               fill
               className="object-cover"
             />
@@ -400,7 +400,7 @@ export default function RepPageContent() {
           <div className="relative w-full aspect-[21/9] bg-[#f5f0e8] overflow-hidden">
             <Image
               src="/images/homepage/hero-community-group.jpg"
-              alt="Community members gathered at the YDO campus"
+              alt="Community members gathered at the campus"
               fill
               className="object-cover"
             />
