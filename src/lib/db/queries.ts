@@ -14,7 +14,7 @@
  *     strings.
  */
 
-import { and, desc, eq, ilike, isNotNull, or, sql } from 'drizzle-orm';
+import { and, desc, eq, isNotNull, or, sql } from 'drizzle-orm';
 import { db } from './client';
 import {
   children,
@@ -121,6 +121,7 @@ export async function getViewerSponsorshipForChild(
   child: { id: string; childId: string }
 ): Promise<ViewerSponsorshipSummary | null> {
   if (!viewerEmail || !child.id) return null;
+  const emailLower = viewerEmail.toLowerCase();
   const rows = await db
     .select({
       status: sponsorships.status,
@@ -128,11 +129,12 @@ export async function getViewerSponsorshipForChild(
       monthlyAmount: sponsorships.monthlyAmount,
       sponsorshipStartDate: sponsorships.sponsorshipStartDate,
       childRevealedAt: sponsorships.childRevealedAt,
+      createdAt: sponsorships.createdAt,
     })
     .from(sponsorships)
     .where(
       and(
-        ilike(sponsorships.sponsorEmail, viewerEmail),
+        sql`lower(${sponsorships.sponsorEmail}) = ${emailLower}`,
         or(
           eq(sponsorships.status, 'Active'),
           eq(sponsorships.status, 'Holder')
@@ -142,6 +144,13 @@ export async function getViewerSponsorshipForChild(
           eq(sponsorships.childIdLegacy, child.childId)
         )
       )
+    )
+    // Prefer Active over Holder if a user has both rows for the same
+    // kid (rare but real during a Holder→Active claim transition).
+    // Then newest first.
+    .orderBy(
+      sql`case when ${sponsorships.status} = 'Active' then 0 else 1 end`,
+      desc(sponsorships.createdAt)
     )
     .limit(1);
   const row = rows[0];
@@ -165,6 +174,12 @@ export async function getViewerSponsorshipForChild(
  */
 export async function getViewerSponsorships(viewerEmail: string) {
   if (!viewerEmail) return [];
+  const emailLower = viewerEmail.toLowerCase();
+  // LEFT JOIN on children.id (UUID) catches sponsorships with a
+  // resolved FK. We COALESCE in a second left-join via legacy ChildID
+  // text so transition-state rows (legacy populated, UUID NULL)
+  // still render the kid card. SQL is hand-rolled because Drizzle
+  // doesn&rsquo;t support COALESCE across two joins ergonomically.
   return db
     .select({
       sponsorshipId: sponsorships.id,
@@ -174,19 +189,23 @@ export async function getViewerSponsorships(viewerEmail: string) {
       sponsorshipStartDate: sponsorships.sponsorshipStartDate,
       stripeSubscriptionId: sponsorships.stripeSubscriptionId,
       childRevealedAt: sponsorships.childRevealedAt,
-      childRecordId: children.id,
-      childIdLegacy: children.childId,
-      childFirstName: children.firstName,
-      childDisplayName: children.displayName,
-      childPhotoUrl: children.profilePhotoUrl,
-      childShirtNumber: children.shirtNumber,
-      childDepartedAt: children.departedAt,
+      childRecordId: sql<string | null>`coalesce(${children.id}, child_legacy.id)`,
+      childIdLegacy: sql<string | null>`coalesce(${children.childId}, child_legacy.child_id)`,
+      childFirstName: sql<string | null>`coalesce(${children.firstName}, child_legacy.first_name)`,
+      childDisplayName: sql<string | null>`coalesce(${children.displayName}, child_legacy.display_name)`,
+      childPhotoUrl: sql<string | null>`coalesce(${children.profilePhotoUrl}, child_legacy.profile_photo_url)`,
+      childShirtNumber: sql<number | null>`coalesce(${children.shirtNumber}, child_legacy.shirt_number)`,
+      childDepartedAt: sql<Date | null>`coalesce(${children.departedAt}, child_legacy.departed_at)`,
     })
     .from(sponsorships)
     .leftJoin(children, eq(children.id, sponsorships.childId))
+    .leftJoin(
+      sql`children as child_legacy`,
+      sql`child_legacy.child_id = ${sponsorships.childIdLegacy}`
+    )
     .where(
       and(
-        ilike(sponsorships.sponsorEmail, viewerEmail),
+        sql`lower(${sponsorships.sponsorEmail}) = ${emailLower}`,
         or(
           eq(sponsorships.status, 'Active'),
           eq(sponsorships.status, 'Holder')
@@ -325,10 +344,11 @@ export async function getLatestUpdateForChild(
 // ─── Donors ──────────────────────────────────────────────────────
 
 export async function getDonorByEmail(email: string) {
+  const lowered = email.toLowerCase();
   const rows = await db
     .select()
     .from(donors)
-    .where(ilike(donors.email, email))
+    .where(sql`lower(${donors.email}) = ${lowered}`)
     .limit(1);
   return rows[0] ?? null;
 }

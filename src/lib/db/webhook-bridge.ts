@@ -186,6 +186,13 @@ export async function mirrorSponsorship(args: MirrorSponsorshipArgs) {
     childPgId = child?.id ?? null;
   }
 
+  // Status reflects the relationship reality, not the row template.
+  // A sponsorship with monthly_amount = 0 is a Holder (claimed the
+  // number, not paying monthly). The kind-derivation in queries.ts
+  // already maps Active+0 → 'holder' on the read side, but storing
+  // the correct status keeps the database honest for admin views.
+  const statusForRow = args.monthlyAmount > 0 ? 'Active' : 'Holder';
+
   if (!childPgId) {
     // Sponsorships.childId is nullable, but the schema would benefit
     // from at least a legacy id for debugging. Insert with NULL UUID,
@@ -198,7 +205,7 @@ export async function mirrorSponsorship(args: MirrorSponsorshipArgs) {
       childIdLegacy: args.childLegacyId ?? null,
       childDisplayName: args.childDisplayName ?? null,
       monthlyAmount: args.monthlyAmount,
-      status: 'Active',
+      status: statusForRow,
       stripeSubscriptionId: args.stripeSubscriptionId ?? null,
       sponsorshipStartDate: args.sponsorshipStartDate ?? null,
       childRevealedAt: args.revealedNow ? new Date() : null,
@@ -213,7 +220,7 @@ export async function mirrorSponsorship(args: MirrorSponsorshipArgs) {
     childIdLegacy: args.childLegacyId ?? null,
     childDisplayName: args.childDisplayName ?? null,
     monthlyAmount: args.monthlyAmount,
-    status: 'Active',
+    status: statusForRow,
     stripeSubscriptionId: args.stripeSubscriptionId ?? null,
     sponsorshipStartDate: args.sponsorshipStartDate ?? null,
     childRevealedAt: args.revealedNow ? new Date() : null,
@@ -321,6 +328,18 @@ export async function mirrorGiftChildAssignment(args: {
 }) {
   const child = await findChildByShirtNumber(args.shirtNumber);
   if (!child) return null;
+  // Only claim the kid if no one&rsquo;s already on it. A gift assignment
+  // arriving after a real buyer has already claimed the shirt MUST
+  // NOT overwrite the original buyer&rsquo;s identity — that would erase
+  // the relationship the brand mechanic depends on. The shirt was
+  // already assigned; the gift either arrived too late or to the
+  // wrong number, and a human needs to look at it.
+  if (child.shirtBuyerEmail || child.shirtBuyerName) {
+    console.warn(
+      `[pg-mirror] gift child assignment skipped: shirt #${args.shirtNumber} already has buyer ${child.shirtBuyerEmail}`
+    );
+    return child.id;
+  }
   await db
     .update(children)
     .set({

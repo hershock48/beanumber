@@ -5,6 +5,22 @@ import {
 } from '@/lib/db/queries';
 import type { Child } from '@/lib/db/schema';
 
+/**
+ * Map a cycle shirt number to its canonical kid (shirts > 53). Mirrors
+ * the formula in /children/[number]/page.tsx so the carousel and the
+ * kid page agree on what kid #67, #100, etc. show.
+ *
+ *   Era 1 (#54-150):  ((N - 54) % 52) + 2     → kid 2..53
+ *   Era 2 (#151+):    ((N - 151) % 53) + 1    → kid 1..53
+ *
+ * Returns null for #1-53 (no cycle).
+ */
+function canonicalShirtNumber(n: number): number | null {
+  if (n <= 53) return null;
+  if (n <= 150) return ((n - 54) % 52) + 2;
+  return ((n - 151) % 53) + 1;
+}
+
 // Never cache. The enrolled roster changes and we don't want the homepage grid
 // or the fallback child lookup serving stale data.
 export const dynamic = 'force-dynamic';
@@ -90,7 +106,26 @@ export async function GET(request: Request) {
           { status: 400 }
         );
       }
-      const child = await getChildByShirtNumber(num);
+      let child = await getChildByShirtNumber(num);
+      // Cycle-math fallback so the API mirrors the kid page: cycle
+      // shirts (e.g., #55, #100) resolve to their canonical kid.
+      // Without this, the carousel would 404 on cycle numbers while
+      // /children/55 renders fine, and the two surfaces would
+      // disagree on what shirt #N means.
+      if (!child) {
+        const canonicalNum = canonicalShirtNumber(num);
+        if (canonicalNum) {
+          const canonical = await getChildByShirtNumber(canonicalNum);
+          if (canonical) {
+            // Synthesize with the cycle shirt number as identity.
+            child = {
+              ...canonical,
+              shirtNumber: num,
+              childId: `HSP/BAN-${String(num).padStart(3, '0')}`,
+            };
+          }
+        }
+      }
       if (!child) {
         return NextResponse.json(
           { error: 'Child not found', child: null },

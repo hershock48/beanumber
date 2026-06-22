@@ -326,29 +326,42 @@ async function resolveBuyerContext(
  * {firstName}" — photos and short updates the YDO team batches each
  * term. Drafts and rejected records stay hidden via VisibleToSponsor.
  */
-async function getLatestChildUpdate(childRecordId: string): Promise<{
+async function getLatestChildUpdate(
+  child: { id: string; childId: string }
+): Promise<{
   title: string;
   content: string;
   photos: Array<{ url: string; filename?: string }>;
   updateDate?: string;
 } | null> {
-  if (!childRecordId) return null;
+  if (!child.id && !child.childId) return null;
   try {
+    // Dual-match on UUID + legacy ChildID so cycle records (which
+    // carry legacy ChildID HSP/BAN-NNN but no canonical UUID) still
+    // surface their canonical kid&rsquo;s updates. Order by publishedAt
+    // (actual publish event) not updateDate (editorial date) — two
+    // updates from the same field day can publish out of order, and
+    // the published date is what sponsors see.
     const rows = await db
       .select({
         title: childUpdatesTable.title,
         content: childUpdatesTable.content,
         photoUrls: childUpdatesTable.photoUrls,
+        publishedAt: childUpdatesTable.publishedAt,
         updateDate: childUpdatesTable.updateDate,
       })
       .from(childUpdatesTable)
       .where(
         and(
-          eq(childUpdatesTable.childId, childRecordId),
-          eq(childUpdatesTable.visibleToSponsor, true)
+          eq(childUpdatesTable.visibleToSponsor, true),
+          isNotNull(childUpdatesTable.publishedAt),
+          or(
+            child.id ? eq(childUpdatesTable.childId, child.id) : drizzleSql`false`,
+            eq(childUpdatesTable.childIdLegacy, child.childId)
+          )
         )
       )
-      .orderBy(desc(childUpdatesTable.updateDate))
+      .orderBy(desc(childUpdatesTable.publishedAt))
       .limit(1);
     const r = rows[0];
     if (!r) return null;
@@ -451,9 +464,14 @@ async function donorHasActiveSponsorship(donorRecordId: string): Promise<boolean
     return rows.length > 0;
   } catch (err) {
     console.warn('[children/page] Donor sponsorship check failed', err);
-    // Fail closed: if we can't check, don't show the claim card —
-    // better to under-prompt than to let a second-claim race in.
-    return true;
+    // Fail OPEN: when we can&rsquo;t check, show the claim card. A
+    // doubled CTA is recoverable; silently hiding the conversion
+    // ritual for new shirt+monthly buyers is not. The original
+    // &ldquo;fail closed&rdquo; pattern hid the card on any transient DB
+    // hiccup, which broke conversion under any latency spike. The
+    // claim API itself is idempotent on the back end, so a
+    // double-tap can&rsquo;t cause a double-claim race.
+    return false;
   }
 }
 
@@ -498,6 +516,13 @@ const getChildByShirtNumber = cache(async function getChildByShirtNumber(shirtNu
   try {
     let childRow = await getChildByShirtNumberFromDb(shirtNumber);
 
+    // Track whether the row came from real DB data or was synthesized
+    // via cycle math. Sponsorships are keyed to specific Children
+    // rows; a synthesized row has no real id and must NOT be
+    // UUID-matched against existing sponsorships (that would leak
+    // the canonical kid's sponsor onto every cycle shirt).
+    let isSynthesizedCycleRow = false;
+
     // Cycle-math fallback: if no Children row carries this shirt
     // number, derive the canonical kid via the hardcoded cycle
     // formula (see canonicalShirtNumber + core_model.md §2). Only
@@ -511,17 +536,21 @@ const getChildByShirtNumber = cache(async function getChildByShirtNumber(shirtNu
       if (canonicalNum) {
         const canonical = await getChildByShirtNumberFromDb(canonicalNum);
         if (canonical) {
-          // Synthesize a cycle-record row: canonical kid's data, but
-          // identity (id, shirt_number, child_id) stays bound to the
-          // requested cycle shirt number. The downstream adapter
-          // childToAirtableFields() reads these fields verbatim, so
-          // sponsorships/donations stay correctly tied to the cycle
-          // ChildID convention (HSP/BAN-NNN where NNN = shirt_number).
+          // Synthesize a cycle-record: canonical kid's data, but
+          // identity (shirt_number, child_id) stays bound to the
+          // requested cycle shirt number. The synthesized row has
+          // id='' so downstream sponsorship lookups do NOT match
+          // the canonical kid's UUID — only legacy ChildID matches
+          // count for cycle records. This is the privacy boundary:
+          // a sponsor of Isaiah (#15) must not be recognized on
+          // every cycle shirt that maps to #15 (#67, #119, …).
           childRow = {
             ...canonical,
+            id: '',
             shirtNumber: shirtNumber,
             childId: `HSP/BAN-${String(shirtNumber).padStart(3, '0')}`,
           };
+          isSynthesizedCycleRow = true;
         }
       }
     }
@@ -602,19 +631,27 @@ const getChildByShirtNumber = cache(async function getChildByShirtNumber(shirtNu
     // Fire the sponsorship lookup and cookie read in parallel.
     // The sponsorship call depends on childId but NOT on the cookie,
     // and the cookie read is pure I/O — no reason to serialize them.
+    //
+    // Synthesized cycle rows MUST NOT UUID-match against the
+    // canonical kid&rsquo;s actual sponsorships — that would render a
+    // canonical kid&rsquo;s sponsor as the recognized owner on every
+    // cycle shirt that maps to them. The legacy ChildID text match
+    // is the correct identity for cycle records (HSP/BAN-NNN where
+    // NNN is the shirt number, distinct from the canonical kid&rsquo;s
+    // own ChildID).
     let sponsorship: AirtableSponsorshipRecord['fields'] | null = null;
     const sponsorshipPromise = childId
       ? (async () => {
           try {
+            const childIdClause = eq(sponsorshipsTable.childIdLegacy, childId);
+            const where =
+              isSynthesizedCycleRow || !recordId
+                ? childIdClause
+                : or(childIdClause, eq(sponsorshipsTable.childId, recordId));
             const rows = await db
               .select()
               .from(sponsorshipsTable)
-              .where(
-                or(
-                  eq(sponsorshipsTable.childIdLegacy, childId),
-                  eq(sponsorshipsTable.childId, recordId)
-                )
-              )
+              .where(where)
               .orderBy(desc(sponsorshipsTable.createdAt))
               .limit(1);
             if (rows[0]) return sponsorshipToAirtableFields(rows[0], childRow);
@@ -1090,8 +1127,11 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
     stats: ReturnType<typeof computeSponsorStats>;
     latestChildUpdate: Awaited<ReturnType<typeof getLatestChildUpdate>>;
   } | null = null;
-  if (child.viewer_is_sponsor && child.record_id) {
-    const latestChildUpdate = await getLatestChildUpdate(child.record_id);
+  if (child.viewer_is_sponsor && (child.record_id || child.child_id)) {
+    const latestChildUpdate = await getLatestChildUpdate({
+      id: child.record_id,
+      childId: child.child_id,
+    });
     portalData = {
       stats: computeSponsorStats(child.sponsorship_start_date, child.monthly_amount ?? 25),
       latestChildUpdate,
