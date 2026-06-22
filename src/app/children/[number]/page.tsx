@@ -496,7 +496,35 @@ function canonicalShirtNumber(n: number): number | null {
 // so without cache() the page would hit Postgres twice per kid render.
 const getChildByShirtNumber = cache(async function getChildByShirtNumber(shirtNumber: number) {
   try {
-    const childRow = await getChildByShirtNumberFromDb(shirtNumber);
+    let childRow = await getChildByShirtNumberFromDb(shirtNumber);
+
+    // Cycle-math fallback: if no Children row carries this shirt
+    // number, derive the canonical kid via the hardcoded cycle
+    // formula (see canonicalShirtNumber + core_model.md §2). Only
+    // canonical kids #1–53 are materialized in Postgres; every
+    // higher number resolves at display time. This is the single
+    // most important branch — without it, /children/55 (and most
+    // numbers above 53) would 404 even though there's a real kid
+    // they cycle-resolve to.
+    if (!childRow) {
+      const canonicalNum = canonicalShirtNumber(shirtNumber);
+      if (canonicalNum) {
+        const canonical = await getChildByShirtNumberFromDb(canonicalNum);
+        if (canonical) {
+          // Synthesize a cycle-record row: canonical kid's data, but
+          // identity (id, shirt_number, child_id) stays bound to the
+          // requested cycle shirt number. The downstream adapter
+          // childToAirtableFields() reads these fields verbatim, so
+          // sponsorships/donations stay correctly tied to the cycle
+          // ChildID convention (HSP/BAN-NNN where NNN = shirt_number).
+          childRow = {
+            ...canonical,
+            shirtNumber: shirtNumber,
+            childId: `HSP/BAN-${String(shirtNumber).padStart(3, '0')}`,
+          };
+        }
+      }
+    }
 
     if (!childRow) {
       console.warn('[children/page] No child record found for shirt number', {
