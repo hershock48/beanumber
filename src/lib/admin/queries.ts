@@ -591,10 +591,26 @@ function rowToRosterKid(row: typeof children.$inferSelect): RosterKid {
   };
 }
 
+/**
+ * Cap on canonical shirt numbers. Anything past this is a cycle
+ * record (Trap 3.5 / core_model.md §2) — a shirt-number representation
+ * of a canonical kid, NOT a separate person. Cycle rows pollute the
+ * admin roster with duplicate, sparse profiles ("Aaron #12" vs
+ * "Aaron #116" — same kid, same data, but the cycle copy looks
+ * incomplete in the UI).
+ *
+ * Adjust upward only when YDO actually adds new on-campus kids past
+ * shirt #53. Until then this gate keeps the admin roster honest:
+ * one profile per real kid.
+ */
+const CANONICAL_ROSTER_MAX = 53;
+
 export async function getRoster(): Promise<RosterKid[]> {
   // Pull every canonical kid with a positive shirt number and a name.
   // Postgres rows are already canonical (the migrator deduplicated
-  // ghost copies) so no by-name dedup needed.
+  // ghost copies) so no by-name dedup needed. The shirt_number ≤ 53
+  // gate hides cycle records — they&rsquo;re display-only artifacts of
+  // the Batches cycle math, not separate people to manage.
   const rows = await db
     .select()
     .from(children)
@@ -606,6 +622,7 @@ export async function getRoster(): Promise<RosterKid[]> {
     const n = row.shirtNumber;
     if (!displayName) continue;
     if (typeof n !== 'number' || n < 1) continue;
+    if (n > CANONICAL_ROSTER_MAX) continue; // skip cycle records
     kids.push(rowToRosterKid(row));
   }
   // Alphabetical by display name — reads like a class roster.
