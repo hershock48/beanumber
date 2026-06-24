@@ -1546,6 +1546,10 @@ async function sendSponsorWelcomeEmail(data: {
 
   const fromEmail = process.env.SENDGRID_FROM_EMAIL || 'Kevin@beanumber.org';
   const firstName = data.name.split(' ')[0] || 'Friend';
+  // The kid is referred to by first name in the Surface 13 paragraph below;
+  // "Aaron Ouma Joseph's classroom" reads stiff, "Aaron's classroom" reads
+  // human. Display name stays for the formal references elsewhere.
+  const childFirstName = (data.childDisplayName || '').split(/\s+/)[0] || data.childDisplayName;
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.beanumber.org';
   // The kid's page is the sponsor's home base. No sponsor code shown \u2014
   // the browser remembers them via cookie, and the page itself has a
@@ -1566,11 +1570,15 @@ async function sendSponsorWelcomeEmail(data: {
 
               <p>You're officially sponsoring <strong>${data.childDisplayName}</strong>. Your $${data.amount.toFixed(2)}/month supports the campus where they go to school, eat two meals a day, and get medical care.</p>
 
+              <p>One thing happens fast on the other side of this. The minute you clicked the button, we sent a note to Simon on the campus. Tomorrow morning over there &mdash; they&rsquo;re hours ahead of us &mdash; Simon is going to tell ${childFirstName} they have a sponsor. They don&rsquo;t know your name yet. They&rsquo;re going to ask.</p>
+
+              <p style="background: #FFF8F0; border-left: 3px solid #D4A843; padding: 16px 20px; margin: 24px 0;"><strong>Reply to this email and tell us what you want ${childFirstName} to know.</strong> One sentence. Two. Whatever feels right. We&rsquo;ll pass it on.</p>
+
               <p><strong>${data.childDisplayName}'s page is at <a href="${childUrl}" style="color: #D4A843;">${childUrlLabel}</a>.</strong> Bookmark it. That's where photos, updates, and letters from the campus will show up over the year, and where you can pick up gear with their number on it. Your browser will remember you, so most of the time you'll just land on your page when you visit.</p>
 
-              <p>Here's what to expect from us: a monthly newsletter from the campus in Gulu, photos of ${data.childDisplayName} every few months, a handwritten letter from them once a year, and a year-end report card. You'll get an email each time something new lands on their page.</p>
+              <p>Here's what else to expect: a monthly newsletter from the campus in Gulu, photos of ${data.childDisplayName} every few months, a handwritten letter from them once a year, and a year-end report card. You'll get an email each time something new lands on their page.</p>
 
-              <p>If you ever can't get back into your page, or you want to write back, visit, change your monthly, or ask anything at all, reply to this email or write me at <a href="mailto:Kevin@beanumber.org" style="color: #D4A843;">Kevin@beanumber.org</a>. I read every one.</p>
+              <p>If you ever want to write back, visit, change your monthly, or ask anything at all, just reply. I read every one.</p>
 
               <p>Thanks for being in their corner,<br>
               <strong>Kevin</strong></p>

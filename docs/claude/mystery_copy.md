@@ -25,7 +25,7 @@ Fifteen words. The entire product.
    > The shirt is how you meet them. $25 a month is how you stay.
 
 3. **The reveal page CTA.** Full-bleed photo. Name above it. Three short blocks. A button. Nothing else.
-   > You know them now. Stay in their life.
+   > You know them now. They've been waiting for you. Stay in their life.
    >
    > $25 a month covers their school day: fees, lunch, the clinic when malaria hits.
    >

@@ -214,16 +214,24 @@ export async function sendSponsorWelcomeEmail(
     ? `<p><strong>${childName}'s page is at <a href="${childUrl}" style="color: #D4A843;">${childUrlLabel}</a>.</strong> Bookmark it. That's where photos, updates, and letters from the campus show up over the year, and where you can pick up gear with their number on it. Your browser remembers you, so most of the time you'll just land on their page when you visit.</p>`
     : `<p><strong>${childName}'s page lives at <a href="${childUrl}" style="color: #D4A843;">${childUrlLabel}</a></strong> — enter their number and you'll land right on it. Bookmark it. That's where photos, updates, and letters from the campus show up over the year. Your browser remembers you, so most of the time you'll just land on their page when you visit.</p>`;
 
+  // Kid by first name only in the Surface 13 paragraph — "Aaron's classroom"
+  // reads human; "Aaron Ouma Joseph's classroom" reads formal.
+  const childFirstName = (childName || '').split(/\s+/)[0] || childName;
+
   const html = wrapTransactionalEmail(`
     <p style="margin-top: 0;">Hey ${firstName},</p>
 
     <p>Your sponsorship of ${childName} is active. That means ${childName} goes to school at the campus, eats two meals a day, and has the on-site clinic when they need it.</p>
 
+    <p>One thing happens fast on the other side of this. The minute you clicked the button, we sent a note to Simon on the campus. Tomorrow morning over there &mdash; they&rsquo;re hours ahead of us &mdash; Simon is going to tell ${childFirstName} they have a sponsor. They don&rsquo;t know your name yet. They&rsquo;re going to ask.</p>
+
+    <p style="background: #FFF8F0; border-left: 3px solid #D4A843; padding: 16px 20px; margin: 24px 0;"><strong>Reply to this email and tell us what you want ${childFirstName} to know.</strong> One sentence. Two. Whatever feels right. We&rsquo;ll pass it on.</p>
+
     ${pageLine}
 
     <p>You'll also get a monthly campus newsletter from our team in Northern Uganda, photos of ${childName} every few months, a handwritten letter from them once a year, and a year-end report card.</p>
 
-    <p>If you ever can't get back to their page, or you want to write back, change your monthly, or ask anything at all, reply to this email or write me at <a href="mailto:Kevin@beanumber.org" style="color: #D4A843;">Kevin@beanumber.org</a>. I read every one.</p>
+    <p>If you ever want to write back, change your monthly, or ask anything else, just reply. I read every one.</p>
 
     <p>Kevin</p>
   `);

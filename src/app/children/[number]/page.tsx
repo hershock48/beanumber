@@ -1693,7 +1693,7 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
                   className="text-2xl text-[#0d0d0d] mb-4"
                   style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
                 >
-                  You know {firstName} now. Stay in their life.
+                  You know {firstName} now. They&rsquo;ve been waiting for you. Stay in their life.
                 </p>
 
                 <p className="text-[#555] leading-relaxed mb-4">
