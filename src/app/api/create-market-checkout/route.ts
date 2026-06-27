@@ -64,8 +64,19 @@ export async function POST(request: NextRequest) {
     const shirt = SHIRTS[shirtId]!;
     const origin = request.headers.get('origin') || 'https://www.beanumber.org';
 
+    // IMPORTANT: order_type is aliased to 'shirt' so the existing webhook
+    // path (src/app/api/webhooks/stripe/route.ts ~L1815) fires unmodified —
+    // creates the donation record, enrolls in shirt_nurture drip, etc.
+    // The webhook only branches on a fixed set of order_type values; adding
+    // a new 'market' branch would require touching that webhook, which is
+    // load-bearing and risky to change the night before a market.
+    //
+    // The sold_in_person/sold_at flags carry the market-sale signal in
+    // metadata for any future routing (e.g. swap the day-0 drip copy from
+    // "your shirt is in the mail" to "your shirt is in your hands"). They
+    // are safe to add — the webhook ignores unknown metadata keys.
     const metadata: Record<string, string> = {
-      order_type: 'market',
+      order_type: 'shirt',
       shirt_id: shirtId,
       shirt_name: shirt.name,
       shirt_color: color,
