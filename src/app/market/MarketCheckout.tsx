@@ -8,32 +8,65 @@ const SHIRTS = [
   { id: 'blossom', name: 'Blossom', swatch: '#f3cfd4' },
   { id: 'sky',     name: 'Sky',     swatch: '#bdd5e5' },
 ] as const;
+type ShirtId = typeof SHIRTS[number]['id'];
 
 const SIZES = ['S', 'M', 'L', 'XL', '2XL'] as const;
 
+type CartItem = {
+  id: string;            // local UI id for keying
+  shirtId: ShirtId;
+  size: typeof SIZES[number];
+  continueMonthly: boolean;
+};
+
+const SHIRT_PRICE = 25;
+
+function newItem(): CartItem {
+  return {
+    id: 'i-' + Math.random().toString(36).slice(2, 10),
+    shirtId: 'onyx',
+    size: 'M',
+    continueMonthly: false,
+  };
+}
+
 export function MarketCheckout() {
-  const [shirtId, setShirtId] = useState<string>('onyx');
-  const [size, setSize] = useState<string>('M');
+  const [items, setItems] = useState<CartItem[]>([newItem()]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const selectedShirt = SHIRTS.find(s => s.id === shirtId);
+  const totalToday    = items.length * SHIRT_PRICE;
+  const monthlyCount  = items.filter(i => i.continueMonthly).length;
+  const totalMonthly  = monthlyCount * SHIRT_PRICE;
+
+  function patchItem(id: string, patch: Partial<CartItem>) {
+    setItems(prev => prev.map(it => (it.id === id ? { ...it, ...patch } : it)));
+  }
+  function removeItem(id: string) {
+    setItems(prev => (prev.length <= 1 ? prev : prev.filter(it => it.id !== id)));
+  }
+  function addItem() {
+    setItems(prev => (prev.length >= 10 ? prev : [...prev, newItem()]));
+  }
 
   async function handleCheckout() {
-    if (!shirtId || !size) {
-      setError('Pick a color and size.');
+    if (items.length === 0) {
+      setError('Add at least one shirt.');
       return;
     }
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/create-market-checkout', {
+      const res = await fetch('/api/create-market-cart-checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          shirtId,
-          size,
-          color: selectedShirt?.name || 'Onyx',
+          items: items.map(it => ({
+            shirtId: it.shirtId,
+            size: it.size,
+            color: (SHIRTS.find(s => s.id === it.shirtId)?.name) || 'Onyx',
+            continueMonthly: it.continueMonthly,
+          })),
         }),
       });
       const data = await res.json();
@@ -51,76 +84,50 @@ export function MarketCheckout() {
   }
 
   return (
-    <div className="max-w-md mx-auto px-5 py-8">
-      {/* Color */}
-      <div className="mb-8">
-        <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-3">
-          Color
-        </p>
-        <div className="grid grid-cols-4 gap-3">
-          {SHIRTS.map(shirt => (
-            <button
-              key={shirt.id}
-              type="button"
-              onClick={() => setShirtId(shirt.id)}
-              className={`aspect-square border-2 p-2 transition-all ${
-                shirtId === shirt.id
-                  ? 'border-[#D4A843] shadow-md'
-                  : 'border-[#e8e0d4] hover:border-[#aaa]'
-              }`}
-              aria-pressed={shirtId === shirt.id}
-              aria-label={shirt.name}
-            >
-              <div
-                className="w-full h-full"
-                style={{ backgroundColor: shirt.swatch }}
-              />
-            </button>
-          ))}
-        </div>
-        <p className="text-center text-sm text-[#666] mt-3">
-          {selectedShirt?.name}
-        </p>
-      </div>
+    <div className="max-w-md mx-auto px-5 py-6">
+      {items.map((item, idx) => (
+        <ShirtRow
+          key={item.id}
+          item={item}
+          index={idx}
+          canRemove={items.length > 1}
+          onPatch={patch => patchItem(item.id, patch)}
+          onRemove={() => removeItem(item.id)}
+        />
+      ))}
 
-      {/* Size */}
-      <div className="mb-10">
-        <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-3">
-          Size
-        </p>
-        <div className="grid grid-cols-5 gap-2">
-          {SIZES.map(s => (
-            <button
-              key={s}
-              type="button"
-              onClick={() => setSize(s)}
-              className={`py-4 text-base font-bold border-2 transition-all ${
-                size === s
-                  ? 'border-[#D4A843] bg-[#FFF8F0] text-[#0d0d0d]'
-                  : 'border-[#e8e0d4] bg-white text-[#777] hover:border-[#aaa]'
-              }`}
-              aria-pressed={size === s}
-            >
-              {s}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Price summary */}
-      <div className="bg-[#FFF8F0] border border-[#e8e0d4] p-5 mb-6 text-center">
-        <p className="text-xs uppercase tracking-[0.2em] text-[#aaa] mb-1">
-          Total
-        </p>
-        <p
-          className="text-5xl text-[#0d0d0d]"
-          style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 700 }}
+      {items.length < 10 && (
+        <button
+          type="button"
+          onClick={addItem}
+          className="w-full border-2 border-dashed border-[#D4A843] text-[#D4A843] font-bold py-4 mb-6 tracking-wide hover:bg-[#FFF8F0] transition-colors"
         >
-          $25
+          + ADD ANOTHER SHIRT
+        </button>
+      )}
+
+      {/* Running total */}
+      <div className="bg-[#FFF8F0] border border-[#e8e0d4] p-5 mb-6">
+        <div className="flex justify-between items-baseline mb-2">
+          <p className="text-xs uppercase tracking-[0.2em] text-[#aaa]">
+            Today
+          </p>
+          <p
+            className="text-4xl text-[#0d0d0d]"
+            style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 700 }}
+          >
+            ${totalToday}
+          </p>
+        </div>
+        <p className="text-xs text-[#666]">
+          {items.length} shirt{items.length === 1 ? '' : 's'} · {monthlyCount} sponsored
         </p>
-        <p className="text-sm text-[#666] mt-2">
-          {selectedShirt?.name} · Size {size}
-        </p>
+        {monthlyCount > 0 && (
+          <p className="text-xs text-[#777] mt-3 pt-3 border-t border-[#e8e0d4]">
+            Then <span className="font-bold text-[#0d0d0d]">${totalMonthly}/month</span>{' '}
+            ({monthlyCount} sponsorship{monthlyCount === 1 ? '' : 's'}) starting in 30 days
+          </p>
+        )}
       </div>
 
       {error && (
@@ -133,14 +140,138 @@ export function MarketCheckout() {
         disabled={loading}
         className="w-full bg-[#D4A843] text-[#0d0d0d] font-bold py-5 text-lg tracking-wide disabled:opacity-60 transition-opacity"
       >
-        {loading ? 'OPENING CHECKOUT…' : 'CHARGE $25'}
+        {loading
+          ? 'OPENING CHECKOUT…'
+          : monthlyCount > 0
+            ? `CHARGE $${totalToday} + START MONTHLY`
+            : `CHARGE $${totalToday}`}
       </button>
 
       <p className="text-xs text-[#aaa] text-center mt-4 leading-relaxed">
         Stripe will collect the buyer&rsquo;s email and name on the next
-        screen so they get the post-purchase drip + can claim their number
-        at beanumber.org/[N] when they get home.
+        screen.
       </p>
+    </div>
+  );
+}
+
+function ShirtRow({
+  item,
+  index,
+  canRemove,
+  onPatch,
+  onRemove,
+}: {
+  item: CartItem;
+  index: number;
+  canRemove: boolean;
+  onPatch: (patch: Partial<CartItem>) => void;
+  onRemove: () => void;
+}) {
+  const selectedShirt = SHIRTS.find(s => s.id === item.shirtId);
+
+  return (
+    <div className="border border-[#e8e0d4] bg-white p-4 mb-4">
+      <div className="flex items-center justify-between mb-3">
+        <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843]">
+          Shirt {index + 1}
+        </p>
+        {canRemove && (
+          <button
+            type="button"
+            onClick={onRemove}
+            className="text-xs text-[#999] hover:text-[#0d0d0d] tracking-wider"
+          >
+            REMOVE
+          </button>
+        )}
+      </div>
+
+      {/* Color row */}
+      <div className="mb-3">
+        <div className="grid grid-cols-4 gap-2">
+          {SHIRTS.map(s => (
+            <button
+              key={s.id}
+              type="button"
+              onClick={() => onPatch({ shirtId: s.id })}
+              className={`aspect-square border-2 p-1.5 transition-all ${
+                item.shirtId === s.id
+                  ? 'border-[#D4A843]'
+                  : 'border-[#e8e0d4] hover:border-[#aaa]'
+              }`}
+              aria-pressed={item.shirtId === s.id}
+              aria-label={s.name}
+            >
+              <div className="w-full h-full" style={{ backgroundColor: s.swatch }} />
+            </button>
+          ))}
+        </div>
+        <p className="text-xs text-[#777] mt-2 text-center">
+          {selectedShirt?.name}
+        </p>
+      </div>
+
+      {/* Size row */}
+      <div className="mb-3">
+        <div className="grid grid-cols-5 gap-1.5">
+          {SIZES.map(s => (
+            <button
+              key={s}
+              type="button"
+              onClick={() => onPatch({ size: s })}
+              className={`py-3 text-sm font-bold border-2 transition-all ${
+                item.size === s
+                  ? 'border-[#D4A843] bg-[#FFF8F0] text-[#0d0d0d]'
+                  : 'border-[#e8e0d4] bg-white text-[#777] hover:border-[#aaa]'
+              }`}
+              aria-pressed={item.size === s}
+            >
+              {s}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Monthly toggle per shirt */}
+      <button
+        type="button"
+        onClick={() => onPatch({ continueMonthly: !item.continueMonthly })}
+        className={`w-full text-left border-2 p-3 transition-all ${
+          item.continueMonthly
+            ? 'border-[#D4A843] bg-[#FFF8F0]'
+            : 'border-[#e8e0d4] bg-white hover:border-[#aaa]'
+        }`}
+        aria-pressed={item.continueMonthly}
+      >
+        <div className="flex items-center gap-3">
+          <div
+            className={`flex-shrink-0 w-5 h-5 border-2 flex items-center justify-center transition-all ${
+              item.continueMonthly
+                ? 'border-[#D4A843] bg-[#D4A843]'
+                : 'border-[#bbb] bg-white'
+            }`}
+            aria-hidden
+          >
+            {item.continueMonthly && (
+              <svg className="w-3.5 h-3.5 text-white" viewBox="0 0 16 16" fill="none">
+                <path d="M3 8L7 12L13 4" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            )}
+          </div>
+          <div className="flex-1">
+            <p
+              className="text-sm text-[#0d0d0d]"
+              style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
+            >
+              Stay with this one — $25/mo
+            </p>
+            <p className="text-[11px] text-[#777] leading-relaxed">
+              First charge 30 days from today. Cancel anytime.
+            </p>
+          </div>
+        </div>
+      </button>
     </div>
   );
 }

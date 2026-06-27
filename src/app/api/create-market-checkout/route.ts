@@ -1,18 +1,19 @@
 /**
  * Market checkout — in-person sales at a farmers market booth.
  *
- * Mirrors /api/create-shirt-checkout (single shirt, no cart) except:
- *   - NO shipping_address_collection (buyer walks away with the shirt)
- *   - NO shipping_options (no $5 USPS line item)
- *   - order_type metadata = 'market' so the webhook + drip can branch later
- *   - success_url routes back to /market/success
+ * Mirrors /api/create-shirt-checkout (single shirt) except:
+ *   - NO shipping_address_collection in either branch (buyer walks away
+ *     with the shirt)
+ *   - NO shipping_options on the payment-mode branch (no $5 USPS)
+ *   - order_type metadata is 'shirt' / 'shirt_plus_monthly' (aliased so
+ *     the existing webhook handlers fire unmodified); the sold_in_person
+ *     and sold_at flags carry the market-sale signal alongside
+ *   - success_url routes to /market/success
  *
- * Same downstream contract as the standard shirt checkout:
- *   - Stripe Customer is created + payment method saved off_session for
- *     the one-tap "stay with [child]" CTA on /[N]
- *   - Stripe Checkout natively collects email + name; no form needed
- *   - The webhook fires checkout.session.completed and runs the standard
- *     post-purchase pipeline (drip, sponsor recovery, etc.)
+ * Two branches like /api/create-shirt-checkout:
+ *   1. continueMonthly = false  → mode='payment', one $25 shirt line item
+ *   2. continueMonthly = true   → mode='subscription', shirt today + $25/mo
+ *      starting in 30 days (trial_period_days: 30)
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -45,10 +46,16 @@ export async function POST(request: NextRequest) {
     const stripe = await getStripe();
 
     const body = await request.json().catch(() => ({}));
-    const { shirtId, size, color } = body as {
+    const {
+      shirtId,
+      size,
+      color,
+      continueMonthly: continueMonthlyRaw,
+    } = body as {
       shirtId?: string;
       size?: string;
       color?: string;
+      continueMonthly?: boolean;
     };
 
     if (!shirtId || !SHIRTS[shirtId]) {
@@ -63,28 +70,60 @@ export async function POST(request: NextRequest) {
 
     const shirt = SHIRTS[shirtId]!;
     const origin = request.headers.get('origin') || 'https://www.beanumber.org';
+    const continueMonthly = continueMonthlyRaw === true;
 
-    // IMPORTANT: order_type is aliased to 'shirt' so the existing webhook
-    // path (src/app/api/webhooks/stripe/route.ts ~L1815) fires unmodified —
-    // creates the donation record, enrolls in shirt_nurture drip, etc.
-    // The webhook only branches on a fixed set of order_type values; adding
-    // a new 'market' branch would require touching that webhook, which is
-    // load-bearing and risky to change the night before a market.
-    //
-    // The sold_in_person/sold_at flags carry the market-sale signal in
-    // metadata for any future routing (e.g. swap the day-0 drip copy from
-    // "your shirt is in the mail" to "your shirt is in your hands"). They
-    // are safe to add — the webhook ignores unknown metadata keys.
+    // order_type is aliased so the existing webhook switches (which check
+    // for the exact strings 'shirt' / 'shirt_plus_monthly') fire unmodified.
+    // The sold_in_person / sold_at flags carry the market-sale signal for
+    // the webhook + drip cron to branch on. See webhooks/stripe/route.ts
+    // ~L2576 (shirt-only drip enrollment) for where sold_in_person gets read.
+    const orderType = continueMonthly ? 'shirt_plus_monthly' : 'shirt';
+
     const metadata: Record<string, string> = {
-      order_type: 'shirt',
+      order_type: orderType,
       shirt_id: shirtId,
       shirt_name: shirt.name,
       shirt_color: color,
       shirt_size: size,
+      continue_monthly: continueMonthly ? 'true' : 'false',
       sold_in_person: 'true',
       sold_at: 'farmers_market',
     };
 
+    // ── Branch 1: shirt only, payment mode ────────────────────────
+    if (!continueMonthly) {
+      const session = await stripe.checkout.sessions.create({
+        payment_method_types: ['card', 'link'],
+        line_items: [
+          {
+            price_data: {
+              currency: 'usd',
+              product_data: {
+                name: `${shirt.name} tee · ${size}`,
+                description:
+                  'The shirt is how you meet them. Open the bag, find the number, look it up, meet your kid.',
+              },
+              unit_amount: SHIRT_PRICE * 100,
+            },
+            quantity: 1,
+          },
+        ],
+        // NO shipping_options — in-person sale
+        mode: 'payment',
+        customer_creation: 'always',
+        payment_intent_data: {
+          setup_future_usage: 'off_session',
+          metadata,
+        },
+        success_url: `${origin}/market/success?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${origin}/market`,
+        // NO shipping_address_collection — buyer is at the booth
+        metadata,
+      });
+      return NextResponse.json({ sessionId: session.id, url: session.url });
+    }
+
+    // ── Branch 2: shirt + monthly, subscription mode ─────────────
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card', 'link'],
       line_items: [
@@ -94,26 +133,38 @@ export async function POST(request: NextRequest) {
             product_data: {
               name: `${shirt.name} tee · ${size}`,
               description:
-                'The shirt is how you meet them. $25 a month is how you stay. Open the bag, find the number, look it up, meet your kid.',
+                'The shirt is how you meet them. Open the bag, find the number, look it up, meet your kid.',
             },
             unit_amount: SHIRT_PRICE * 100,
           },
           quantity: 1,
         },
+        {
+          price_data: {
+            currency: 'usd',
+            product_data: {
+              name: 'Monthly Sponsorship',
+              description:
+                "$25 a month is how you stay. Letters, photos, report cards from the kid behind your number. First charge 30 days from today. Cancel anytime.",
+            },
+            unit_amount: SHIRT_PRICE * 100,
+            recurring: { interval: 'month' },
+          },
+          quantity: 1,
+        },
       ],
-      // NO shipping_options — in-person sale
-      mode: 'payment',
-      customer_creation: 'always',
-      payment_intent_data: {
-        setup_future_usage: 'off_session',
-        metadata,
-      },
+      mode: 'subscription',
+      // NO shipping_address_collection — buyer is at the booth.
+      // Stripe Checkout collects the billing address natively when card
+      // entry is required for a subscription; that's enough for AVS.
       success_url: `${origin}/market/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/market`,
-      // NO shipping_address_collection — buyer is standing at the booth
-      // Stripe Checkout natively collects email + name (always required by
-      // the Stripe receipt + customer record)
       metadata,
+      subscription_data: {
+        description: `Monthly sponsorship started in person at the market with ${shirt.name} (${color}, ${size}).`,
+        trial_period_days: 30,
+        metadata,
+      },
     });
 
     return NextResponse.json({ sessionId: session.id, url: session.url });

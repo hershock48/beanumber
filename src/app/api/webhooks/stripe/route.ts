@@ -2087,9 +2087,30 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
       // blank because no assignment happened. The drip templates branch
       // on whether a child name is set, so they'll render the generic
       // "the child connected to your shirt" copy.
+      //
+      // Pipeline selection:
+      //   - any monthly opt-in    → 'shirt_sponsor' (online + market both)
+      //   - shirt-only, online    → 'shirt_nurture' (10-day delay, "in mail")
+      //   - shirt-only, in-person → 'shirt_nurture_inperson' (3-day delay,
+      //                              "in your hands" stage-0 copy)
       if (donorId) {
+        const isMarketCart = session.metadata?.sold_in_person === 'true';
+        let pipeline: string;
+        let dripDelayDays: number;
+        if (monthlyOptIns.length > 0) {
+          pipeline = 'shirt_sponsor';
+          dripDelayDays = 10;
+        } else if (isMarketCart) {
+          pipeline = 'shirt_nurture_inperson';
+          dripDelayDays = 3;
+        } else {
+          pipeline = 'shirt_nurture';
+          dripDelayDays = 10;
+        }
+        const dripNextSendDate = new Date(Date.now() + dripDelayDays * 86400000);
+        const dripNextSendStr = dripNextSendDate.toISOString().split('T')[0];
+
         try {
-          const pipeline = monthlyOptIns.length > 0 ? 'shirt_sponsor' : 'shirt_nurture';
           await airtableAPICall(() =>
             fetch(
               `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_DONORS_TABLE}/${donorId}`,
@@ -2100,20 +2121,30 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
                   fields: {
                     DripPipeline: pipeline,
                     DripStage: 0,
-                    // Drip kicks off 10 days from enrollment. The first
-                    // email is "Did your shirt arrive?" — by day 10 most
-                    // shirts have landed. Skipping the manual "set when
-                    // shipped" gate keeps the sequence from getting stuck.
-                    DripNextSend: new Date(Date.now() + 10 * 86400000).toISOString().split('T')[0],
-                    // DripChildName / DripShirtNumber left blank
+                    DripNextSend: dripNextSendStr,
                   },
                 }),
               }
             )
           );
-          console.log('[WH] Cart: enrolled in ' + pipeline + ' drip (no numbers yet)');
+          console.log(`[WH] Cart: enrolled in ${pipeline} drip (no numbers yet), next send ${dripNextSendStr}`);
         } catch (err: any) {
           console.error('[WH] Cart drip enrollment failed:', String(err?.message || err).slice(0, 200));
+        }
+
+        // Mirror to Postgres so the drip cron (which queries Postgres)
+        // can find this donor. Wrapped in mirrorToPostgres so a Postgres
+        // failure logs without breaking the Airtable write or the receipt.
+        const cartDonorEmail = email;
+        if (cartDonorEmail) {
+          await mirrorToPostgres('cart-drip-fields', async () => {
+            await mirrorDripFields({
+              email: cartDonorEmail,
+              dripPipeline: pipeline,
+              dripStage: 0,
+              dripNextSend: dripNextSendDate,
+            });
+          });
         }
       }
 
@@ -2573,6 +2604,18 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
       // stay blank — the drip templates already handle that case with
       // generic copy ("the child connected to your shirt") and fall back to
       // beanumber.org instead of a child-specific URL.
+      //
+      // Branch on session.metadata.sold_in_person to route market-booth
+      // buyers (who have the shirt in hand) onto a different pipeline name
+      // — 'shirt_nurture_inperson' — and a shorter first-email delay of 3
+      // days instead of 10. The day-0 copy on the in-person variant says
+      // "your shirt is in your hands" instead of "your shirt's in the mail."
+      const isMarketSale = session.metadata?.sold_in_person === 'true';
+      const dripPipelineName = isMarketSale ? 'shirt_nurture_inperson' : 'shirt_nurture';
+      const dripDelayDays = isMarketSale ? 3 : 10;
+      const dripNextSendDate = new Date(Date.now() + dripDelayDays * 86400000);
+      const dripNextSendStr = dripNextSendDate.toISOString().split('T')[0];
+
       try {
         await airtableAPICall(() =>
           fetch(
@@ -2582,23 +2625,35 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
               headers: getAirtableHeaders(),
               body: JSON.stringify({
                 fields: {
-                  DripPipeline: 'shirt_nurture',
+                  DripPipeline: dripPipelineName,
                   DripStage: 0,
-                  // Drip kicks off 10 days from enrollment. See shirt+monthly
-                  // branch for rationale.
-                  DripNextSend: new Date(Date.now() + 10 * 86400000).toISOString().split('T')[0],
+                  DripNextSend: dripNextSendStr,
                   // DripChildName / DripShirtNumber left blank — match
-                  // happens at unboxing, not at checkout
+                  // happens at unboxing/lookup, not at checkout
                 },
               }),
             }
           )
         );
-        console.log('[WH] Enrolled in shirt_nurture drip (no number yet)');
+        console.log(`[WH] Enrolled in ${dripPipelineName} drip (no number yet), next send ${dripNextSendStr}`);
       } catch (err: any) {
         // Non-fatal — the purchase still succeeded even if drip enrollment fails
         console.error('[WH] Drip enrollment failed:', String(err?.message || err).slice(0, 200));
       }
+
+      // Mirror to Postgres so the drip cron (which queries Postgres only)
+      // can find this donor. Wrapped in mirrorToPostgres so a Postgres
+      // failure logs without breaking the Airtable write or the Stripe
+      // receipt. Email is the join key — mirrorDripFields updates by
+      // lower(email) match.
+      await mirrorToPostgres('drip-fields', async () => {
+        await mirrorDripFields({
+          email,
+          dripPipeline: dripPipelineName,
+          dripStage: 0,
+          dripNextSend: dripNextSendDate,
+        });
+      });
 
       return { donorId, donationId };
 

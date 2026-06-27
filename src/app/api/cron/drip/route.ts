@@ -75,6 +75,12 @@ type PipelineConfig = { gaps: number[]; maxStages: number };
 
 const PIPELINE_CONFIGS: Record<string, PipelineConfig> = {
   shirt_nurture:    { gaps: [6, 6, 8, 10], maxStages: 4 },
+  // In-person variant: same 4-email cadence as shirt_nurture but the
+  // day-0 email body is rewritten to "your shirt is in your hands"
+  // instead of "your shirt's in the mail" since the buyer walked away
+  // with the shirt at a farmers market booth. Branch lives in
+  // shirtNurtureEmail(stage=0) on donor.pipeline === this value.
+  shirt_nurture_inperson: { gaps: [6, 6, 8, 10], maxStages: 4 },
   sponsor_onboard:  { gaps: [3, 7, 11],    maxStages: 3 },
   donor_convert:    { gaps: [5, 9, 11],    maxStages: 3 },
   shirt_sponsor:    { gaps: [3, 5, 7, 10], maxStages: 4 },
@@ -152,24 +158,45 @@ function shirtNurtureEmail(
     // the IVE (a real kid in a real classroom right now) and the three-action
     // close (open / find / meet). P.S. seeds the unboxing photo behavior and
     // puts Simon's name on the campus side of the relationship.
-    case 0:
+    case 0: {
+      // Branch on pipeline name so in-person market buyers (who have the
+      // shirt in hand from a booth) don't get a "your shirt's in the mail"
+      // email. Same brand voice, same action sequence (find number → look
+      // it up → meet the kid), different opener.
+      const isInPerson = donor.pipeline === 'shirt_nurture_inperson';
+
+      let bodyParagraph: string;
+      let postscript: string;
+
+      if (isInPerson) {
+        bodyParagraph = multi
+          ? `<p>Thanks for stopping by the booth — you walked away with ${numbers.length} shirts. A real kid is on the other side of each number printed on them. Neither of us knows who yet. Flip the shirts over. Find the numbers. Meet them at <a href="${SITE_URL}" style="color: #D4A843; font-weight: bold;">beanumber.org</a>.</p>`
+          : `<p>Thanks for stopping by the booth — you walked away with your shirt. A real kid is on the other side of the number printed on it. Neither of us knows who yet. Flip the shirt over. Find the number. Meet them at <a href="${SITE_URL}" style="color: #D4A843; font-weight: bold;">beanumber.org</a>.</p>`;
+        // No "P.S. take a picture when you open it" — they already opened
+        // it at the booth. Replace with the Marshall-origin breadcrumb.
+        postscript = `<p style="color: #777; font-size: 14px; margin-top: 24px;">P.S. If you took a photo at the booth, send it back — we share those with Simon at the campus so the kids see who&rsquo;s wearing their number.</p>`;
+      } else {
+        bodyParagraph = multi
+          ? `<p>Your shirts are in the mail. A real kid is on the other side of each number printed on them. Neither of us knows who yet. Open the bag. Find the numbers. Meet them at <a href="${SITE_URL}" style="color: #D4A843; font-weight: bold;">beanumber.org</a>.</p>`
+          : `<p>Your shirt&rsquo;s in the mail. A real kid is on the other side of the number printed on it. Neither of us knows who yet. Open the bag. Find the number. Meet them at <a href="${SITE_URL}" style="color: #D4A843; font-weight: bold;">beanumber.org</a>.</p>`;
+        postscript = `<p style="color: #777; font-size: 14px; margin-top: 24px;">P.S. When you open it, take a picture. We send those to Simon at the campus, and the kids see who&rsquo;s wearing their number.</p>`;
+      }
+
       return {
         subject: "Your kid is waiting.",
         html: wrapEmail(`
           <p style="margin-top: 0; font-style: italic; color: #0d0d0d; font-size: 17px; text-align: center; line-height: 1.5;">The shirt is how you meet them.<br>$25 a month is how you stay.</p>
           <hr style="border: none; border-top: 1px solid #e8e0d4; margin: 24px 0;">
           <p>Hey ${firstName},</p>
-          ${multi
-            ? `<p>Your shirts are in the mail. A real kid is on the other side of each number printed on them. Neither of us knows who yet. Open the bag. Find the numbers. Meet them at <a href="${SITE_URL}" style="color: #D4A843; font-weight: bold;">beanumber.org</a>.</p>`
-            : `<p>Your shirt&rsquo;s in the mail. A real kid is on the other side of the number printed on it. Neither of us knows who yet. Open the bag. Find the number. Meet them at <a href="${SITE_URL}" style="color: #D4A843; font-weight: bold;">beanumber.org</a>.</p>`
-          }
+          ${bodyParagraph}
           <p style="text-align: center; margin: 28px 0;">
             <a href="${SITE_URL}" style="display: inline-block; background: #D4A843; color: #0d0d0d; font-weight: bold; text-decoration: none; padding: 14px 32px; font-size: 15px; letter-spacing: 0.05em;">ENTER YOUR ${multi ? 'NUMBERS' : 'NUMBER'}</a>
           </p>
           <p>Kevin</p>
-          <p style="color: #777; font-size: 14px; margin-top: 24px;">P.S. When you open it, take a picture. We send those to Simon at the campus, and the kids see who&rsquo;s wearing their number.</p>
+          ${postscript}
         `),
       };
+    }
 
     // ── Email 2: A real campus moment (ship + 9 days) ─────────────────────
     case 1:
@@ -488,9 +515,10 @@ function getEmailForPipeline(
   donor: DripDonor
 ): { subject: string; html: string } | null {
   switch (pipeline) {
-    case 'shirt_nurture':    return shirtNurtureEmail(stage, donor);
-    case 'sponsor_onboard':  return sponsorOnboardEmail(stage, donor);
-    case 'donor_convert':    return donorConvertEmail(stage, donor);
+    case 'shirt_nurture':           return shirtNurtureEmail(stage, donor);
+    case 'shirt_nurture_inperson':  return shirtNurtureEmail(stage, donor);
+    case 'sponsor_onboard':         return sponsorOnboardEmail(stage, donor);
+    case 'donor_convert':           return donorConvertEmail(stage, donor);
     case 'shirt_sponsor':    return shirtSponsorEmail(stage, donor);
     case 'monthly_donor':    return monthlyDonorEmail(stage, donor);
     default:                 return null;
