@@ -208,7 +208,7 @@ async function createFulfillmentRecord(opts: {
   notes?: string;
 }): Promise<void> {
   if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) {
-    console.error('[WH] Fulfillment: missing Airtable creds, skipping');
+    console.warn('[WH] Fulfillment: missing Airtable creds, skipping (non-fatal)');
     return;
   }
 
@@ -252,25 +252,31 @@ async function createFulfillmentRecord(opts: {
     fields['fldoX0697ASTKcDvD'] = opts.notes;                        // Notes
   }
 
-  await airtableAPICall(() =>
-    fetch(
-      `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_FULFILLMENT_TABLE_ID}`,
-      {
-        method: 'POST',
-        headers: getAirtableHeaders(),
-        body: JSON.stringify({ fields }),
-      }
-    ).then(async (res) => {
-      if (!res.ok) {
-        const body = await res.text();
-        throw new Error(`Fulfillment create failed (${res.status}): ${body}`);
-      }
-      return res.json();
-    })
-  );
+  try {
+    await airtableAPICall(() =>
+      fetch(
+        `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_FULFILLMENT_TABLE_ID}`,
+        {
+          method: 'POST',
+          headers: getAirtableHeaders(),
+          body: JSON.stringify({ fields }),
+        }
+      ).then(async (res) => {
+        if (!res.ok) {
+          const body = await res.text();
+          throw new Error(`Fulfillment create failed (${res.status}): ${body}`);
+        }
+        return res.json();
+      })
+    );
 
-  const numLabel = typeof opts.shirtNumber === 'number' ? `#${opts.shirtNumber}` : '#TBD';
-  console.log(`[WH] Fulfillment record created: ${numLabel} ${opts.design} / ${opts.shirtColor} / ${opts.shirtSize}`);
+    const numLabel = typeof opts.shirtNumber === 'number' ? `#${opts.shirtNumber}` : '#TBD';
+    console.log(`[WH] Fulfillment record created: ${numLabel} ${opts.design} / ${opts.shirtColor} / ${opts.shirtSize}`);
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error('[WH] Fulfillment Airtable write failed (non-fatal):', message.slice(0, 300));
+    return;
+  }
 }
 
 // Find or create donor with deduplication.
@@ -743,7 +749,8 @@ async function createCommunicationRecord(
   }
 ): Promise<string> {
   if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) {
-    throw new Error('Airtable credentials not configured');
+    console.warn('[WH] Communication: missing Airtable creds, skipping (non-fatal)');
+    return '';
   }
 
   const communicationFields: any = {
@@ -757,27 +764,34 @@ async function createCommunicationRecord(
     'Related Donor': [donorId],
   };
 
-  const response = await airtableAPICall(() =>
-    fetch(
-      `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_COMMUNICATIONS_TABLE}`,
-      {
-        method: 'POST',
-        headers: getAirtableHeaders(),
-        body: JSON.stringify({
-          fields: communicationFields,
-        }),
-      }
-    )
-  );
+  try {
+    const response = await airtableAPICall(() =>
+      fetch(
+        `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_COMMUNICATIONS_TABLE}`,
+        {
+          method: 'POST',
+          headers: getAirtableHeaders(),
+          body: JSON.stringify({
+            fields: communicationFields,
+          }),
+        }
+      )
+    );
 
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Airtable API error: ${error}`);
+    if (!response.ok) {
+      const error = await response.text();
+      console.error('[WH] Communication Airtable write rejected (non-fatal):', response.status, error.slice(0, 300));
+      return '';
+    }
+
+    const data = await response.json();
+    console.log('[Airtable] Created communication record:', data.id);
+    return data.id;
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error('[WH] Communication Airtable write failed (non-fatal):', message.slice(0, 300));
+    return '';
   }
-
-  const data = await response.json();
-  console.log('[Airtable] Created communication record:', data.id);
-  return data.id;
 }
 
 // Send thank-you email via SendGrid
@@ -1426,12 +1440,36 @@ async function createSponsorshipRecord(data: {
   // the physical moment.
   alreadyRevealed?: boolean;
 }): Promise<{ recordId: string; sponsorCode: string }> {
-  if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) {
-    throw new Error('Airtable credentials not configured');
-  }
-
   const sponsorCode = generateSponsorCode();
   const today = new Date().toISOString().split('T')[0];
+
+  // POSTGRES FIRST. Source of truth since the June 22 migration. Idempotent
+  // on sponsor_code (uniquely indexed) — a webhook retry won't duplicate.
+  // Mirrors before Airtable so an Airtable outage can't drop the sponsorship.
+  await mirrorToPostgres(
+    `sponsorship ${sponsorCode}`,
+    () =>
+      mirrorSponsorship({
+        sponsorCode,
+        sponsorEmail: data.sponsorEmail,
+        sponsorName: data.sponsorName ?? null,
+        monthlyAmount: data.monthlyAmount ?? 25,
+        childLegacyId: data.childId,
+        childDisplayName: data.childDisplayName,
+        stripeSubscriptionId: data.subscriptionId ?? null,
+        sponsorshipStartDate: today,
+        revealedNow: !!data.alreadyRevealed,
+      })
+  );
+  console.log('[WH] sponsorship mirrored to Postgres:', sponsorCode);
+
+  // AIRTABLE BEST-EFFORT. Try the legacy mirror; failures (quota,
+  // network, schema drift) are logged but no longer break the webhook
+  // or block downstream Postgres operations.
+  if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) {
+    console.warn('[WH] Sponsorship: missing Airtable creds, skipping Airtable mirror (non-fatal)');
+    return { recordId: '', sponsorCode };
+  }
 
   const sponsorshipFields: Record<string, unknown> = {
     SponsorCode: sponsorCode,
@@ -1462,44 +1500,32 @@ async function createSponsorshipRecord(data: {
     sponsorshipFields.ChildRevealedAt = new Date().toISOString();
   }
 
-  const response = await airtableAPICall(() =>
-    fetch(
-      `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_SPONSORSHIPS_TABLE}`,
-      {
-        method: 'POST',
-        headers: getAirtableHeaders(),
-        body: JSON.stringify({ fields: sponsorshipFields }),
-      }
-    )
-  );
+  try {
+    const response = await airtableAPICall(() =>
+      fetch(
+        `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_SPONSORSHIPS_TABLE}`,
+        {
+          method: 'POST',
+          headers: getAirtableHeaders(),
+          body: JSON.stringify({ fields: sponsorshipFields }),
+        }
+      )
+    );
 
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Airtable Sponsorship create error: ${error}`);
+    if (!response.ok) {
+      const error = await response.text();
+      console.error('[WH] Airtable Sponsorship create rejected (non-fatal):', response.status, error.slice(0, 300));
+      return { recordId: '', sponsorCode };
+    }
+
+    const result = await response.json();
+    console.log('[Airtable] Created sponsorship:', result.id, sponsorCode);
+    return { recordId: result.id, sponsorCode };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error('[WH] Airtable Sponsorship write failed (non-fatal, Postgres has the sponsorship):', message.slice(0, 300));
+    return { recordId: '', sponsorCode };
   }
-
-  const result = await response.json();
-  console.log('[Airtable] Created sponsorship:', result.id, sponsorCode);
-
-  // Dual-write to Postgres. Idempotent on sponsor_code (uniquely
-  // indexed) — a webhook retry won&rsquo;t duplicate.
-  await mirrorToPostgres(
-    `sponsorship ${sponsorCode}`,
-    () =>
-      mirrorSponsorship({
-        sponsorCode,
-        sponsorEmail: data.sponsorEmail,
-        sponsorName: data.sponsorName ?? null,
-        monthlyAmount: data.monthlyAmount ?? 25,
-        childLegacyId: data.childId,
-        childDisplayName: data.childDisplayName,
-        stripeSubscriptionId: data.subscriptionId ?? null,
-        sponsorshipStartDate: today,
-        revealedNow: !!data.alreadyRevealed,
-      })
-  );
-
-  return { recordId: result.id, sponsorCode };
 }
 
 /**
@@ -1518,8 +1544,28 @@ async function createSponsorshipFromCartCheckout(data: {
   donorRecordId: string;
   sponsorshipStartDate: string;
 }): Promise<{ recordId: string }> {
+  // POSTGRES FIRST. Source of truth since the June 22 migration. No child
+  // link — matches the cart-mode Airtable shape. Idempotent on sponsor_code.
+  await mirrorToPostgres(
+    `cart sponsorship ${data.sponsorCode}`,
+    () =>
+      mirrorSponsorship({
+        sponsorCode: data.sponsorCode,
+        sponsorEmail: data.sponsorEmail,
+        sponsorName: data.sponsorName ?? null,
+        monthlyAmount: data.monthlyAmount,
+        childLegacyId: null,
+        stripeSubscriptionId: data.stripeSubscriptionId,
+        sponsorshipStartDate: data.sponsorshipStartDate,
+        revealedNow: false,
+      })
+  );
+  console.log('[WH] cart sponsorship mirrored to Postgres:', data.sponsorCode);
+
+  // AIRTABLE BEST-EFFORT.
   if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) {
-    throw new Error('Airtable credentials not configured');
+    console.warn('[WH] Cart Sponsorship: missing Airtable creds, skipping Airtable mirror (non-fatal)');
+    return { recordId: '' };
   }
 
   const fields: Record<string, unknown> = {
@@ -1535,43 +1581,32 @@ async function createSponsorshipFromCartCheckout(data: {
   };
   if (data.sponsorName) fields.SponsorName = data.sponsorName;
 
-  const response = await airtableAPICall(() =>
-    fetch(
-      `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_SPONSORSHIPS_TABLE}`,
-      {
-        method: 'POST',
-        headers: getAirtableHeaders(),
-        body: JSON.stringify({ fields }),
-      }
-    )
-  );
+  try {
+    const response = await airtableAPICall(() =>
+      fetch(
+        `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_SPONSORSHIPS_TABLE}`,
+        {
+          method: 'POST',
+          headers: getAirtableHeaders(),
+          body: JSON.stringify({ fields }),
+        }
+      )
+    );
 
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Airtable cart Sponsorship create error: ${error}`);
+    if (!response.ok) {
+      const error = await response.text();
+      console.error('[WH] Airtable cart Sponsorship create rejected (non-fatal):', response.status, error.slice(0, 300));
+      return { recordId: '' };
+    }
+
+    const result = await response.json();
+    console.log('[Airtable] Created cart Sponsorship:', result.id, data.sponsorCode);
+    return { recordId: result.id };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error('[WH] Airtable cart Sponsorship write failed (non-fatal, Postgres has the sponsorship):', message.slice(0, 300));
+    return { recordId: '' };
   }
-
-  const result = await response.json();
-  console.log('[Airtable] Created cart Sponsorship:', result.id, data.sponsorCode);
-
-  // Dual-write to Postgres — no child link, matches the cart-mode
-  // Airtable shape.
-  await mirrorToPostgres(
-    `cart sponsorship ${data.sponsorCode}`,
-    () =>
-      mirrorSponsorship({
-        sponsorCode: data.sponsorCode,
-        sponsorEmail: data.sponsorEmail,
-        sponsorName: data.sponsorName ?? null,
-        monthlyAmount: data.monthlyAmount,
-        childLegacyId: null,
-        stripeSubscriptionId: data.stripeSubscriptionId,
-        sponsorshipStartDate: data.sponsorshipStartDate,
-        revealedNow: false,
-      })
-  );
-
-  return { recordId: result.id };
 }
 
 // Send sponsor welcome email with sponsor code
@@ -3252,70 +3287,77 @@ async function verifyWebhookSignature(
  * reveal state should be preserved for auditability even after cancellation.
  */
 async function handleSubscriptionCanceled(subscription: Stripe.Subscription): Promise<void> {
-  if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) {
-    console.error('[Webhook] Subscription canceled but Airtable credentials missing');
-    return;
-  }
-
   const subscriptionId = subscription.id;
 
-  // Find the Sponsorship row by StripeSubscriptionID
-  const formula = `{StripeSubscriptionID} = "${subscriptionId}"`;
-  const searchResponse = await airtableAPICall(() =>
-    fetch(
-      `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_SPONSORSHIPS_TABLE}?filterByFormula=${encodeURIComponent(formula)}`,
-      { headers: getAirtableHeaders() }
-    )
-  );
-
-  if (!searchResponse.ok) {
-    const errText = await searchResponse.text();
-    console.error('[Webhook] Failed to look up sponsorship for canceled subscription:', subscriptionId, errText);
-    return;
-  }
-
-  const searchData = await searchResponse.json();
-  const records = searchData.records ?? [];
-
-  if (records.length === 0) {
-    // Not every subscription cancellation is a sponsor — could be an old
-    // recurring donor with no sponsorship row. Log and move on.
-    console.log('[Webhook] No sponsorship found for canceled subscription:', subscriptionId);
-    return;
-  }
-
-  // Defensive: if we somehow have duplicates, update them all
-  for (const record of records) {
-    const updateResponse = await airtableAPICall(() =>
-      fetch(
-        `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_SPONSORSHIPS_TABLE}/${record.id}`,
-        {
-          method: 'PATCH',
-          headers: getAirtableHeaders(),
-          body: JSON.stringify({
-            fields: {
-              Status: 'Ended',
-              AuthStatus: 'Inactive',
-              VisibleToSponsor: false,
-            },
-          }),
-        }
-      )
-    );
-
-    if (updateResponse.ok) {
-      console.log('[Webhook] Sponsorship marked Ended:', record.id, 'subscription:', subscriptionId);
-    } else {
-      const errText = await updateResponse.text();
-      console.error('[Webhook] Failed to mark sponsorship Ended:', record.id, errText);
-    }
-  }
-
-  // Dual-write to Postgres.
+  // POSTGRES FIRST. Source of truth — flip the sponsorship to ended regardless
+  // of Airtable health so cancellations always land.
   await mirrorToPostgres(
     `sub.deleted ${subscriptionId}`,
     () => mirrorSubscriptionDeleted(subscriptionId)
   );
+
+  // AIRTABLE BEST-EFFORT.
+  if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) {
+    console.warn('[WH] Subscription canceled: missing Airtable creds, skipping Airtable mirror (non-fatal)');
+    return;
+  }
+
+  try {
+    // Find the Sponsorship row by StripeSubscriptionID
+    const formula = `{StripeSubscriptionID} = "${subscriptionId}"`;
+    const searchResponse = await airtableAPICall(() =>
+      fetch(
+        `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_SPONSORSHIPS_TABLE}?filterByFormula=${encodeURIComponent(formula)}`,
+        { headers: getAirtableHeaders() }
+      )
+    );
+
+    if (!searchResponse.ok) {
+      const errText = await searchResponse.text();
+      console.error('[WH] Failed to look up sponsorship for canceled subscription (non-fatal):', subscriptionId, errText.slice(0, 300));
+      return;
+    }
+
+    const searchData = await searchResponse.json();
+    const records = searchData.records ?? [];
+
+    if (records.length === 0) {
+      // Not every subscription cancellation is a sponsor — could be an old
+      // recurring donor with no sponsorship row. Log and move on.
+      console.log('[Webhook] No sponsorship found for canceled subscription:', subscriptionId);
+      return;
+    }
+
+    // Defensive: if we somehow have duplicates, update them all
+    for (const record of records) {
+      const updateResponse = await airtableAPICall(() =>
+        fetch(
+          `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_SPONSORSHIPS_TABLE}/${record.id}`,
+          {
+            method: 'PATCH',
+            headers: getAirtableHeaders(),
+            body: JSON.stringify({
+              fields: {
+                Status: 'Ended',
+                AuthStatus: 'Inactive',
+                VisibleToSponsor: false,
+              },
+            }),
+          }
+        )
+      );
+
+      if (updateResponse.ok) {
+        console.log('[Webhook] Sponsorship marked Ended:', record.id, 'subscription:', subscriptionId);
+      } else {
+        const errText = await updateResponse.text();
+        console.error('[Webhook] Failed to mark sponsorship Ended (non-fatal):', record.id, errText.slice(0, 300));
+      }
+    }
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error('[WH] Airtable subscription-canceled mirror failed (non-fatal, Postgres has the cancellation):', message.slice(0, 300));
+  }
 }
 
 /**
@@ -3327,11 +3369,6 @@ async function handleSubscriptionCanceled(subscription: Stripe.Subscription): Pr
  * with the refunded amount — keeps the paper trail intact.
  */
 async function handleChargeRefunded(charge: Stripe.Charge): Promise<void> {
-  if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) {
-    console.error('[Webhook] Charge refunded but Airtable credentials missing');
-    return;
-  }
-
   const paymentIntentId =
     typeof charge.payment_intent === 'string'
       ? charge.payment_intent
@@ -3347,67 +3384,8 @@ async function handleChargeRefunded(charge: Stripe.Charge): Promise<void> {
   const isFullRefund = amountRefundedCents >= amountTotalCents;
   const refundedDollars = (amountRefundedCents / 100).toFixed(2);
 
-  // Find the Donation row by Stripe Payment Intent ID
-  const formula = `{Stripe Payment Intent ID} = "${paymentIntentId}"`;
-  const searchResponse = await airtableAPICall(() =>
-    fetch(
-      `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_DONATIONS_TABLE}?filterByFormula=${encodeURIComponent(formula)}`,
-      { headers: getAirtableHeaders() }
-    )
-  );
-
-  if (!searchResponse.ok) {
-    const errText = await searchResponse.text();
-    console.error('[Webhook] Failed to look up donation for refunded charge:', paymentIntentId, errText);
-    return;
-  }
-
-  const searchData = await searchResponse.json();
-  const records = searchData.records ?? [];
-
-  if (records.length === 0) {
-    // This can legitimately happen if the charge was from a test or from
-    // before we started recording donations. Log and move on.
-    console.log('[Webhook] No donation found for refunded charge, payment_intent:', paymentIntentId);
-    return;
-  }
-
-  for (const record of records) {
-    const existingNote = (record.fields?.['Donation Note'] as string | undefined) ?? '';
-    const refundLabel = isFullRefund
-      ? `[Refunded in full on ${new Date().toISOString().split('T')[0]}]`
-      : `[Partially refunded $${refundedDollars} on ${new Date().toISOString().split('T')[0]}]`;
-    const mergedNote = existingNote ? `${existingNote}\n${refundLabel}` : refundLabel;
-
-    const updateResponse = await airtableAPICall(() =>
-      fetch(
-        `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_DONATIONS_TABLE}/${record.id}`,
-        {
-          method: 'PATCH',
-          headers: getAirtableHeaders(),
-          body: JSON.stringify({
-            fields: {
-              'Payment Status': 'Refunded',
-              'Donation Note': mergedNote,
-            },
-          }),
-        }
-      )
-    );
-
-    if (updateResponse.ok) {
-      console.log(
-        '[Webhook] Donation marked Refunded:',
-        record.id,
-        isFullRefund ? '(full)' : `(partial $${refundedDollars})`
-      );
-    } else {
-      const errText = await updateResponse.text();
-      console.error('[Webhook] Failed to mark donation Refunded:', record.id, errText);
-    }
-  }
-
-  // Dual-write to Postgres.
+  // POSTGRES FIRST. Source of truth — record the refund regardless of
+  // Airtable health so the donation status always reflects reality.
   await mirrorToPostgres(
     `refund ${paymentIntentId}`,
     () =>
@@ -3418,6 +3396,77 @@ async function handleChargeRefunded(charge: Stripe.Charge): Promise<void> {
         refundedAt: new Date(),
       })
   );
+
+  // AIRTABLE BEST-EFFORT.
+  if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) {
+    console.warn('[WH] Charge refunded: missing Airtable creds, skipping Airtable mirror (non-fatal)');
+    return;
+  }
+
+  try {
+    // Find the Donation row by Stripe Payment Intent ID
+    const formula = `{Stripe Payment Intent ID} = "${paymentIntentId}"`;
+    const searchResponse = await airtableAPICall(() =>
+      fetch(
+        `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_DONATIONS_TABLE}?filterByFormula=${encodeURIComponent(formula)}`,
+        { headers: getAirtableHeaders() }
+      )
+    );
+
+    if (!searchResponse.ok) {
+      const errText = await searchResponse.text();
+      console.error('[WH] Failed to look up donation for refunded charge (non-fatal):', paymentIntentId, errText.slice(0, 300));
+      return;
+    }
+
+    const searchData = await searchResponse.json();
+    const records = searchData.records ?? [];
+
+    if (records.length === 0) {
+      // This can legitimately happen if the charge was from a test or from
+      // before we started recording donations. Log and move on.
+      console.log('[Webhook] No donation found for refunded charge, payment_intent:', paymentIntentId);
+      return;
+    }
+
+    for (const record of records) {
+      const existingNote = (record.fields?.['Donation Note'] as string | undefined) ?? '';
+      const refundLabel = isFullRefund
+        ? `[Refunded in full on ${new Date().toISOString().split('T')[0]}]`
+        : `[Partially refunded $${refundedDollars} on ${new Date().toISOString().split('T')[0]}]`;
+      const mergedNote = existingNote ? `${existingNote}\n${refundLabel}` : refundLabel;
+
+      const updateResponse = await airtableAPICall(() =>
+        fetch(
+          `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_DONATIONS_TABLE}/${record.id}`,
+          {
+            method: 'PATCH',
+            headers: getAirtableHeaders(),
+            body: JSON.stringify({
+              fields: {
+                'Payment Status': 'Refunded',
+                'Donation Note': mergedNote,
+              },
+            }),
+          }
+        )
+      );
+
+      if (updateResponse.ok) {
+        console.log(
+          '[Webhook] Donation marked Refunded:',
+          record.id,
+          isFullRefund ? '(full)' : `(partial $${refundedDollars})`
+        );
+      } else {
+        const errText = await updateResponse.text();
+        console.error('[Webhook] Failed to mark donation Refunded (non-fatal):', record.id, errText.slice(0, 300));
+      }
+    }
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error('[WH] Airtable refund mirror failed (non-fatal, Postgres has the refund):', message.slice(0, 300));
+  }
 }
 
 export async function POST(request: NextRequest) {
