@@ -109,6 +109,12 @@ export const donors = pgTable(
     dripNextSend: date('drip_next_send'),
     dripChildName: text('drip_child_name'),
     dripShirtNumber: text('drip_shirt_number'),
+    // Set when the buyer was acquired at a named live event (e.g.
+    // 'Marshall' for the farmers market). Drip cron uses this to swap
+    // the day-0 in-person opener for an event-aware recognition cue —
+    // "thanks for stopping by at the Marshall booth" lands warmer than
+    // a generic "your shirt is in your hands." Null for everyone else.
+    dripMarketLocation: text('drip_market_location'),
 
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()

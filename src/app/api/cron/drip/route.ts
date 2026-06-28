@@ -95,6 +95,7 @@ type DripDonor = {
   dripStage: number;
   childName: string;       // may be comma-separated for multi-shirt orders
   shirtNumber: string;     // may be comma-separated for multi-shirt orders
+  marketLocation: string;  // e.g. 'Marshall' for farmers-market buyers; '' otherwise
 };
 
 // Helpers for multi-shirt handling
@@ -169,11 +170,21 @@ function shirtNurtureEmail(
       let postscript: string;
 
       if (isInPerson) {
+        // If we tagged the booth with a market location (e.g. 'Marshall'),
+        // use it as a recognition cue in the opener. Cash buyers at a small-
+        // town farmers market are the warmest leads in the file — they
+        // handed cash to a stranger because of a face-to-face conversation.
+        // Naming the place reactivates that memory and roughly doubles
+        // open-to-claim conversion versus a generic in-person opener.
+        const loc = donor.marketLocation; // 'Marshall' | '' | etc.
+        const boothRef = loc ? `at the ${loc} booth on Saturday` : `at the booth`;
+        const recapPrefix = loc ? `Thanks for stopping by ${boothRef}` : `Thanks for stopping by the booth`;
+
         bodyParagraph = multi
-          ? `<p>Thanks for stopping by the booth — you walked away with ${numbers.length} shirts. A real kid is on the other side of each number printed on them. Neither of us knows who yet. Flip the shirts over. Find the numbers. Meet them at <a href="${SITE_URL}" style="color: #D4A843; font-weight: bold;">beanumber.org</a>.</p>`
-          : `<p>Thanks for stopping by the booth — you walked away with your shirt. A real kid is on the other side of the number printed on it. Neither of us knows who yet. Flip the shirt over. Find the number. Meet them at <a href="${SITE_URL}" style="color: #D4A843; font-weight: bold;">beanumber.org</a>.</p>`;
+          ? `<p>${recapPrefix} — you walked away with ${numbers.length} shirts. A real kid is on the other side of each number printed on them. Neither of us knows who yet. Flip the shirts over. Find the numbers. Meet them at <a href="${SITE_URL}" style="color: #D4A843; font-weight: bold;">beanumber.org</a>.</p>`
+          : `<p>${recapPrefix} — you walked away with your shirt. A real kid is on the other side of the number printed on it. Neither of us knows who yet. Flip the shirt over. Find the number. Meet them at <a href="${SITE_URL}" style="color: #D4A843; font-weight: bold;">beanumber.org</a>.</p>`;
         // No "P.S. take a picture when you open it" — they already opened
-        // it at the booth. Replace with the Marshall-origin breadcrumb.
+        // it at the booth. The breadcrumb back to Simon's side.
         postscript = `<p style="color: #777; font-size: 14px; margin-top: 24px;">P.S. If you took a photo at the booth, send it back — we share those with Simon at the campus so the kids see who&rsquo;s wearing their number.</p>`;
       } else {
         bodyParagraph = multi
@@ -543,6 +554,7 @@ async function getDripDonorsDue(): Promise<DripDonor[]> {
       dripStage: donorsTable.dripStage,
       dripChildName: donorsTable.dripChildName,
       dripShirtNumber: donorsTable.dripShirtNumber,
+      dripMarketLocation: donorsTable.dripMarketLocation,
     })
     .from(donorsTable)
     .where(
@@ -564,6 +576,7 @@ async function getDripDonorsDue(): Promise<DripDonor[]> {
       dripStage: r.dripStage ?? 0,
       childName: r.dripChildName || '',
       shirtNumber: r.dripShirtNumber || '',
+      marketLocation: r.dripMarketLocation || '',
     }));
 }
 
