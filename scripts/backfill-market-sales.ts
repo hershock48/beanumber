@@ -12,13 +12,19 @@
  *
  * Usage
  * ─────
- *   1. In Stripe Dashboard: Payments → filter to today's date → Export.
- *      In the export dialog, include ALL metadata columns (this is the
- *      default if you select "All columns"). Save as CSV.
- *   2. Drop the CSV at airtable-export/ or anywhere; pass the path:
+ * Two input modes — Stripe API (preferred, no manual export needed)
+ * or CSV file (kept for archival / replay):
  *
- *        tsx scripts/backfill-market-sales.ts <path-to-csv>            # dry-run
- *        tsx scripts/backfill-market-sales.ts <path-to-csv> --apply    # actually write
+ *   # Pull today's payments directly from Stripe (default if no path):
+ *     tsx scripts/backfill-market-sales.ts                       # dry-run
+ *     tsx scripts/backfill-market-sales.ts --apply               # write
+ *
+ *   # Pull a custom date range from Stripe (YYYY-MM-DD, inclusive):
+ *     tsx scripts/backfill-market-sales.ts --from=2026-06-26 --to=2026-06-27
+ *
+ *   # Read from a Stripe-exported CSV:
+ *     tsx scripts/backfill-market-sales.ts <path-to-csv>
+ *     tsx scripts/backfill-market-sales.ts <path-to-csv> --apply
  *
  * What it does, per row
  * ─────────────────────
@@ -70,11 +76,27 @@ import { recordDonation, upsertDonorByEmail } from '../src/lib/db/mutations';
 
 const APPLY = process.argv.includes('--apply');
 const CSV_PATH = process.argv.find(a => a.endsWith('.csv'));
+const FROM_FLAG = process.argv.find(a => a.startsWith('--from='));
+const TO_FLAG = process.argv.find(a => a.startsWith('--to='));
 
-if (!CSV_PATH) {
-  console.error('Usage: tsx scripts/backfill-market-sales.ts <path-to-csv> [--apply]');
-  process.exit(1);
+function todayISO(): string {
+  return new Date().toISOString().slice(0, 10);
 }
+function parseDateFlag(flag: string | undefined, fallback: string): string {
+  if (!flag) return fallback;
+  const v = flag.split('=')[1];
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) {
+    console.error(`Invalid date flag: ${flag}. Use YYYY-MM-DD.`);
+    process.exit(1);
+  }
+  return v;
+}
+const FROM_DATE = parseDateFlag(FROM_FLAG, todayISO());
+const TO_DATE = parseDateFlag(TO_FLAG, todayISO());
+
+// If no CSV path supplied, default to Stripe API mode using the date
+// range above (today by default).
+const USE_STRIPE_API = !CSV_PATH;
 
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
 if (!STRIPE_SECRET_KEY) {
@@ -128,7 +150,7 @@ interface BackfillSummary {
   pi: string;
   email: string;
   amount: number;
-  action: 'skip-existing' | 'skip-refunded' | 'skip-failed' | 'skip-no-email' | 'would-write' | 'wrote';
+  action: 'skip-existing' | 'skip-refunded' | 'skip-failed' | 'skip-no-email' | 'skip-existing-sponsor' | 'would-write' | 'wrote';
   isSubscription: boolean;
   note?: string;
 }
@@ -230,6 +252,36 @@ async function processOne(piId: string): Promise<BackfillSummary> {
 
   const amount = (pi.amount_received || pi.amount || 0) / 100;
   summary.amount = amount;
+
+  // ── EXISTING-SPONSOR GUARD ─────────────────────────────────────
+  // If the customer behind this PI already has an active subscription
+  // that PRE-DATES this PI's date, they're an existing sponsor — not a
+  // fresh shirt buyer. Enrolling them in the shirt-nurture drip would
+  // send "your shirt is in your hands, meet your kid" to someone who
+  // already has their shirt and already knows their kid. The 6/28
+  // backfill bit on this: 8 existing monthly sponsors got wrongly
+  // enrolled. Skip them entirely here — Kevin can address those
+  // separately if he wants to record the additional payment.
+  const piCustomerId = typeof pi.customer === 'string' ? pi.customer : pi.customer?.id;
+  if (piCustomerId && pi.invoice == null) {
+    try {
+      const subs = await stripe.subscriptions.list({ customer: piCustomerId, status: 'all', limit: 10 });
+      const preexisting = subs.data.find(s => {
+        if (s.status !== 'active' && s.status !== 'trialing') return false;
+        return s.start_date < pi.created;
+      });
+      if (preexisting) {
+        summary.action = 'skip-existing-sponsor';
+        summary.note = `customer already has active sub ${preexisting.id} (started ${new Date(preexisting.start_date * 1000).toISOString().slice(0, 10)}) — not a fresh shirt buyer`;
+        return summary;
+      }
+    } catch (err) {
+      // Fail-open: if Stripe sub lookup fails, fall through and treat
+      // as a regular shirt order. The script is dry-run by default so
+      // operator can catch any oddities before --apply.
+      console.warn(`  ! sponsor-check failed for ${pi.id}: ${(err as Error).message}`);
+    }
+  }
 
   // Pull session for metadata (preferred over PI-level metadata since
   // /market routes set order_type / sold_in_person / items_json at the
@@ -386,21 +438,51 @@ async function processOne(piId: string): Promise<BackfillSummary> {
   return summary;
 }
 
+// ─── Stripe API fetch (no CSV needed) ────────────────────────────
+//
+// Pulls every successful PaymentIntent in the date range. Paginates
+// until exhausted. Local midnight semantics: from = 00:00:00 on
+// FROM_DATE, to = 23:59:59 on TO_DATE, machine timezone.
+async function fetchPaymentIntentIdsFromStripe(): Promise<string[]> {
+  const fromTs = Math.floor(new Date(FROM_DATE + 'T00:00:00').getTime() / 1000);
+  const toTs = Math.floor(new Date(TO_DATE + 'T23:59:59').getTime() / 1000);
+  const ids: string[] = [];
+  let starting_after: string | undefined;
+  for (;;) {
+    const page = await stripe.paymentIntents.list({
+      created: { gte: fromTs, lte: toTs },
+      limit: 100,
+      starting_after,
+    });
+    for (const pi of page.data) {
+      if (pi.status === 'succeeded') ids.push(pi.id);
+    }
+    if (!page.has_more) break;
+    starting_after = page.data[page.data.length - 1]?.id;
+    if (!starting_after) break;
+  }
+  return ids;
+}
+
 // ─── Driver ──────────────────────────────────────────────────────
 
 async function main() {
-  console.log(`Backfilling from CSV: ${CSV_PATH}`);
-  console.log(`Mode: ${APPLY ? 'APPLY (will write to Postgres)' : 'DRY RUN (no writes)'}\n`);
+  console.log(`Mode: ${APPLY ? 'APPLY (will write to Postgres)' : 'DRY RUN (no writes)'}`);
 
-  const rows = loadCsvRows(CSV_PATH!);
-  console.log(`Loaded ${rows.length} CSV rows.\n`);
-
-  // Extract candidate IDs. Dedup in case the CSV has both a charge
-  // line and a PI line for the same payment.
-  const ids = Array.from(new Set(
-    rows.map(r => extractPaymentIntentId(r)).filter(id => id && (id.startsWith('pi_') || id.startsWith('ch_')))
-  ));
-  console.log(`Found ${ids.length} unique payment ids.\n`);
+  let ids: string[];
+  if (USE_STRIPE_API) {
+    console.log(`Source: Stripe API, payments from ${FROM_DATE} to ${TO_DATE} (local time)\n`);
+    ids = await fetchPaymentIntentIdsFromStripe();
+    console.log(`Found ${ids.length} succeeded PaymentIntents in that range.\n`);
+  } else {
+    console.log(`Source: CSV at ${CSV_PATH}\n`);
+    const rows = loadCsvRows(CSV_PATH!);
+    console.log(`Loaded ${rows.length} CSV rows.`);
+    ids = Array.from(new Set(
+      rows.map(r => extractPaymentIntentId(r)).filter(id => id && (id.startsWith('pi_') || id.startsWith('ch_')))
+    ));
+    console.log(`Found ${ids.length} unique payment ids.\n`);
+  }
 
   const results: BackfillSummary[] = [];
   for (const id of ids) {
