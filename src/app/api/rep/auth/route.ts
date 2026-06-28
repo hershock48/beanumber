@@ -42,7 +42,8 @@ export async function POST(request: NextRequest) {
     );
 
     if (!searchResponse.ok) {
-      return NextResponse.json({ error: 'Something went wrong.' }, { status: 500 });
+      console.warn('[Rep Auth] Airtable lookup failed:', searchResponse.status);
+      return NextResponse.json({ error: 'Login service temporarily unavailable. Please try again in a few minutes.' }, { status: 503 });
     }
 
     const searchData = await searchResponse.json();
@@ -60,20 +61,31 @@ export async function POST(request: NextRequest) {
     const token = crypto.randomBytes(32).toString('hex');
     const expiry = new Date(Date.now() + 30 * 60 * 1000).toISOString(); // 30 minutes
 
-    // Store token on the rep record
-    await fetch(
-      `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${REPS_TABLE}/${rep.id}`,
-      {
-        method: 'PATCH',
-        headers: getAirtableHeaders(),
-        body: JSON.stringify({
-          fields: {
-            AuthToken: token,
-            AuthTokenExpiry: expiry,
-          },
-        }),
+    // Store token on the rep record — if Airtable rejects this write, the
+    // magic link is useless (GET below won't find the token), so this one
+    // failure must surface as 503 instead of silently sending a dead link.
+    try {
+      const patchRes = await fetch(
+        `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${REPS_TABLE}/${rep.id}`,
+        {
+          method: 'PATCH',
+          headers: getAirtableHeaders(),
+          body: JSON.stringify({
+            fields: {
+              AuthToken: token,
+              AuthTokenExpiry: expiry,
+            },
+          }),
+        }
+      );
+      if (!patchRes.ok) {
+        console.warn('[Rep Auth] Airtable token write failed:', patchRes.status);
+        return NextResponse.json({ error: 'Login service temporarily unavailable. Please try again in a few minutes.' }, { status: 503 });
       }
-    );
+    } catch (e: any) {
+      console.warn('[Rep Auth] Airtable token write threw:', e?.message || e);
+      return NextResponse.json({ error: 'Login service temporarily unavailable. Please try again in a few minutes.' }, { status: 503 });
+    }
 
     // Send the magic link
     const origin = request.headers.get('origin') || 'https://www.beanumber.org';
@@ -108,8 +120,8 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true, message: 'If an account exists with that email, a login link has been sent.' });
   } catch (error: any) {
-    console.error('[Rep Auth] Error:', error);
-    return NextResponse.json({ error: 'Something went wrong.' }, { status: 500 });
+    console.warn('[Rep Auth] POST failed (likely Airtable unreachable):', error?.message || error);
+    return NextResponse.json({ error: 'Login service temporarily unavailable. Please try again in a few minutes.' }, { status: 503 });
   }
 }
 
@@ -127,7 +139,8 @@ export async function GET(request: NextRequest) {
     );
 
     if (!searchResponse.ok) {
-      return NextResponse.json({ error: 'Something went wrong.' }, { status: 500 });
+      console.warn('[Rep Auth] GET Airtable lookup failed:', searchResponse.status);
+      return NextResponse.json({ error: 'Login service temporarily unavailable. Please try again in a few minutes.' }, { status: 503 });
     }
 
     const searchData = await searchResponse.json();
@@ -164,7 +177,7 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error: any) {
-    console.error('[Rep Auth] GET Error:', error);
-    return NextResponse.json({ error: 'Something went wrong.' }, { status: 500 });
+    console.warn('[Rep Auth] GET failed (likely Airtable unreachable):', error?.message || error);
+    return NextResponse.json({ error: 'Login service temporarily unavailable. Please try again in a few minutes.' }, { status: 503 });
   }
 }

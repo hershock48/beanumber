@@ -5,11 +5,11 @@ import { BANFooter } from '@/components/BANFooter';
 export const metadata: Metadata = {
   title: 'Terms of Service | Be A Number',
   description:
-    "The rules for using beanumber.org, buying shirts, and sponsoring children at YDO's campus in Northern Uganda.",
+    "The rules for using beanumber.org, buying shirts, and sponsoring children at the campus in Northern Uganda.",
   openGraph: {
     title: 'Terms of Service | Be A Number',
     description:
-      "The rules for using beanumber.org, buying shirts, and sponsoring children at YDO's campus in Northern Uganda.",
+      "The rules for using beanumber.org, buying shirts, and sponsoring children at the campus in Northern Uganda.",
     images: undefined,
   },
   twitter: {

@@ -89,10 +89,10 @@ export async function POST(request: NextRequest) {
 
     if (!createResponse.ok) {
       const errData = await createResponse.json().catch(() => ({}));
-      console.error('[Rep Apply] Airtable error:', JSON.stringify(errData));
+      console.warn('[Rep Apply] Airtable unavailable:', JSON.stringify(errData));
       return NextResponse.json(
-        { error: 'Failed to submit application. Please try again.' },
-        { status: 500 }
+        { error: 'Application service temporarily unavailable. Please try again in a few minutes.' },
+        { status: 503 }
       );
     }
 
@@ -130,10 +130,10 @@ export async function POST(request: NextRequest) {
       message: 'Application submitted. Kevin will be in touch.',
     });
   } catch (error: any) {
-    console.error('[Rep Apply] Error:', error);
+    console.warn('[Rep Apply] Failed (likely Airtable unreachable):', error?.message || error);
     return NextResponse.json(
-      { error: 'Something went wrong. Please try again.' },
-      { status: 500 }
+      { error: 'Application service temporarily unavailable. Please try again in a few minutes.' },
+      { status: 503 }
     );
   }
 }

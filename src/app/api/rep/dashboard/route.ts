@@ -39,7 +39,8 @@ export async function GET(request: NextRequest) {
     );
 
     if (!authResponse.ok) {
-      return NextResponse.json({ error: 'Something went wrong.' }, { status: 500 });
+      console.warn('[Cohort Dashboard] Airtable auth lookup failed:', authResponse.status);
+      return NextResponse.json({ error: 'Dashboard service temporarily unavailable. Please try again in a few minutes.' }, { status: 503 });
     }
 
     const authData = await authResponse.json();
@@ -161,7 +162,7 @@ export async function GET(request: NextRequest) {
       cohortLeaderboard,
     });
   } catch (error: any) {
-    console.error('[Cohort Dashboard] Error:', error);
-    return NextResponse.json({ error: 'Something went wrong.' }, { status: 500 });
+    console.warn('[Cohort Dashboard] Failed (likely Airtable unreachable):', error?.message || error);
+    return NextResponse.json({ error: 'Dashboard service temporarily unavailable. Please try again in a few minutes.' }, { status: 503 });
   }
 }

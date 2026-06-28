@@ -294,7 +294,10 @@ async function recordRecurringDonation(data: ProcessRecurringPaymentInput): Prom
 
   if (!createResponse.ok) {
     const error = await createResponse.text();
-    throw new Error(`Failed to create donation record: ${error}`);
+    // Airtable is best-effort here — the Stripe webhook has already written
+    // the donation to Postgres. Log and return null instead of throwing.
+    logger.warn('Failed to create Airtable donation record (Postgres write already succeeded)', { error });
+    return null;
   }
 
   const createData = await createResponse.json();

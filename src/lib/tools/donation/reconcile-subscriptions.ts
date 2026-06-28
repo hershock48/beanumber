@@ -201,24 +201,36 @@ async function fetchAirtableSponsorships(): Promise<Array<{
   const AIRTABLE_DONATIONS_TABLE = process.env.AIRTABLE_DONATIONS_TABLE || 'Donations';
 
   if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) {
-    throw new Error('Airtable credentials not configured');
+    // Airtable not configured — return empty list so reconciliation degrades
+    // to "all Stripe subs look unrecorded" rather than crashing the route.
+    logger.warn('Airtable not configured, returning empty sponsorship list');
+    return [];
   }
 
   // Fetch recurring donations with subscription IDs
   const formula = `AND({Recurring Donation}=TRUE(),{Subscription ID}!='')`;
-  const response = await fetch(
-    `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_DONATIONS_TABLE}?filterByFormula=${encodeURIComponent(formula)}`,
-    {
-      headers: {
-        Authorization: `Bearer ${AIRTABLE_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-    }
-  );
+  let response: Response;
+  try {
+    response = await fetch(
+      `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_DONATIONS_TABLE}?filterByFormula=${encodeURIComponent(formula)}`,
+      {
+        headers: {
+          Authorization: `Bearer ${AIRTABLE_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+  } catch (err) {
+    logger.warn('Airtable unreachable during reconciliation, returning empty list', {
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return [];
+  }
 
   if (!response.ok) {
     const error = await response.text();
-    throw new Error(`Airtable API error: ${error}`);
+    logger.warn('Airtable API error during reconciliation, returning empty list', { error });
+    return [];
   }
 
   const data = await response.json();
