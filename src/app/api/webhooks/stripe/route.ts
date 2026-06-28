@@ -273,7 +273,18 @@ async function createFulfillmentRecord(opts: {
   console.log(`[WH] Fulfillment record created: ${numLabel} ${opts.design} / ${opts.shirtColor} / ${opts.shirtSize}`);
 }
 
-// Find or create donor with deduplication
+// Find or create donor with deduplication.
+//
+// Returns an Airtable donor record ID when Airtable is healthy, else
+// returns an empty string. Callers must treat an empty donor id as a
+// "skip Airtable-only writes" signal and rely on the Postgres mirror
+// (mirrorDonation / upsertDonorByEmail) to persist the donor by email.
+//
+// This is the result of a June 27 incident: Airtable rate-limit /
+// quota failures were causing this function to throw, which bailed the
+// entire webhook before the Postgres mirror could run. Donations
+// stopped landing in Postgres on June 22. Postgres-first writes via
+// mirrorDonation now run unconditionally; Airtable is best-effort.
 async function findOrCreateDonor(
   stripeCustomerId: string | null,
   email: string | null,
@@ -287,9 +298,51 @@ async function findOrCreateDonor(
   }
 ): Promise<string> {
   if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) {
-    throw new Error('Airtable credentials not configured');
+    console.warn('[WH] findOrCreateDonor: Airtable creds missing — returning empty donor id (Postgres mirror will create by email)');
+    return '';
   }
 
+  try {
+    return await findOrCreateDonorViaAirtable(stripeCustomerId, email, donorData);
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error('[WH] findOrCreateDonor: Airtable failed (non-fatal, falling back to Postgres-only):', message.slice(0, 300));
+    // Even though Airtable failed, ensure the donor exists in Postgres
+    // by email so downstream mirrorDonation/mirrorDripFields calls have
+    // a row to attach to. mirrorDonation also calls upsertDonorByEmail
+    // internally — this is a safety net to make sure the donor row is
+    // present even if mirrorDonation hasn't fired yet (e.g. drip
+    // enrollment path that runs before any donation).
+    if (donorData.email) {
+      await mirrorToPostgres('donor-fallback', async () => {
+        const { upsertDonorByEmail } = await import('@/lib/db/mutations');
+        await upsertDonorByEmail({
+          email: donorData.email,
+          name: donorData.name || null,
+          organizationName: donorData.organization || null,
+          mailingAddress: donorData.address || null,
+          stripeCustomerId: stripeCustomerId || null,
+        });
+      });
+    }
+    return '';
+  }
+}
+
+// Internal: the original Airtable-only path. May throw on any Airtable
+// failure; the public findOrCreateDonor wrapper catches.
+async function findOrCreateDonorViaAirtable(
+  stripeCustomerId: string | null,
+  email: string | null,
+  donorData: {
+    name: string;
+    organization?: string;
+    email: string;
+    phone?: string;
+    address?: string;
+    referral?: string;
+  }
+): Promise<string> {
   // Step 1: Search by Stripe Customer ID first
   if (stripeCustomerId) {
     const formula = `{Stripe Customer ID} = "${stripeCustomerId}"`;
@@ -539,37 +592,7 @@ async function upsertDonation(
     childRecordId?: string;
   }
 ): Promise<string> {
-  if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) {
-    throw new Error('Airtable credentials not configured');
-  }
-
-  // Check if donation already exists (idempotency)
-  const formula = `{Stripe Payment Intent ID} = "${paymentIntentId}"`;
-  const searchResponse = await airtableAPICall(() =>
-    fetch(
-      `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_DONATIONS_TABLE}?filterByFormula=${encodeURIComponent(formula)}`,
-      {
-        headers: getAirtableHeaders(),
-      }
-    )
-  );
-
-  if (searchResponse.ok) {
-    const searchData = await searchResponse.json();
-    if (searchData.records && searchData.records.length > 0) {
-      console.log('[Airtable] Donation already exists:', searchData.records[0].id);
-      return searchData.records[0].id;
-    }
-  }
-
-  // Normalize Donation Source to a valid singleSelect option.
-  // Airtable only accepts: Website, Manual Entry, Event, Other.
-  // Real labels like "Shirt Order" or "Sponsorship" go into Donation Note.
-  // Mirrors the Donation Source singleSelect options in Airtable. If you
-  // add a new option in the UI, add it here too. If code passes a label
-  // that isn't in this set OR in Airtable, the normalizer below falls
-  // back to 'Website' and prefixes the raw label onto Donation Note as
-  // a safety net.
+  // Normalize donation source (used by both Postgres and Airtable writes).
   const VALID_SOURCES = new Set([
     'Website',
     'Manual Entry',
@@ -583,70 +606,19 @@ async function upsertDonation(
   const rawSource = donationData.donationSource || 'Website';
   const sourceForAirtable = VALID_SOURCES.has(rawSource) ? rawSource : 'Website';
   const sourceLabelForNote = VALID_SOURCES.has(rawSource) ? null : rawSource;
-
-  // Build the note: prepend the real source label if it was normalized away,
-  // then append whatever note the caller already provided.
   const noteParts: string[] = [];
   if (sourceLabelForNote) noteParts.push(`[${sourceLabelForNote}]`);
   if (donationData.notes) noteParts.push(donationData.notes);
   const finalNote = noteParts.join(' ') || undefined;
 
-  // Create new donation record.
-  // IMPORTANT: Only write fields that actually exist on the Donations table.
-  // Address, Organization, and Subscription ID do NOT exist here — they live
-  // on Donors or Sponsorships. See docs/claude/airtable_schema.md Trap 2.
-  const donationFields: any = {
-    'Stripe Payment Intent ID': paymentIntentId,
-    'Stripe Checkout Session ID': donationData.sessionId,
-    'Stripe Customer ID': donationData.customerId || '',
-    'Donation Amount': donationData.amount,
-    'Currency': donationData.currency.toUpperCase(),
-    'Donation Date': donationData.donationDate,
-    'Payment Status': donationData.status,
-    'Recurring Donation': donationData.isRecurring,
-    'Donor': [donationData.donorId], // Link to donor record
-    'Donor Email at Donation': donationData.email,
-    'Donation Source': sourceForAirtable,
-  };
-
-  if (finalNote) {
-    donationFields['Donation Note'] = finalNote;
-  }
-
-  if (donationData.childRecordId) {
-    donationFields['Child'] = [donationData.childRecordId];
-  }
-
-  const response = await airtableAPICall(() =>
-    fetch(
-      `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_DONATIONS_TABLE}`,
-      {
-        method: 'POST',
-        headers: getAirtableHeaders(),
-        body: JSON.stringify({
-          fields: donationFields,
-        }),
-      }
-    )
-  );
-
-  if (!response.ok) {
-    const error = await response.text();
-    console.error('[WH] Airtable donation REJECT:', response.status, error.slice(0, 300));
-    throw new Error(`Airtable API error (${response.status}): ${error.slice(0, 200)}`);
-  }
-
-  const data = await response.json();
-  console.log('[WH] donation created:', data.id);
-
-  // Fire-and-forget: recalculate the donor's summary fields
-  // (lifetime giving, first/last date, status, recurring flag)
-  if (donationData.donorId) {
-    updateDonorSummary(donationData.donorId).catch(() => {});
-  }
-
-  // Dual-write to Postgres. Failures here log but never break the
-  // Airtable write — the bridge wraps everything in try/catch.
+  // POSTGRES FIRST. Source of truth since the June 22 migration.
+  // Previously this ran AFTER the Airtable write and only if the Airtable
+  // write succeeded — meaning every Airtable failure (rate limit, quota
+  // exhaustion, network blip) also silently dropped the Postgres mirror.
+  // That's why donations stopped landing in Postgres after June 22 when
+  // Airtable quota started failing writes. Postgres-first decouples the
+  // mirror from Airtable's health and is itself idempotent on the payment
+  // intent id (see lib/db/mutations.ts recordDonation).
   await mirrorToPostgres(
     `donation ${paymentIntentId}`,
     () =>
@@ -683,8 +655,80 @@ async function upsertDonation(
         designatedChildLegacyId: null,
       })
   );
+  console.log('[WH] donation mirrored to Postgres:', paymentIntentId);
 
-  return data.id;
+  // AIRTABLE BEST-EFFORT. Try the legacy mirror; failures (quota,
+  // network, schema drift) are logged but no longer break the webhook
+  // or block downstream Postgres operations.
+  if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) {
+    console.warn('[WH] Airtable credentials not configured — skipping Airtable mirror');
+    return paymentIntentId;
+  }
+
+  try {
+    // Idempotency check: don't double-write to Airtable if the record
+    // already exists.
+    const formula = `{Stripe Payment Intent ID} = "${paymentIntentId}"`;
+    const searchResponse = await airtableAPICall(() =>
+      fetch(
+        `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_DONATIONS_TABLE}?filterByFormula=${encodeURIComponent(formula)}`,
+        { headers: getAirtableHeaders() }
+      )
+    );
+    if (searchResponse.ok) {
+      const searchData = await searchResponse.json();
+      if (searchData.records && searchData.records.length > 0) {
+        console.log('[Airtable] Donation already exists:', searchData.records[0].id);
+        return searchData.records[0].id;
+      }
+    }
+
+    const donationFields: any = {
+      'Stripe Payment Intent ID': paymentIntentId,
+      'Stripe Checkout Session ID': donationData.sessionId,
+      'Stripe Customer ID': donationData.customerId || '',
+      'Donation Amount': donationData.amount,
+      'Currency': donationData.currency.toUpperCase(),
+      'Donation Date': donationData.donationDate,
+      'Payment Status': donationData.status,
+      'Recurring Donation': donationData.isRecurring,
+      'Donor': [donationData.donorId],
+      'Donor Email at Donation': donationData.email,
+      'Donation Source': sourceForAirtable,
+    };
+    if (finalNote) donationFields['Donation Note'] = finalNote;
+    if (donationData.childRecordId) donationFields['Child'] = [donationData.childRecordId];
+
+    const response = await airtableAPICall(() =>
+      fetch(
+        `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_DONATIONS_TABLE}`,
+        {
+          method: 'POST',
+          headers: getAirtableHeaders(),
+          body: JSON.stringify({ fields: donationFields }),
+        }
+      )
+    );
+
+    if (!response.ok) {
+      const error = await response.text();
+      console.error('[WH] Airtable donation REJECT (non-fatal):', response.status, error.slice(0, 300));
+      return paymentIntentId;
+    }
+
+    const data = await response.json();
+    console.log('[WH] donation also created in Airtable:', data.id);
+
+    if (donationData.donorId) {
+      updateDonorSummary(donationData.donorId).catch(() => {});
+    }
+
+    return data.id;
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error('[WH] Airtable donation write failed (non-fatal, Postgres has the donation):', message.slice(0, 300));
+    return paymentIntentId;
+  }
 }
 
 // Create communication record
