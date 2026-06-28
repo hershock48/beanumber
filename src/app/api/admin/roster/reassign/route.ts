@@ -31,6 +31,7 @@ import { getAdminRole } from '@/lib/admin-session';
 import { normalizeGrade } from '@/lib/admin/grade';
 import { db } from '@/lib/db/client';
 import { children, sponsorships } from '@/lib/db/schema';
+import { audit } from '@/lib/db/mutations';
 import { and, eq, inArray, isNull, or } from 'drizzle-orm';
 
 async function findKidByShirtNumber(n: number) {
@@ -249,6 +250,23 @@ export async function POST(request: NextRequest) {
         updatedAt: new Date(),
       })
       .where(eq(children.id, departing.id));
+
+    // Audit both children rows so the reassignment shows up cleanly
+    // in the change log. Reassignment is the highest-stakes roster op
+    // (it rewires the sponsor→kid relationship), so the audit trail is
+    // worth two rows.
+    await audit({
+      table: 'children', recordId: replacement.id, action: 'UPDATE',
+      actorType: 'admin', actorId: role,
+      before: replacement as unknown as Record<string, unknown>,
+      after: { ...(replacement as unknown as Record<string, unknown>), shirtNumber: fromShirtNumber, archivedShirtNumber: typeof replacementOldShirt === 'number' ? replacementOldShirt : replacement.archivedShirtNumber },
+    });
+    await audit({
+      table: 'children', recordId: departing.id, action: 'UPDATE',
+      actorType: 'admin', actorId: role,
+      before: departing as unknown as Record<string, unknown>,
+      after: { ...(departing as unknown as Record<string, unknown>), shirtNumber: null, archivedShirtNumber: fromShirtNumber },
+    });
 
     // Step 2: rewrite each sponsorship.
     const now = new Date();

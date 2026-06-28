@@ -35,6 +35,7 @@ import {
 } from '@/lib/admin/pending-draft';
 import { db } from '@/lib/db/client';
 import { children } from '@/lib/db/schema';
+import { audit } from '@/lib/db/mutations';
 import { eq } from 'drizzle-orm';
 
 export async function POST(request: NextRequest) {
@@ -191,6 +192,19 @@ export async function POST(request: NextRequest) {
     patch.updatedAt = new Date();
 
     await db.update(children).set(patch).where(eq(children.id, kid.id));
+
+    // Audit row so Kevin can spot-check Simon's work. Snapshot diff lets
+    // him see exact before→after for every changed field. actorId='simon'
+    // | 'admin' distinguishes who did what.
+    await audit({
+      table: 'children',
+      recordId: kid.id,
+      action: 'UPDATE',
+      actorType: 'admin',
+      actorId: role || 'admin',
+      before: kid as unknown as Record<string, unknown>,
+      after: { ...(kid as unknown as Record<string, unknown>), ...patch },
+    });
 
     return NextResponse.json({ ok: true, recordId: kid.id });
   } catch (err) {

@@ -19,6 +19,7 @@ import { verifyAdminToken } from '@/lib/auth';
 import { getAdminRole } from '@/lib/admin-session';
 import { db } from '@/lib/db/client';
 import { children } from '@/lib/db/schema';
+import { audit } from '@/lib/db/mutations';
 import { eq } from 'drizzle-orm';
 
 export async function POST(request: NextRequest) {
@@ -94,6 +95,17 @@ export async function POST(request: NextRequest) {
     }
 
     await db.update(children).set(patch).where(eq(children.id, kid.id));
+
+    const role = await getAdminRole();
+    await audit({
+      table: 'children',
+      recordId: kid.id,
+      action: 'UPDATE',
+      actorType: 'admin',
+      actorId: role || 'admin',
+      before: kid as unknown as Record<string, unknown>,
+      after: { ...(kid as unknown as Record<string, unknown>), ...patch },
+    });
 
     return NextResponse.json({
       ok: true,

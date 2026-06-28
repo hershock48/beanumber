@@ -49,8 +49,13 @@ interface AuditArgs {
  * Diffs before/after and writes a compact changed_fields jsonb.
  * Falls back to a full snapshot for inserts. Failures are logged but
  * never thrown — audit must not break the underlying write.
+ *
+ * Exported so admin API routes (e.g. /api/admin/roster/*) can stamp
+ * an audit row for every UI-driven mutation. actorType='admin' +
+ * actorId='simon' | 'admin' is the convention for admin-UI edits —
+ * gives Kevin a real change log to spot-check Simon's roster work.
  */
-async function audit(args: AuditArgs) {
+export async function audit(args: AuditArgs) {
   try {
     const changed = computeChangedFields(args.before, args.after);
     await db.insert(auditLog).values({

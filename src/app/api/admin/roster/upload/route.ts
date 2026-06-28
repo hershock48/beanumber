@@ -32,6 +32,7 @@ import { getAdminRole } from '@/lib/admin-session';
 import { sendEmail } from '@/lib/email';
 import { db } from '@/lib/db/client';
 import { children, sponsorships } from '@/lib/db/schema';
+import { audit } from '@/lib/db/mutations';
 import { and, eq, or } from 'drizzle-orm';
 import { uploadAttachment } from '@/lib/storage';
 
@@ -174,6 +175,16 @@ export async function POST(request: NextRequest) {
     }
 
     await db.update(children).set(patch).where(eq(children.id, kid.id));
+
+    await audit({
+      table: 'children',
+      recordId: kid.id,
+      action: 'UPDATE',
+      actorType: 'admin',
+      actorId: role || 'admin',
+      before: kid as unknown as Record<string, unknown>,
+      after: { ...(kid as unknown as Record<string, unknown>), ...patch },
+    });
 
     // Sponsor notification.
     let notifyResult: { sent: number; failed: number; skipped?: boolean } = {

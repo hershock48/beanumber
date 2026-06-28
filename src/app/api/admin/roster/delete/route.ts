@@ -27,6 +27,7 @@ import { verifyAdminToken } from '@/lib/auth';
 import { getAdminRole } from '@/lib/admin-session';
 import { db } from '@/lib/db/client';
 import { children, sponsorships } from '@/lib/db/schema';
+import { audit } from '@/lib/db/mutations';
 import { and, eq, inArray, or } from 'drizzle-orm';
 
 async function findKid(shirtNumber: number) {
@@ -139,6 +140,15 @@ export async function POST(request: NextRequest) {
         .update(children)
         .set({ deletionRequestedAt: new Date(), updatedAt: new Date() })
         .where(eq(children.id, kid.id));
+      await audit({
+        table: 'children',
+        recordId: kid.id,
+        action: 'UPDATE',
+        actorType: 'admin',
+        actorId: role || 'admin',
+        before: kid as unknown as Record<string, unknown>,
+        after: { ...(kid as unknown as Record<string, unknown>), deletionRequestedAt: new Date() },
+      });
       return NextResponse.json({ ok: true, action: 'request', name: displayName });
     }
 
@@ -148,6 +158,15 @@ export async function POST(request: NextRequest) {
         .update(children)
         .set({ deletionRequestedAt: null, updatedAt: new Date() })
         .where(eq(children.id, kid.id));
+      await audit({
+        table: 'children',
+        recordId: kid.id,
+        action: 'UPDATE',
+        actorType: 'admin',
+        actorId: role || 'admin',
+        before: kid as unknown as Record<string, unknown>,
+        after: { ...(kid as unknown as Record<string, unknown>), deletionRequestedAt: null },
+      });
       return NextResponse.json({ ok: true, action: 'reject', name: displayName });
     }
 
@@ -157,6 +176,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: safe.reason }, { status: 409 });
     }
     await db.delete(children).where(eq(children.id, kid.id));
+    await audit({
+      table: 'children',
+      recordId: kid.id,
+      action: 'DELETE',
+      actorType: 'admin',
+      actorId: role || 'admin',
+      before: kid as unknown as Record<string, unknown>,
+    });
     return NextResponse.json({
       ok: true,
       action: 'delete',

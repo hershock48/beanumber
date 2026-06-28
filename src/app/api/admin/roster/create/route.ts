@@ -22,8 +22,10 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdminToken } from '@/lib/auth';
+import { getAdminRole } from '@/lib/admin-session';
 import { db } from '@/lib/db/client';
 import { children } from '@/lib/db/schema';
+import { audit } from '@/lib/db/mutations';
 import { sql } from 'drizzle-orm';
 
 export async function POST(request: NextRequest) {
@@ -74,6 +76,16 @@ export async function POST(request: NextRequest) {
       })
       .returning({ id: children.id });
     const recordId = inserted[0].id;
+
+    const role = await getAdminRole();
+    await audit({
+      table: 'children',
+      recordId,
+      action: 'INSERT',
+      actorType: 'admin',
+      actorId: role || 'admin',
+      after: { childId, shirtNumber, firstName, displayName: displayName || firstName, status: 'Active', notes: intakeFromCampus || null },
+    });
 
     return NextResponse.json({
       ok: true,

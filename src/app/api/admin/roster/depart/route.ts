@@ -21,7 +21,7 @@ import { getAdminRole } from '@/lib/admin-session';
 import { db } from '@/lib/db/client';
 import { children } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
-import { markChildDeparted } from '@/lib/db/mutations';
+import { audit, markChildDeparted } from '@/lib/db/mutations';
 
 async function findKid(shirtNumber: number) {
   const rows = await db
@@ -85,45 +85,44 @@ export async function POST(request: NextRequest) {
           { status: 409 }
         );
       }
-      await db
-        .update(children)
-        .set({
-          departureRequestedAt: new Date(),
-          departureRequestedNote: note || null,
-          updatedAt: new Date(),
-        })
-        .where(eq(children.id, kid.id));
+      const patch = { departureRequestedAt: new Date(), departureRequestedNote: note || null };
+      await db.update(children).set({ ...patch, updatedAt: new Date() }).where(eq(children.id, kid.id));
+      await audit({
+        table: 'children', recordId: kid.id, action: 'UPDATE',
+        actorType: 'admin', actorId: role,
+        before: kid as unknown as Record<string, unknown>,
+        after: { ...(kid as unknown as Record<string, unknown>), ...patch },
+      });
       return NextResponse.json({ ok: true, action, name: displayName });
     }
 
     if (action === 'reject') {
-      await db
-        .update(children)
-        .set({
-          departureRequestedAt: null,
-          departureRequestedNote: null,
-          updatedAt: new Date(),
-        })
-        .where(eq(children.id, kid.id));
+      const patch = { departureRequestedAt: null, departureRequestedNote: null };
+      await db.update(children).set({ ...patch, updatedAt: new Date() }).where(eq(children.id, kid.id));
+      await audit({
+        table: 'children', recordId: kid.id, action: 'UPDATE',
+        actorType: 'admin', actorId: role,
+        before: kid as unknown as Record<string, unknown>,
+        after: { ...(kid as unknown as Record<string, unknown>), ...patch },
+      });
       return NextResponse.json({ ok: true, action, name: displayName });
     }
 
     if (action === 'restore') {
-      // Bring back the kid: clear departure fields, restore shirt
-      // number from archive if available, flip status back to Active.
-      await db
-        .update(children)
-        .set({
-          departedAt: null,
-          departureNote: null,
-          departureRequestedAt: null,
-          departureRequestedNote: null,
-          status: 'Active',
-          shirtNumber: kid.shirtNumber ?? kid.archivedShirtNumber,
-          archivedShirtNumber: kid.shirtNumber ? kid.archivedShirtNumber : null,
-          updatedAt: new Date(),
-        })
-        .where(eq(children.id, kid.id));
+      const patch = {
+        departedAt: null, departureNote: null,
+        departureRequestedAt: null, departureRequestedNote: null,
+        status: 'Active',
+        shirtNumber: kid.shirtNumber ?? kid.archivedShirtNumber,
+        archivedShirtNumber: kid.shirtNumber ? kid.archivedShirtNumber : null,
+      };
+      await db.update(children).set({ ...patch, updatedAt: new Date() }).where(eq(children.id, kid.id));
+      await audit({
+        table: 'children', recordId: kid.id, action: 'UPDATE',
+        actorType: 'admin', actorId: role,
+        before: kid as unknown as Record<string, unknown>,
+        after: { ...(kid as unknown as Record<string, unknown>), ...patch },
+      });
       return NextResponse.json({ ok: true, action, name: displayName });
     }
 
