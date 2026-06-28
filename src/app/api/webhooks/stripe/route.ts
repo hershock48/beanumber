@@ -9,6 +9,8 @@ import {
   mirrorSubscriptionDeleted,
   mirrorRefund,
   mirrorDripFields,
+  mirrorCommunication,
+  findDonationByPaymentIntent,
 } from '@/lib/db/webhook-bridge';
 
 // Allow up to 60 seconds for the webhook handler. The default 10s on
@@ -746,10 +748,31 @@ async function createCommunicationRecord(
     subject: string;
     body: string;
     status: string;
+    emailType?: string; // 'Thank You' (default) | 'Drip' | 'Receipt' | etc.
+    // Stripe Payment Intent ID — used by the Postgres mirror to link
+    // the row to the donations table. All current webhook call sites
+    // are inside handleCheckoutSessionCompleted where paymentIntentId
+    // is in scope; passing it lets the mirror produce a fully-linked
+    // audit row instead of a floating one.
+    stripePaymentIntentId?: string | null;
   }
 ): Promise<string> {
+  // Postgres-first: write the audit row to communications regardless of
+  // Airtable health. Email itself already sent via SendGrid; this is
+  // pure record-keeping. mirrorToPostgres swallows errors so a Postgres
+  // outage can't block the Airtable write either.
+  await mirrorToPostgres('communication', () =>
+    mirrorCommunication({
+      recipientEmail: emailData.email,
+      subject: emailData.subject,
+      status: emailData.status,
+      emailType: emailData.emailType,
+      stripePaymentIntentId: emailData.stripePaymentIntentId ?? null,
+    })
+  );
+
   if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) {
-    console.warn('[WH] Communication: missing Airtable creds, skipping (non-fatal)');
+    console.warn('[WH] Communication: missing Airtable creds, skipping Airtable side (Postgres mirrored)');
     return '';
   }
 
@@ -1829,7 +1852,28 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
     // fulfillment record creation) have already run — they execute BEFORE
     // the donation upsert in every flow.  Emails / drip / notifications
     // are non-fatal and safe to skip on retry.
+    //
+    // Postgres-first: ask the donations table directly. This is the only
+    // store that's reliably available — Airtable can be down or quota-
+    // limited and we still need idempotency to hold so Stripe retries
+    // during an Airtable outage don't double-process the same payment
+    // (duplicate admin emails, duplicate drip enrollment, etc.).
     // ────────────────────────────────────────────────────────────────────
+    const pgIdempotency = await findDonationByPaymentIntent(paymentIntentId);
+    if (pgIdempotency) {
+      console.log(
+        `[WH] IDEMPOTENCY (pg): donation already exists for PI ${paymentIntentId}, ` +
+        `status=${pgIdempotency.paymentStatus}, id=${pgIdempotency.id}. Skipping all side effects.`
+      );
+      return;
+    }
+
+    // Secondary defense: the original Airtable-based check stays until we
+    // cut over fully. If Postgres said "no row yet" but Airtable already
+    // logged this PI (the most likely cause is a Postgres write that
+    // hadn't landed at retry time), skip the side effects on Airtable's
+    // word. If Airtable is down, this block is a no-op and Postgres
+    // already had the final say above.
     if (AIRTABLE_API_KEY && AIRTABLE_BASE_ID) {
       const idempotencyFormula = `{Stripe Payment Intent ID} = "${paymentIntentId}"`;
       try {
@@ -2140,6 +2184,7 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
           subject: `Your ${cartItems.length} shirt${cartItems.length > 1 ? 's are' : ' is'} being made.`,
           body: `Cart order: ${assignmentNotes.join('; ')}`,
           status: emailStatus,
+          stripePaymentIntentId: paymentIntentId,
         });
       } catch (err) {
         console.error('[WH] Cart communication record failed:', err);
@@ -2339,6 +2384,7 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
           subject: `You're sponsoring ${childDisplayName}.`,
           body: `Sponsorship welcome. Code: ${sponsorCode || 'N/A'}. Child: ${childDisplayName} (${childId || 'no id'}). $${amount.toFixed(2)}/mo.`,
           status: emailStatus,
+          stripePaymentIntentId: paymentIntentId,
         });
       } catch (err) {
         console.error('[Webhook] Failed to create communication record:', err);
@@ -2494,6 +2540,7 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
           subject: 'Your shirt + monthly sponsorship is confirmed.',
           body: `Shirt+Monthly (stockpile, match pending): ${shirtName} (${shirtColor}, ${shirtSize}) / $${amount.toFixed(2)}/mo`,
           status: emailStatus,
+          stripePaymentIntentId: paymentIntentId,
         });
       } catch (err) {
         console.error('[Webhook] Failed to create communication record (shirt+monthly):', err);
@@ -2645,6 +2692,7 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
           subject: 'Your shirt is being made right now.',
           body: `Shirt order (stockpile, number not yet assigned): ${shirtName} (${shirtColor}, ${shirtSize}) / $${amount.toFixed(2)}`,
           status: emailStatus,
+          stripePaymentIntentId: paymentIntentId,
         });
       } catch (error) {
         console.error('[Webhook] Failed to create communication record:', error);
@@ -2830,6 +2878,7 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
           subject: `Your reorder is being made (#${existingShirtNumber}).`,
           body: `Portal reorder: ${shirtName} (${shirtColor}, ${shirtSize}) / $${amount.toFixed(2)} / Re-using #${existingShirtNumber} (${childDisplayName})`,
           status: emailStatus,
+          stripePaymentIntentId: paymentIntentId,
         });
       } catch (error) {
         console.error('[Webhook] Failed to create communication record (portal-repeat):', error);
@@ -2938,6 +2987,7 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
           subject: `Your ${merchName} order is being made.`,
           body: `Merch order: ${merchName}${size ? ` (${size})` : ''}, #${shirtNumber}, ${childDisplayName || ''} / $${amount.toFixed(2)}`,
           status: emailStatus,
+          stripePaymentIntentId: paymentIntentId,
         });
       } catch (err) {
         console.error('[WH] Failed to create communication record (merch):', err);
@@ -3103,6 +3153,7 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
             `/ Assigned #${assignedChild?.shirtNumber || 'none'} ${assignedChild?.displayName || ''} ` +
             `/ Recipient email: ${recipientEmailStatus} / Gifter email: ${gifterEmailStatus}`,
           status: recipientEmailStatus === 'Sent' ? 'Sent' : 'Failed',
+          stripePaymentIntentId: paymentIntentId,
         });
       } catch (error) {
         console.error('[Webhook] Failed to create communication record (gift_sponsorship):', error);
@@ -3182,6 +3233,7 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
           subject: isRecurring ? 'You just became a monthly sponsor.' : 'Thank you. This matters.',
           body: `${isRecurring ? 'Monthly sponsor' : 'One-time gift'} of $${amount.toFixed(2)}.`,
           status: emailStatus,
+          stripePaymentIntentId: paymentIntentId,
         });
       } catch (error) {
         console.error('[Webhook] Failed to create communication record:', error);

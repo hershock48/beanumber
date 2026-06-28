@@ -46,8 +46,39 @@ import {
   type UpsertSubscriptionInput,
 } from './mutations';
 import { db } from './client';
-import { children, donors, sponsorships } from './schema';
+import { children, communications, donations, donors, sponsorships } from './schema';
 import { and, eq, sql } from 'drizzle-orm';
+
+// ─── Idempotency lookup (used by the Stripe webhook) ────────────
+//
+// Before Airtable was the only memory of "we already processed this
+// PaymentIntent." When Airtable was down, Stripe retries would
+// re-fire every side effect. Now we ask Postgres first: if a
+// donations row already exists for this PI, the webhook returns
+// early. Safe to call on every event; failures swallow to undefined
+// so a Postgres outage can't block the webhook either.
+export async function findDonationByPaymentIntent(
+  paymentIntentId: string
+): Promise<{ id: string; paymentStatus: string | null } | null> {
+  if (!paymentIntentId) return null;
+  try {
+    const rows = await db
+      .select({
+        id: donations.id,
+        paymentStatus: donations.paymentStatus,
+      })
+      .from(donations)
+      .where(eq(donations.stripePaymentIntentId, paymentIntentId))
+      .limit(1);
+    return rows[0] ?? null;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(
+      `[pg-mirror] ✗ idempotency lookup PI=${paymentIntentId}: ${msg}`
+    );
+    return null;
+  }
+}
 
 /**
  * Universal wrapper. Use at every call site:
@@ -395,6 +426,70 @@ export async function mirrorDripFields(args: {
       updatedAt: new Date(),
     })
     .where(sql`lower(${donors.email}) = ${args.email.toLowerCase()}`);
+}
+
+// ─── Communications (audit trail of webhook-triggered emails) ────
+//
+// The Communications table is a log of which emails went out for
+// which orders. Until now it lived only in Airtable, so an Airtable
+// outage during a webhook would drop the audit row — the email
+// itself still sent via SendGrid, but we lost the record. This
+// mirror keeps the trail in Postgres regardless of Airtable health.
+//
+// Schema is intentionally narrow: subject, status, recipient,
+// emailType, related donor/donation. The full email body is not
+// stored here — SendGrid logs hold that. We rely on the related
+// donation foreign key for joins; if we can't resolve the donation
+// (PI not yet mirrored, or this email isn't tied to a payment) we
+// store the row anyway with related_donation_id = null.
+export interface MirrorCommunicationArgs {
+  recipientEmail: string;
+  subject: string;
+  status: string; // 'Sent' | 'Failed' | 'Bounced'
+  emailType?: string; // 'Thank You' | 'Drip' | 'Receipt' | etc.
+  // Used to find the related donation row by natural key. Optional —
+  // not every webhook-driven email is tied to a Stripe payment.
+  stripePaymentIntentId?: string | null;
+}
+
+export async function mirrorCommunication(args: MirrorCommunicationArgs) {
+  const email = args.recipientEmail.toLowerCase().trim();
+  if (!email) return null;
+
+  // Best-effort donor lookup. Email is the canonical key.
+  const donorRow = await db
+    .select({ id: donors.id })
+    .from(donors)
+    .where(sql`lower(${donors.email}) = ${email}`)
+    .limit(1);
+  const donorId = donorRow[0]?.id ?? null;
+
+  // Best-effort donation lookup. PI is uniquely indexed so this is
+  // a single-key hit when present.
+  let donationId: string | null = null;
+  if (args.stripePaymentIntentId) {
+    const donationRow = await db
+      .select({ id: donations.id })
+      .from(donations)
+      .where(eq(donations.stripePaymentIntentId, args.stripePaymentIntentId))
+      .limit(1);
+    donationId = donationRow[0]?.id ?? null;
+  }
+
+  const [inserted] = await db
+    .insert(communications)
+    .values({
+      subject: args.subject,
+      sendDate: new Date().toISOString().slice(0, 10),
+      status: args.status,
+      recipientEmail: args.recipientEmail,
+      emailType: args.emailType ?? 'Thank You',
+      relatedDonorId: donorId,
+      relatedDonationId: donationId,
+    })
+    .returning({ id: communications.id });
+
+  return inserted;
 }
 
 // ─── Re-exports for convenience ──────────────────────────────────
