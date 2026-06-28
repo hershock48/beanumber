@@ -13,6 +13,7 @@
     "check-airtable": "tsx scripts/check-airtable-setup.ts",
     "migrate-csv": "tsx scripts/migrate-from-csv.ts",
     "migrate-csv-dry": "tsx scripts/migrate-from-csv.ts --dry-run",
+    "backfill-market": "tsx scripts/backfill-market-sales.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
