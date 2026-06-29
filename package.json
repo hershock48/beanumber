@@ -38,10 +38,8 @@
     "postgres": "^3.4.9",
     "react": "19.2.3",
     "react-dom": "19.2.3",
-    "react-globe.gl": "^2.38.0",
     "remotion": "^4.0.409",
-    "stripe": "^20.1.2",
-    "three": "^0.173.0"
+    "stripe": "^20.1.2"
   },
   "devDependencies": {
     "@resvg/resvg-js": "^2.6.2",
