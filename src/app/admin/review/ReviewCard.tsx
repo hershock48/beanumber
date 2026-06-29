@@ -42,16 +42,19 @@ export function ReviewCard({ kid, labels }: ReviewCardProps) {
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [status, setStatus] = useState<string | null>(null);
 
   const pending = FIELD_KEYS.filter(
     k => typeof kid.pendingDraft[k] === 'string'
   );
+  const firstName = kid.displayName?.split(' ')[0] || `#${kid.shirtNumber}`;
 
   const doApprove = async (
     action: 'approveAll' | { field: FieldKey; decision: 'accept' | 'dismiss' }
   ) => {
     setBusy(typeof action === 'string' ? 'all' : `${action.field}-${action.decision}`);
     setError(null);
+    setStatus(null);
     try {
       const res = await fetch('/api/admin/roster/approve', {
         method: 'POST',
@@ -61,9 +64,26 @@ export function ReviewCard({ kid, labels }: ReviewCardProps) {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Approval failed');
+
+      // Stamp a success line BEFORE router.refresh() so the message
+      // survives the re-render. router.refresh() refetches server data
+      // but preserves React state in this client component.
+      if (typeof action === 'string') {
+        setStatus(`✓ Approved all of ${firstName}'s pending edits.`);
+      } else {
+        const label = labels[action.field] || action.field;
+        const remainingCount = pending.length - 1;
+        const verb = action.decision === 'accept' ? 'Approved' : 'Dismissed';
+        setStatus(
+          remainingCount > 0
+            ? `✓ ${verb} ${firstName}'s ${label.toLowerCase()}. ${remainingCount} field${remainingCount === 1 ? '' : 's'} left.`
+            : `✓ ${verb} ${firstName}'s ${label.toLowerCase()}. ${firstName} is done — clearing from queue…`
+        );
+      }
       router.refresh();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Something went wrong');
+    } finally {
       setBusy(null);
     }
   };
@@ -97,11 +117,10 @@ export function ReviewCard({ kid, labels }: ReviewCardProps) {
           >
             {kid.displayName}
           </p>
-          {kid.lastEditedBySimon && (
-            <p className="text-xs text-[#888] mt-0.5">
-              Edited {formatRelative(kid.lastEditedBySimon)}
-            </p>
-          )}
+          <p className="text-xs text-[#888] mt-0.5">
+            {pending.length} field{pending.length === 1 ? '' : 's'} pending
+            {kid.lastEditedBySimon && ` · edited ${formatRelative(kid.lastEditedBySimon)}`}
+          </p>
         </div>
         <div className="flex flex-col sm:flex-row gap-2 flex-shrink-0">
           <button
@@ -110,7 +129,9 @@ export function ReviewCard({ kid, labels }: ReviewCardProps) {
             disabled={busy !== null}
             className="px-4 py-2 bg-[#D4A843] hover:bg-[#c49a3a] text-[#0d0d0d] text-xs font-bold uppercase tracking-wider transition-colors disabled:opacity-50"
           >
-            {busy === 'all' ? 'Approving...' : 'Approve all'}
+            {busy === 'all'
+              ? 'Approving...'
+              : `Approve all ${pending.length}`}
           </button>
           <Link
             href={`/admin/roster/${kid.shirtNumber}`}
@@ -166,7 +187,9 @@ export function ReviewCard({ kid, labels }: ReviewCardProps) {
                   disabled={busy !== null}
                   className="px-3 py-1.5 bg-[#0d0d0d] hover:bg-[#333] text-white text-xs font-bold uppercase tracking-wider transition-colors disabled:opacity-50"
                 >
-                  {busy === `${key}-accept` ? 'Accepting...' : 'Accept'}
+                  {busy === `${key}-accept`
+                    ? 'Approving...'
+                    : `Approve this ${(labels[key] || key).toLowerCase()}`}
                 </button>
                 <button
                   type="button"
@@ -180,6 +203,11 @@ export function ReviewCard({ kid, labels }: ReviewCardProps) {
             </div>
           );
         })}
+        {status && (
+          <div className="p-4 text-sm text-[#0d0d0d] bg-[#FFF8F0] border-t border-[#D4A843]/40">
+            {status}
+          </div>
+        )}
         {error && (
           <div className="p-5 text-sm text-[#a85a3a] bg-[#fdf3ef]">
             {error}
