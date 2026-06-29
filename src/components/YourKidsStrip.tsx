@@ -34,6 +34,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { SESSION } from '@/lib/constants';
 import { YourKidsStripSticky } from './YourKidsStripSticky';
+import { YourKidsCoachmark } from './YourKidsCoachmark';
 import { getViewerSponsorships } from '@/lib/db/queries';
 
 interface KidLink {
@@ -217,6 +218,12 @@ export async function YourKidsStrip({
           </Link>
         </div>
       </div>
+      {/* First-visit coachmark — explains the strip the first time a
+          viewer has 2+ kids. Self-dismissing, localStorage-gated,
+          never returns once seen. Pass total kid count (not just
+          the strip's display count) so it fires even when the
+          current page kid is excluded from the visible list. */}
+      <YourKidsCoachmark kidsCount={allKids.length} />
     </div>
     </YourKidsStripSticky>
   );
