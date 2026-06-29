@@ -895,7 +895,10 @@ export const auditLog = pgTable(
     // 'INSERT' | 'UPDATE' | 'DELETE'
     action: text('action').notNull(),
     changedFields: jsonb('changed_fields'),
-    actorId: uuid('actor_id'),
+    // text (not uuid) so admin-UI edits can stamp actor_id='simon' |
+    // 'admin' for spot-checking. System / webhook actors may still
+    // store real UUIDs here when relevant — no constraint either way.
+    actorId: text('actor_id'),
     // 'admin' | 'system' | 'webhook' | 'sponsor' | 'migration'
     actorType: text('actor_type'),
     occurredAt: timestamp('occurred_at', { withTimezone: true })
