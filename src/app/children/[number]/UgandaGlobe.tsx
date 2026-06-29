@@ -4,44 +4,32 @@
  * CSS-animated globe with Uganda highlighted.
  *
  * Pure CSS + SVG implementation — no Three.js, no react-globe.gl, no
- * runtime dependencies. A flat equirectangular Earth texture scrolls
- * across a circular mask, simulating rotation. Box-shadow on the
- * circle gives it 3D depth. An SVG overlay marks Uganda's location
- * with a pulsing gold dot.
+ * runtime dependencies. The Earth texture is positioned so Uganda
+ * sits at the center-front of the visible sphere; a gold marker
+ * pulses over that exact spot. Ambient motion (gentle sway + breath
+ * glow) keeps the globe feeling alive without the marker drifting
+ * off the country it's anchored to.
  *
  * Why CSS instead of WebGL:
  *   - Always renders (no library compatibility risks on Next 16 +
  *     React 19 + turbopack).
  *   - ~5KB total weight vs ~700KB for Three.js.
- *   - Performant on every device including 4-year-old phones.
- *   - Looks legitimately premium when paired with a real Earth
- *     texture and proper shading.
+ *   - Performant on every device.
  *
- * Behavior:
- *   - Page load: ambient rotation kicks in immediately.
- *   - Uganda pulses gold continuously (gentle, ~2s cycle).
- *   - Click → fires onClick to open the context panel in the parent.
- *
- * The Earth texture is served from a public NASA Blue Marble URL via
- * a CDN. ~50KB, cached aggressively after first load.
+ * Texture math:
+ *   - Equirectangular projection: lng -180..+180, lat +90..-90.
+ *   - Uganda center: lat 1.37°N, lng 32.29°E.
+ *   - On a 2:1 texture sized to 200% of the container width, Uganda
+ *     sits at backgroundPosition X = -(58.97% - 25%) * 2 = -67.94%
+ *     to center it in the visible circle. Sway oscillates around
+ *     that value by ±4% for a subtle "breathing planet" effect.
  */
 
 const GLOBE_DIAMETER = 240;
 
 // NASA Blue Marble equirectangular — public domain, served via jsdelivr.
-// Wide aspect ratio (2:1) so we can pan the background-position to
-// simulate rotation across the full surface.
 const EARTH_TEXTURE_URL =
   '//cdn.jsdelivr.net/npm/three-globe/example/img/earth-blue-marble.jpg';
-
-// Uganda's approximate position on an equirectangular projection,
-// expressed as percentages of the texture's width/height.
-// Uganda center: lat ~1.37° N, lng ~32.29° E.
-// On an equirectangular map (-180..+180 lng, +90..-90 lat):
-//   x% = (32.29 + 180) / 360 = 58.97%
-//   y% = (90 - 1.37) / 180 = 49.23%
-const UGANDA_X_PCT = 58.97;
-const UGANDA_Y_PCT = 49.23;
 
 export function UgandaGlobe({ onClick }: { onClick?: () => void }) {
   return (
@@ -50,14 +38,13 @@ export function UgandaGlobe({ onClick }: { onClick?: () => void }) {
       className="relative cursor-pointer select-none group"
       style={{ width: GLOBE_DIAMETER, height: GLOBE_DIAMETER }}
       title="Click to learn more about Uganda"
-      aria-label="Rotating globe showing the location of Uganda"
+      aria-label="Globe showing the location of Uganda"
     >
-      {/* The globe — a circular div with the Earth texture scrolling
-          horizontally as background-position. Box-shadow inset on the
-          edges gives the illusion of a sphere; box-shadow outset adds
-          a soft glow + drop shadow. */}
+      {/* The sphere — circular div masked over the Earth texture, with
+          Uganda positioned at the center-front. Gently sways for an
+          ambient "alive" feel without losing the marker's anchor. */}
       <div
-        className="globe-sphere"
+        className="ban-globe-sphere"
         style={{
           width: '100%',
           height: '100%',
@@ -65,14 +52,14 @@ export function UgandaGlobe({ onClick }: { onClick?: () => void }) {
           backgroundImage: `url('${EARTH_TEXTURE_URL}')`,
           backgroundSize: '200% 100%',
           backgroundRepeat: 'no-repeat',
-          backgroundPosition: '0% 50%',
-          animation: 'ban-globe-spin 60s linear infinite',
+          backgroundPosition: '-67.94% 50%',
+          animation: 'ban-globe-sway 24s ease-in-out infinite',
           boxShadow:
             'inset -25px -25px 50px rgba(0,0,0,0.55), inset 15px 15px 35px rgba(255,255,255,0.08), 0 8px 24px rgba(0,0,0,0.35), 0 0 40px rgba(212,168,67,0.18)',
         }}
       />
 
-      {/* Atmospheric glow ring */}
+      {/* Atmospheric glow ring — breathes slowly. */}
       <div
         aria-hidden
         style={{
@@ -85,13 +72,8 @@ export function UgandaGlobe({ onClick }: { onClick?: () => void }) {
         }}
       />
 
-      {/* Uganda marker — sits at Uganda's coordinates on the texture,
-          pulses gold. Positioned with absolute % so it stays anchored
-          to the visible "front face" of the sphere as it spins.
-          Important: the marker doesn't actually move with the texture
-          rotation — it always points at the center-front of the globe
-          where Uganda appears most of the time. A small inset keeps
-          it from sliding off the edge curvature. */}
+      {/* Uganda marker — sits at the center where Uganda is rendered
+          on the texture. Pulsing ring + solid gold dot. */}
       <svg
         viewBox="0 0 100 100"
         style={{
@@ -103,7 +85,7 @@ export function UgandaGlobe({ onClick }: { onClick?: () => void }) {
         }}
         aria-hidden
       >
-        {/* Pulsing ring */}
+        {/* Outer pulsing ring */}
         <circle
           cx="50"
           cy="50"
@@ -127,7 +109,7 @@ export function UgandaGlobe({ onClick }: { onClick?: () => void }) {
         />
       </svg>
 
-      {/* Hover affordance — subtle highlight to suggest clickability */}
+      {/* Hover affordance */}
       <div
         aria-hidden
         className="opacity-0 group-hover:opacity-100 transition-opacity"
@@ -141,12 +123,10 @@ export function UgandaGlobe({ onClick }: { onClick?: () => void }) {
         }}
       />
 
-      {/* Inline keyframes — keeping them local to the component so we
-          don't pollute globals.css with a one-off animation set. */}
       <style jsx>{`
-        @keyframes ban-globe-spin {
-          0%   { background-position: 0% 50%; }
-          100% { background-position: -200% 50%; }
+        @keyframes ban-globe-sway {
+          0%, 100% { background-position: -67.94% 50%; }
+          50%      { background-position: -71.94% 50%; }
         }
         @keyframes ban-globe-pulse {
           0%   { transform: scale(1);   opacity: 0.9; }

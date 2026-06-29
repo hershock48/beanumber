@@ -31,13 +31,13 @@ export function LocationBlock() {
     <div className="mb-2">
       {/* Globe sits as the visual centerpiece. Click it OR the label
           below to open the context panel. */}
-      <div className="flex flex-col items-start">
+      <div className="flex flex-col items-start gap-4">
         <UgandaGlobe onClick={() => setOpen(o => !o)} />
 
         <button
           type="button"
           onClick={() => setOpen(o => !o)}
-          className="group inline-flex items-center gap-2 text-left -mt-2"
+          className="group inline-flex items-center gap-2 text-left"
           aria-expanded={open}
           aria-controls="location-detail"
         >
