@@ -45,7 +45,7 @@ export function LocationBlock() {
             Lives in
           </span>
           <span className="text-base md:text-lg text-[#0d0d0d] underline decoration-[#D4A843]/40 decoration-2 underline-offset-4 group-hover:decoration-[#D4A843]">
-            Uganda
+            Uganda, Africa
           </span>
           <svg
             className={`w-3 h-3 text-[#aaa] transition-transform ${open ? 'rotate-180' : ''}`}
