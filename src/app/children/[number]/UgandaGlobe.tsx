@@ -53,7 +53,6 @@ export function UgandaGlobe({ onClick }: { onClick?: () => void }) {
           backgroundSize: '200% 100%',
           backgroundRepeat: 'no-repeat',
           backgroundPosition: '67.94% 50%',
-          animation: 'ban-globe-sway 24s ease-in-out infinite',
           boxShadow:
             'inset -25px -25px 50px rgba(0,0,0,0.55), inset 15px 15px 35px rgba(255,255,255,0.08), 0 8px 24px rgba(0,0,0,0.35), 0 0 40px rgba(212,168,67,0.18)',
         }}
@@ -124,10 +123,6 @@ export function UgandaGlobe({ onClick }: { onClick?: () => void }) {
       />
 
       <style jsx>{`
-        @keyframes ban-globe-sway {
-          0%, 100% { background-position: 67.94% 50%; }
-          50%      { background-position: 63.94% 50%; }
-        }
         @keyframes ban-globe-pulse {
           0%   { transform: scale(1);   opacity: 0.9; }
           60%  { transform: scale(4);   opacity: 0;   }

@@ -28,16 +28,16 @@ export function LocationBlock() {
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="mb-2">
-      {/* Globe sits as the visual centerpiece. Click it OR the label
-          below to open the context panel. */}
-      <div className="flex flex-col items-start gap-4">
+    <div className="mb-2 w-full">
+      {/* Globe is the visual centerpiece — click it or the label below
+          to expand the context panel. Centered in the hero column. */}
+      <div className="flex flex-col items-center gap-4">
         <UgandaGlobe onClick={() => setOpen(o => !o)} />
 
         <button
           type="button"
           onClick={() => setOpen(o => !o)}
-          className="group inline-flex items-center gap-2 text-left"
+          className="group inline-flex items-center gap-2"
           aria-expanded={open}
           aria-controls="location-detail"
         >

@@ -1260,12 +1260,13 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
           previousChildName={child.previous_kid_name ?? null}
         >
         <RevealOverlay shirtNumber={Number(number)} childName={displayName}>
-        <div className="grid md:grid-cols-2 gap-5 md:gap-14 items-start">
-          {/* Photo — shorter on mobile to keep the CTA reachable without
-              a marathon scroll. Desktop keeps the taller portrait crop.
-              Multiple photos render as a horizontal scroll-snap
-              carousel; single photo or none falls back to the static
-              hero. */}
+        {/* Centered hero: photo on top, everything (name, meaning, globe,
+            location, age/grade) stacked centered below. Pulls the eye
+            into a single reading lane instead of zigzagging between
+            two columns. max-w-xl keeps the photo a portrait crop rather
+            than a wide cinematic. */}
+        <div className="max-w-xl mx-auto">
+          {/* Photo */}
           <div className="aspect-[4/4] md:aspect-[4/5] bg-[#f5f0e8] border border-[#e8e0d4] overflow-hidden relative">
             {child.photo_urls && child.photo_urls.length > 1 ? (
               <div className="w-full h-full overflow-x-auto snap-x snap-mandatory flex">
@@ -1321,8 +1322,8 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
             </div>
           </div>
 
-          {/* Details */}
-          <div className="flex flex-col justify-center py-0 md:py-4">
+          {/* Details — centered text column under the photo. */}
+          <div className="flex flex-col items-center text-center pt-6 md:pt-8">
             {/* Departure banner — when the kid is no longer at the
                 campus. Under the auto-reveal model (core_model.md §0b,
                 June 2026), this state is transient: the admin marks
@@ -1336,7 +1337,7 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
                 acknowledgment. No &ldquo;pick a kid&rdquo; CTA: humans don&rsquo;t
                 pick, the Number picks. */}
             {child.departed_at && (
-              <div className="mb-4 p-5 border border-[#D4A843] bg-[#fffaf0]">
+              <div className="mb-4 p-5 border border-[#D4A843] bg-[#fffaf0] text-left w-full">
                 <p className="text-xs font-bold uppercase tracking-[0.3em] text-[#D4A843] mb-2">
                   No longer at the campus
                 </p>
@@ -1375,8 +1376,8 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
                 StudentOfMonth = no badge. The reason text renders
                 below as an italic citation. */}
             {!child.departed_at && child.student_of_month && (
-              <div className="mb-3">
-                <p className="inline-flex self-start items-center gap-1.5 bg-[#D4A843] text-[#0d0d0d] text-xs font-bold uppercase tracking-wider px-3 py-1.5">
+              <div className="mb-3 flex flex-col items-center">
+                <p className="inline-flex items-center gap-1.5 bg-[#D4A843] text-[#0d0d0d] text-xs font-bold uppercase tracking-wider px-3 py-1.5">
                   <span aria-hidden>★</span>
                   Student of the Month · {child.student_of_month}
                 </p>
@@ -1391,7 +1392,7 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
               </div>
             )}
             <h1
-              className="text-4xl md:text-5xl text-[#0d0d0d] mb-2"
+              className="text-4xl md:text-5xl text-[#0d0d0d] mb-2 text-center"
               style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
             >
               {displayName}
