@@ -1447,11 +1447,18 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
             blurred until they claim or hit Maybe later. The blur is
             the conversion lever — the gate says "you bought this
             kid, claim them to read who they are." */}
-        <div className="mt-8 md:mt-10 max-w-2xl mx-auto">
-          <div className="flex items-center justify-center gap-3 text-[#777] mb-6">
-            {child.age && <span className="text-lg">Age {child.age}</span>}
-            {child.age && child.grade_class && <span className="text-[#ccc]">&middot;</span>}
-            {child.grade_class && <span className="text-lg">{child.grade_class}</span>}
+        <div className="mt-10 md:mt-14 max-w-2xl mx-auto">
+          {/* Zone header — tells the sponsor what they're about to read
+              so the bio block doesn't just appear as floating paragraphs. */}
+          <div className="text-center mb-6 md:mb-8">
+            <p className="text-xs font-bold uppercase tracking-[0.3em] text-[#D4A843] mb-2">
+              About {firstName}
+            </p>
+            <div className="flex items-center justify-center gap-3 text-[#777]">
+              {child.age && <span className="text-base">Age {child.age}</span>}
+              {child.age && child.grade_class && <span className="text-[#ccc]">&middot;</span>}
+              {child.grade_class && <span className="text-base">{child.grade_class}</span>}
+            </div>
           </div>
 
           {/* Pull quote from the child — in their own voice. The
@@ -1761,15 +1768,43 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
         </div>
         </ClaimGate>
 
-        {/* ── Sponsor-only portal content (stats + latest update). The
-            campus newsletter no longer renders here — it lives in
-            the public CampusNewsfeed below. */}
-        {child.viewer_is_sponsor && portalData && (
-          <SponsorPortalSections
-            firstName={firstName}
-            stats={portalData.stats}
-            latestChildUpdate={portalData.latestChildUpdate}
-          />
+        {/* ── Sponsor-only zone ──
+            For active sponsors: stats + the latest direct-from-the-kid
+            update (letters, photos, report cards). For non-sponsors:
+            a clear placeholder telling them what shows up in this
+            spot once they sponsor — making the value of the monthly
+            visible without requiring them to imagine it. */}
+        {!child.departed_at && (
+          <div className="max-w-2xl mx-auto mt-12 md:mt-16">
+            <div className="text-center mb-6">
+              <p className="text-xs font-bold uppercase tracking-[0.3em] text-[#D4A843] mb-2">
+                Letters, photos, report cards
+              </p>
+              <h2
+                className="text-2xl md:text-3xl text-[#0d0d0d]"
+                style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
+              >
+                Updates straight from {firstName}.
+              </h2>
+            </div>
+            {child.viewer_is_sponsor && portalData ? (
+              <SponsorPortalSections
+                firstName={firstName}
+                stats={portalData.stats}
+                latestChildUpdate={portalData.latestChildUpdate}
+              />
+            ) : (
+              <div className="bg-[#FFF8F0] border border-[#e8e0d4] p-6 md:p-8 text-center">
+                <p className="text-[15px] md:text-base text-[#555] leading-relaxed">
+                  Once you&rsquo;re sponsoring {firstName}, this is where their
+                  handwritten letters, report cards, and personal photo
+                  updates appear — straight from the campus, three or four
+                  times a year. Sponsors get the inside view; visitors get
+                  the public campus newsletter below.
+                </p>
+              </div>
+            )}
+          </div>
         )}
 
         {/* ── Public campus newsfeed ───────────────────────────────
