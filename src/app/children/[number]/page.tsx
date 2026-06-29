@@ -1447,8 +1447,8 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
             blurred until they claim or hit Maybe later. The blur is
             the conversion lever — the gate says "you bought this
             kid, claim them to read who they are." */}
-        <div className="mt-8 md:mt-10 max-w-2xl">
-          <div className="flex items-center gap-3 text-[#777] mb-6">
+        <div className="mt-8 md:mt-10 max-w-2xl mx-auto">
+          <div className="flex items-center justify-center gap-3 text-[#777] mb-6">
             {child.age && <span className="text-lg">Age {child.age}</span>}
             {child.age && child.grade_class && <span className="text-[#ccc]">&middot;</span>}
             {child.grade_class && <span className="text-lg">{child.grade_class}</span>}
@@ -1502,8 +1502,14 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
           )}
         </div>
 
-        <div className="grid md:grid-cols-2 gap-5 md:gap-14 mt-10 md:mt-12 items-start">
-          {/* LEFT — bio + teacher + story placeholder */}
+        {/* Below the hero: bio + sponsor CTA stacked in a single centered
+            column. Originally a 2-col layout (bio left, CTA right) which
+            looked unbalanced after the hero refactor — the CTA card hung
+            off the right while everything else was centered. Now CTA
+            sits directly under the bio, centered, full width of the
+            reading column. */}
+        <div className="max-w-2xl mx-auto mt-10 md:mt-12 space-y-8">
+          {/* Bio + teacher + story placeholder */}
           <div>
             {/* Longer-form bio paragraph from the Notes field. */}
             {child.fun_fact && (
