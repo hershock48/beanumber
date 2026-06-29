@@ -40,7 +40,7 @@ export function LocationBlock() {
           Lives in
         </span>
         <span className="text-[17px] md:text-lg text-[#0d0d0d] underline decoration-[#D4A843]/40 decoration-2 underline-offset-4 group-hover:decoration-[#D4A843]">
-          Omoro District, Northern Uganda
+          Uganda
         </span>
         <svg
           className={`w-3 h-3 text-[#aaa] transition-transform ${open ? 'rotate-180' : ''}`}
