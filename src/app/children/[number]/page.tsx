@@ -20,6 +20,7 @@ import { SponsorRecoveryForm } from './SponsorRecoveryForm';
 import { OtherKidsAtCampus } from './OtherKidsAtCampus';
 import { ClaimThisNumberCard } from './ClaimThisNumberCard';
 import { ClaimGate } from './ClaimGate';
+import { LocationBlock } from './LocationBlock';
 import { YourKidsStrip } from '@/components/YourKidsStrip';
 import { AlreadySponsoringBanner } from './AlreadySponsoringBanner';
 import { RecentKidsTracker } from '@/components/RecentKidsTracker';
@@ -1444,6 +1445,13 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
             {child.age && child.grade_class && <span className="text-[#ccc]">&middot;</span>}
             {child.grade_class && <span className="text-lg">{child.grade_class}</span>}
           </div>
+
+          {/* Geographic anchor — gives the sponsor a real place to hold
+              the relationship in. Always visible as a pill; expands to a
+              continent map + regional context paragraph. Page stays
+              kid-first by default, but the curious can dig in without
+              leaving. */}
+          <LocationBlock />
 
           {/* Pull quote from the child — in their own voice. The
               single strongest element on the page when it's present. */}
