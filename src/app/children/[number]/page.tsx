@@ -478,6 +478,68 @@ async function donorHasActiveSponsorship(donorRecordId: string): Promise<boolean
 }
 
 /**
+ * Bundler around the buyer-context chain so the page-level Promise.all
+ * can treat it as one promise. Returns null/false on the cheap path
+ * (viewer is already the sponsor) so the chain short-circuits before
+ * the cookie + DB lookups fire.
+ */
+async function resolveBuyerBundle(
+  viewerIsSponsor: boolean | undefined,
+  recordId: string | undefined
+): Promise<{
+  buyerContext: Awaited<ReturnType<typeof resolveBuyerContext>> | null;
+  showClaimCard: boolean;
+}> {
+  if (viewerIsSponsor || !recordId) {
+    return { buyerContext: null, showClaimCard: false };
+  }
+  const buyerSessionId = await getBuyerSessionId();
+  if (!buyerSessionId) return { buyerContext: null, showClaimCard: false };
+  const buyerContext = await resolveBuyerContext(buyerSessionId);
+  let showClaimCard = false;
+  if (
+    buyerContext?.isShirtMonthly &&
+    buyerContext.donorRecordId &&
+    !(await donorHasActiveSponsorship(buyerContext.donorRecordId))
+  ) {
+    showClaimCard = true;
+  }
+  return { buyerContext, showClaimCard };
+}
+
+/**
+ * Bundler around the sponsor portal fetch. Returns null for non-
+ * sponsors so the Promise.all short-circuits without hitting the
+ * child-updates query. Stats are pure computation; latestChildUpdate
+ * is the one actual DB call here.
+ */
+async function resolvePortalData(child: {
+  viewer_is_sponsor?: boolean;
+  record_id?: string;
+  child_id?: string;
+  sponsorship_start_date?: string | null;
+  monthly_amount?: number | null;
+}): Promise<{
+  stats: ReturnType<typeof computeSponsorStats>;
+  latestChildUpdate: Awaited<ReturnType<typeof getLatestChildUpdate>>;
+} | null> {
+  if (!child.viewer_is_sponsor || (!child.record_id && !child.child_id)) {
+    return null;
+  }
+  const latestChildUpdate = await getLatestChildUpdate({
+    id: child.record_id ?? '',
+    childId: child.child_id ?? '',
+  });
+  return {
+    stats: computeSponsorStats(
+      child.sponsorship_start_date ?? undefined,
+      child.monthly_amount ?? 25
+    ),
+    latestChildUpdate,
+  };
+}
+
+/**
  * Cycle-number → canonical-kid resolver.
  *
  * BAN's roster has 53 real children (shirt numbers 1–53). Shirt
@@ -1112,23 +1174,21 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
   // Under the stockpile model, Donations no longer have a Child link
   // at checkout, so we no longer require buyer→child match in code.
   // The match decision moves entirely to the buyer's explicit tap.
-  let buyerContext:
-    | Awaited<ReturnType<typeof resolveBuyerContext>>
-    | null = null;
-  let showClaimCard = false;
-  if (!child.viewer_is_sponsor && child.record_id) {
-    const buyerSessionId = await getBuyerSessionId();
-    if (buyerSessionId) {
-      buyerContext = await resolveBuyerContext(buyerSessionId);
-      if (
-        buyerContext?.isShirtMonthly &&
-        buyerContext.donorRecordId &&
-        !(await donorHasActiveSponsorship(buyerContext.donorRecordId))
-      ) {
-        showClaimCard = true;
-      }
-    }
-  }
+  // ── Parallel data fetches ─────────────────────────────────────────
+  // Three independent data dependencies — buyer context, sponsor
+  // portal data, and campus newsletters — used to await in series,
+  // which meant kid-page render time = sum(each). Promise.all-ing
+  // brings the total to max(each) and shaves hundreds of ms off the
+  // mobile load. The biggest single perf win available on this page
+  // without restructuring queries.
+  const [buyerBundle, portalData, recentNewsletters] = await Promise.all([
+    resolveBuyerBundle(child.viewer_is_sponsor, child.record_id),
+    resolvePortalData(child),
+    child.departed_at
+      ? Promise.resolve<CampusNewsletterEntry[]>([])
+      : getRecentCampusNewsletters(),
+  ]);
+  const { buyerContext, showClaimCard } = buyerBundle;
   const buyerHint = buyerContext
     ? { customerId: buyerContext.customerId, email: buyerContext.email }
     : null;
@@ -1140,36 +1200,6 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
   // stay?" framing and the locked-merch teaser firing for buyers who
   // came in via /shirts/success but aren't yet sponsors.
   const viewerLooksLikeBuyer = child.shirt_assigned || Boolean(buyerContext);
-
-  // Sponsor-only portal content (stats + latest child update). The
-  // newsletter feed used to live here; it now sits in a public
-  // CampusNewsfeed section below the bio/CTA grid, visible to anyone.
-  // Report cards and letters stay sponsor-gated and continue to
-  // render through SponsorPortalSections.
-  let portalData: {
-    stats: ReturnType<typeof computeSponsorStats>;
-    latestChildUpdate: Awaited<ReturnType<typeof getLatestChildUpdate>>;
-  } | null = null;
-  if (child.viewer_is_sponsor && (child.record_id || child.child_id)) {
-    const latestChildUpdate = await getLatestChildUpdate({
-      id: child.record_id,
-      childId: child.child_id,
-    });
-    portalData = {
-      stats: computeSponsorStats(child.sponsorship_start_date, child.monthly_amount ?? 25),
-      latestChildUpdate,
-    };
-  }
-
-  // Public newsfeed — fetched for every non-departed kid view. The
-  // newsletter Kevin writes once a month gets published to every
-  // kid's page as a campus-wide feed. Sponsors see an acknowledgment
-  // card above; non-sponsors see a conversion card. Departed kids
-  // skip the feed entirely — the "no longer at the campus" framing
-  // takes precedence over campus-level content.
-  const recentNewsletters: CampusNewsletterEntry[] = child.departed_at
-    ? []
-    : await getRecentCampusNewsletters();
 
   return (
     <div className="min-h-screen bg-[#FFF8F0]">
