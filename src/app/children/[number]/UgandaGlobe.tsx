@@ -27,9 +27,11 @@
 
 const GLOBE_DIAMETER = 240;
 
-// NASA Blue Marble equirectangular — public domain, served via jsdelivr.
-const EARTH_TEXTURE_URL =
-  '//cdn.jsdelivr.net/npm/three-globe/example/img/earth-blue-marble.jpg';
+// NASA Blue Marble equirectangular — public domain, self-hosted under
+// /public/images so we don't depend on an external CDN. Mobile networks
+// were silently dropping the jsdelivr fetch, leaving the globe blank.
+// Pre-resized to 1024×512 and mozjpeg-compressed (~55KB).
+const EARTH_TEXTURE_URL = '/images/earth-blue-marble.jpg';
 
 export function UgandaGlobe({ onClick }: { onClick?: () => void }) {
   return (
@@ -43,16 +45,23 @@ export function UgandaGlobe({ onClick }: { onClick?: () => void }) {
       {/* The sphere — circular div masked over the Earth texture, with
           Uganda positioned at the center-front. Gently sways for an
           ambient "alive" feel without losing the marker's anchor. */}
+      {/* Sphere — Earth texture on top of a radial-gradient fallback.
+          If the texture fails to load (slow network, blocked, etc.),
+          the gradient still reads as 'planet from space': deep blue
+          core with darker edges. The marker still pins Uganda's
+          conceptual location at the center. */}
       <div
         className="ban-globe-sphere"
         style={{
           width: '100%',
           height: '100%',
           borderRadius: '50%',
-          backgroundImage: `url('${EARTH_TEXTURE_URL}')`,
-          backgroundSize: '200% 100%',
-          backgroundRepeat: 'no-repeat',
-          backgroundPosition: '67.94% 50%',
+          // Fallback: radial gradient that LOOKS like Earth-from-space.
+          // Image layer renders ON TOP via backgroundImage stack.
+          background: `
+            url('${EARTH_TEXTURE_URL}') 67.94% 50% / 200% 100% no-repeat,
+            radial-gradient(circle at 35% 30%, #4a8cc7 0%, #1e4a7a 50%, #0a1f3a 100%)
+          `,
           boxShadow:
             'inset -25px -25px 50px rgba(0,0,0,0.55), inset 15px 15px 35px rgba(255,255,255,0.08), 0 8px 24px rgba(0,0,0,0.35), 0 0 40px rgba(212,168,67,0.18)',
         }}
