@@ -78,7 +78,7 @@ export function LocationBlock() {
             The kids you sponsor live within walking distance of the campus
             and attend classes here every day.{' '}
             <a
-              href="/story"
+              href="/founder"
               className="text-[#D4A843] font-semibold underline decoration-[#D4A843]/40 underline-offset-2 hover:decoration-[#D4A843]"
             >
               Read the full story →
