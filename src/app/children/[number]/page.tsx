@@ -568,6 +568,13 @@ async function resolvePortalData(child: {
  * Airtable too (cheap one-time copy, no special render path needed).
  */
 function canonicalShirtNumber(n: number): number | null {
+  // Hard upper bound: the highest opened Batch end (currently 300,
+  // end of Batch 3). Without this guard the modulo math would happily
+  // map any integer N to a real kid, so /children/1000000 would
+  // render someone's profile. Anything above the bound returns null
+  // and the page falls through to the 'we don't have a #X yet' view.
+  // Bump this when Kevin opens Batch 4.
+  if (!Number.isFinite(n) || n < 1 || n > 300) return null;
   if (n <= 53) return null;
   if (n <= 150) return ((n - 54) % 52) + 2;
   return ((n - 151) % 53) + 1;

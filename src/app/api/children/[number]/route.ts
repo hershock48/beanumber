@@ -40,6 +40,10 @@ export const revalidate = 0;
  * Returns null for #1-53 (no cycle).
  */
 function canonicalShirtNumber(n: number): number | null {
+  // Upper bound at 300 (end of Batch 3) — without this the modulo
+  // math would happily map arbitrarily large N to a real kid. Bump
+  // when Kevin opens Batch 4.
+  if (!Number.isFinite(n) || n < 1 || n > 300) return null;
   if (n <= 53) return null;
   if (n <= 150) return ((n - 54) % 52) + 2;
   return ((n - 151) % 53) + 1;
