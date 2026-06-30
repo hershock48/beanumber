@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { HoldButton } from '@/components/HoldButton';
 import { SplitFlapBoard } from '@/components/SplitFlapBoard';
 
@@ -210,11 +210,25 @@ function playRevealChime() {
 //   done    → final state (same as return visits)
 type Stage = 'idle' | 'board' | 'unblur' | 'done';
 
+// How long the user has to hold (anywhere) before reveal fires.
+const HOLD_DURATION_MS = 1500;
+
 export function RevealOverlay({ shirtNumber, childName, children }: RevealOverlayProps) {
   const storageKey = `ban-revealed-${shirtNumber}`;
   const [checked, setChecked] = useState(false);
   const [alreadyRevealed, setAlreadyRevealed] = useState(false);
   const [stage, setStage] = useState<Stage>('idle');
+
+  // ── Hold-to-reveal state ──
+  // Lifted out of HoldButton so the touch handler can live on the
+  // full-screen overlay div. Anywhere the user puts their finger on
+  // the idle screen fills the ring; release before complete drains
+  // back to zero.
+  const [progress, setProgress] = useState(0);
+  const [holding, setHolding] = useState(false);
+  const startedAtRef = useRef<number | null>(null);
+  const rafRef = useRef<number | null>(null);
+  const completedRef = useRef(false);
 
   useEffect(() => {
     try {
@@ -248,6 +262,86 @@ export function RevealOverlay({ shirtNumber, childName, children }: RevealOverla
       } catch {}
     }, 3800);
   }, [storageKey]);
+
+  // ── Hold mechanics ─────────────────────────────────────────────────
+  // start/release/tick used to live inside HoldButton; lifted up here
+  // so the entire idle overlay div acts as the touch zone. Touch
+  // anywhere on the reveal screen → ring fills. Release → drains.
+  // Complete → handleComplete fires.
+  const stopRaf = useCallback(() => {
+    if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+    rafRef.current = null;
+    startedAtRef.current = null;
+    setHolding(false);
+  }, []);
+
+  const tick = useCallback(
+    (now: number) => {
+      if (startedAtRef.current === null) return;
+      const elapsed = now - startedAtRef.current;
+      const p = Math.min(1, elapsed / HOLD_DURATION_MS);
+      setProgress(p);
+      if (p >= 1) {
+        if (!completedRef.current) {
+          completedRef.current = true;
+          try {
+            if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+              navigator.vibrate(80);
+            }
+          } catch {}
+          handleComplete();
+        }
+        stopRaf();
+        return;
+      }
+      rafRef.current = requestAnimationFrame(tick);
+    },
+    [handleComplete, stopRaf]
+  );
+
+  const startHold = useCallback(() => {
+    if (completedRef.current) return;
+    try {
+      if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+        navigator.vibrate(15);
+      }
+    } catch {}
+    setHolding(true);
+    startedAtRef.current = performance.now() - progress * HOLD_DURATION_MS;
+    rafRef.current = requestAnimationFrame(tick);
+  }, [progress, tick]);
+
+  const releaseHold = useCallback(() => {
+    if (completedRef.current) return;
+    stopRaf();
+    // Drain the ring back to zero over ~250 ms.
+    const startAt = performance.now();
+    const from = progress;
+    function drain(now: number) {
+      const t = Math.min(1, (now - startAt) / 250);
+      const eased = 1 - Math.pow(1 - t, 2);
+      const next = from * (1 - eased);
+      setProgress(next);
+      if (t < 1) requestAnimationFrame(drain);
+    }
+    requestAnimationFrame(drain);
+  }, [progress, stopRaf]);
+
+  // Keyboard fallback — Space/Enter completes immediately.
+  const onKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === ' ' || e.key === 'Enter') {
+        e.preventDefault();
+        if (completedRef.current) return;
+        completedRef.current = true;
+        setProgress(1);
+        handleComplete();
+      }
+    },
+    [handleComplete]
+  );
+
+  useEffect(() => () => stopRaf(), [stopRaf]);
 
   if (!checked) return <div className="min-h-[60vh]" />;
   if (alreadyRevealed || stage === 'done') return <>{children}</>;
@@ -292,11 +386,28 @@ export function RevealOverlay({ shirtNumber, childName, children }: RevealOverla
         {children}
       </div>
 
-      {/* ── Stage: idle ── pre-reveal overlay with hold button */}
+      {/* ── Stage: idle ── pre-reveal overlay.
+          The ENTIRE fixed-inset div is the touch target. Touch
+          anywhere on the screen → ring fills. Release → drains.
+          Complete → reveal fires. Kevin's request: "if someone
+          touches anywhere on that screen the ring goes around the
+          circle and then it pops and reveals." */}
       {stage === 'idle' && (
-        <div className="fixed inset-0 flex items-center justify-center z-10 pointer-events-none">
+        <div
+          role="button"
+          tabIndex={0}
+          aria-label={`Hold to meet child number ${shirtNumber}`}
+          onPointerDown={startHold}
+          onPointerUp={releaseHold}
+          onPointerLeave={releaseHold}
+          onPointerCancel={releaseHold}
+          onContextMenu={e => e.preventDefault()}
+          onKeyDown={onKeyDown}
+          className="fixed inset-0 flex items-center justify-center z-10 cursor-pointer select-none focus:outline-none"
+          style={{ touchAction: 'none' }}
+        >
           <div
-            className="text-center px-8 pointer-events-auto"
+            className="text-center px-8"
             style={{ animation: 'revealIdleIn 500ms ease-out both' }}
           >
             <div className="bg-white/90 backdrop-blur-sm border border-[#e8e0d4] py-10 px-8 md:py-14 md:px-16 shadow-xl max-w-lg mx-auto">
@@ -314,13 +425,13 @@ export function RevealOverlay({ shirtNumber, childName, children }: RevealOverla
               </p>
               <div className="flex flex-col items-center">
                 <HoldButton
-                  onComplete={handleComplete}
+                  progress={progress}
+                  holding={holding}
                   label="Hold to meet"
-                  holdDurationMs={1500}
                   size={180}
                 />
                 <p className="text-xs text-[#999] mt-5 uppercase tracking-[0.2em]">
-                  Press and hold
+                  Press anywhere
                 </p>
               </div>
             </div>
