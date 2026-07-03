@@ -607,24 +607,32 @@ const CANONICAL_ROSTER_MAX = 53;
 
 export async function getRoster(): Promise<RosterKid[]> {
   // Pull every canonical kid with a positive shirt number and a name.
-  // Postgres rows are already canonical (the migrator deduplicated
-  // ghost copies) so no by-name dedup needed. The shirt_number ≤ 53
-  // gate hides cycle records — they&rsquo;re display-only artifacts of
-  // the Batches cycle math, not separate people to manage.
+  // The shirt_number ≤ 53 gate hides cycle records past the canonical
+  // roster (#54+ are batch cycles of #2-53). Additional dedupe by
+  // displayName catches cycle-copies WITHIN 1-53 (e.g. Asenath at #3
+  // AND #47 — separate rows, same person — and Blessing at #50/#52).
+  // Keep the lowest shirt_number for each name; that's the original
+  // canonical row, the higher-numbered copy is the cycle artifact.
   const rows = await db
     .select()
     .from(children)
     .where(isNotNull(children.shirtNumber));
 
-  const kids: RosterKid[] = [];
+  const byName = new Map<string, typeof rows[number]>();
   for (const row of rows) {
     const displayName = (row.displayName || row.firstName || '').trim();
     const n = row.shirtNumber;
     if (!displayName) continue;
     if (typeof n !== 'number' || n < 1) continue;
-    if (n > CANONICAL_ROSTER_MAX) continue; // skip cycle records
-    kids.push(rowToRosterKid(row));
+    if (n > CANONICAL_ROSTER_MAX) continue; // skip cycle records past roster
+    const key = displayName.toLowerCase();
+    const existing = byName.get(key);
+    if (!existing || (existing.shirtNumber ?? Infinity) > n) {
+      byName.set(key, row);
+    }
   }
+
+  const kids: RosterKid[] = Array.from(byName.values()).map(rowToRosterKid);
   // Alphabetical by display name — reads like a class roster.
   kids.sort((a, b) => a.displayName.localeCompare(b.displayName));
   return kids;
