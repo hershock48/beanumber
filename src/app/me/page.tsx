@@ -507,7 +507,10 @@ export default async function MePage() {
                   This month at the campus
                 </p>
                 <Link
-                  href="/news"
+                  // back=me → /news page swaps its "Back to home"
+                  // breadcrumb to "Back to My Campus" pointing at /me.
+                  // Same smart-back pattern used on /children/[N].
+                  href="/news?back=me"
                   className="group block bg-[#1a1208] text-white overflow-hidden hover:ring-2 hover:ring-[#D4A843] transition"
                 >
                   <div className="flex flex-col md:flex-row">

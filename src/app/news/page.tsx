@@ -36,9 +36,24 @@ export const metadata: Metadata = {
   },
 };
 
-export default async function NewsPage() {
+export default async function NewsPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ back?: string }>;
+}) {
   const newsletters = await getRecentCampusNewsletters();
   const hasContent = newsletters.length > 0;
+
+  // Smart back-link. When the visitor arrived from /me (newsletter
+  // card link sets ?back=me), the header back-link returns to /me
+  // as "Back to My Campus." Any other value falls through to the
+  // default so a shared /news URL from outside doesn't lie about
+  // where "back" goes.
+  const sp = searchParams ? await searchParams : undefined;
+  const backTarget =
+    sp?.back === 'me'
+      ? { href: '/me', label: 'Back to My Campus' }
+      : { href: '/', label: 'Back to home' };
 
   return (
     <div className="min-h-screen bg-[#FFF8F0]">
@@ -60,9 +75,9 @@ export default async function NewsPage() {
       </div>
 
       <main className="max-w-5xl mx-auto px-5 py-10 md:py-16">
-        {/* Header */}
+        {/* Header — back-link resolves per ?back searchParam. */}
         <Link
-          href="/"
+          href={backTarget.href}
           className="inline-flex items-center gap-2 text-sm text-[#aaa] hover:text-[#D4A843] transition-colors mb-8"
         >
           <svg
@@ -78,7 +93,7 @@ export default async function NewsPage() {
               d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18"
             />
           </svg>
-          Back to home
+          {backTarget.label}
         </Link>
 
         <div className="max-w-2xl mb-10 md:mb-14">
