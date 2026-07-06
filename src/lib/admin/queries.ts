@@ -265,6 +265,10 @@ export interface RosterGapsCard {
   missingFamilyContext: number;
   missingLoves: number;
   missingNotes: number;
+  // Kids whose profile has no child_quote yet. Sponsors read this on
+  // the kid page — it's the kid's voice, not Simon's. Required
+  // alongside the other structured intake fields.
+  missingChildQuote: number;
   // Kids with null grade_class. Required now that SOTM is per-grade —
   // kids without a grade can't be nominated in a grade section.
   missingGrade: number;
@@ -288,6 +292,7 @@ export async function getRosterGapsCard(): Promise<RosterGapsCard> {
         familyContext: children.familyContext,
         loves: children.loves,
         notes: children.notes,
+        childQuote: children.childQuote,
         gradeClass: children.gradeClass,
       })
       .from(children)
@@ -299,6 +304,7 @@ export async function getRosterGapsCard(): Promise<RosterGapsCard> {
     let missingFamilyContext = 0;
     let missingLoves = 0;
     let missingNotes = 0;
+    let missingChildQuote = 0;
     let missingGrade = 0;
     let fullyComplete = 0;
     for (const r of rows) {
@@ -312,14 +318,24 @@ export async function getRosterGapsCard(): Promise<RosterGapsCard> {
       const hasFamily = !!r.familyContext;
       const hasLoves = !!r.loves;
       const hasNotes = !!r.notes;
+      const hasChildQuote = !!r.childQuote;
       const hasGrade = !!r.gradeClass;
       if (!hasPhoto) missingPhoto++;
       if (!hasNameMeaning) missingNameMeaning++;
       if (!hasFamily) missingFamilyContext++;
       if (!hasLoves) missingLoves++;
       if (!hasNotes) missingNotes++;
+      if (!hasChildQuote) missingChildQuote++;
       if (!hasGrade) missingGrade++;
-      if (hasPhoto && hasNameMeaning && hasFamily && hasLoves && hasNotes && hasGrade) {
+      if (
+        hasPhoto &&
+        hasNameMeaning &&
+        hasFamily &&
+        hasLoves &&
+        hasNotes &&
+        hasChildQuote &&
+        hasGrade
+      ) {
         fullyComplete++;
       }
     }
@@ -331,6 +347,7 @@ export async function getRosterGapsCard(): Promise<RosterGapsCard> {
       missingFamilyContext,
       missingLoves,
       missingNotes,
+      missingChildQuote,
       missingGrade,
       fullyComplete,
     };
@@ -343,6 +360,7 @@ export async function getRosterGapsCard(): Promise<RosterGapsCard> {
       missingFamilyContext: 0,
       missingLoves: 0,
       missingNotes: 0,
+      missingChildQuote: 0,
       missingGrade: 0,
       fullyComplete: 0,
       error: err instanceof Error ? err.message : String(err),

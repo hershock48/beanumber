@@ -1,6 +1,8 @@
 /**
- * Run-and-report panel for the Stripe → Airtable sync. POSTs to the
+ * Run-and-report panel for the Stripe → Postgres sync. POSTs to the
  * sync endpoint, renders the JSON report as a human-readable summary.
+ * Migrated off Airtable — the endpoint now writes donors/donations
+ * directly to Postgres. Header comment updated 2026-07-06 to match.
  */
 'use client';
 

@@ -3,9 +3,9 @@
  * to /api/admin/stripe/sync-customers, renders the JSON report.
  *
  * Use case: shirt buyers paid through Stripe Checkout but never
- * showed up in Airtable Donors (webhook missed them or fired
- * pre-launch of the webhook handler). This walks every charge,
- * dedupes by email, and ensures a Donor row exists.
+ * showed up as a Donor row (webhook missed them or fired pre-launch
+ * of the webhook handler). This walks every charge, dedupes by
+ * email, and ensures a Donor row exists in Postgres.
  */
 'use client';
 

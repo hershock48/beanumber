@@ -45,7 +45,7 @@ Fields you fill in:
 
 | Field | Purpose |
 |---|---|
-| `Title` | Internal label only. Never seen by readers. |
+| `Title` | Drives the auto-generated "{Month} at the campus" default AND is used server-side to dedupe drafts by month. Also shown to Kevin in the admin banner. Not sent to readers directly (Subject is), but not invisible either — treat as canonical. |
 | `Subject` | Email subject line. Also the headline on the kid page. |
 | `Author` | "Kevin" usually. Internal. |
 | `Teaser` | 1–3 sentences. Renders as the italic blockquote in the notification email. Pull the strongest moment from the body, not the first paragraph. Leave blank to auto-extract. |

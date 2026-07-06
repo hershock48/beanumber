@@ -131,6 +131,7 @@ export default async function AdminHomePage() {
                 <GapLine label="Missing family" count={data.rosterGaps.missingFamilyContext} />
                 <GapLine label="Missing loves" count={data.rosterGaps.missingLoves} />
                 <GapLine label="Missing bio" count={data.rosterGaps.missingNotes} />
+                <GapLine label="Missing quote" count={data.rosterGaps.missingChildQuote} />
                 <GapLine label="Missing grade" count={data.rosterGaps.missingGrade} />
               </div>
             )}

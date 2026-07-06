@@ -219,7 +219,7 @@ Key fields:
 
 ### Subscriptions (`tbl3WANtB8pg7XZpw`)
 
-Shadow table for Stripe subscription state. Synced by webhook events. Don't edit by hand.
+Legacy shadow table for Stripe subscription state. Historical only — Postgres `subscriptions` is now the source of truth. The webhook still writes here during the observation window but nothing sponsor-facing reads from it. Don't edit by hand.
 
 Key fields:
 - `Subscription ID` (singleLineText) — primary field. `sub_...`.

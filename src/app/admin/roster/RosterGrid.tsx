@@ -53,6 +53,7 @@ const REQUIRED_FIELDS = [
   'familyContext',
   'loves',
   'notes',
+  'childQuote',
   'gradeClass',
 ] as const;
 
@@ -62,6 +63,7 @@ const LABELS: Record<(typeof REQUIRED_FIELDS)[number], string> = {
   familyContext: 'family',
   loves: 'loves',
   notes: 'bio',
+  childQuote: 'quote',
   gradeClass: 'grade',
 };
 

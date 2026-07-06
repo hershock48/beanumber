@@ -96,9 +96,9 @@ Deprecated routes (still in code but should not be the primary path):
 
 ## Key libraries in `src/lib/`
 
-### `src/lib/db/` — Postgres data-access layer (the new way, mid-migration)
+### `src/lib/db/` — Postgres data-access layer (source of truth as of July 2026)
 
-Live alongside Airtable as of 2026-06-22 (commit `b2deb06`). Webhook dual-writes through it. Public read paths still go through Airtable until the CSV migration loads the data and the page-level refactors land.
+Postgres is now the source of truth. The public site reads through `db/queries.ts`; the webhook writes through `db/webhook-bridge.ts` and `db/mutations.ts`. Airtable is legacy read-only in a handful of admin-only surfaces and can be ignored for anything sponsor-facing. The intake route (`/api/admin/child-updates/intake`) and the stripe-sync page are Postgres-only. If you find a route still calling Airtable, it's either intentional (admin-side historical read) or drift — flag it.
 
 - `db/schema.ts` — Drizzle table definitions. Source of truth for the database. Changes go HERE first, then `npx drizzle-kit generate` produces a SQL migration in `/drizzle`, then `npx drizzle-kit migrate` applies it. Conventions: UUID PKs, `airtable_id` text for cross-reference, every queryable column indexed, singleSelect-style stored as text not Postgres enums (easier to evolve).
 - `db/client.ts` — Drizzle + `postgres` driver. Single module-level connection. `prepare:false, max:1` required for Supabase's transaction-mode pooler.

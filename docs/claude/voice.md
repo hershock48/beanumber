@@ -23,7 +23,7 @@ Source of truth is `BAN_Brand_Guide.docx` in the repo root. If this file and the
 - "sustainable development" (corporate-NGO speak; means nothing to a sponsor)
 - "impact" as a verb ("we impacted 400 lives")
 - "empowerment" standing alone (empty without specifics)
-- "change the world" / "make a difference" (weightless)
+- "make a difference" (weightless — note: "change the world" is the physical shirt back print, which is intentional graphic design; the banned phrase applies to prose only)
 - "Dear [Name]," in transactional email (use "Hey [FirstName],")
 - "bright and hopeful" (appears on every nonprofit site about Africa; lazy)
 - "life is not always easy" (patronizing)

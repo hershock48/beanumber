@@ -36,6 +36,7 @@ export default async function AdminRosterPage() {
     k.has.familyContext &&
     k.has.loves &&
     k.has.notes &&
+    k.has.childQuote &&
     k.has.gradeClass
   ).length;
   // A kid needs Kevin's review when Simon has touched the structured

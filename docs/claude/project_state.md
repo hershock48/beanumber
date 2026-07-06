@@ -92,8 +92,8 @@ What happened today, recorded so it doesn't get lost:
 - Tailwind CSS
 - Deployed on Vercel, auto-deploy on push to `main`
 - Production domain: `www.beanumber.org`
-- Stripe for payments (Checkout Sessions; payment mode and subscription mode). Currently on **test mode keys** in Vercel env. Switching to live requires swapping 3 env vars (see operations.md).
-- Airtable as the source-of-truth CRM/CMS (Donors, Donations, Sponsorships, Children, Child Updates, Communications, Subscriptions, Scheduled Posts, Newsletters)
+- Stripe for payments (Checkout Sessions; payment mode and subscription mode). **Live mode** as of the July 2026 snapshot — real money, real sponsors ($600/mo recurring). Test-mode language elsewhere in this doc is stale.
+- **Postgres (Supabase) is source of truth** as of July 2026. The public site reads through `src/lib/db/queries.ts`; the webhook writes through `src/lib/db/webhook-bridge.ts` and `src/lib/db/mutations.ts`. Airtable is legacy read-only in a few admin-side surfaces; ignore it for sponsor-facing paths.
 - Email: `sendEmail()` in `src/lib/email.ts` is a dual-provider abstraction. Tries Gmail OAuth2 first (`GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`, `GMAIL_REFRESH_TOKEN`), falls back to SendGrid if Gmail isn't configured. In production, Gmail is configured and active — SendGrid is dead-code fallback. All outbound email routes through this abstraction.
 - Admin order notifications: email only (to kevin@beanumber.org). SMS gateway was removed April 18 — Kevin requested it killed, not replaced.
 
