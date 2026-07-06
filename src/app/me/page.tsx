@@ -899,8 +899,12 @@ function KidCard({
             update for THIS kid so /me reads as a digest. Quiet when
             we don't have one yet. If the update is newer than this
             viewer's last visit to the kid page, KidCardUnreadBadge
-            adds a red NEW pill next to the "Latest" kicker. */}
-        {latestUpdate && !child.departed && (
+            adds a red NEW pill next to the "Latest" kicker.
+            Monthly-sponsor only (2026-07-06 rule change) — holders
+            don't get personal kid updates. On the kid page itself the
+            'Updates straight from {kid}' section is already sponsor-
+            gated; this preview matches that behavior. */}
+        {latestUpdate && !child.departed && monthlyOrHolder === 'monthly' && (
           <div className="mt-3 pt-3 border-t border-[#e8e0d4]">
             <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-1 flex items-center">
               <span>Latest &middot; {formatRelativeDate(latestUpdate.publishedAt)}</span>
@@ -916,12 +920,12 @@ function KidCard({
         )}
 
         {/* Per-kid correspondence preview — silent until the sponsor
-            has written to this kid at least once. When present, shows
-            the newest event (their latest sent note OR the kid's reply,
-            whichever is more recent), with a snippet and a "see all" hint
-            when the thread has multiple entries. Departed kids skip this
-            so the section stays focused on live relationships. */}
-        {!child.departed && (
+            has written to this kid at least once. Monthly-sponsor only
+            per the 2026-07-06 rule change; holders can't write, so
+            they'd never accumulate a thread anyway. Belt-and-
+            suspenders gate here in case a legacy holder somehow has a
+            historical thread. */}
+        {!child.departed && monthlyOrHolder === 'monthly' && (
           <KidCardNotesPreview
             preview={notePreview ?? null}
             firstName={child.firstName || child.displayName}

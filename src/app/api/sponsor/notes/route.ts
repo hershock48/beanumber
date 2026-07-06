@@ -143,13 +143,18 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Enforce sponsorship of the target kid — Active or Holder both
-  // count (both statuses see sponsor-gated content elsewhere in the
-  // app, so both can write notes).
+  // Writing notes requires an ACTIVE MONTHLY sponsorship of the target
+  // kid. Rule change 2026-07-06: holders (shirt-only, no monthly) can
+  // no longer write. The correspondence engine is a sponsor benefit,
+  // and letting holders write while the composer promises "the campus
+  // team will translate and deliver" reads wrong when the holder has
+  // no monthly relationship to fund that work. Holders can still meet
+  // the kid, hold the number, and convert to monthly to unlock notes.
   const relatedSponsorships = await db
     .select({
       id: sponsorships.id,
       status: sponsorships.status,
+      monthlyAmount: sponsorships.monthlyAmount,
       // childRevealedAt is set only when the sponsor claimed this kid
       // via Hold-to-Meet (they physically hold the shirt with this
       // kid's number). Null when they added the sponsorship without
@@ -166,14 +171,19 @@ export async function POST(request: NextRequest) {
           eq(sponsorships.childId, childRow.id),
           eq(sponsorships.childIdLegacy, childRow.childId ?? '')
         ),
-        inArray(sponsorships.status, ['Active', 'Holder'])
+        eq(sponsorships.status, 'Active')
       )
     )
     .limit(1);
-  if (relatedSponsorships.length === 0) {
+  // Also require monthlyAmount > 0 — an 'Active' status with $0/mo is
+  // still a holder in the spirit of the rule.
+  const monthlyRow = relatedSponsorships.find(
+    r => Number(r.monthlyAmount ?? 0) > 0
+  );
+  if (!monthlyRow) {
     return NextResponse.json(
       {
-        error: `You need to sponsor ${childRow.firstName ?? 'this kid'} before you can write a note.`,
+        error: `You need to be sponsoring ${childRow.firstName ?? 'this kid'} monthly before you can write a note. If you're the holder, add a monthly sponsorship to unlock writing.`,
       },
       { status: 403 }
     );
@@ -237,7 +247,7 @@ export async function POST(request: NextRequest) {
         // for. The alert renders a small tag so Kevin knows which
         // channel he's looking at (matters for retention analysis
         // and for how he might frame a personal follow-up).
-        sponsorHoldsShirt: !!relatedSponsorships[0]?.childRevealedAt,
+        sponsorHoldsShirt: !!monthlyRow.childRevealedAt,
         bodyEn: rawBody,
       });
     } catch (err) {

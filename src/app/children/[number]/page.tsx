@@ -1983,9 +1983,11 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
             the surface exists. Rendered above the composer so a
             sponsor arriving from a "you got a reply" email sees the
             reply front-and-center without scrolling past a fresh
-            composer they don't need. */}
+            composer they don't need.
+            Monthly-sponsor only (2026-07-06 rule change). Holders
+            can't write, so they wouldn't have a thread to view. */}
         {!child.departed_at &&
-          (child.viewer_is_sponsor || child.viewer_is_holder) &&
+          child.viewer_is_sponsor &&
           noteThread.length > 0 && (
             <div className="mt-12 md:mt-16">
               <NotesThread firstName={firstName} thread={noteThread} />
@@ -1996,10 +1998,12 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
             Sponsor writes to the kid; the campus team translates and
             delivers. The correspondence half of the retention engine
             — this is what turns sponsorship from watching into
-            participating. Sponsor + holder only; departed kids
-            don't get new notes. */}
+            participating. Monthly-sponsor only per 2026-07-06 rule
+            change — holders can't write. If they want to unlock notes,
+            they can convert to monthly. Departed kids don't get new
+            notes. */}
         {!child.departed_at &&
-          (child.viewer_is_sponsor || child.viewer_is_holder) &&
+          child.viewer_is_sponsor &&
           child.record_id && (
             <div className="mt-12 md:mt-16">
               <SendNoteComposer

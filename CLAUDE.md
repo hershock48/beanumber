@@ -27,6 +27,13 @@ The relationship exists the moment the shirt is printed with a number on it. The
 
 *The exclusivity is the NUMBER, not the RELATIONSHIP.* The kid's shirt number is a 1-to-1 physical object with a single holder. Sponsorships are many-to-1 (many sponsors can support one kid) and one-to-many (one sponsor can support many kids). A co-sponsor's `/me` KidCard for that kid does NOT show the `#N` badge (because they don't hold the shirt) — but the sponsorship itself is fully real and "your kid" language is fine for every kid a sponsor sponsors. The relationship is real; only the number-to-shirt binding is exclusive.
 
+*Two access rights are gated to MONTHLY sponsorship, not just holder status:* writing notes to a kid via the composer, and viewing the kid's personal updates ("Updates straight from {kid}" and the /me KidCard "Latest [update]" preview). Enforced at:
+- `/api/sponsor/notes` POST — 403 unless the viewer has an Active sponsorship of the target kid with `monthly_amount > 0`.
+- `/children/[N]` render — NotesThread + SendNoteComposer + Updates section all gated on `viewer_is_sponsor` (which is Active status).
+- `/me` KidCard — `latestUpdate` block + `KidCardNotesPreview` gated on `monthlyOrHolder === 'monthly'`.
+
+Holders (shirt buyers who never converted to $25/mo) get the reveal, the profile, the campus feed, and can share the kid — but not the correspondence engine or personal updates until they convert. The "Once you're sponsoring {kid}" teaser on the kid page tells them what unlocks when they convert.
+
 Practical consequence: "your kid / your kids" is safe copy for any sponsored kid. What you can't do is imply a co-sponsor holds the number — no `#N` badge on their card for that kid, no "the number belongs to you" language for a kid they added later.
 
 Kevin runs this alone as of today. He is not a developer. He is a strong operator — marketing, conversion, brand, partner comms — and he expects the same standard from me. He reads fast, moves fast, and resents hedging.
