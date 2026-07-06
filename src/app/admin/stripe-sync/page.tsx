@@ -1,11 +1,19 @@
 /**
  * Admin · Sync from Stripe.
  *
- * One-button reconcile of Stripe subscriptions into Airtable. For
- * every active sub in Stripe, ensures there's a matching Donor and
- * Sponsorship row in Airtable. Returns a per-row breakdown so Kevin
- * can see exactly what was created / updated / left alone.
+ * Two-button reconcile of Stripe → Postgres:
  *
+ *   1. Every customer (shirt buyers included). Walks every Stripe
+ *      charge, ensures the donor row exists for the email behind it.
+ *      Use when the newsletter recipient count looks light.
+ *
+ *   2. Every subscription (sponsors only). Walks every Stripe sub,
+ *      ensures Donor + Sponsorship + Subscription rows exist. Fixes
+ *      subs that predated the webhook or that the webhook dropped
+ *      due to a signature failure. Returns a per-row breakdown so
+ *      Kevin can see exactly what was created / updated / left alone.
+ *
+ * Both endpoints are idempotent and safe to re-run.
  * Admin only.
  */
 
@@ -34,7 +42,7 @@ export default async function StripeSyncPage() {
         </Link>
 
         <p className="text-xs uppercase tracking-[0.2em] text-[#aaa] mb-1">
-          Stripe → Airtable
+          Stripe → Postgres
         </p>
         <h1
           className="text-3xl md:text-4xl text-[#0d0d0d] mb-3"
@@ -52,12 +60,11 @@ export default async function StripeSyncPage() {
             Every customer who&rsquo;s paid you.
           </h2>
           <p className="text-[#666] text-sm mb-5 leading-relaxed">
-            Walks every successful Stripe charge and ensures Airtable
-            has a Donor row for the email behind it. This is what fills
-            in shirt buyers who never converted to monthly &mdash;
-            their checkout completed but the webhook may have missed
-            writing them to Airtable. Run this first when the
-            newsletter recipient count looks too small.
+            Walks every successful Stripe charge and ensures Postgres
+            has a Donor row for the email behind it. This fills in
+            shirt buyers whose checkout completed but never made it
+            into the local donors table &mdash; run this first when
+            the newsletter recipient count looks too small.
           </p>
           <StripeCustomerSyncClient />
         </section>
@@ -73,8 +80,11 @@ export default async function StripeSyncPage() {
             Subscriptions.
           </h2>
           <p className="text-[#666] text-sm mb-5 leading-relaxed">
-            Pulls every Stripe subscription and ensures Airtable has a
-            matching Donor + Sponsorship row. Safe to re-run.
+            Pulls every Stripe subscription and ensures Postgres has a
+            matching Donor + Sponsorship + Subscription row. Also
+            surfaces past-due and paused subscribers so you can chase
+            the card update. Safe to re-run &mdash; every write is
+            idempotent.
           </p>
           <StripeSyncClient />
         </section>
