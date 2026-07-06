@@ -147,7 +147,17 @@ export async function POST(request: NextRequest) {
   // count (both statuses see sponsor-gated content elsewhere in the
   // app, so both can write notes).
   const relatedSponsorships = await db
-    .select({ id: sponsorships.id, status: sponsorships.status })
+    .select({
+      id: sponsorships.id,
+      status: sponsorships.status,
+      // childRevealedAt is set only when the sponsor claimed this kid
+      // via Hold-to-Meet (they physically hold the shirt with this
+      // kid's number). Null when they added the sponsorship without
+      // owning the shirt — an "add-on" sponsorship. Used downstream to
+      // color the Kevin alert email so add-on notes aren't described
+      // as coming from the shirt-holder.
+      childRevealedAt: sponsorships.childRevealedAt,
+    })
     .from(sponsorships)
     .where(
       and(
@@ -217,10 +227,17 @@ export async function POST(request: NextRequest) {
         noteId: inserted[0].id,
         sponsorEmail: email,
         sponsorName,
-        kidFirstName: childRow.firstName || 'your kid',
+        kidFirstName: childRow.firstName || 'the kid',
         kidDisplayName:
           childRow.displayName || childRow.firstName || 'the kid',
         shirtNumber: childRow.shirtNumber ?? null,
+        // True only when the sponsor claimed THIS kid's number via
+        // Hold-to-Meet (owns the shirt). False for add-on sponsorships
+        // — same sponsor writing to a kid they don't hold the shirt
+        // for. The alert renders a small tag so Kevin knows which
+        // channel he's looking at (matters for retention analysis
+        // and for how he might frame a personal follow-up).
+        sponsorHoldsShirt: !!relatedSponsorships[0]?.childRevealedAt,
         bodyEn: rawBody,
       });
     } catch (err) {

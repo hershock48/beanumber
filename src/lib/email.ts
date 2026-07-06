@@ -756,6 +756,16 @@ export async function sendKevinNoteAlert(params: {
   kidFirstName: string;
   kidDisplayName: string;
   shirtNumber: number | null;
+  /**
+   * True when the sponsor holds the shirt for THIS kid — i.e., they
+   * claimed the number via Hold-to-Meet. False for add-on sponsorships
+   * where the sponsor is paying $25/mo for a kid whose shirt is held
+   * by someone else. CLAUDE.md non-negotiable #4: shirt-first is the
+   * only door in, but existing sponsors can add shirt-less
+   * sponsorships for other kids at the campus. Kevin should be able
+   * to tell the two apart at a glance in the alert.
+   */
+  sponsorHoldsShirt: boolean;
   bodyEn: string;
 }): Promise<EmailSendResult> {
   const {
@@ -765,14 +775,22 @@ export async function sendKevinNoteAlert(params: {
     kidFirstName,
     kidDisplayName,
     shirtNumber,
+    sponsorHoldsShirt,
     bodyEn,
   } = params;
 
+  // The kid's shirt number is always the identifier (it's THE kid's
+  // public number, regardless of which sponsor is writing). But when
+  // the writer doesn't own that shirt, don't imply they do — the
+  // # follows the kid, not the sponsor's channel.
   const kidLabel = shirtNumber
     ? `${kidDisplayName || kidFirstName} (#${shirtNumber})`
     : kidDisplayName || kidFirstName;
   const preview = truncateForPreview(bodyEn, 240);
   const sponsorDisplay = sponsorName?.trim() || sponsorEmail;
+  const channelTag = sponsorHoldsShirt
+    ? `<span style="display: inline-block; background: #D4A843; color: #0d0d0d; padding: 2px 8px; font-size: 11px; font-weight: bold; letter-spacing: 0.05em; text-transform: uppercase; margin-left: 6px;">Shirt-holder</span>`
+    : `<span style="display: inline-block; background: #e8e0d4; color: #333; padding: 2px 8px; font-size: 11px; font-weight: bold; letter-spacing: 0.05em; text-transform: uppercase; margin-left: 6px;">Add-on sponsor</span>`;
 
   // Deep-link to the messages queue. There's no per-note URL yet, but
   // /admin/messages surfaces pending items at the top ordered by age,
@@ -784,7 +802,7 @@ export async function sendKevinNoteAlert(params: {
 
     <p><strong>From:</strong> ${escapeHtmlLocal(sponsorDisplay)}${
     sponsorName ? ` &lt;${escapeHtmlLocal(sponsorEmail)}&gt;` : ''
-  }<br>
+  } ${channelTag}<br>
     <strong>To:</strong> ${escapeHtmlLocal(kidLabel)}</p>
 
     <p style="background: #FFF8F0; border-left: 3px solid #D4A843; padding: 16px 20px; margin: 24px 0; font-style: italic; color: #555;">

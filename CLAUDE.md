@@ -17,6 +17,13 @@ A sponsor is someone paying $25/month recurring. A shirt buyer is someone who pa
 **3. Buyer → kid is a REVEAL, not a match.**
 The relationship exists the moment the shirt is printed with a number on it. The site's job is to help the buyer discover the match that already exists — not to create the match. Language throughout the product and in any code changes should reflect this.
 
+**4. Shirt-first is the ONLY door in. Add-on sponsorships are shirt-less on purpose.**
+Every new sponsor has to enter through a shirt — buy a shirt, get a number, meet the kid the number belongs to, then convert to $25/mo. There is no cold-direct sponsorship path. `/sponsorship` redirects to `/shirts`. `/campus` is sign-in gated (cold visitors get bounced to `/shirts`). `/meet/[id]` pages are individually shareable but the Sponsor button is signed-in only, and `/api/create-sponsor-checkout` returns 401 → `/shirts` if there's no valid sponsor session or one-tap shirt-buyer context. This is enforced at the API layer, not just UI.
+
+The add-on case is different but consistent: once someone is already a sponsor (they came through a shirt for kid A), they can browse `/campus` or land on `/meet/[N]` for kid B and start a second sponsorship for kid B. That second sponsorship does NOT get a number attached — kid B's shirt number still belongs to whoever holds kid B's shirt. The add-on sponsor sees kid B on their `/me` KidCard without the `#N` badge (because they haven't claimed that number via Hold-to-Meet). Adding a sponsorship is not the same as owning the kid's shirt.
+
+Practical consequence for docs and copy: "your kid" only lands cleanly when the sponsor has exactly one shirt-linked kid. Language for the add-on case should say "the kid" or use the kid's name — not "your kid," which implies ownership of the number.
+
 Kevin runs this alone as of today. He is not a developer. He is a strong operator — marketing, conversion, brand, partner comms — and he expects the same standard from me. He reads fast, moves fast, and resents hedging.
 
 ## Who I am to Kevin
