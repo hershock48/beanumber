@@ -292,13 +292,13 @@ function sponsorOnboardEmail(
           <p>Your sponsorship is active, and I wanted to make sure you have everything you need to get started.</p>
           ${displayChildName
             ? `<p>Your $25 a month supports school fees, two meals a day, and medical care at the campus where ${displayChildName} goes to school. For a lot of the kids on campus, those meals are the only ones they get all day, so this matters starting right now.</p>`
-            : `<p>Your $25 a month supports school fees, two meals a day, and medical care at the campus where your matched child goes to school. For a lot of the kids on campus, those meals are the only ones they get all day, so this matters starting right now.</p>`
+            : `<p>Your $25 a month supports school fees, two meals a day, and medical care at the campus where your kid goes to school. For a lot of the kids on campus, those meals are the only ones they get all day, so this matters starting right now.</p>`
           }
           ${firstNumber
             ? `<p><strong>${displayChildName ? `${displayChildName}’s` : 'Your'} page is at <a href="${childUrl}" style="color: #D4A843; font-weight: bold;">${childUrlLabel}</a>.</strong> Bookmark it. That&rsquo;s where updates, photos, and letters from the campus show up. Your browser remembers you after your first visit, so there&rsquo;s no separate login to keep track of.</p>`
             : `<p><strong>Updates, photos, and letters from the campus show up on your kid&rsquo;s page at <a href="${SITE_URL}" style="color: #D4A843; font-weight: bold;">beanumber.org</a>.</strong></p>`
           }
-          <p>If you ever want to write to ${displayChildName || 'your child'}, just reply to this email. The team on the ground handles delivery and translation. And if you ever can&rsquo;t get back to your page, write me at <a href="mailto:Kevin@beanumber.org" style="color: #D4A843; font-weight: bold;">Kevin@beanumber.org</a> and I&rsquo;ll sort it out.</p>
+          <p>If you ever want to write to ${displayChildName || 'your kid'}, reply to this email. The team on the ground handles delivery and translation. And if you ever can&rsquo;t get back to your page, write me at <a href="mailto:Kevin@beanumber.org" style="color: #D4A843; font-weight: bold;">Kevin@beanumber.org</a> and I&rsquo;ll sort it out.</p>
           <p>Kevin</p>
         `),
       };
@@ -359,7 +359,7 @@ function donorConvertEmail(
         html: wrapEmail(`
           <p style="margin-top: 0;">Hey ${firstName},</p>
           <p>I wanted to tell you a little more about how we work, since you already took a chance on us once.</p>
-          <p>Every child at our campus has a number, and that number is the bridge to a sponsor. The sponsor pays $25 a month, which supports school, two meals a day, and medical care at the campus. In return, the sponsor gets letters, photos, and report cards from their matched child. The child knows their sponsor&rsquo;s name. It&rsquo;s a real relationship between two real people, and that&rsquo;s kind of the whole point of what we built.</p>
+          <p>Every child at our campus has a number, and that number is the bridge to a sponsor. The sponsor pays $25 a month, which supports school, two meals a day, and medical care at the campus. In return, the sponsor gets letters, photos, and report cards from the specific kid whose number they carry. The kid knows their sponsor&rsquo;s name. It&rsquo;s a real relationship between two real people, and that&rsquo;s kind of the whole point of what we built.</p>
           <p>If you want in, grab a shirt and the number on the back is your kid. <a href="${SITE_URL}/shirts" style="color: #D4A843; font-weight: bold;">Pick a shirt here</a>.</p>
           <p style="text-align: center; margin: 24px 0;">
             <a href="${SITE_URL}/shirts" style="display: inline-block; background: #D4A843; color: #0d0d0d; font-weight: bold; text-decoration: none; padding: 14px 32px; font-size: 15px; letter-spacing: 0.05em;">GET A SHIRT</a>
@@ -492,7 +492,7 @@ function monthlyDonorEmail(
           <p>I wanted to give you a better picture of how things work on the ground, since your monthly gift is part of what makes it all run.</p>
           <p>Every child at the campus has a number, and that number goes on a shirt. When someone buys that shirt or sponsors that child, they get connected to a real kid by name. The sponsor gets letters, photos, and report cards, and the child knows their sponsor. It&rsquo;s not a big faceless program.</p>
           <p>Your monthly gift is what keeps the whole campus going: the meals, the teachers, the clinic. Without monthly donors, none of the rest of it would work.</p>
-          <p>If you want to be matched with one of the kids your gift is supporting, you can <a href="${SITE_URL}/shirts" style="color: #D4A843; font-weight: bold;">get a Shirt here</a>.</p>
+          <p>If you want a shirt with a specific kid&rsquo;s number on it, you can <a href="${SITE_URL}/shirts" style="color: #D4A843; font-weight: bold;">get one here</a>. The number-to-name reveal happens when the shirt arrives.</p>
           <p>Kevin</p>
         `),
       };

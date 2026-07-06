@@ -123,7 +123,7 @@ export default function AdminSponsorsPage() {
                           <div className="text-xs text-gray-500 truncate">{s.sponsorEmail}</div>
                           <div className="text-xs text-gray-500 mt-1">
                             <span className="font-mono">{s.sponsorCode}</span>
-                            {' · matched to '}
+                            {' · sponsoring '}
                             {s.childDisplayName}
                           </div>
                         </div>

@@ -23,7 +23,7 @@ export default function GiftSuccessPage() {
           Your gift is on its way.
         </h1>
         <p className="text-base md:text-lg text-[#666] leading-relaxed mb-8 max-w-xl mx-auto">
-          We&rsquo;re emailing your recipient right now with their matched child&rsquo;s number
+          We&rsquo;re emailing your recipient right now with a specific kid&rsquo;s number
           and a link to meet them. You&rsquo;ll get a confirmation receipt at the email
           you used at checkout.
         </p>

@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
               description:
                 `One-time $${GIFT_AMOUNT} gift to Be A Number, International. ` +
                 `Sponsors a child for their first month at the campus in Northern Uganda. ` +
-                `Your recipient meets the matched child and decides whether to continue at $25/month.`,
+                `Your recipient meets the specific kid whose number they carry and decides whether to continue at $25/month.`,
             },
             unit_amount: GIFT_AMOUNT * 100,
           },

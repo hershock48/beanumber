@@ -149,10 +149,11 @@ export default function TermsPage() {
                 Shirt purchases and shipping
               </h2>
               <p className="text-[#555] leading-relaxed text-lg mb-3">
-                Every numbered shirt you buy is matched to a child at the campus
-                in Omoro District. The price of the shirt covers manufacturing
-                and shipping, and the balance supports the campus where your
-                matched child attends school, eats meals, and receives medical care.
+                Every numbered shirt you buy carries the number of a specific
+                child at the campus in Omoro District. The price of the shirt
+                covers manufacturing and shipping, and the balance supports
+                the campus where that child attends school, eats meals, and
+                receives medical care.
               </p>
               <p className="text-[#555] leading-relaxed text-lg mb-3">
                 We&rsquo;re a small team. Orders are typically shipped within 2 to

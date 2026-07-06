@@ -1046,7 +1046,7 @@ async function sendShirtConfirmationEmail(orderData: {
   // their child is.
   const revealBlock = orderData.isPortalRepeat
     ? `
-              <p>This one ships with <strong>#${orderData.shirtNumber || ''}</strong> pressed on the back &mdash; the same number you already know, matched to ${orderData.childDisplayName || 'your child'}. Free shipping, no new sponsorship started, your monthly is unchanged.</p>
+              <p>This one ships with <strong>#${orderData.shirtNumber || ''}</strong> pressed on the back &mdash; the same number you already know, connected to ${orderData.childDisplayName || 'your kid'}. Free shipping, no new sponsorship started, your monthly is unchanged.</p>
     `
     : `
               <p>When it arrives, look at the back of the shirt. There&rsquo;s a number pressed below the main design, and that number belongs to a real child at the campus in Northern Uganda. Go to <a href="${siteUrl}" style="color: #D4A843; font-weight: bold;">beanumber.org</a>, enter your number, and meet them &mdash; their name, their face, their story.</p>
@@ -2960,7 +2960,7 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
         organization: organization || undefined,
         address,
         donationSource: 'Merch',
-        notes: `Number Collection — ${merchName}${size ? ` (Size ${size})` : ''} stamped with #${shirtNumber}, matched to ${childDisplayName || 'sponsor child'}. Sponsor ${sponsorCode}.`,
+        notes: `Number Collection — ${merchName}${size ? ` (Size ${size})` : ''} stamped with #${shirtNumber}, connected to ${childDisplayName || 'sponsor kid'}. Sponsor ${sponsorCode}.`,
       });
 
       // Step 4: Confirmation email to the buyer.

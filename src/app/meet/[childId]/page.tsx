@@ -39,6 +39,7 @@ import { BANNavigation } from '@/components/BANNavigation';
 import { BANFooter } from '@/components/BANFooter';
 import { RecentKidsStrip } from '@/components/RecentKidsStrip';
 import { getChildByRecordId } from '@/lib/db/queries';
+import { gradeLabelForSponsor, isGradeCode } from '@/lib/grades';
 import { db } from '@/lib/db/client';
 import { children as childrenTable, type Child } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
@@ -286,7 +287,11 @@ export default async function MeetKidPage({
                 )}
                 {f.GradeClass && (
                   <span>
-                    <span className="font-bold text-[#0d0d0d]">{f.GradeClass}</span>
+                    <span className="font-bold text-[#0d0d0d]">
+                      {isGradeCode(f.GradeClass)
+                        ? gradeLabelForSponsor(f.GradeClass)
+                        : f.GradeClass}
+                    </span>
                   </span>
                 )}
                 {f.HomeVillage && (

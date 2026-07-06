@@ -183,8 +183,6 @@ export async function POST(request: NextRequest) {
     // Match on child_id UUID + legacy child_id_legacy string (dual
     // lookup, same pattern the rest of the codebase uses), plus the
     // period-or-academic-term matching the request's source type.
-    const periodField = body.sourceType === SOURCE_TYPE.FIELD ? 'period' : 'academic_term';
-    void periodField; // reserved for possible future indexing
     const dupes = await db
       .select({ id: childUpdates.id, status: childUpdates.status })
       .from(childUpdates)

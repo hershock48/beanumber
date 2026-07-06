@@ -19,13 +19,13 @@
  * the same editor.
  */
 
-// Vercel runtime is UTC. On the last day of any month after ~7pm CT
-// the server clock rolls to the next month; a title generated then
-// would say the wrong month for Kevin (who's in Central time) and
-// for the audience the newsletter is authored to. Explicit tz keeps
-// the month label anchored to Kevin's working day, which is when
-// he'd actually be drafting or saving.
-const AUTHOR_TZ = 'America/Chicago';
+// Anchor the month label to Uganda time (the campus). Vercel runtime
+// is UTC — at end-of-month rollover a title generated between UTC
+// midnight and Uganda midnight (UTC+3) would say the wrong month
+// from the campus's point of view. Since the newsletter is FROM the
+// campus, the campus's calendar is the source of truth for "which
+// month is this."
+const AUTHOR_TZ = 'Africa/Kampala';
 
 export function buildCampusUpdateTitle(d: Date = new Date()): string {
   const month = d.toLocaleString('en-US', { month: 'long', timeZone: AUTHOR_TZ });

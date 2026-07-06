@@ -37,9 +37,22 @@ import { db } from '@/lib/db/client';
 import { children, sotmHistory } from '@/lib/db/schema';
 import { eq, isNotNull, sql as drizzleSql } from 'drizzle-orm';
 
+// Both the writer (this) and the /me milestone reader must anchor to
+// the same calendar. The ceremony is a Uganda event — Africa/Kampala
+// is the source of truth for "what month is Simon designating." UTC
+// on Vercel would flip several hours before Kampala midnight and
+// cause the writer and reader to disagree at month rollover.
 function currentMonthLabel(): string {
   const d = new Date();
-  return `${d.toLocaleString('en-US', { month: 'long' })} ${d.getFullYear()}`;
+  const month = d.toLocaleString('en-US', {
+    month: 'long',
+    timeZone: 'Africa/Kampala',
+  });
+  const year = d.toLocaleString('en-US', {
+    year: 'numeric',
+    timeZone: 'Africa/Kampala',
+  });
+  return `${month} ${year}`;
 }
 
 async function findChildByShirtNumber(n: number) {

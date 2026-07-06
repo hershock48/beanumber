@@ -299,7 +299,7 @@ function HomePageInner() {
           <p className="text-[#777] max-w-lg mx-auto leading-relaxed text-lg">
             Every Number on every Shirt belongs to a Child like the ones below. Your Shirt starts their year
             at the campus. Stay with them for $25/month to finish it &mdash; a monthly newsletter from the campus,
-            photos of your matched child through the year, and a handwritten letter from them once a year.
+            photos of your Kid through the year, and a handwritten letter from them once a year.
           </p>
         </div>
 

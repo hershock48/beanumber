@@ -268,8 +268,21 @@ export function sotmCurrentMilestone(
   kidFirstName: string
 ): Milestone | null {
   if (!sotmMonth) return null;
+  // "Current month" is the CAMPUS's current month, not Vercel's UTC
+  // clock. The SOTM ceremony happens on the ground in Uganda; if
+  // Simon designates a July winner and we compare against UTC in
+  // late June (when Kampala is already July after 21:00 UTC), we'd
+  // fail the equality check and the milestone banner would silently
+  // not render. Anchoring both sides to Africa/Kampala keeps the
+  // comparison honest with the ceremony's local calendar.
   const now = new Date();
-  const currentLabel = `${now.toLocaleString('en-US', { month: 'long' })} ${now.getFullYear()}`;
+  const currentLabel = `${now.toLocaleString('en-US', {
+    month: 'long',
+    timeZone: 'Africa/Kampala',
+  })} ${now.toLocaleString('en-US', {
+    year: 'numeric',
+    timeZone: 'Africa/Kampala',
+  })}`;
   if (sotmMonth.trim() !== currentLabel) return null;
   const gradeClause = gradeSponsorLabel ? ` in ${gradeSponsorLabel}` : '';
   // Reason gets rendered as an italic pull-quote below the headline.

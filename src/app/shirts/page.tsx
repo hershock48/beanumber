@@ -23,7 +23,7 @@ const faqJsonLd = {
       name: 'Where does the $25 actually go?',
       acceptedAnswer: {
         '@type': 'Answer',
-        text: 'Your $25/month supports the campus where your matched child goes to school, eats two meals a day, and gets medical care through the on-site clinic. The campus runs on the combined support of every sponsor — that\'s also what keeps the 60 women in vocational training, the medical outreach that has served 700+ patients, and the construction apprenticeships going. You\'re not paying line items on one child\'s bill. You\'re supporting the ecosystem that keeps them in school.',
+        text: 'Your $25/month supports the campus where your kid goes to school, eats two meals a day, and gets medical care through the on-site clinic. The campus runs on the combined support of every sponsor — that\'s also what keeps the 60 women in vocational training, the medical outreach that has served 700+ patients, and the construction apprenticeships going. You\'re not paying line items on one child\'s bill. You\'re supporting the ecosystem that keeps them in school.',
       },
     },
     {
@@ -31,7 +31,7 @@ const faqJsonLd = {
       name: 'Can I pick my Number?',
       acceptedAnswer: {
         '@type': 'Answer',
-        text: 'No. Numbers are assigned in order so every Child gets matched, not just the ones with the best photos. Your Number isn\'t random — it\'s someone\'s name waiting to be learned.',
+        text: 'No. Numbers are assigned in order so every Child gets a sponsor, not just the ones with the best photos. Your Number isn\'t random — it\'s someone\'s name waiting to be learned.',
       },
     },
     {

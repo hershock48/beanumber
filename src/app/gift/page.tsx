@@ -46,8 +46,8 @@ export default function GiftLandingPage() {
             </h2>
             <p className="text-[#666] leading-relaxed mb-6">
               $25 supports a child&rsquo;s first month at the campus. The person you&rsquo;re gifting to
-              gets an email introducing them to their matched child. They can stay at $25/month if they want
-              to &mdash; entirely their choice, no obligation.
+              gets an email introducing them to a specific kid whose first month they&rsquo;re covering.
+              They can stay at $25/month if they want to &mdash; entirely their choice, no obligation.
             </p>
             <div className="flex items-baseline gap-1 mb-5">
               <span
@@ -75,9 +75,9 @@ export default function GiftLandingPage() {
               Gift a shirt.
             </h2>
             <p className="text-[#666] leading-relaxed mb-6">
-              The full BAN experience as a gift: a numbered shirt shipped to your recipient, their matched
-              child waiting on the back of the shirt. We&rsquo;re building this for the holiday window &mdash; check
-              back, or grab the digital gift sponsorship for now.
+              The full BAN experience as a gift: a numbered shirt shipped to your recipient, with a
+              specific kid&rsquo;s number pressed on the back. We&rsquo;re building this for the holiday window &mdash;
+              check back, or grab the digital gift sponsorship for now.
             </p>
             <div className="flex items-baseline gap-1 mb-5">
               <span
@@ -125,8 +125,8 @@ export default function GiftLandingPage() {
                 They meet a child.
               </p>
               <p className="text-sm text-[#666] leading-relaxed">
-                We email your recipient a number and a link. They click through and meet their matched child &mdash;
-                name, face, story.
+                We email your recipient a number and a link. They click through and meet the specific kid
+                that number belongs to &mdash; name, face, story.
               </p>
             </div>
             <div>

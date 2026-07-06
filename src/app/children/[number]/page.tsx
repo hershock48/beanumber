@@ -812,7 +812,14 @@ const getChildByShirtNumber = cache(async function getChildByShirtNumber(shirtNu
       );
     }
 
-    let age: string | undefined = sponsorship?.ChildAge;
+    // Only trust ChildAge when it looks like a real age. Legacy
+    // sponsorships written before the claim-match grade-fallback fix
+    // may have "LK", "UK", "P3", etc. stored in this column; rendering
+    // those as "Age P3" is the bug we're guarding against here.
+    // Numeric-only shape (with optional whitespace) is the accept path.
+    const rawAge = sponsorship?.ChildAge;
+    let age: string | undefined =
+      rawAge && /^\s*\d{1,3}\s*$/.test(rawAge) ? rawAge.trim() : undefined;
     if (!age && child.DateOfBirth) {
       const birthDate = new Date(child.DateOfBirth);
       const today = new Date();

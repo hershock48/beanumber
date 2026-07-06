@@ -171,9 +171,15 @@ export async function POST(request: NextRequest) {
       child.displayName ||
       `${child.firstName || 'Child'} ${child.lastInitial || ''}`.trim();
     const childLocation = child.schoolLocation;
+    // childAge on the sponsorship snapshot must be an actual age (or
+    // empty). The old fallback wrote raw grade codes (LK / UK / P1–P5)
+    // into a field the kid page renders as "Age {value}" — producing
+    // 'Age P3' etc. Grade context belongs to gradeCode / gradeLabelForSponsor,
+    // not ChildAge. If DOB is missing, leave age empty; the kid page has
+    // its own fallbacks for grade rendering.
     const childAge = child.dateOfBirth
       ? String(yearsSince(child.dateOfBirth))
-      : child.gradeClass;
+      : '';
 
     // 4. Look up the Donation by Stripe Checkout Session ID, hydrated
     // with donor email + name so we can build the Sponsorship.

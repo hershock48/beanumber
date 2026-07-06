@@ -170,7 +170,7 @@ export async function POST(request: NextRequest) {
     const sizeSuffix = size ? ` (Size ${size})` : '';
     const productName = `${item.name}${sizeSuffix} · #${shirtNumber}`;
     const productDescription =
-      `${item.description} Pressed/embroidered with #${shirtNumber} — the same number on the back of ${sponsorName || 'your'} shirt, matched to ${childDisplayName || 'your child'}.`;
+      `${item.description} Pressed/embroidered with #${shirtNumber} — the same number on the back of ${sponsorName || 'your'} shirt, connected to ${childDisplayName || 'your kid'}.`;
 
     const childIdLegacy = sponsorship.childIdLegacy || child.childId || '';
     const metadata: Record<string, string> = {
