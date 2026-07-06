@@ -105,8 +105,6 @@ export function RosterGrid({ kids, role }: RosterGridProps) {
     };
   }, [kids]);
 
-  const visible = filter === 'needs' ? sorted.filter(k => !isComplete(k)) : sorted;
-
   // Server + client render should match on first paint. Use the SSR
   // default ('all') until localStorage has been consulted, then let
   // client updates take over.
@@ -135,10 +133,11 @@ export function RosterGrid({ kids, role }: RosterGridProps) {
         {visibleFinal.map(kid => (
           <RosterCard key={kid.recordId} kid={kid} role={role} />
         ))}
-        {/* Only show the add tile when we're not filtered to needs-finishing
-            (adding a kid from the incomplete-only view is fine but visually
-            adding is more relevant on the full grid). */}
-        {filterToUse === 'all' && <AddKidButton />}
+        {/* Always show the add tile — a newly-added kid starts with
+            zero fields filled so they land in the needs-finishing
+            bucket immediately, which is convenient regardless of
+            which filter is active. */}
+        <AddKidButton />
       </div>
     </>
   );

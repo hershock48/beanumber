@@ -11,9 +11,11 @@
  *                               // in the Postgres schema.
  * }
  *
- * Creates a new Children record. Shirt number is auto-assigned: max
- * existing + 1. Status defaults to "Active". ChildID is "HSP/BAN-NNN"
- * matching the assigned shirt number.
+ * Creates a new Children record. Shirt number is auto-assigned: the
+ * lowest empty slot in the canonical roster range (fills gaps first —
+ * currently #31, then #47, #52 — then extends upward). Errors with
+ * 409 if the range is full. Status defaults to "Active". ChildID is
+ * "HSP/BAN-NNN" matching the assigned shirt number.
  *
  * Returns shirtNumber so the caller can redirect to the editor.
  *
