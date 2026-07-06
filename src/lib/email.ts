@@ -438,7 +438,7 @@ export async function sendNewsletterNotificationEmail(params: {
 
     ${kidLines}
 
-    <p style="margin-top: 24px; font-size: 14px; color: #555;">Or open your <strong>My Campus</strong> page at <a href="${siteUrl}/me" style="color: #D4A843;">beanumber.org/me</a> &mdash; your ${kids.length === 1 ? 'kid' : 'kids'}, the campus feed, and this newsletter all in one place. That&rsquo;s the home base.</p>
+    <p style="margin-top: 24px; font-size: 14px; color: #555;">Also worth exploring: your <strong>My Campus</strong> page at <a href="${siteUrl}/me" style="color: #D4A843;">beanumber.org/me</a>. We built it to make exploring the campus feel closer. Your ${kids.length === 1 ? 'kid is' : 'kids are'} front and center &mdash; but so are the other kids at the campus you haven&rsquo;t met yet, the school itself, and every newsletter I&rsquo;ve sent. A home base, not a dashboard. Poke around.</p>
 
     <p style="margin-top: 24px; font-size: 14px; color: #888;">Reply to this email if anything&rsquo;s not loading or you want to write back to the campus &mdash; I read every one.</p>
 
@@ -500,7 +500,7 @@ export async function sendNewsletterNotificationEmailForNonSponsor(params: {
 
     <p style="font-size: 14px; color: #555;">Don&rsquo;t have the shirt handy? Read it at <a href="${siteUrl}/news" style="color: #D4A843;">beanumber.org/news</a> &mdash; same story, without the kid-page framing.</p>
 
-    <p style="font-size: 14px; color: #555;">And once you&rsquo;ve met your kid, your <strong>My Campus</strong> page at <a href="${siteUrl}/me" style="color: #D4A843;">beanumber.org/me</a> becomes your home for everything &mdash; your kid, the campus feed, and every newsletter I send.</p>
+    <p style="font-size: 14px; color: #555;">Once you&rsquo;ve met your kid, your <strong>My Campus</strong> page at <a href="${siteUrl}/me" style="color: #D4A843;">beanumber.org/me</a> opens up. Your kid&rsquo;s front and center &mdash; but so are the other kids at the campus, the school itself, and every newsletter I&rsquo;ve sent. We built it to make exploring the campus feel closer. Home base, not dashboard. Explore it.</p>
 
     <p style="font-size: 14px; color: #555;">If reading this makes you want to become a monthly sponsor of the kid on your shirt, that&rsquo;s a $25-a-month decision and the sponsor button is right there on their page. No pressure &mdash; the work runs either way. Just wanted you to know the door is open.</p>
 
@@ -561,7 +561,7 @@ export async function sendNewsletterNotificationEmailForLegacyDonor(params: {
 
     <p style="font-size: 14px; color: #555;">How this works: every shirt at <a href="${siteUrl}" style="color: #D4A843;">beanumber.org</a> is tied to a kid at the campus by number. Buy one, and you&rsquo;ll meet the kid attached to it when it arrives. From there, $25/mo sponsorship is optional &mdash; cancel anytime, runs the whole campus.</p>
 
-    <p style="font-size: 14px; color: #555;">Every shirt buyer also gets a <strong>My Campus</strong> page &mdash; their kid, the campus feed, and every newsletter in one place. Take a peek at <a href="${siteUrl}/me" style="color: #D4A843;">beanumber.org/me</a> if you want to see what that looks like.</p>
+    <p style="font-size: 14px; color: #555;">Every shirt buyer also gets a <strong>My Campus</strong> page &mdash; a real home base for exploring the campus. Your kid front and center, but also the other kids there, the school itself, every newsletter. We built it to make the connection feel closer. Take a peek at <a href="${siteUrl}/me" style="color: #D4A843;">beanumber.org/me</a> to see what that looks like.</p>
 
     <p>Kevin</p>
   `);
