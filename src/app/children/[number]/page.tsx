@@ -580,12 +580,30 @@ function canonicalShirtNumber(n: number): number | null {
   return ((n - 151) % 53) + 1;
 }
 
+// Canonical roster max — anything past this is a cycle number that
+// MUST resolve to a canonical kid via the Batches table, not via a
+// direct row lookup. Prior to July 2026 the children table had
+// duplicate rows past this cap (stale copies of canonical kids),
+// which meant /children/106 read a frozen photocopy of Marvin rather
+// than live Marvin. The dedupe migration cleared those rows and this
+// gate keeps them from ever winning again — even if a future
+// migration accidentally re-inserts one.
+const CANONICAL_ROSTER_MAX = 53;
+
 // React cache() deduplicates calls within a single server request.
 // Both generateMetadata() and the page component call this function,
 // so without cache() the page would hit Postgres twice per kid render.
 const getChildByShirtNumber = cache(async function getChildByShirtNumber(shirtNumber: number) {
   try {
-    let childRow = await getChildByShirtNumberFromDb(shirtNumber);
+    // For shirt numbers PAST the canonical roster (i.e. Batch 2, 3,
+    // 4+ cycle numbers), always resolve via the Batches table first.
+    // Direct row lookup for these numbers would risk reading a stale
+    // duplicate that no update flow writes to. Numbers 1..53 use the
+    // direct-row lookup as before — that's the canonical row itself.
+    let childRow =
+      shirtNumber <= CANONICAL_ROSTER_MAX
+        ? await getChildByShirtNumberFromDb(shirtNumber)
+        : null;
 
     // Track whether the row came from real DB data or was synthesized
     // via cycle math. Sponsorships are keyed to specific Children

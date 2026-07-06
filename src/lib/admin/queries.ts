@@ -607,32 +607,26 @@ const CANONICAL_ROSTER_MAX = 53;
 
 export async function getRoster(): Promise<RosterKid[]> {
   // Pull every canonical kid with a positive shirt number and a name.
-  // The shirt_number ≤ 53 gate hides cycle records past the canonical
-  // roster (#54+ are batch cycles of #2-53). Additional dedupe by
-  // displayName catches cycle-copies WITHIN 1-53 (e.g. Asenath at #3
-  // AND #47 — separate rows, same person — and Blessing at #50/#52).
-  // Keep the lowest shirt_number for each name; that's the original
-  // canonical row, the higher-numbered copy is the cycle artifact.
+  // As of the July 2026 dedupe migration, the children table holds
+  // exactly one row per canonical kid — no cycle-copies past the
+  // canonical range. The shirt_number ≤ 53 filter still exists as a
+  // defensive guard in case a future admin action accidentally
+  // creates a row past that range; such a row would not represent a
+  // canonical roster entry.
   const rows = await db
     .select()
     .from(children)
     .where(isNotNull(children.shirtNumber));
 
-  const byName = new Map<string, typeof rows[number]>();
+  const kids: RosterKid[] = [];
   for (const row of rows) {
     const displayName = (row.displayName || row.firstName || '').trim();
     const n = row.shirtNumber;
     if (!displayName) continue;
     if (typeof n !== 'number' || n < 1) continue;
-    if (n > CANONICAL_ROSTER_MAX) continue; // skip cycle records past roster
-    const key = displayName.toLowerCase();
-    const existing = byName.get(key);
-    if (!existing || (existing.shirtNumber ?? Infinity) > n) {
-      byName.set(key, row);
-    }
+    if (n > CANONICAL_ROSTER_MAX) continue; // guard: canonical roster only
+    kids.push(rowToRosterKid(row));
   }
-
-  const kids: RosterKid[] = Array.from(byName.values()).map(rowToRosterKid);
   // Alphabetical by display name — reads like a class roster.
   kids.sort((a, b) => a.displayName.localeCompare(b.displayName));
   return kids;
