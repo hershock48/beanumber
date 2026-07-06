@@ -241,7 +241,7 @@ export function BANNavigationClient({
   return (
     <nav
       ref={navRef}
-      className={`sticky top-0 z-50 transition-all duration-300 ${
+      className={`sticky top-0 z-[70] transition-all duration-300 ${
         showSolid
           ? 'bg-[#FFF8F0]/95 backdrop-blur-md border-b border-[#e8e0d4]'
           : 'bg-transparent'

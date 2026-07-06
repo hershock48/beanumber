@@ -851,6 +851,8 @@ export async function sendKevinReplyAlert(params: {
   kidFirstName: string;
   kidDisplayName: string;
   shirtNumber: number | null;
+  /** See sendKevinNoteAlert for the channel-tag semantics. */
+  sponsorHoldsShirt: boolean;
   replyBodyEn: string;
 }): Promise<EmailSendResult> {
   const {
@@ -860,6 +862,7 @@ export async function sendKevinReplyAlert(params: {
     kidFirstName,
     kidDisplayName,
     shirtNumber,
+    sponsorHoldsShirt,
     replyBodyEn,
   } = params;
 
@@ -868,6 +871,10 @@ export async function sendKevinReplyAlert(params: {
     : kidDisplayName || kidFirstName;
   const preview = truncateForPreview(replyBodyEn, 240);
   const sponsorDisplay = sponsorName?.trim() || sponsorEmail;
+  const holderTag = shirtNumber ? `Holds #${shirtNumber}` : `Shirt-linked`;
+  const channelTag = sponsorHoldsShirt
+    ? `<span style="display: inline-block; background: #D4A843; color: #0d0d0d; padding: 2px 8px; font-size: 11px; font-weight: bold; letter-spacing: 0.05em; text-transform: uppercase; margin-left: 6px;">${escapeHtmlLocal(holderTag)}</span>`
+    : `<span style="display: inline-block; background: #e8e0d4; color: #333; padding: 2px 8px; font-size: 11px; font-weight: bold; letter-spacing: 0.05em; text-transform: uppercase; margin-left: 6px;">Co-sponsor</span>`;
 
   const queueUrl = `${SITE_URL}/admin/messages`;
   const kidPageUrl = shirtNumber
@@ -880,7 +887,7 @@ export async function sendKevinReplyAlert(params: {
     <p><strong>From:</strong> ${escapeHtmlLocal(kidLabel)}<br>
     <strong>To:</strong> ${escapeHtmlLocal(sponsorDisplay)}${
     sponsorName ? ` &lt;${escapeHtmlLocal(sponsorEmail)}&gt;` : ''
-  }</p>
+  } ${channelTag}</p>
 
     <p style="background: #FFF8F0; border-left: 3px solid #c0392b; padding: 16px 20px; margin: 24px 0; font-style: italic; color: #555;">
       &ldquo;${escapeHtmlLocal(preview)}&rdquo;
@@ -919,6 +926,8 @@ export async function sendKevinDeclineAlert(params: {
   kidFirstName: string;
   kidDisplayName: string;
   shirtNumber: number | null;
+  /** See sendKevinNoteAlert for the channel-tag semantics. */
+  sponsorHoldsShirt: boolean;
   bodyEn: string;
   simonNotes: string | null;
   notifiedSponsor: boolean;
@@ -930,6 +939,7 @@ export async function sendKevinDeclineAlert(params: {
     kidFirstName,
     kidDisplayName,
     shirtNumber,
+    sponsorHoldsShirt,
     bodyEn,
     simonNotes,
     notifiedSponsor,
@@ -940,6 +950,10 @@ export async function sendKevinDeclineAlert(params: {
     : kidDisplayName || kidFirstName;
   const preview = truncateForPreview(bodyEn, 240);
   const sponsorDisplay = sponsorName?.trim() || sponsorEmail;
+  const holderTag = shirtNumber ? `Holds #${shirtNumber}` : `Shirt-linked`;
+  const channelTag = sponsorHoldsShirt
+    ? `<span style="display: inline-block; background: #D4A843; color: #0d0d0d; padding: 2px 8px; font-size: 11px; font-weight: bold; letter-spacing: 0.05em; text-transform: uppercase; margin-left: 6px;">${escapeHtmlLocal(holderTag)}</span>`
+    : `<span style="display: inline-block; background: #e8e0d4; color: #333; padding: 2px 8px; font-size: 11px; font-weight: bold; letter-spacing: 0.05em; text-transform: uppercase; margin-left: 6px;">Co-sponsor</span>`;
   const queueUrl = `${SITE_URL}/admin/messages`;
 
   const html = wrapTransactionalEmail(`
@@ -947,7 +961,7 @@ export async function sendKevinDeclineAlert(params: {
 
     <p><strong>From:</strong> ${escapeHtmlLocal(sponsorDisplay)}${
     sponsorName ? ` &lt;${escapeHtmlLocal(sponsorEmail)}&gt;` : ''
-  }<br>
+  } ${channelTag}<br>
     <strong>To:</strong> ${escapeHtmlLocal(kidLabel)}</p>
 
     <p style="background: #FFF8F0; border-left: 3px solid #D4A843; padding: 16px 20px; margin: 20px 0; font-style: italic; color: #555;">

@@ -24,9 +24,9 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { db } from '@/lib/db/client';
-import { kidMessages, children } from '@/lib/db/schema';
+import { kidMessages, children, sponsorships } from '@/lib/db/schema';
 import { getAdminRole } from '@/lib/admin-session';
 import { sendEmail, sendKevinDeclineAlert } from '@/lib/email';
 
@@ -268,6 +268,26 @@ export async function PATCH(
         typeof patch.simonNotes === 'string'
           ? patch.simonNotes
           : message.simonNotes ?? null;
+      // Same channel-tag lookup as the initial note-alert email. See
+      // /api/sponsor/notes/route.ts for the rationale — childRevealedAt
+      // tells us whether the sponsor holds this specific kid's shirt.
+      // Non-fatal — falls through as co-sponsor on error.
+      let sponsorHoldsShirt = false;
+      try {
+        const spRows = await db
+          .select({ childRevealedAt: sponsorships.childRevealedAt })
+          .from(sponsorships)
+          .where(
+            and(
+              sql`lower(${sponsorships.sponsorEmail}) = lower(${message.sponsorEmail})`,
+              eq(sponsorships.childId, message.childId)
+            )
+          )
+          .limit(1);
+        sponsorHoldsShirt = !!spRows[0]?.childRevealedAt;
+      } catch {
+        // Fall through with sponsorHoldsShirt=false.
+      }
       await sendKevinDeclineAlert({
         noteId: id,
         sponsorEmail: message.sponsorEmail,
@@ -275,6 +295,7 @@ export async function PATCH(
         kidFirstName: message.firstName || 'the kid',
         kidDisplayName: message.displayName || message.firstName || 'the kid',
         shirtNumber: message.shirtNumber ?? null,
+        sponsorHoldsShirt,
         bodyEn: message.bodyEn,
         simonNotes: declinedNotes,
         notifiedSponsor: shouldNotify,

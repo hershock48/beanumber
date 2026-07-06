@@ -37,9 +37,9 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { db } from '@/lib/db/client';
-import { kidMessages, children } from '@/lib/db/schema';
+import { kidMessages, children, sponsorships } from '@/lib/db/schema';
 import { getAdminRole } from '@/lib/admin-session';
 import { sendEmail, sendKevinReplyAlert } from '@/lib/email';
 
@@ -262,6 +262,27 @@ export async function POST(
   // gets logged and swallowed so a Gmail blip doesn't take down the
   // admin reply POST.
   try {
+    // Look up whether the sponsor holds THIS kid's shirt so the alert
+    // can render the same "Holds #N" vs "Co-sponsor" tag as the initial
+    // note-alert email. childRevealedAt is set only when the sponsor
+    // claimed via Hold-to-Meet. Non-fatal — if the lookup errors, we
+    // treat it as "we don't know" and fall through as co-sponsor.
+    let sponsorHoldsShirt = false;
+    try {
+      const spRows = await db
+        .select({ childRevealedAt: sponsorships.childRevealedAt })
+        .from(sponsorships)
+        .where(
+          and(
+            sql`lower(${sponsorships.sponsorEmail}) = lower(${parent.sponsorEmail})`,
+            eq(sponsorships.childId, parent.childId)
+          )
+        )
+        .limit(1);
+      sponsorHoldsShirt = !!spRows[0]?.childRevealedAt;
+    } catch {
+      // Fall through with sponsorHoldsShirt=false.
+    }
     await sendKevinReplyAlert({
       replyId: inserted[0].id,
       parentMessageId: parent.id,
@@ -270,6 +291,7 @@ export async function POST(
       kidFirstName: parent.firstName || 'the kid',
       kidDisplayName: parent.displayName || parent.firstName || 'the kid',
       shirtNumber: parent.shirtNumber ?? null,
+      sponsorHoldsShirt,
       replyBodyEn: bodyEn,
     });
   } catch (err) {
