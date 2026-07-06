@@ -45,7 +45,7 @@
  *     links or a story sticker can carry a URL.
  */
 
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 
 interface ShareKidCardProps {
   firstName: string;
@@ -69,6 +69,20 @@ export function ShareKidCard({
   const [flash, setFlash] = useState<string | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const modalRef = useRef<HTMLDivElement | null>(null);
+
+  // Normalized filename base — used for both the download link and
+  // the Web Share File. Previously the download path normalized
+  // (José → jose) while the share path passed the raw firstName, so
+  // the two flows produced different filenames from the same card.
+  const filenameBase = useMemo(() => {
+    const base = firstName
+      .normalize('NFD')
+      .replace(/[̀-ͯ]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, '');
+    return base || 'kid';
+  }, [firstName]);
+  const kidPageUrl = `https://www.beanumber.org/children/${shirtNumber}`;
 
   // Web Share API feature detection. We probe with a tiny 1x1 PNG
   // file because navigator.canShare(...) requires a File instance —
@@ -104,7 +118,7 @@ export function ShareKidCard({
     if (!ctx) return;
 
     setRendering(true);
-
+    try {
     // Resolve Lora's actual font-family name from the CSS variable
     // set by next/font/google in layout.tsx (variable: "--font-lora").
     // The variable resolves to a scrambled family list — something
@@ -152,9 +166,24 @@ export function ShareKidCard({
       try {
         const img = new Image();
         img.crossOrigin = 'anonymous';
+        // 8s ceiling on the photo load. Without this, a stalled CDN
+        // or a black-hole URL (DNS resolves but connection never
+        // completes) leaves the promise pending indefinitely — the
+        // 'Rendering…' spinner sticks and both action buttons stay
+        // disabled. On timeout we fall through to the placeholder
+        // tile so the sponsor still gets a card they can share.
         await new Promise<void>((resolve, reject) => {
-          img.onload = () => resolve();
-          img.onerror = () => reject(new Error('photo load failed'));
+          const timer = setTimeout(() => {
+            reject(new Error('photo load timeout'));
+          }, 8000);
+          img.onload = () => {
+            clearTimeout(timer);
+            resolve();
+          };
+          img.onerror = () => {
+            clearTimeout(timer);
+            reject(new Error('photo load failed'));
+          };
           img.src = photoUrl;
         });
         if (img.naturalWidth > 0 && img.naturalHeight > 0) {
@@ -254,8 +283,13 @@ export function ShareKidCard({
       CARD_SIZE / 2,
       PHOTO_HEIGHT + 370
     );
-
-    setRendering(false);
+    } finally {
+      // ALWAYS clear the rendering flag, even if drawImage /
+      // measureText / an unexpected canvas error threw. Without
+      // try/finally, a mid-draw throw leaves both action buttons
+      // permanently disabled until the modal is closed and reopened.
+      setRendering(false);
+    }
   }, [firstName, photoUrl, shirtNumber]);
 
   useEffect(() => {
@@ -273,7 +307,36 @@ export function ShareKidCard({
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpen(false);
+      if (e.key === 'Escape') {
+        setOpen(false);
+        return;
+      }
+      // Focus trap: wrap Tab / Shift+Tab so keyboard focus can't
+      // leave the modal while it's open. Without this, Tab from the
+      // Copy button escapes past the modal into the (invisible,
+      // scroll-locked) page below — keyboard and screen-reader
+      // users lose the dialog entirely.
+      if (e.key !== 'Tab') return;
+      const modal = modalRef.current;
+      if (!modal) return;
+      const tabbables = modal.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      );
+      if (tabbables.length === 0) {
+        e.preventDefault();
+        modal.focus();
+        return;
+      }
+      const first = tabbables[0];
+      const last = tabbables[tabbables.length - 1];
+      const active = document.activeElement as HTMLElement | null;
+      if (e.shiftKey && (active === first || active === modal)) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && active === last) {
+        e.preventDefault();
+        first.focus();
+      }
     };
     document.addEventListener('keydown', onKey);
     const prevOverflow = document.body.style.overflow;
@@ -327,16 +390,7 @@ export function ShareKidCard({
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    // Normalize accented characters to their ASCII base (José → jose)
-    // before stripping non-alphanumerics — otherwise ".replace(/[^a-z0-9]/)"
-    // strips the accented char and shortens the name.
-    const cleanName =
-      firstName
-        .normalize('NFD')
-        .replace(/[̀-ͯ]/g, '')
-        .toLowerCase()
-        .replace(/[^a-z0-9]/g, '') || 'kid';
-    link.download = `${cleanName}-beanumber.png`;
+    link.download = `${filenameBase}-beanumber.png`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -352,12 +406,19 @@ export function ShareKidCard({
       return;
     }
     try {
-      const file = new File([blob], `${firstName}-beanumber.png`, {
+      const file = new File([blob], `${filenameBase}-beanumber.png`, {
         type: 'image/png',
       });
+      // Pass `url` as its own field, not baked into `text`. iOS
+      // Messages, IG Direct, native mail, and Slack all render a
+      // proper link preview when the URL is a first-class field —
+      // whereas raw text with a URL just becomes a text link the
+      // recipient has to tap through. Text stays short and personal.
       await navigator.share({
         files: [file],
-        text: `I'm sponsoring ${firstName}'s education at the campus in Northern Uganda. beanumber.org/children/${shirtNumber}`,
+        title: `${firstName} at the campus`,
+        text: `I'm sponsoring ${firstName}'s education at the campus in Northern Uganda.`,
+        url: kidPageUrl,
       });
       setFlash(null);
     } catch (err) {
@@ -368,9 +429,8 @@ export function ShareKidCard({
   };
 
   const handleCopyLink = async () => {
-    const url = `https://www.beanumber.org/children/${shirtNumber}`;
     try {
-      await navigator.clipboard.writeText(url);
+      await navigator.clipboard.writeText(kidPageUrl);
       setFlash('Link copied.');
     } catch {
       setFlash("Couldn't copy. Long-press the URL to select.");
@@ -483,11 +543,19 @@ export function ShareKidCard({
               </button>
             </div>
 
-            {flash && (
-              <p className="text-sm text-[#0d0d0d] mt-4 text-center" role="status">
-                {flash}
-              </p>
-            )}
+            {/* Live region is always in the DOM (not conditionally
+                rendered) so screen readers register it BEFORE the
+                first announcement. Announces politely on change and
+                reads the entire region as one unit rather than diffing
+                text nodes. */}
+            <p
+              className="text-sm text-[#0d0d0d] mt-4 text-center min-h-[1.25rem]"
+              role="status"
+              aria-live="polite"
+              aria-atomic="true"
+            >
+              {flash ?? ''}
+            </p>
           </div>
         </div>
       )}
