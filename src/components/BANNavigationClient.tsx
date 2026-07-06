@@ -171,7 +171,13 @@ export function BANNavigationClient({
   // instead of presenting a parallel directory surface.
   const navLinks = [
     { href: '/shirts', label: 'Shirts' },
-    ...(signedIn ? [{ href: '/me', label: 'Your kids' }] : []),
+    // "My campus" is the signed-in home base. Renamed 2026-07-06 from
+    // "Your kids" — the page had already outgrown the label (campus
+    // snapshot + newsletter + monthly stats + kid cards). "My campus"
+    // owns the whole scope in first-person and matches the /me H1.
+    // "Dashboard" was considered and rejected — voice.md rule 3
+    // (personal over institutional).
+    ...(signedIn ? [{ href: '/me', label: 'My campus' }] : []),
     { href: '/founder', label: 'Story' },
   ];
 

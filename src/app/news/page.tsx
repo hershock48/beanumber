@@ -20,6 +20,7 @@ import { BANNavigation } from '@/components/BANNavigation';
 import { BANFooter } from '@/components/BANFooter';
 import { CampusNewsfeed } from '@/app/children/[number]/CampusNewsfeed';
 import { getRecentCampusNewsletters } from '@/lib/newsletter-feed';
+import { MarkNewsletterSeen } from '@/components/UnreadNewsletterPill';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -97,6 +98,20 @@ export default async function NewsPage() {
             right now.
           </p>
         </div>
+
+        {/* Mark the freshest newsletter as seen for THIS browser.
+            Clears the NEW pill on /me and (if any) the freshness
+            signals wherever else the newsletter surfaces. Pure mount
+            side-effect. */}
+        {hasContent && (
+          <MarkNewsletterSeen
+            publishedAt={
+              newsletters[0]?.publishedAt
+                ? new Date(newsletters[0].publishedAt).toISOString()
+                : null
+            }
+          />
+        )}
 
         {/* Feed */}
         {hasContent ? (

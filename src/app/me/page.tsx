@@ -18,6 +18,8 @@ import { BANNavigation } from '@/components/BANNavigation';
 import { BANFooter } from '@/components/BANFooter';
 import { RecentKidsStrip } from '@/components/RecentKidsStrip';
 import { KidCardUnreadBadge } from '@/components/KidCardUnreadBadge';
+import { UnreadNewsletterPill } from '@/components/UnreadNewsletterPill';
+import { MeContextualCTA, type MeCTAState } from '@/components/MeContextualCTA';
 import { SESSION } from '@/lib/constants';
 import { getRecentCampusNewsletters } from '@/lib/newsletter-feed';
 import {
@@ -188,88 +190,110 @@ export default async function MePage() {
   const holders = rows.filter(r => r.monthlyOrHolder === 'holder');
   const latestNewsletter = recentNewsletters[0];
 
+  // Earliest sponsorship start → "part of the campus for N days."
+  // Beats a hard-coded "Signed in" kicker: warm, dated, honest.
+  const earliestStart = rows
+    .map(r => r.startDate)
+    .filter((s): s is string => !!s)
+    .sort()[0];
+  const daysSinceJoin = earliestStart
+    ? Math.max(0, Math.floor((Date.now() - new Date(earliestStart).getTime()) / 86_400_000))
+    : null;
+
+  // Contextual CTA. Priority chain:
+  //   1. Any kid with a published latest update → point at that kid.
+  //      Pick the kid whose latest update is newest so the CTA
+  //      surfaces the freshest thing, regardless of read state.
+  //   2. Newsletter within the last ~45 days → point at /news.
+  //   3. Fallback → grow-your-campus (add another kid).
+  const kidWithFreshestUpdate = rows
+    .filter(r => r.latestUpdate && !r.child.departed)
+    .sort((a, b) => {
+      const at = a.latestUpdate?.publishedAt ?? '';
+      const bt = b.latestUpdate?.publishedAt ?? '';
+      return bt.localeCompare(at);
+    })[0];
+  const newsletterIsFresh =
+    latestNewsletter?.publishedAt
+      ? Date.now() - new Date(latestNewsletter.publishedAt).getTime() < 45 * 86_400_000
+      : false;
+
+  const ctaState: MeCTAState = kidWithFreshestUpdate
+    ? {
+        kind: 'kid-update',
+        kidFirstName: kidWithFreshestUpdate.child.firstName,
+        kidHref: kidWithFreshestUpdate.child.shirtNumber
+          ? `/children/${kidWithFreshestUpdate.child.shirtNumber}`
+          : `/meet/${kidWithFreshestUpdate.child.recordId}`,
+      }
+    : newsletterIsFresh
+    ? { kind: 'newsletter', newsletterHref: '/news' }
+    : { kind: 'grow' };
+
   return (
     <div className="bg-[#FFF8F0] min-h-screen flex flex-col">
       <BANNavigation currentPath="/me" />
-      <main className="flex-1 max-w-5xl w-full mx-auto px-5 py-8 md:py-14">
-        {/* ── Header ── */}
-        <div className="mb-10 md:mb-14">
-          <p className="text-xs font-bold uppercase tracking-[0.3em] text-[#D4A843] mb-3">
-            Signed in
+      <main className="flex-1 max-w-5xl w-full mx-auto px-5 py-10 md:py-16">
+        {/* ── Header ────────────────────────────────────────────────
+            Kicker + serif H1 + one warm line. Dated where we can
+            (days since first sponsorship start) so returning
+            sponsors feel their tenure. Accounting stat moves to a
+            small footer strip lower on the page. */}
+        <header className="mb-12 md:mb-16">
+          <p className="text-xs font-bold uppercase tracking-[0.35em] text-[#D4A843] mb-4">
+            My campus
           </p>
           <h1
-            className="text-3xl md:text-5xl text-[#0d0d0d] mb-3 leading-tight"
+            className="text-4xl md:text-6xl text-[#0d0d0d] mb-4 leading-[1.05]"
             style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
           >
-            Your campus.
+            My campus.
           </h1>
-          <p className="text-base md:text-lg text-[#666] leading-relaxed max-w-2xl">
-            Every kid you have a relationship with, in one place.
-            {sponsors.length > 0 && (
+          <p className="text-base md:text-lg text-[#555] leading-relaxed max-w-2xl">
+            {daysSinceJoin !== null && daysSinceJoin > 0 ? (
               <>
-                {' '}You sponsor{' '}
+                You&rsquo;ve been part of the campus for{' '}
+                <span className="font-bold text-[#0d0d0d]">
+                  {daysSinceJoin} day{daysSinceJoin === 1 ? '' : 's'}
+                </span>
+                .{' '}
+              </>
+            ) : (
+              <>Welcome to the campus. </>
+            )}
+            {sponsors.length > 0 && holders.length === 0 && (
+              <>
+                You&rsquo;re staying in the life of{' '}
                 <span className="font-bold text-[#0d0d0d]">
                   {sponsors.length} kid{sponsors.length === 1 ? '' : 's'}
                 </span>{' '}
-                at <span className="font-bold text-[#0d0d0d]">${monthlyTotal}/month</span> total.
+                on the ground in Northern Uganda.
               </>
             )}
-            {holders.length > 0 && sponsors.length > 0 && <> You hold </>}
-            {holders.length > 0 && sponsors.length === 0 && <> You hold </>}
-            {holders.length > 0 && (
+            {sponsors.length > 0 && holders.length > 0 && (
               <>
+                You&rsquo;re staying in the life of{' '}
+                <span className="font-bold text-[#0d0d0d]">
+                  {sponsors.length} kid{sponsors.length === 1 ? '' : 's'}
+                </span>
+                {' '}and holding{' '}
+                <span className="font-bold text-[#0d0d0d]">
+                  {holders.length} more number{holders.length === 1 ? '' : 's'}
+                </span>
+                .
+              </>
+            )}
+            {sponsors.length === 0 && holders.length > 0 && (
+              <>
+                You&rsquo;re holding{' '}
                 <span className="font-bold text-[#0d0d0d]">
                   {holders.length} number{holders.length === 1 ? '' : 's'}
                 </span>{' '}
-                without monthly.
+                waiting on the kids behind them.
               </>
             )}
           </p>
-        </div>
-
-        {/* Campus snapshot — pulls the latest newsletter so /me reads
-            like the campus is alive when you visit, not a static
-            list of your relationships. Renders only when we have a
-            newsletter to surface; quiet otherwise. */}
-        {latestNewsletter && (
-          <Link
-            href="/news"
-            className="group block bg-[#1a1208] text-white mb-10 md:mb-14 overflow-hidden hover:ring-2 hover:ring-[#D4A843] transition"
-          >
-            <div className="flex flex-col md:flex-row">
-              {latestNewsletter.heroPhotoUrl && (
-                <div className="md:w-1/3 aspect-[16/10] md:aspect-auto relative bg-[#2a1f14]">
-                  <Image
-                    src={latestNewsletter.heroPhotoUrl}
-                    alt={latestNewsletter.title || 'From the campus'}
-                    fill
-                    sizes="(max-width: 768px) 100vw, 33vw"
-                    className="object-cover group-hover:scale-105 transition-transform duration-500"
-                  />
-                </div>
-              )}
-              <div className="p-6 md:p-7 flex-1">
-                <p className="text-xs font-bold uppercase tracking-[0.25em] text-[#D4A843] mb-2">
-                  From the campus
-                  {latestNewsletter.publishedAt && (
-                    <span className="text-[#d8cfc1] font-normal normal-case tracking-normal ml-2">
-                      &middot; {formatRelativeMonth(latestNewsletter.publishedAt)}
-                    </span>
-                  )}
-                </p>
-                <p
-                  className="text-xl md:text-2xl leading-tight mb-2"
-                  style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
-                >
-                  {latestNewsletter.title || latestNewsletter.subject || 'Latest from Uganda'}
-                </p>
-                <p className="text-xs uppercase tracking-wider text-[#D4A843] font-bold group-hover:underline">
-                  Read this issue &rarr;
-                </p>
-              </div>
-            </div>
-          </Link>
-        )}
+        </header>
 
         {rows.length === 0 ? (
           <div className="bg-white border border-[#e8e0d4] p-8 md:p-12 text-center">
@@ -301,15 +325,23 @@ export default async function MePage() {
           </div>
         ) : (
           <>
-            {/* ── Sponsors (paying monthly) ── */}
+            {/* ── Kids first ─────────────────────────────────────────
+                Sponsors come here to see their kids. Newsletter and
+                CTA sit around them, not above them. */}
             {sponsors.length > 0 && (
-              <section className="mb-12">
-                <h2
-                  className="text-xs font-bold uppercase tracking-[0.3em] text-[#D4A843] mb-5"
-                >
-                  Your sponsored kids
-                </h2>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+              <section className="mb-14">
+                <div className="flex items-baseline justify-between mb-6">
+                  <h2
+                    className="text-2xl md:text-3xl text-[#0d0d0d] leading-none"
+                    style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
+                  >
+                    Your kids.
+                  </h2>
+                  <p className="text-xs font-bold uppercase tracking-[0.25em] text-[#888]">
+                    {sponsors.length} sponsored
+                  </p>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                   {sponsors.map(row => (
                     <KidCard key={row.recordId} row={row} />
                   ))}
@@ -317,13 +349,20 @@ export default async function MePage() {
               </section>
             )}
 
-            {/* ── Holders (own the number, not paying monthly) ── */}
             {holders.length > 0 && (
-              <section className="mb-12">
-                <h2 className="text-xs font-bold uppercase tracking-[0.3em] text-[#888] mb-5">
-                  Numbers you own
-                </h2>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+              <section className="mb-14">
+                <div className="flex items-baseline justify-between mb-6">
+                  <h2
+                    className="text-xl md:text-2xl text-[#0d0d0d] leading-none"
+                    style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
+                  >
+                    Numbers you&rsquo;re holding.
+                  </h2>
+                  <p className="text-xs font-bold uppercase tracking-[0.25em] text-[#888]">
+                    {holders.length}
+                  </p>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                   {holders.map(row => (
                     <KidCard key={row.recordId} row={row} />
                   ))}
@@ -331,36 +370,89 @@ export default async function MePage() {
               </section>
             )}
 
+            {/* ── One CTA, chosen by state ──────────────────────────
+                Points at the freshest thing waiting for the sponsor.
+                Fresh kid update > fresh newsletter > add-another. */}
+            <MeContextualCTA state={ctaState} />
+
+            {/* ── Campus snapshot (newsletter) ──────────────────────
+                Now below the kids, above the recent-visits strip.
+                Renders the NEW pill when this browser hasn't opened
+                the letter yet. */}
+            {latestNewsletter && (
+              <section className="mb-14">
+                <p className="text-xs font-bold uppercase tracking-[0.3em] text-[#D4A843] mb-4">
+                  This month at the campus
+                </p>
+                <Link
+                  href="/news"
+                  className="group block bg-[#1a1208] text-white overflow-hidden hover:ring-2 hover:ring-[#D4A843] transition"
+                >
+                  <div className="flex flex-col md:flex-row">
+                    {latestNewsletter.heroPhotoUrl && (
+                      <div className="md:w-2/5 aspect-[16/10] md:aspect-auto relative bg-[#2a1f14]">
+                        <Image
+                          src={latestNewsletter.heroPhotoUrl}
+                          alt={latestNewsletter.title || 'From the campus'}
+                          fill
+                          sizes="(max-width: 768px) 100vw, 40vw"
+                          className="object-cover group-hover:scale-105 transition-transform duration-500"
+                        />
+                      </div>
+                    )}
+                    <div className="p-6 md:p-8 flex-1">
+                      <p className="text-xs font-bold uppercase tracking-[0.25em] text-[#D4A843] mb-3 flex items-center gap-2">
+                        <span>
+                          From the campus
+                          {latestNewsletter.publishedAt && (
+                            <span className="text-[#d8cfc1] font-normal normal-case tracking-normal ml-2">
+                              &middot; {formatRelativeMonth(latestNewsletter.publishedAt)}
+                            </span>
+                          )}
+                        </span>
+                        <UnreadNewsletterPill
+                          latestNewsletterPublishedAt={
+                            latestNewsletter.publishedAt
+                              ? new Date(latestNewsletter.publishedAt).toISOString()
+                              : null
+                          }
+                        />
+                      </p>
+                      <p
+                        className="text-xl md:text-2xl leading-tight mb-3"
+                        style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
+                      >
+                        {latestNewsletter.title || latestNewsletter.subject || 'Latest from Uganda'}
+                      </p>
+                      <p className="text-xs uppercase tracking-wider text-[#D4A843] font-bold group-hover:underline">
+                        Read this issue &rarr;
+                      </p>
+                    </div>
+                  </div>
+                </Link>
+              </section>
+            )}
+
             {/* ── Kids you've recently met (client-side localStorage) ── */}
             <RecentKidsStrip />
 
-            {/* ── Grow your campus ── */}
-            <section className="mt-10 md:mt-14 border-t border-[#e8e0d4] pt-10">
-              <h2
-                className="text-2xl md:text-3xl text-[#0d0d0d] mb-3 leading-tight"
-                style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
-              >
-                Add another kid.
-              </h2>
-              <p className="text-[#666] leading-relaxed mb-5 max-w-2xl">
-                Every shirt is a new number. Every number is another
-                kid. Your relationships aren&rsquo;t locked to one.
-              </p>
-              <div className="flex flex-col sm:flex-row gap-3">
-                <Link
-                  href="/shirts"
-                  className="px-6 py-3 bg-[#D4A843] hover:bg-[#c49a3a] text-[#0d0d0d] text-xs font-bold uppercase tracking-wider transition-colors text-center"
-                >
-                  Shop another shirt
-                </Link>
-                <Link
-                  href="/campus"
-                  className="px-6 py-3 bg-white border border-[#0d0d0d] hover:bg-[#0d0d0d] hover:text-white text-[#0d0d0d] text-xs font-bold uppercase tracking-wider transition-colors text-center"
-                >
-                  Meet the campus
-                </Link>
+            {/* ── Support summary (demoted) ─────────────────────────
+                The monthly dollar total moves to a warm footer strip
+                instead of leading. Sponsors can still find it; it
+                just isn't the first thing they see. */}
+            {sponsors.length > 0 && (
+              <div className="mt-16 pt-8 border-t border-[#e8e0d4] text-center">
+                <p className="text-sm text-[#666] leading-relaxed">
+                  You&rsquo;re supporting{' '}
+                  <span className="font-bold text-[#0d0d0d]">${monthlyTotal}</span>{' '}
+                  a month across{' '}
+                  <span className="font-bold text-[#0d0d0d]">
+                    {sponsors.length} kid{sponsors.length === 1 ? '' : 's'}
+                  </span>
+                  . Thank you.
+                </p>
               </div>
-            </section>
+            )}
           </>
         )}
       </main>
