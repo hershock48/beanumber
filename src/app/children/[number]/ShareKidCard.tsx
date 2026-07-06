@@ -45,7 +45,7 @@
  *     links or a story sticker can carry a URL.
  */
 
-import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
+import { useEffect, useId, useMemo, useRef, useState, useCallback } from 'react';
 
 interface ShareKidCardProps {
   firstName: string;
@@ -69,6 +69,15 @@ export function ShareKidCard({
   const [flash, setFlash] = useState<string | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const modalRef = useRef<HTMLDivElement | null>(null);
+  // Element that had focus when the modal opened. We restore focus
+  // to it on close so keyboard / screen-reader users don't get
+  // dropped onto <body>.
+  const returnFocusRef = useRef<HTMLElement | null>(null);
+  // Per-instance IDs. Hardcoded 'share-kid-card-title' would collide
+  // if two ShareKidCards ever coexist on one page (currently only
+  // one per kid page, but future-proof).
+  const reactId = useId();
+  const titleId = `share-kid-card-title-${reactId}`;
 
   // Normalized filename base — used for both the download link and
   // the Web Share File. Previously the download path normalized
@@ -341,6 +350,14 @@ export function ShareKidCard({
     document.addEventListener('keydown', onKey);
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
+    // Capture the element that had focus when the modal opened so we
+    // can put focus back there on close. Falls back to null (=> body)
+    // if activeElement is null or not a focusable element.
+    const previouslyFocused =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+    returnFocusRef.current = previouslyFocused;
     // Defer focus so the modal has actually painted; without the
     // rAF, the focus call can race the append and land on <body>.
     const raf = requestAnimationFrame(() => {
@@ -350,6 +367,15 @@ export function ShareKidCard({
       cancelAnimationFrame(raf);
       document.removeEventListener('keydown', onKey);
       document.body.style.overflow = prevOverflow;
+      // Restore focus to whatever had it before the modal opened —
+      // typically the "Make the card" button. Guarded with isConnected
+      // so we don't try to focus a node that got removed while the
+      // modal was open.
+      const restore = returnFocusRef.current;
+      if (restore && restore.isConnected) {
+        restore.focus();
+      }
+      returnFocusRef.current = null;
     };
   }, [open]);
 
@@ -478,7 +504,7 @@ export function ShareKidCard({
             ref={modalRef}
             role="dialog"
             aria-modal="true"
-            aria-labelledby="share-kid-card-title"
+            aria-labelledby={titleId}
             tabIndex={-1}
             className="bg-[#FFF8F0] max-w-lg w-full max-h-[90vh] overflow-y-auto p-6 md:p-8 relative outline-none"
             onClick={e => e.stopPropagation()}
@@ -492,7 +518,7 @@ export function ShareKidCard({
               ×
             </button>
             <h2
-              id="share-kid-card-title"
+              id={titleId}
               className="text-xl md:text-2xl text-[#0d0d0d] mb-1"
               style={{ fontFamily: 'var(--font-lora), Georgia, serif', fontWeight: 600 }}
             >
@@ -545,12 +571,13 @@ export function ShareKidCard({
 
             {/* Live region is always in the DOM (not conditionally
                 rendered) so screen readers register it BEFORE the
-                first announcement. Announces politely on change and
-                reads the entire region as one unit rather than diffing
-                text nodes. */}
+                first announcement. Explicit aria-live="polite" +
+                aria-atomic="true" without role="status" — the two
+                together cause NVDA on Chrome to double-announce in
+                some configs, and the explicit ARIA attributes are
+                the more reliable path per MDN. */}
             <p
               className="text-sm text-[#0d0d0d] mt-4 text-center min-h-[1.25rem]"
-              role="status"
               aria-live="polite"
               aria-atomic="true"
             >
