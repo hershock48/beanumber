@@ -807,6 +807,159 @@ export async function sendKevinNoteAlert(params: {
   });
 }
 
+/**
+ * Admin alert to Kevin — a kid just replied to a sponsor.
+ *
+ * Fires from src/app/api/admin/messages/[id]/reply/route.ts alongside
+ * the sponsor-facing teaser email. Non-fatal, same posture as
+ * sendKevinNoteAlert. Includes a preview of what the kid said so Kevin
+ * can gauge the moment without opening the console (this is the
+ * highlight-reel side of the correspondence engine — worth surfacing).
+ */
+export async function sendKevinReplyAlert(params: {
+  replyId: string;
+  parentMessageId: string;
+  sponsorEmail: string;
+  sponsorName: string | null;
+  kidFirstName: string;
+  kidDisplayName: string;
+  shirtNumber: number | null;
+  replyBodyEn: string;
+}): Promise<EmailSendResult> {
+  const {
+    replyId,
+    sponsorEmail,
+    sponsorName,
+    kidFirstName,
+    kidDisplayName,
+    shirtNumber,
+    replyBodyEn,
+  } = params;
+
+  const kidLabel = shirtNumber
+    ? `${kidDisplayName || kidFirstName} (#${shirtNumber})`
+    : kidDisplayName || kidFirstName;
+  const preview = truncateForPreview(replyBodyEn, 240);
+  const sponsorDisplay = sponsorName?.trim() || sponsorEmail;
+
+  const queueUrl = `${SITE_URL}/admin/messages`;
+  const kidPageUrl = shirtNumber
+    ? `${SITE_URL}/children/${shirtNumber}`
+    : queueUrl;
+
+  const html = wrapTransactionalEmail(`
+    <p style="margin-top: 0;">A kid just wrote back.</p>
+
+    <p><strong>From:</strong> ${escapeHtmlLocal(kidLabel)}<br>
+    <strong>To:</strong> ${escapeHtmlLocal(sponsorDisplay)}${
+    sponsorName ? ` &lt;${escapeHtmlLocal(sponsorEmail)}&gt;` : ''
+  }</p>
+
+    <p style="background: #FFF8F0; border-left: 3px solid #c0392b; padding: 16px 20px; margin: 24px 0; font-style: italic; color: #555;">
+      &ldquo;${escapeHtmlLocal(preview)}&rdquo;
+    </p>
+
+    <p>The sponsor got a teaser email pointing them back to their kid's page. Reply thread lives there.</p>
+
+    <p style="text-align: center; margin: 28px 0;">
+      <a href="${kidPageUrl}" style="display: inline-block; background: #D4A843; color: #0d0d0d; font-weight: bold; text-decoration: none; padding: 14px 32px; font-size: 15px; letter-spacing: 0.05em;">
+        Open ${escapeHtmlLocal(kidFirstName)}&rsquo;s page
+      </a>
+    </p>
+
+    <p style="color: #888; font-size: 12px;">Reply ID: ${escapeHtmlLocal(replyId)}</p>
+  `);
+
+  return sendEmail({
+    to: { email: 'kevin@beanumber.org', name: 'Kevin' },
+    subject: `${kidFirstName} wrote back to ${sponsorDisplay}`,
+    html,
+  });
+}
+
+/**
+ * Admin alert to Kevin — Simon declined a sponsor's note.
+ *
+ * Fires from src/app/api/admin/messages/[id]/route.ts on the decline
+ * action. Includes Simon's internal decline notes if he wrote any, so
+ * Kevin can weigh in on borderline cases before the decline email
+ * lands with the sponsor. Non-fatal.
+ */
+export async function sendKevinDeclineAlert(params: {
+  noteId: string;
+  sponsorEmail: string;
+  sponsorName: string | null;
+  kidFirstName: string;
+  kidDisplayName: string;
+  shirtNumber: number | null;
+  bodyEn: string;
+  simonNotes: string | null;
+  notifiedSponsor: boolean;
+}): Promise<EmailSendResult> {
+  const {
+    noteId,
+    sponsorEmail,
+    sponsorName,
+    kidFirstName,
+    kidDisplayName,
+    shirtNumber,
+    bodyEn,
+    simonNotes,
+    notifiedSponsor,
+  } = params;
+
+  const kidLabel = shirtNumber
+    ? `${kidDisplayName || kidFirstName} (#${shirtNumber})`
+    : kidDisplayName || kidFirstName;
+  const preview = truncateForPreview(bodyEn, 240);
+  const sponsorDisplay = sponsorName?.trim() || sponsorEmail;
+  const queueUrl = `${SITE_URL}/admin/messages`;
+
+  const html = wrapTransactionalEmail(`
+    <p style="margin-top: 0;">A sponsor's note was declined at the queue.</p>
+
+    <p><strong>From:</strong> ${escapeHtmlLocal(sponsorDisplay)}${
+    sponsorName ? ` &lt;${escapeHtmlLocal(sponsorEmail)}&gt;` : ''
+  }<br>
+    <strong>To:</strong> ${escapeHtmlLocal(kidLabel)}</p>
+
+    <p style="background: #FFF8F0; border-left: 3px solid #D4A843; padding: 16px 20px; margin: 20px 0; font-style: italic; color: #555;">
+      &ldquo;${escapeHtmlLocal(preview)}&rdquo;
+    </p>
+
+    ${
+      simonNotes && simonNotes.trim()
+        ? `<p><strong>Reason logged:</strong></p>
+    <p style="background: #f8f4ed; padding: 14px 18px; margin: 12px 0 24px; color: #333;">
+      ${escapeHtmlLocal(simonNotes.trim())}
+    </p>`
+        : `<p style="color: #888; font-style: italic;">No reason was logged on the decline.</p>`
+    }
+
+    <p style="color: ${notifiedSponsor ? '#333' : '#c0392b'};">
+      ${
+        notifiedSponsor
+          ? 'The sponsor was emailed a soft explanation.'
+          : 'The sponsor was NOT notified. If you want to reach out, this is the moment.'
+      }
+    </p>
+
+    <p style="text-align: center; margin: 28px 0;">
+      <a href="${queueUrl}" style="display: inline-block; background: #D4A843; color: #0d0d0d; font-weight: bold; text-decoration: none; padding: 14px 32px; font-size: 15px; letter-spacing: 0.05em;">
+        Open the queue
+      </a>
+    </p>
+
+    <p style="color: #888; font-size: 12px;">Note ID: ${escapeHtmlLocal(noteId)}</p>
+  `);
+
+  return sendEmail({
+    to: { email: 'kevin@beanumber.org', name: 'Kevin' },
+    subject: `Note declined: ${sponsorDisplay} → ${kidFirstName}`,
+    html,
+  });
+}
+
 // Local escape because email.ts doesn't already export one. Kept
 // module-private to avoid competing with per-file escapers elsewhere.
 function escapeHtmlLocal(input: string | null | undefined): string {

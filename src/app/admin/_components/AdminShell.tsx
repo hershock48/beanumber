@@ -14,7 +14,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Logo } from '@/components/Logo';
 
 export type AdminTab =
@@ -55,6 +55,37 @@ export function AdminShell({
   const [signingOut, setSigningOut] = useState(false);
   const tabs = ALL_TABS.filter(t => t.visibleTo.includes(role));
 
+  // Pending sponsor notes count for the red-dot indicator on the
+  // "Sponsor notes" tab. Fetched on mount + on window focus so that
+  // when Kevin tabs back to the admin console from his inbox, the
+  // count reflects reality. No aggressive polling — Kevin is one
+  // user; this is the pragmatic amount of freshness.
+  const [pendingNotes, setPendingNotes] = useState<number | null>(null);
+  const refetchPendingNotes = useCallback(async () => {
+    try {
+      const r = await fetch('/api/admin/messages/pending-count', {
+        cache: 'no-store',
+      });
+      if (!r.ok) return;
+      const j = (await r.json()) as { count?: number };
+      if (typeof j.count === 'number') setPendingNotes(j.count);
+    } catch {
+      // Silent — the badge is decorative, DB blips shouldn't nag.
+    }
+  }, []);
+  useEffect(() => {
+    refetchPendingNotes();
+    const onVis = () => {
+      if (document.visibilityState === 'visible') refetchPendingNotes();
+    };
+    document.addEventListener('visibilitychange', onVis);
+    window.addEventListener('focus', refetchPendingNotes);
+    return () => {
+      document.removeEventListener('visibilitychange', onVis);
+      window.removeEventListener('focus', refetchPendingNotes);
+    };
+  }, [refetchPendingNotes]);
+
   async function signOut() {
     if (signingOut) return;
     setSigningOut(true);
@@ -82,20 +113,40 @@ export function AdminShell({
           {/* Tab nav — horizontally scrollable on small screens */}
           <nav className="flex-1 overflow-x-auto">
             <ul className="flex items-center gap-1 md:gap-2 justify-end md:justify-center">
-              {tabs.map(tab => (
-                <li key={tab.id}>
-                  <Link
-                    href={tab.href}
-                    className={`inline-block px-3 py-2 text-xs uppercase tracking-wider whitespace-nowrap transition-colors ${
-                      activeTab === tab.id
-                        ? 'text-[#0d0d0d] font-bold border-b-2 border-[#D4A843]'
-                        : 'text-[#888] hover:text-[#0d0d0d]'
-                    }`}
-                  >
-                    {tab.label}
-                  </Link>
-                </li>
-              ))}
+              {tabs.map(tab => {
+                // Red dot on the "Sponsor notes" tab when there are
+                // pending or translated outbound notes waiting on
+                // admin action. Positioned as an inline sup pill so
+                // the tab layout doesn't jitter when the count flips.
+                const showDot =
+                  tab.id === 'messages' &&
+                  pendingNotes != null &&
+                  pendingNotes > 0;
+                return (
+                  <li key={tab.id}>
+                    <Link
+                      href={tab.href}
+                      className={`inline-flex items-center gap-1.5 px-3 py-2 text-xs uppercase tracking-wider whitespace-nowrap transition-colors ${
+                        activeTab === tab.id
+                          ? 'text-[#0d0d0d] font-bold border-b-2 border-[#D4A843]'
+                          : 'text-[#888] hover:text-[#0d0d0d]'
+                      }`}
+                    >
+                      <span>{tab.label}</span>
+                      {showDot && (
+                        <span
+                          className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1.5 rounded-full bg-[#c0392b] text-white text-[10px] font-bold"
+                          aria-label={`${pendingNotes} note${
+                            pendingNotes === 1 ? '' : 's'
+                          } waiting`}
+                        >
+                          {pendingNotes}
+                        </span>
+                      )}
+                    </Link>
+                  </li>
+                );
+              })}
             </ul>
           </nav>
 

@@ -41,7 +41,7 @@ import { and, eq } from 'drizzle-orm';
 import { db } from '@/lib/db/client';
 import { kidMessages, children } from '@/lib/db/schema';
 import { getAdminRole } from '@/lib/admin-session';
-import { sendEmail } from '@/lib/email';
+import { sendEmail, sendKevinReplyAlert } from '@/lib/email';
 
 const SITE_URL =
   process.env.NEXT_PUBLIC_SITE_URL || 'https://www.beanumber.org';
@@ -114,6 +114,7 @@ export async function POST(
       sponsorName: kidMessages.sponsorName,
       childId: kidMessages.childId,
       firstName: children.firstName,
+      displayName: children.displayName,
       shirtNumber: children.shirtNumber,
     })
     .from(kidMessages)
@@ -253,6 +254,29 @@ export async function POST(
         err instanceof Error ? err.message : String(err)
       );
     }
+  }
+
+  // Kevin's copy — fires regardless of the sponsor notifyFlag because
+  // Kevin's admin awareness of the reply is independent of whether
+  // the sponsor was emailed. Fully non-fatal: any failure here just
+  // gets logged and swallowed so a Gmail blip doesn't take down the
+  // admin reply POST.
+  try {
+    await sendKevinReplyAlert({
+      replyId: inserted[0].id,
+      parentMessageId: parent.id,
+      sponsorEmail: parent.sponsorEmail,
+      sponsorName: parent.sponsorName,
+      kidFirstName: parent.firstName || 'the kid',
+      kidDisplayName: parent.displayName || parent.firstName || 'the kid',
+      shirtNumber: parent.shirtNumber ?? null,
+      replyBodyEn: bodyEn,
+    });
+  } catch (err) {
+    console.warn(
+      '[messages/reply] Kevin alert failed (non-fatal):',
+      err instanceof Error ? err.message : String(err)
+    );
   }
 
   return NextResponse.json({

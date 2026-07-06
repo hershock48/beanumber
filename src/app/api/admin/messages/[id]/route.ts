@@ -28,7 +28,7 @@ import { eq } from 'drizzle-orm';
 import { db } from '@/lib/db/client';
 import { kidMessages, children } from '@/lib/db/schema';
 import { getAdminRole } from '@/lib/admin-session';
-import { sendEmail } from '@/lib/email';
+import { sendEmail, sendKevinDeclineAlert } from '@/lib/email';
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.beanumber.org';
 const FROM_EMAIL = process.env.SENDGRID_FROM_EMAIL || 'Kevin@beanumber.org';
@@ -99,8 +99,12 @@ export async function PATCH(
       // there's no translation on file (either already stored here or
       // being submitted in this same PATCH).
       bodyTranslated: kidMessages.bodyTranslated,
+      // Needed by the Kevin decline alert — falls back to the existing
+      // simon_notes when this PATCH doesn't include a fresh one.
+      simonNotes: kidMessages.simonNotes,
       childId: kidMessages.childId,
       firstName: children.firstName,
+      displayName: children.displayName,
       shirtNumber: children.shirtNumber,
     })
     .from(kidMessages)
@@ -245,6 +249,39 @@ export async function PATCH(
     } catch (err) {
       console.warn(
         '[messages] sponsor notification failed (non-fatal):',
+        err instanceof Error ? err.message : String(err)
+      );
+    }
+  }
+
+  // Kevin's decline alert — fires whenever Simon declines a note,
+  // regardless of whether the sponsor was notified. Kevin sees Simon's
+  // reason (from simon_notes) and can decide whether to reach out
+  // manually. Non-fatal, same posture as the other alerts.
+  if (action === 'decline') {
+    try {
+      // Use whatever simon_notes ended up on the row after this patch —
+      // could be a fresh value from this PATCH or an older value left
+      // alone. patch.simonNotes is set higher up when the client sends
+      // it; fall back to whatever was on the message before.
+      const declinedNotes =
+        typeof patch.simonNotes === 'string'
+          ? patch.simonNotes
+          : message.simonNotes ?? null;
+      await sendKevinDeclineAlert({
+        noteId: id,
+        sponsorEmail: message.sponsorEmail,
+        sponsorName: message.sponsorName,
+        kidFirstName: message.firstName || 'the kid',
+        kidDisplayName: message.displayName || message.firstName || 'the kid',
+        shirtNumber: message.shirtNumber ?? null,
+        bodyEn: message.bodyEn,
+        simonNotes: declinedNotes,
+        notifiedSponsor: shouldNotify,
+      });
+    } catch (err) {
+      console.warn(
+        '[messages] Kevin decline alert failed (non-fatal):',
         err instanceof Error ? err.message : String(err)
       );
     }
