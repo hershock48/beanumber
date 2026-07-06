@@ -11,7 +11,6 @@
  */
 
 import { cookies } from 'next/headers';
-import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { BANNavigation } from '@/components/BANNavigation';
@@ -20,11 +19,13 @@ import { RecentKidsStrip } from '@/components/RecentKidsStrip';
 import { KidCardUnreadBadge } from '@/components/KidCardUnreadBadge';
 import { UnreadNewsletterPill } from '@/components/UnreadNewsletterPill';
 import { MeContextualCTA, type MeCTAState } from '@/components/MeContextualCTA';
+import { PreviewMyCampus } from './PreviewMyCampus';
 import { SESSION } from '@/lib/constants';
 import { getRecentCampusNewsletters } from '@/lib/newsletter-feed';
 import {
   getViewerSponsorships,
   getLatestUpdateForChild,
+  listAllChildren,
 } from '@/lib/db/queries';
 
 export const dynamic = 'force-dynamic';
@@ -130,13 +131,54 @@ async function fetchSponsorshipsForEmail(email: string): Promise<SponsorshipRow[
 
 export default async function MePage() {
   const email = await getViewerEmail();
+
+  // ── Anon viewer: preview the surface ──────────────────────────
+  // Instead of hiding /me behind /signin, show anon visitors a
+  // preview version that sells the page as the reason to buy a
+  // shirt. Same nav ("My campus" is now visible to everyone), so
+  // clicking it as anon lands here, not on a redirect to sign-in.
   if (!email) {
-    // No session — route to the sign-in page with context. The
-    // ?next=/me param tells /signin what they were trying to reach
-    // so it can frame the page accordingly. Previously we redirected
-    // to home with ?signin=needed which silently dropped them on
-    // the homepage with no indication of why.
-    redirect('/signin?next=/me&reason=your-kids');
+    // Pull a small handful of real roster kids (photo required so
+    // the preview doesn't render placeholder ghosts) and the latest
+    // newsletter. Both are already public data.
+    const [allKids, recentNewsletters] = await Promise.all([
+      listAllChildren({ onlyWithPhoto: true }),
+      getRecentCampusNewsletters(1),
+    ]);
+    // Shuffle then slice so the preview doesn't always show the
+    // same three faces. Cryptographic randomness isn't the point;
+    // just enough variety that a repeat visitor sees a different
+    // sample.
+    const shuffled = [...allKids].sort(() => Math.random() - 0.5);
+    const sampleKids = shuffled.slice(0, 3).map(k => ({
+      recordId: k.id,
+      firstName: k.firstName || k.displayName?.split(' ')[0] || 'A kid',
+      displayName: k.displayName || k.firstName || 'A kid',
+      photoUrl: k.profilePhotoUrl ?? undefined,
+      shirtNumber: k.shirtNumber ?? null,
+    }));
+    const nl = recentNewsletters[0];
+    const previewNewsletter = nl
+      ? {
+          title: nl.title ?? null,
+          subject: nl.subject ?? null,
+          heroPhotoUrl: nl.heroPhotoUrl ?? null,
+          publishedAt: nl.publishedAt
+            ? new Date(nl.publishedAt).toISOString()
+            : null,
+        }
+      : null;
+
+    return (
+      <div className="bg-[#FFF8F0] min-h-screen flex flex-col">
+        <BANNavigation currentPath="/me" />
+        <PreviewMyCampus
+          sampleKids={sampleKids}
+          latestNewsletter={previewNewsletter}
+        />
+        <BANFooter />
+      </div>
+    );
   }
 
   const [rawRows, recentNewsletters] = await Promise.all([

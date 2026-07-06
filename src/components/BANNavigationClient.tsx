@@ -177,7 +177,13 @@ export function BANNavigationClient({
     // owns the whole scope in first-person and matches the /me H1.
     // "Dashboard" was considered and rejected — voice.md rule 3
     // (personal over institutional).
-    ...(signedIn ? [{ href: '/me', label: 'My campus' }] : []),
+    //
+    // Shown to anon viewers too (added 2026-07-06). Clicking it as
+    // anon lands on the preview version of /me that shows what a
+    // real sponsor sees — real roster kids, latest newsletter, framed
+    // as the reason to buy a shirt. Sells the surface as a benefit of
+    // being a number rather than hiding it behind sign-in.
+    { href: '/me', label: 'My campus' },
     { href: '/founder', label: 'Story' },
   ];
 
