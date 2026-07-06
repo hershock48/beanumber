@@ -24,6 +24,7 @@ import { LocationBlock } from './LocationBlock';
 import { YourKidsStrip } from '@/components/YourKidsStrip';
 import { AlreadySponsoringBanner } from './AlreadySponsoringBanner';
 import { RecentKidsTracker } from '@/components/RecentKidsTracker';
+import { MarkKidUpdatesSeen } from '@/components/MarkKidUpdatesSeen';
 import { RecentKidsStrip } from '@/components/RecentKidsStrip';
 import { SESSION } from '@/lib/constants';
 import {
@@ -1902,6 +1903,14 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
           displayName={displayName}
           firstName={firstName}
           photoUrl={child.photo_url}
+        />
+
+        {/* Mark this kid's updates as seen for the current browser.
+            Pairs with KidCardUnreadBadge + UnreadYourKidsDot: as soon
+            as the sponsor lands here, the red indicator for THIS kid
+            goes away everywhere. Pure mount side-effect. */}
+        <MarkKidUpdatesSeen
+          childIdLegacy={child.child_id ?? null}
         />
 
         </RevealOverlay>

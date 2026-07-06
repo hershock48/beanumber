@@ -17,6 +17,7 @@ import Image from 'next/image';
 import { BANNavigation } from '@/components/BANNavigation';
 import { BANFooter } from '@/components/BANFooter';
 import { RecentKidsStrip } from '@/components/RecentKidsStrip';
+import { KidCardUnreadBadge } from '@/components/KidCardUnreadBadge';
 import { SESSION } from '@/lib/constants';
 import { getRecentCampusNewsletters } from '@/lib/newsletter-feed';
 import {
@@ -443,11 +444,17 @@ function KidCard({ row }: { row: SponsorshipRow }) {
 
         {/* Latest from the campus &mdash; surfaces the most recent published
             update for THIS kid so /me reads as a digest. Quiet when
-            we don't have one yet. */}
+            we don't have one yet. If the update is newer than this
+            viewer's last visit to the kid page, KidCardUnreadBadge
+            adds a red NEW pill next to the "Latest" kicker. */}
         {latestUpdate && !child.departed && (
           <div className="mt-3 pt-3 border-t border-[#e8e0d4]">
-            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-1">
-              Latest &middot; {formatRelativeDate(latestUpdate.publishedAt)}
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-1 flex items-center">
+              <span>Latest &middot; {formatRelativeDate(latestUpdate.publishedAt)}</span>
+              <KidCardUnreadBadge
+                childIdLegacy={child.childId || null}
+                latestUpdatePublishedAt={latestUpdate.publishedAt}
+              />
             </p>
             <p className="text-sm text-[#333] leading-snug line-clamp-2">
               {latestUpdate.title}

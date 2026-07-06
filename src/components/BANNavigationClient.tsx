@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { Logo } from '@/components/Logo';
+import { UnreadYourKidsDot } from '@/components/UnreadYourKidsDot';
 
 interface BANNavigationClientProps {
   currentPath?: string;
@@ -261,6 +262,11 @@ export function BANNavigationClient({
                 }`}
               >
                 {link.label}
+                {/* Small red dot next to Your Kids when a personal
+                    child update has landed since this browser last
+                    visited the kid page. Silent for every other
+                    link. */}
+                {link.href === '/me' && <UnreadYourKidsDot />}
               </Link>
             ))}
             {authButton}
@@ -308,6 +314,7 @@ export function BANNavigationClient({
                 onClick={() => setMobileOpen(false)}
               >
                 {link.label}
+                {link.href === '/me' && <UnreadYourKidsDot />}
               </Link>
             ))}
             {authButtonMobile}
