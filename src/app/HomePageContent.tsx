@@ -7,6 +7,11 @@ import Link from 'next/link';
 import { BANNavigationClient as BANNavigation } from '@/components/BANNavigationClient';
 import { BANFooter } from '@/components/BANFooter';
 import { Logo } from '@/components/Logo';
+import {
+  gradeLabelForSponsor,
+  isGradeCode,
+  type GradeCode,
+} from '@/lib/grades';
 
 // ---------------------------------------------------------------------------
 // Animated count-up hook — starts as soon as the component mounts on the
@@ -379,7 +384,13 @@ function HomePageInner() {
                       <div className="flex items-center gap-3 text-sm text-[#999]">
                         {child.age && <span>Age {child.age}</span>}
                         {child.age && child.grade_class && <span className="text-[#ccc]">&middot;</span>}
-                        {child.grade_class && <span>{child.grade_class}</span>}
+                        {child.grade_class && (
+                          <span>
+                            {isGradeCode(child.grade_class)
+                              ? gradeLabelForSponsor(child.grade_class as GradeCode)
+                              : child.grade_class /* legacy fallback */}
+                          </span>
+                        )}
                       </div>
                       {child.fun_fact && (
                         <p className="text-sm text-[#777] italic mt-3 line-clamp-2">

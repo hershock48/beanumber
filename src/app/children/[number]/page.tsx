@@ -25,6 +25,11 @@ import { YourKidsStrip } from '@/components/YourKidsStrip';
 import { AlreadySponsoringBanner } from './AlreadySponsoringBanner';
 import { RecentKidsTracker } from '@/components/RecentKidsTracker';
 import { MarkKidUpdatesSeen } from '@/components/MarkKidUpdatesSeen';
+import {
+  gradeLabelForSponsor,
+  isGradeCode,
+  type GradeCode,
+} from '@/lib/grades';
 import { RecentKidsStrip } from '@/components/RecentKidsStrip';
 import { SESSION } from '@/lib/constants';
 import {
@@ -1509,7 +1514,13 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
             <div className="flex items-center justify-center gap-3 text-[#777]">
               {child.age && <span className="text-base">Age {child.age}</span>}
               {child.age && child.grade_class && <span className="text-[#ccc]">&middot;</span>}
-              {child.grade_class && <span className="text-base">{child.grade_class}</span>}
+              {child.grade_class && (
+                <span className="text-base">
+                  {isGradeCode(child.grade_class)
+                    ? gradeLabelForSponsor(child.grade_class as GradeCode)
+                    : child.grade_class /* legacy fallback */}
+                </span>
+              )}
             </div>
           </div>
 

@@ -27,6 +27,11 @@ import { listAllChildren } from '@/lib/db/queries';
 import { db } from '@/lib/db/client';
 import { sponsorships as sponsorshipsTable } from '@/lib/db/schema';
 import type { Child } from '@/lib/db/schema';
+import {
+  gradeLabelForSponsor,
+  isGradeCode,
+  type GradeCode,
+} from '@/lib/grades';
 
 interface KidCard {
   recordId: string;
@@ -217,7 +222,9 @@ export async function OtherKidsAtCampus({
                 </p>
                 {kid.gradeClass && (
                   <p className="text-xs text-[#888] mb-3">
-                    {kid.gradeClass}
+                    {isGradeCode(kid.gradeClass)
+                      ? gradeLabelForSponsor(kid.gradeClass as GradeCode)
+                      : kid.gradeClass /* legacy fallback */}
                   </p>
                 )}
                 <p className="text-xs font-bold uppercase tracking-wider text-[#0d0d0d] group-hover:text-[#D4A843] transition-colors">

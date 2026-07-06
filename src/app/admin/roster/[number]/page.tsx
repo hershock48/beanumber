@@ -12,6 +12,11 @@ import { AdminShell } from '../../_components/AdminShell';
 import { getRosterKidByNumber } from '@/lib/admin/queries';
 import { getAdminRole } from '@/lib/admin-session';
 import { RosterEditor } from './RosterEditor';
+import {
+  gradeLabelForSimon,
+  isGradeCode,
+  type GradeCode,
+} from '@/lib/grades';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -54,7 +59,7 @@ export default async function AdminRosterEditPage({ params }: Props) {
           )}
           <div>
             <p className="text-xs uppercase tracking-[0.2em] text-[#D4A843] mb-1">
-              #{kid.shirtNumber}{kid.age ? ` · age ${kid.age}` : ''}{kid.gradeClass ? ` · ${kid.gradeClass}` : ''}
+              #{kid.shirtNumber}{kid.age ? ` · age ${kid.age}` : ''}{kid.gradeClass && isGradeCode(kid.gradeClass) ? ` · ${gradeLabelForSimon(kid.gradeClass as GradeCode)}` : ''}
             </p>
             <h1
               className="text-2xl md:text-3xl text-[#0d0d0d]"
@@ -88,6 +93,9 @@ export default async function AdminRosterEditPage({ params }: Props) {
             homeVillage: kid.homeVillage,
             teacherName: kid.teacherName,
             teacherQuote: kid.teacherQuote,
+            // Grade code (LK/UK/P1–P5) or empty string when not set.
+            // Simon-visible dropdown labeled in the Ugandan system.
+            gradeClass: isGradeCode(kid.gradeClass) ? (kid.gradeClass as GradeCode) : '',
           }}
           reportCards={kid.reportCards}
           letters={kid.letters}

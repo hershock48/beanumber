@@ -17,7 +17,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdminToken } from '@/lib/auth';
 import { getAdminRole } from '@/lib/admin-session';
-import { normalizeGrade } from '@/lib/admin/grade';
+import { isGradeCode, type GradeCode } from '@/lib/grades';
+
+// Reassignment prefers a same-grade candidate; unmatched grades fall
+// into the 'unknown' bucket so a null/junk-grade kid never gets
+// silently paired with a real-grade one.
+function gradeBucket(raw: string | null | undefined): GradeCode | 'unknown' {
+  return isGradeCode(raw) ? (raw as GradeCode) : 'unknown';
+}
 import { sendEmail } from '@/lib/email';
 import { makeRecoveryToken } from '@/lib/recovery-tokens';
 import { db } from '@/lib/db/client';
@@ -133,12 +140,12 @@ export async function POST(request: NextRequest) {
         { status: 409 }
       );
     }
-    const targetGradeKey = normalizeGrade(departing.gradeClass).key;
+    const targetGradeKey = gradeBucket(departing.gradeClass);
     const sameGrade = shuffle(
-      allEligible.filter(r => normalizeGrade(r.gradeClass).key === targetGradeKey)
+      allEligible.filter(r => gradeBucket(r.gradeClass) === targetGradeKey)
     );
     const others = shuffle(
-      allEligible.filter(r => normalizeGrade(r.gradeClass).key !== targetGradeKey)
+      allEligible.filter(r => gradeBucket(r.gradeClass) !== targetGradeKey)
     );
     replacement = sameGrade[0] || others[0] || null;
   }

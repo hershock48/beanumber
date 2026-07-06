@@ -13,6 +13,11 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import {
+  gradeLabelForSimon,
+  isGradeCode,
+  type GradeCode,
+} from '@/lib/grades';
 
 interface Replacement {
   recordId: string;
@@ -268,7 +273,9 @@ export function ReassignBlock({
                     </p>
                     <p className="text-xs text-[#888] truncate">
                       #{r.shirtNumber}
-                      {r.gradeClass ? ` · ${r.gradeClass}` : ''}
+                      {r.gradeClass && isGradeCode(r.gradeClass)
+                        ? ` · ${gradeLabelForSimon(r.gradeClass as GradeCode)}`
+                        : ''}
                     </p>
                   </div>
                 </button>

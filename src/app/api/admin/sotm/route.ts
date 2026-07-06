@@ -21,7 +21,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdminToken } from '@/lib/auth';
 import { getAdminRole } from '@/lib/admin-session';
-import { normalizeGrade } from '@/lib/admin/grade';
+import { isGradeCode, type GradeCode } from '@/lib/grades';
+
+/**
+ * Canonical grade key for same-grade collision checks. Kids whose
+ * grade_class isn't one of the seven canonical codes (null, or
+ * legacy junk that didn't map cleanly) collide only with each
+ * other under the 'unknown' bucket — safe default so a mis-tagged
+ * kid never accidentally displaces the real SOTM in a real grade.
+ */
+function gradeBucket(raw: string | null | undefined): GradeCode | 'unknown' {
+  return isGradeCode(raw) ? (raw as GradeCode) : 'unknown';
+}
 import { db } from '@/lib/db/client';
 import { children } from '@/lib/db/schema';
 import { eq, isNotNull } from 'drizzle-orm';
@@ -115,7 +126,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const targetGradeKey = normalizeGrade(target.gradeClass).key;
+    const targetGradeKey = gradeBucket(target.gradeClass);
 
     if (action === 'nominate') {
       // Clear other same-grade pending picks.
@@ -126,7 +137,7 @@ export async function POST(request: NextRequest) {
       const otherIds = allPending
         .filter(
           r =>
-            r.id !== target.id && normalizeGrade(r.gradeClass).key === targetGradeKey
+            r.id !== target.id && gradeBucket(r.gradeClass) === targetGradeKey
         )
         .map(r => r.id);
       for (const id of otherIds) {
@@ -161,7 +172,7 @@ export async function POST(request: NextRequest) {
     const samePublishedOtherIds = allPublished
       .filter(
         r =>
-          r.id !== target.id && normalizeGrade(r.gradeClass).key === targetGradeKey
+          r.id !== target.id && gradeBucket(r.gradeClass) === targetGradeKey
       )
       .map(r => r.id);
     for (const id of samePublishedOtherIds) {
@@ -180,7 +191,7 @@ export async function POST(request: NextRequest) {
       .from(children)
       .where(isNotNull(children.pendingSOTMMonth));
     const samePendingIds = allPending
-      .filter(r => normalizeGrade(r.gradeClass).key === targetGradeKey)
+      .filter(r => gradeBucket(r.gradeClass) === targetGradeKey)
       .map(r => r.id);
     for (const id of samePendingIds) {
       await db

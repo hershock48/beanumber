@@ -53,6 +53,10 @@ export async function POST(request: NextRequest) {
       notes?: string;
       intakeFromCampus?: string;
       studentOfMonth?: string;
+      // Canonical grade code (LK, UK, P1–P5) — factual roster data,
+      // not subjective. Simon can update directly without pending-
+      // review gating.
+      gradeClass?: string | null;
     };
     clearSimonFlag?: boolean;
   };
@@ -92,7 +96,8 @@ export async function POST(request: NextRequest) {
       | 'childQuote'
       | 'notes'
       | 'intakeFromCampus'
-      | 'studentOfMonth';
+      | 'studentOfMonth'
+      | 'gradeClass';
     const current: Record<Key, string> = {
       nameMeaning: kid.nameMeaning || '',
       familyContext: kid.familyContext || '',
@@ -103,6 +108,9 @@ export async function POST(request: NextRequest) {
       // studentOfMonth comes in as a month-label string and is stored
       // in studentOfMonthMonth in Postgres.
       studentOfMonth: kid.studentOfMonthMonth || '',
+      // Grade lives on the public gradeClass column; Simon can update
+      // directly, no pending-review gating.
+      gradeClass: kid.gradeClass || '',
     };
     const changedKeys: Key[] = [];
     const incoming: Partial<Record<Key, string>> = {};
@@ -140,6 +148,11 @@ export async function POST(request: NextRequest) {
           patch.intakeFromCampus = incoming[key];
         } else if (key === 'studentOfMonth') {
           patch.studentOfMonthMonth = incoming[key] || null;
+        } else if (key === 'gradeClass') {
+          // Factual roster field; Simon writes directly. Null out
+          // when the incoming value is an empty string so the
+          // database stores null rather than "".
+          patch.gradeClass = incoming[key] || null;
         }
       }
       if (changedKeys.length > 0) {
@@ -159,6 +172,8 @@ export async function POST(request: NextRequest) {
           // Kevin's edits go straight to the public column.
           if (key === 'studentOfMonth') {
             patch.studentOfMonthMonth = incoming[key] || null;
+          } else if (key === 'gradeClass') {
+            patch.gradeClass = incoming[key] || null;
           } else {
             (patch as Record<string, unknown>)[key] = incoming[key];
           }

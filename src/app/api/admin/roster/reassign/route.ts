@@ -28,7 +28,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdminToken } from '@/lib/auth';
 import { getAdminRole } from '@/lib/admin-session';
-import { normalizeGrade } from '@/lib/admin/grade';
+import {
+  gradeLabelForSimon,
+  isGradeCode,
+  type GradeCode,
+} from '@/lib/grades';
+
+// Same-grade candidate matching for reassignment. Kids with null or
+// non-canonical grade_class collapse into the 'unknown' bucket —
+// only other 'unknown' kids will be flagged as sameGrade so a mis-
+// tagged row never gets a false-positive match.
+function gradeBucket(raw: string | null | undefined): GradeCode | 'unknown' {
+  return isGradeCode(raw) ? (raw as GradeCode) : 'unknown';
+}
 import { db } from '@/lib/db/client';
 import { children, sponsorships } from '@/lib/db/schema';
 import { audit } from '@/lib/db/mutations';
@@ -75,12 +87,12 @@ async function listEligibleReplacements(departed: { id: string; gradeClass: stri
     .select()
     .from(children)
     .where(and(isNull(children.departedAt)));
-  const targetGradeKey = normalizeGrade(departed.gradeClass).key;
+  const targetGradeKey = gradeBucket(departed.gradeClass);
   return rows
     .filter(r => r.id !== departed.id)
     .filter(r => typeof r.shirtNumber === 'number' && (r.shirtNumber ?? 0) >= 1)
     .map(r => {
-      const gradeKey = normalizeGrade(r.gradeClass).key;
+      const gradeKey = gradeBucket(r.gradeClass);
       return {
         recordId: r.id,
         shirtNumber: r.shirtNumber!,
@@ -138,8 +150,13 @@ export async function GET(request: NextRequest) {
       displayName:
         kid.displayName || kid.firstName || `Kid #${shirtNumber}`,
       gradeClass: kid.gradeClass || '',
-      gradeKey: normalizeGrade(kid.gradeClass).key,
-      gradeLabel: normalizeGrade(kid.gradeClass).label,
+      gradeKey: gradeBucket(kid.gradeClass),
+      // Admin surface — Simon and Kevin see the Ugandan label. Empty
+      // string when gradeClass is null/unknown so the UI can decide
+      // whether to render a chip.
+      gradeLabel: isGradeCode(kid.gradeClass)
+        ? gradeLabelForSimon(kid.gradeClass as GradeCode)
+        : '',
       departedAt: kid.departedAt ? new Date(kid.departedAt).toISOString() : null,
     },
     sponsorships: sponsorshipsForKid.map(s => ({

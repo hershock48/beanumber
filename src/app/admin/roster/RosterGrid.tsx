@@ -1,5 +1,11 @@
 'use client';
 
+import {
+  gradeLabelForSimon,
+  isGradeCode,
+  type GradeCode,
+} from '@/lib/grades';
+
 /**
  * Client-side filter + sort wrapper around the roster grid.
  *
@@ -269,7 +275,11 @@ function RosterCard({ kid, role }: { kid: RosterKid; role: 'admin' | 'simon' }) 
           )}
         </div>
         {kid.gradeClass && (
-          <p className="text-xs text-[#888] mt-1 truncate">{kid.gradeClass}</p>
+          <p className="text-xs text-[#888] mt-1 truncate">
+            {isGradeCode(kid.gradeClass)
+              ? gradeLabelForSimon(kid.gradeClass as GradeCode)
+              : kid.gradeClass /* fall back to raw when we don't recognize it — better than showing nothing while data is drifting */}
+          </p>
         )}
 
         {/* Completion state. Complete kids get a green celebration pill;

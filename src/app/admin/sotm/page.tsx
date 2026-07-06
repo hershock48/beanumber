@@ -1,20 +1,27 @@
 /**
  * Admin · Student of the Month picker (per-grade).
  *
- * Seven grade sections (Pre-K through 5th, plus an 'Unknown grade'
- * catch-all if any kids have empty GradeClass). Each section has its
- * own current winner / pending nomination / kid grid. Simon nominates
- * one kid per grade per month; Kevin approves each grade's winner
- * independently.
+ * Seven grade sections (Lower Kindergarten through P5, plus an
+ * 'Unknown grade' catch-all if any kids have null grade_class).
+ * Each section has its own current winner / pending nomination /
+ * kid grid. Simon nominates one kid per grade per month; Kevin
+ * approves each grade's winner independently.
  *
  * Server-rendered shell — pulls the roster once, splits by
- * normalized grade, hands each grade's state to the client picker.
+ * canonical grade code, hands each grade's state to the client
+ * picker with the Ugandan label Simon expects to see.
  */
 
 import { AdminShell } from '../_components/AdminShell';
 import { getRoster } from '@/lib/admin/queries';
 import { getAdminRole } from '@/lib/admin-session';
-import { CANONICAL_GRADES, normalizeGrade } from '@/lib/admin/grade';
+import {
+  ALL_GRADES,
+  gradeLabelForSimon,
+  gradeSortOrder,
+  isGradeCode,
+  type GradeCode,
+} from '@/lib/grades';
 import { SOTMPicker } from './SOTMPicker';
 
 export const dynamic = 'force-dynamic';
@@ -30,30 +37,31 @@ export default async function SOTMPage() {
   const role = (await getAdminRole()) || 'admin';
   const month = currentMonthLabel();
 
-  // Group kids by normalized grade key.
+  // Group kids by canonical grade code. Kids whose gradeClass is
+  // null or unrecognized fall into the 'unknown' bucket so Simon
+  // still sees them (probably at the bottom of the page) instead of
+  // having them silently disappear from the SOTM surface.
   const byGradeKey = new Map<
     string,
     { label: string; order: number; kids: typeof allKids }
   >();
   for (const kid of allKids) {
-    // Skip departed kids — they shouldn't be SOTM eligible.
     if (kid.departedAt) continue;
-    const grade = normalizeGrade(kid.gradeClass);
-    const bucket = byGradeKey.get(grade.key);
+    const code: GradeCode | 'unknown' = isGradeCode(kid.gradeClass)
+      ? (kid.gradeClass as GradeCode)
+      : 'unknown';
+    const label =
+      code === 'unknown' ? 'No grade set' : gradeLabelForSimon(code);
+    const order =
+      code === 'unknown' ? 99 : gradeSortOrder(code);
+    const bucket = byGradeKey.get(code);
     if (bucket) bucket.kids.push(kid);
-    else
-      byGradeKey.set(grade.key, {
-        label: grade.label,
-        order: grade.order,
-        kids: [kid],
-      });
+    else byGradeKey.set(code, { label, order, kids: [kid] });
   }
 
-  // Render the 7 canonical grades in age order, then any unknown bucket.
-  const orderedKeys: string[] = [
-    ...CANONICAL_GRADES.map(g => g.key),
-    'unknown',
-  ];
+  // Render the 7 canonical grades in age order, then the unknown
+  // bucket last if it has anything in it.
+  const orderedKeys: string[] = [...ALL_GRADES, 'unknown'];
   const sections = orderedKeys
     .map(key => {
       const bucket = byGradeKey.get(key);

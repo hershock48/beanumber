@@ -20,6 +20,12 @@ import { useState } from 'react';
 import type { RosterKidAttachment } from '@/lib/admin/queries';
 import { compressImageIfNeeded } from '@/lib/client/compress-image';
 import { ReassignBlock } from './ReassignBlock';
+import {
+  ALL_GRADES,
+  gradeLabelForSimon,
+  gradeLabelForSponsor,
+  type GradeCode,
+} from '@/lib/grades';
 
 interface Fields {
   nameMeaning: string;
@@ -32,6 +38,13 @@ interface Fields {
   homeVillage: string;
   teacherName: string;
   teacherQuote: string;
+  /**
+   * Canonical grade code (`LK`, `UK`, `P1`–`P5`) or empty string
+   * when unset. Displayed to Simon in the Ugandan system, translated
+   * to US labels on every sponsor-facing surface (kid page, /me,
+   * newsletter). See src/lib/grades.ts.
+   */
+  gradeClass: GradeCode | '';
 }
 
 export function RosterEditor({
@@ -96,7 +109,8 @@ export function RosterEditor({
     fields.studentOfMonth !== initial.studentOfMonth ||
     fields.homeVillage !== initial.homeVillage ||
     fields.teacherName !== initial.teacherName ||
-    fields.teacherQuote !== initial.teacherQuote;
+    fields.teacherQuote !== initial.teacherQuote ||
+    fields.gradeClass !== initial.gradeClass;
 
   function update<K extends keyof Fields>(key: K, value: Fields[K]) {
     setFields(prev => ({ ...prev, [key]: value }));
@@ -263,6 +277,28 @@ export function RosterEditor({
         firstName={firstName}
         reason={studentOfMonthReason}
       />
+
+      <Field
+        label="Grade"
+        helper={
+          fields.gradeClass
+            ? `Simon sees ${gradeLabelForSimon(fields.gradeClass)}; sponsors see "${gradeLabelForSponsor(fields.gradeClass)}." Update as ${firstName} moves up.`
+            : `The kid's current grade. Simon picks the Ugandan level (Lower Kindergarten / P1 / etc.); sponsors see the US equivalent (Young 5's / 1st Grade / etc.) automatically.`
+        }
+      >
+        <select
+          value={fields.gradeClass}
+          onChange={e => update('gradeClass', e.target.value as GradeCode | '')}
+          className="w-full px-3 py-2 bg-white border border-[#e8e0d4] focus:outline-none focus:border-[#D4A843] focus:ring-1 focus:ring-[#D4A843] text-base"
+        >
+          <option value="">Not set</option>
+          {ALL_GRADES.map(code => (
+            <option key={code} value={code}>
+              {gradeLabelForSimon(code)}
+            </option>
+          ))}
+        </select>
+      </Field>
 
       <Field
         label="Name meaning"
