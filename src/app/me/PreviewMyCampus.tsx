@@ -17,6 +17,8 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
+import { CampusAtmosphere } from '@/components/CampusAtmosphere';
+import type { OmoroWeather } from '@/lib/omoro';
 
 interface PreviewChild {
   recordId: string;
@@ -36,9 +38,13 @@ interface PreviewNewsletter {
 export function PreviewMyCampus({
   sampleKids,
   latestNewsletter,
+  campusNowIso,
+  weather,
 }: {
   sampleKids: PreviewChild[];
   latestNewsletter: PreviewNewsletter | null;
+  campusNowIso: string;
+  weather: OmoroWeather | null;
 }) {
   return (
     <main className="flex-1 max-w-5xl w-full mx-auto px-5 py-10 md:py-16">
@@ -46,9 +52,16 @@ export function PreviewMyCampus({
           Echoes the signed-in header structure so a visitor sees
           the same shape they'd land on after buying a shirt. */}
       <header className="mb-10 md:mb-14">
-        <p className="text-xs font-bold uppercase tracking-[0.35em] text-[#D4A843] mb-4">
+        <p className="text-xs font-bold uppercase tracking-[0.35em] text-[#D4A843] mb-3">
           My campus &middot; Preview
         </p>
+        {/* Live "postmark" — same widget as the signed-in header, so
+            an anon visitor sees the campus reading as a real place
+            with real time and weather right from the preview. */}
+        <CampusAtmosphere
+          initialCampusNow={campusNowIso}
+          weather={weather}
+        />
         <h1
           className="text-4xl md:text-6xl text-[#0d0d0d] mb-4 leading-[1.05]"
           style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}

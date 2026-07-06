@@ -20,6 +20,8 @@ import { KidCardUnreadBadge } from '@/components/KidCardUnreadBadge';
 import { UnreadNewsletterPill } from '@/components/UnreadNewsletterPill';
 import { MeContextualCTA, type MeCTAState } from '@/components/MeContextualCTA';
 import { PreviewMyCampus } from './PreviewMyCampus';
+import { CampusAtmosphere } from '@/components/CampusAtmosphere';
+import { MilestoneBanner } from '@/components/MilestoneBanner';
 import { SESSION } from '@/lib/constants';
 import { getRecentCampusNewsletters } from '@/lib/newsletter-feed';
 import {
@@ -27,6 +29,8 @@ import {
   getLatestUpdateForChild,
   listAllChildren,
 } from '@/lib/db/queries';
+import { fetchOmoroWeather, serverCampusNow } from '@/lib/omoro';
+import { pickKidMilestone, type Milestone } from '@/lib/milestones';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -54,6 +58,12 @@ interface SponsorshipRow {
     firstName: string;
     photoUrl?: string;
     departed: boolean;
+    /**
+     * Kid's date of birth in ISO. Powers the birthday-adjacent
+     * milestones. Null when the YDO intake hasn't filled this in
+     * for the kid yet — milestones layer handles null gracefully.
+     */
+    dateOfBirth: string | null;
   };
   /**
    * Most recent published, sponsor-visible Child Update for this
@@ -121,6 +131,9 @@ async function fetchSponsorshipsForEmail(email: string): Promise<SponsorshipRow[
           firstName,
           photoUrl: r.childPhotoUrl ?? undefined,
           departed: !!r.childDepartedAt,
+          dateOfBirth: r.childDateOfBirth
+            ? new Date(r.childDateOfBirth).toISOString()
+            : null,
         },
       };
     });
@@ -139,12 +152,16 @@ export default async function MePage() {
   // clicking it as anon lands here, not on a redirect to sign-in.
   if (!email) {
     // Pull a small handful of real roster kids (photo required so
-    // the preview doesn't render placeholder ghosts) and the latest
-    // newsletter. Both are already public data.
-    const [allKids, recentNewsletters] = await Promise.all([
+    // the preview doesn't render placeholder ghosts), the latest
+    // newsletter, and current Omoro weather. All three are public
+    // and the atmosphere line reads the same for anon as for signed-
+    // in — "the campus is a real place, right now" is the message.
+    const [allKids, recentNewsletters, weather] = await Promise.all([
       listAllChildren({ onlyWithPhoto: true }),
       getRecentCampusNewsletters(1),
+      fetchOmoroWeather(),
     ]);
+    const previewCampusNow = serverCampusNow();
     // Shuffle then slice so the preview doesn't always show the
     // same three faces. Cryptographic randomness isn't the point;
     // just enough variety that a repeat visitor sees a different
@@ -175,16 +192,24 @@ export default async function MePage() {
         <PreviewMyCampus
           sampleKids={sampleKids}
           latestNewsletter={previewNewsletter}
+          campusNowIso={previewCampusNow}
+          weather={weather}
         />
         <BANFooter />
       </div>
     );
   }
 
-  const [rawRows, recentNewsletters] = await Promise.all([
+  // Parallel-fetch everything server-side. Weather has its own
+  // 15-min cache inside fetchOmoroWeather; the others are per-request.
+  // If Open-Meteo is slow, the 4-sec internal timeout returns null
+  // and the atmosphere widget gracefully drops the weather clause.
+  const [rawRows, recentNewsletters, weather] = await Promise.all([
     fetchSponsorshipsForEmail(email),
     getRecentCampusNewsletters(1),
+    fetchOmoroWeather(),
   ]);
+  const campusNowIso = serverCampusNow();
 
   // Dedupe by kid record ID. A user could end up with multiple
   // sponsorship rows for the same kid (Active + Holder, or two
@@ -223,6 +248,20 @@ export default async function MePage() {
       }
     })
   );
+
+  // Compute the strongest milestone per kid (birthday, tenure, or
+  // welcome). Pure computation, no I/O. Departed kids don't get
+  // milestones — the relationship has a different frame.
+  const milestoneByKidId = new Map<string, Milestone>();
+  for (const r of rows) {
+    if (r.child.departed) continue;
+    const m = pickKidMilestone({
+      startDate: r.startDate,
+      dateOfBirth: r.child.dateOfBirth,
+      kidFirstName: r.child.firstName,
+    });
+    if (m) milestoneByKidId.set(r.recordId, m);
+  }
 
   const monthlyTotal = rows
     .filter(r => r.monthlyOrHolder === 'monthly')
@@ -301,9 +340,17 @@ export default async function MePage() {
             sponsors feel their tenure. Accounting stat moves to a
             small footer strip lower on the page. */}
         <header className="mb-12 md:mb-16">
-          <p className="text-xs font-bold uppercase tracking-[0.35em] text-[#D4A843] mb-4">
+          <p className="text-xs font-bold uppercase tracking-[0.35em] text-[#D4A843] mb-3">
             My campus
           </p>
+          {/* Live "postmark" — the campus is a real place, real time,
+              real weather. Reads like a letter's dateline. Time
+              refreshes client-side every minute; weather is 15-min
+              cached server-side (Open-Meteo). */}
+          <CampusAtmosphere
+            initialCampusNow={campusNowIso}
+            weather={weather}
+          />
           <h1
             className="text-4xl md:text-6xl text-[#0d0d0d] mb-4 leading-[1.05]"
             style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
@@ -404,7 +451,11 @@ export default async function MePage() {
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                   {sponsors.map(row => (
-                    <KidCard key={row.recordId} row={row} />
+                    <KidCard
+                      key={row.recordId}
+                      row={row}
+                      milestone={milestoneByKidId.get(row.recordId) ?? null}
+                    />
                   ))}
                 </div>
               </section>
@@ -425,7 +476,11 @@ export default async function MePage() {
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                   {holders.map(row => (
-                    <KidCard key={row.recordId} row={row} />
+                    <KidCard
+                      key={row.recordId}
+                      row={row}
+                      milestone={milestoneByKidId.get(row.recordId) ?? null}
+                    />
                   ))}
                 </div>
               </section>
@@ -522,7 +577,13 @@ export default async function MePage() {
   );
 }
 
-function KidCard({ row }: { row: SponsorshipRow }) {
+function KidCard({
+  row,
+  milestone,
+}: {
+  row: SponsorshipRow;
+  milestone: Milestone | null;
+}) {
   const { child, monthlyOrHolder, startDate, latestUpdate, revealedAt } = row;
   const monthsActive = startDate ? monthsBetween(new Date(startDate), new Date()) : null;
   // The kid's page URL still uses the shirt number for anyone whose
@@ -561,6 +622,13 @@ function KidCard({ row }: { row: SponsorshipRow }) {
           </div>
         )}
       </div>
+      {/* Milestone band — anniversary, birthday, welcome. Sits
+          between photo and info as a distinctive stamp. Skipped
+          for departed kids because a "One year with…" banner on a
+          card for a kid who left has the wrong emotional shape. */}
+      {milestone && !child.departed && (
+        <MilestoneBanner milestone={milestone} variant="card-band" />
+      )}
       <div className="p-4">
         {/* Number kicker only shows if THIS viewer claimed the number
             via Hold-to-Meet. A raw sponsor who came in through /campus

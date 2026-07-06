@@ -198,6 +198,11 @@ export async function getViewerSponsorships(viewerEmail: string) {
       childPhotoUrl: sql<string | null>`coalesce(${children.profilePhotoUrl}, child_legacy.profile_photo_url)`,
       childShirtNumber: sql<number | null>`coalesce(${children.shirtNumber}, child_legacy.shirt_number)`,
       childDepartedAt: sql<Date | null>`coalesce(${children.departedAt}, child_legacy.departed_at)`,
+      // Date of birth — needed by /me's milestone computation
+      // (birthday-today / -upcoming / -recent banners). Null when
+      // the YDO intake form for this kid hasn't been filled out yet,
+      // which is fine: milestones layer returns null too.
+      childDateOfBirth: sql<Date | null>`coalesce(${children.dateOfBirth}, child_legacy.date_of_birth)`,
     })
     .from(sponsorships)
     .leftJoin(children, eq(children.id, sponsorships.childId))
