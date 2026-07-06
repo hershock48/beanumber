@@ -550,6 +550,17 @@ function rowToRosterKid(row: typeof children.$inferSelect): RosterKid {
   const displayName = (row.displayName || row.firstName || '').trim();
   const hasPhoto = !!row.profilePhotoUrl;
   const studentOfMonthMonth = (row.studentOfMonthMonth || '').trim();
+  // Parse pending draft up front so both the `has` completion signal
+  // AND the returned `pendingDraft` field share one parse. See the
+  // completion-check comment inside `has` for why the draft feeds
+  // into the "filled" signal.
+  const pendingDraft = parsePendingDraft(
+    typeof row.pendingDraft === 'string'
+      ? row.pendingDraft
+      : row.pendingDraft
+        ? JSON.stringify(row.pendingDraft)
+        : ''
+  );
   return {
     recordId: row.id,
     childId: row.childId || '',
@@ -558,30 +569,35 @@ function rowToRosterKid(row: typeof children.$inferSelect): RosterKid {
     firstName: row.firstName || '',
     gradeClass: row.gradeClass || null,
     photoUrl: row.profilePhotoUrl || null,
+    // Structured-field completeness counts a field as "filled" when
+    // EITHER the public column has content OR Simon has a pending
+    // draft entry waiting for Kevin's approval. This matches Simon's
+    // mental model: he typed it in, so it's not "missing" from HIS
+    // perspective. Kevin's review is a separate downstream signal
+    // (surfaced via the pending-review dot on the card and the
+    // pending_fields multi-select).
+    //
+    // Before this fix: Simon entered a family paragraph, saved it,
+    // still saw "MISSING: family" on the roster because his edit
+    // landed in pending_draft not family_context. The completion
+    // counter never moved until Kevin approved. Simon (correctly)
+    // called this broken 2026-07-06.
     has: {
       photo: hasPhoto,
-      nameMeaning: !!row.nameMeaning,
-      familyContext: !!row.familyContext,
-      loves: !!row.loves,
-      childQuote: !!row.childQuote,
-      notes: !!row.notes,
-      // Grade is required for the SOTM-per-grade picker to work
-      // (kids with null grade fall into an 'unknown' bucket rather
-      // than being nominatable). Flagging it as required surfaces
-      // the null-grade kids in the roster grid's "Needs finishing"
-      // filter so Simon can set them via the editor dropdown.
+      nameMeaning: !!row.nameMeaning || !!pendingDraft.nameMeaning,
+      familyContext: !!row.familyContext || !!pendingDraft.familyContext,
+      loves: !!row.loves || !!pendingDraft.loves,
+      childQuote: !!row.childQuote || !!pendingDraft.childQuote,
+      notes: !!row.notes || !!pendingDraft.notes,
+      // Grade isn't a gated field — Simon writes it directly via the
+      // dropdown, no pending-draft workflow. Read from the public
+      // column only.
       gradeClass: !!row.gradeClass,
     },
     hasPendingIntake: !!row.intakeFromCampus,
     lastEditedBySimon: asIsoOrNull(row.lastEditedBySimon),
     pendingFields: asStringArray(row.pendingFields),
-    pendingDraft: parsePendingDraft(
-      typeof row.pendingDraft === 'string'
-        ? row.pendingDraft
-        : row.pendingDraft
-          ? JSON.stringify(row.pendingDraft)
-          : ''
-    ),
+    pendingDraft,
     publicValues: {
       nameMeaning: row.nameMeaning || '',
       familyContext: row.familyContext || '',
