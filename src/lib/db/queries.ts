@@ -781,7 +781,12 @@ export async function getSotmHistoryForChild(
       })
       .from(sotmHistory)
       .where(eq(sotmHistory.childId, childRecordId))
-      .orderBy(desc(sotmHistory.awardedAt));
+      // Order by month, not awardedAt. awardedAt gets bumped to now()
+      // on onConflictDoUpdate — if Kevin corrects an earlier award's
+      // reason, that older award's awardedAt jumps forward and outranks
+      // newer months in the timeline. month is stable per award and
+      // is what "when was this earned" actually means to a sponsor.
+      .orderBy(desc(sotmHistory.month));
     return rows.map(r => ({
       id: r.id,
       gradeCode: r.gradeCode,

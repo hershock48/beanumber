@@ -19,14 +19,23 @@
  * the same editor.
  */
 
+// Vercel runtime is UTC. On the last day of any month after ~7pm CT
+// the server clock rolls to the next month; a title generated then
+// would say the wrong month for Kevin (who's in Central time) and
+// for the audience the newsletter is authored to. Explicit tz keeps
+// the month label anchored to Kevin's working day, which is when
+// he'd actually be drafting or saving.
+const AUTHOR_TZ = 'America/Chicago';
+
 export function buildCampusUpdateTitle(d: Date = new Date()): string {
-  const month = d.toLocaleString('en-US', { month: 'long' });
+  const month = d.toLocaleString('en-US', { month: 'long', timeZone: AUTHOR_TZ });
   return `${month} at the campus`;
 }
 
 export function buildLegacyMonthTitle(d: Date = new Date()): string {
-  const month = d.toLocaleString('en-US', { month: 'long' });
-  return `Campus update — ${month} ${d.getFullYear()}`;
+  const month = d.toLocaleString('en-US', { month: 'long', timeZone: AUTHOR_TZ });
+  const year = d.toLocaleString('en-US', { year: 'numeric', timeZone: AUTHOR_TZ });
+  return `Campus update — ${month} ${year}`;
 }
 
 /**

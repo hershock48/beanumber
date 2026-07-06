@@ -15,7 +15,7 @@
  * to change.
  */
 
-import { and, desc, eq, isNotNull, isNull, or, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNotNull, isNull, or, sql } from 'drizzle-orm';
 import { db } from '@/lib/db/client';
 import {
   children,
@@ -68,7 +68,12 @@ export async function getPendingUpdatesCard(): Promise<PendingUpdatesCard> {
         sql`children as child_legacy`,
         sql`child_legacy.child_id = ${childUpdates.childIdLegacy}`
       )
-      .where(eq(childUpdates.status, 'Pending'))
+      // Accept BOTH 'Pending' (schema default, applies to legacy rows)
+      // and 'Pending Review' (what every explicit writer stamps —
+      // intake route, mutations.ts, admin submit). The mismatch was
+      // silently hiding every Google-form intake from the admin
+      // dashboard's "Updates pending publish" card.
+      .where(inArray(childUpdates.status, ['Pending', 'Pending Review']))
       .orderBy(desc(childUpdates.submittedAt))
       .limit(10);
 

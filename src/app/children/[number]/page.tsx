@@ -983,7 +983,7 @@ export async function generateMetadata({ params }: ChildPageProps) {
   if (child.reserved) {
     return {
       title: `Shirt #${number} is reserved`,
-      description: `Shirt #${number} is held for a live auction. The winner will be matched to a child in Northern Uganda.`,
+      description: `Shirt #${number} is held for a live auction. Its number is connected to a specific child in Northern Uganda &mdash; the winner meets that child when the shirt arrives.`,
     };
   }
 
@@ -1160,9 +1160,10 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
             </h1>
 
             <p className="text-lg text-[#666] leading-relaxed max-w-xl mx-auto mb-10">
-              This number is held for a future live auction. The winning bidder will
-              be matched to a child in Northern Uganda, and their profile will appear
-              here once the match is made.
+              This number is held for a future live auction. Its number is connected to
+              a specific child in Northern Uganda &mdash; the winning bidder meets that
+              child when the shirt arrives, and their profile appears here once the
+              shirt ships.
             </p>
 
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
@@ -1704,7 +1705,7 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
                   </p>
                   <p className="text-[#555] leading-relaxed mb-5">
                     {firstName} has moved on, and #{number} is being
-                    matched with a new kid at the campus. We&rsquo;ll
+                    connected to a new kid at the campus. We&rsquo;ll
                     email you the moment they&rsquo;re ready to meet.
                   </p>
                   <p className="text-xs text-[#888] leading-relaxed">

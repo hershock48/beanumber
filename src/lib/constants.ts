@@ -383,7 +383,7 @@ export const SUCCESS_MESSAGES = {
   LOGOUT_SUCCESS: 'Successfully logged out.',
   UPDATE_REQUESTED: 'Your update request has been submitted. You will receive an update within 2-3 weeks.',
   UPDATE_SUBMITTED: 'Update submitted successfully for review.',
-  DONATION_SUCCESS: 'Thank you for your generous donation!',
+  DONATION_SUCCESS: 'Thank you. Your donation is in.',
 } as const;
 
 // ============================================================================

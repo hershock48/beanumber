@@ -208,8 +208,8 @@ function ShippingConfirmation({
             password to keep track of.
           </p>
           <p className="text-[#888] text-xs leading-relaxed">
-            Cancel anytime &mdash; just email Kevin@beanumber.org, no
-            questions asked.
+            Cancel anytime &mdash; email Kevin@beanumber.org, no questions
+            asked.
           </p>
         </div>
       )}

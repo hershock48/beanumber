@@ -36,7 +36,12 @@ export function MeContextualCTA({ state }: { state: MeCTAState }) {
       <CTABlock
         kicker="Latest from the campus"
         headline={`See what’s new with ${state.kidFirstName}.`}
-        body={`There’s a fresh update on ${state.kidFirstName}’s page — the kind you sponsor for.`}
+        // Copy has to work for BOTH sponsors and holders (shirt buyers).
+        // "the kind you sponsor for" was voice-wrong to a holder — they
+        // haven't sponsored yet. Neutral wording keeps the pull without
+        // conflating the two populations (see CLAUDE.md non-negotiable
+        // #2 — Sponsor ≠ Shirt buyer).
+        body={`There’s a fresh update on ${state.kidFirstName}’s page.`}
         ctaHref={state.kidHref}
         ctaLabel={`Open ${state.kidFirstName}’s page`}
       />

@@ -88,7 +88,7 @@ export default function Contact() {
                   <Link href="/" className="text-gray-900 font-medium hover:underline">
                     home page
                   </Link>
-                  {' '}to learn about sponsorship opportunities, or email us directly and we'll help match you with a child in need.
+                  {' '}to see how it works. Every numbered shirt is already connected to a specific kid at the campus &mdash; buy one and the number-to-name reveal happens when it arrives. Or email us directly to talk it through.
                 </p>
               </div>
 
