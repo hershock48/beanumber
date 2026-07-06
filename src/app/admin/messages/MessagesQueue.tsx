@@ -16,7 +16,7 @@
  * re-fetch. On error we surface a small inline banner.
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import Image from 'next/image';
 
 interface MessageRow {
@@ -145,6 +145,7 @@ function MessageCard({
       setError(res.error);
       return;
     }
+    persistedNotesRef.current = notes;
     onLocalUpdate(message.id, {
       status: res.status,
       bodyTranslated: translation.trim(),
@@ -163,18 +164,37 @@ function MessageCard({
     }
     setSaving('deliver');
     setError(null);
+    // If Simon has edits to the translation textarea that weren't
+    // saved via 'Save translation', include them in the deliver
+    // PATCH so the server-side deliver gate passes and the delivered
+    // row carries the freshest translation. Server accepts
+    // bodyTranslated on the deliver action for exactly this case.
+    const localTranslation = translation.trim();
+    const hasLocalEdits =
+      localTranslation.length > 0 &&
+      localTranslation !== (message.bodyTranslated ?? '').trim();
     const res = await onPatch(message.id, {
       action: 'deliver',
       simonNotes: notes,
+      ...(hasLocalEdits ? { bodyTranslated: localTranslation } : {}),
     });
     setSaving(null);
     if (!res.ok) {
       setError(res.error);
       return;
     }
+    persistedNotesRef.current = notes;
     onLocalUpdate(message.id, {
       status: 'delivered',
       simonNotes: notes,
+      // Reflect the save-and-deliver in local state so a reopened
+      // collapsed card shows the translation Simon just delivered.
+      ...(hasLocalEdits
+        ? {
+            bodyTranslated: localTranslation,
+            translatedAt: new Date().toISOString(),
+          }
+        : {}),
       deliveredAt: new Date().toISOString(),
     });
     setCollapsed(true);
@@ -202,6 +222,8 @@ function MessageCard({
       setError(res.error);
       return;
     }
+    persistedNotesRef.current = nextNotes;
+    setNotes(nextNotes);
     onLocalUpdate(message.id, {
       status: 'declined',
       simonNotes: nextNotes,
@@ -210,21 +232,58 @@ function MessageCard({
     setCollapsed(true);
   }
 
-  async function saveNotesOnly() {
-    if (notes === (message.simonNotes || '')) return; // no diff
+  // Autosave notes after a short debounce so Simon doesn't lose
+  // typing progress if he closes the tab or navigates away. Also
+  // fires on blur (via onBlur handler) as an immediate save when
+  // the user leaves the textarea. Both paths deduplicate on the
+  // no-diff guard.
+  const notesRef = useRef(notes);
+  notesRef.current = notes;
+  const persistedNotesRef = useRef(message.simonNotes || '');
+
+  const saveNotesOnly = useCallback(async () => {
+    const current = notesRef.current;
+    if (current === persistedNotesRef.current) return;
     setSaving('notes');
     setError(null);
     const res = await onPatch(message.id, {
       action: 'edit-notes',
-      simonNotes: notes,
+      simonNotes: current,
     });
     setSaving(null);
     if (!res.ok) {
       setError(res.error);
       return;
     }
-    onLocalUpdate(message.id, { simonNotes: notes });
-  }
+    persistedNotesRef.current = current;
+    onLocalUpdate(message.id, { simonNotes: current });
+  }, [message.id, onPatch, onLocalUpdate]);
+
+  // Debounced autosave: schedule a save 1.5s after the last
+  // keystroke. Reset the timer on every change.
+  useEffect(() => {
+    if (notes === persistedNotesRef.current) return;
+    const t = setTimeout(() => {
+      saveNotesOnly();
+    }, 1500);
+    return () => clearTimeout(t);
+  }, [notes, saveNotesOnly]);
+
+  // Warn before unloading the tab if notes have unsaved changes.
+  // Belt-and-suspenders alongside the debounced save — protects
+  // against Simon closing quickly after typing.
+  useEffect(() => {
+    function beforeUnload(e: BeforeUnloadEvent) {
+      if (notesRef.current !== persistedNotesRef.current) {
+        e.preventDefault();
+        // Modern browsers ignore the returnValue string but still
+        // trigger the native "leave site?" prompt when it's set.
+        e.returnValue = '';
+      }
+    }
+    window.addEventListener('beforeunload', beforeUnload);
+    return () => window.removeEventListener('beforeunload', beforeUnload);
+  }, []);
 
   const statusPill = statusPillFor(message.status);
   const created = message.createdAt
@@ -359,8 +418,25 @@ function MessageCard({
               <button
                 type="button"
                 onClick={markDelivered}
-                disabled={saving !== null}
-                className="inline-block bg-[#D4A843] hover:bg-[#c49a3a] text-[#0d0d0d] disabled:opacity-50 px-4 py-2 text-xs font-bold uppercase tracking-wider transition-colors"
+                // Deliver is gated on a translation existing — either
+                // already stored server-side or currently in the local
+                // textarea. Client-side disable matches the server-side
+                // check in the PATCH endpoint so Simon doesn't get an
+                // error surface for a workflow he didn't complete yet.
+                disabled={
+                  saving !== null ||
+                  (
+                    (translation.trim().length === 0) &&
+                    !(message.bodyTranslated && message.bodyTranslated.trim().length > 0)
+                  )
+                }
+                title={
+                  translation.trim().length === 0 &&
+                  !(message.bodyTranslated && message.bodyTranslated.trim().length > 0)
+                    ? 'Add a translation before delivering'
+                    : undefined
+                }
+                className="inline-block bg-[#D4A843] hover:bg-[#c49a3a] text-[#0d0d0d] disabled:opacity-50 disabled:cursor-not-allowed px-4 py-2 text-xs font-bold uppercase tracking-wider transition-colors"
               >
                 {saving === 'deliver' ? 'Sending…' : 'Mark delivered'}
               </button>

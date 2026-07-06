@@ -1134,6 +1134,19 @@ export const kidMessages = pgTable(
     sponsorEmailIdx: index('kid_messages_sponsor_email_idx').on(
       sql`lower(${table.sponsorEmail})`
     ),
+    // Partial unique constraint: one ACTIVE (pending or translated)
+    // note per (sponsor_email lowercased, child_id). Enforces at the
+    // DB level what the POST handler enforces at the app level, so
+    // two concurrent inserts can't both slip through the rate-limit
+    // check. Delivered / declined rows are excluded from the
+    // constraint so a sponsor can queue another note after each
+    // delivery cycle. Drizzle doesn't emit the WHERE clause for
+    // partial unique indexes yet, so the actual constraint is
+    // applied via raw SQL in prod; the annotation below is here to
+    // document intent for the schema reader.
+    // See CREATE UNIQUE INDEX kid_messages_active_per_sponsor_kid_idx
+    //   ON kid_messages (lower(sponsor_email), child_id)
+    //   WHERE status IN ('pending', 'translated');
   })
 );
 

@@ -33,6 +33,25 @@ import { sendEmail } from '@/lib/email';
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.beanumber.org';
 const FROM_EMAIL = process.env.SENDGRID_FROM_EMAIL || 'Kevin@beanumber.org';
 
+/**
+ * HTML-escape a string before interpolating into an email template.
+ * The email templates below build raw HTML with template literals,
+ * so any interpolated value that came from user-editable data
+ * (kid.firstName, sponsor.sponsorName) would inject if it contained
+ * markup. In practice only admin roles can set those fields today,
+ * but the escape is a cheap defensive layer and matches what a
+ * modern template renderer would do automatically.
+ */
+function escapeHtml(input: string | null | undefined): string {
+  if (input == null) return '';
+  return String(input)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 interface PatchBody {
   action?: string;
   bodyTranslated?: string;
@@ -76,6 +95,10 @@ export async function PATCH(
       sponsorName: kidMessages.sponsorName,
       status: kidMessages.status,
       bodyEn: kidMessages.bodyEn,
+      // Needed by the 'deliver' gate — deliver is refused when
+      // there's no translation on file (either already stored here or
+      // being submitted in this same PATCH).
+      bodyTranslated: kidMessages.bodyTranslated,
       childId: kidMessages.childId,
       firstName: children.firstName,
       shirtNumber: children.shirtNumber,
@@ -122,6 +145,33 @@ export async function PATCH(
           { status: 409 }
         );
       }
+      // A note can't be marked delivered until a translation exists.
+      // Previously the endpoint allowed pending -> delivered, which
+      // meant Simon could accidentally deliver an untranslated note
+      // (nobody at the campus could actually read it to the kid).
+      // Accept an incoming translation in the same PATCH so Simon
+      // can save+deliver in one click from the queue UI — the client
+      // sends bodyTranslated when he has unsaved textarea edits.
+      const incomingTranslation = (body.bodyTranslated ?? '').trim();
+      const storedTranslation = (message.bodyTranslated ?? '').trim();
+      const nextTranslation = incomingTranslation || storedTranslation;
+      if (!nextTranslation) {
+        return NextResponse.json(
+          {
+            error:
+              'Translate this note before marking delivered — the kid needs the translated version.',
+          },
+          { status: 409 }
+        );
+      }
+      // Persist the incoming translation if it differs from what's
+      // stored. Also stamp translatedAt for the audit trail so we
+      // have a real "when was this translated" timestamp even for
+      // the save-and-deliver-in-one-click path.
+      if (incomingTranslation && incomingTranslation !== storedTranslation) {
+        patch.bodyTranslated = incomingTranslation;
+        patch.translatedAt = now;
+      }
       patch.deliveredAt = now;
       patch.status = 'delivered';
       break;
@@ -157,22 +207,35 @@ export async function PATCH(
   const shouldNotify = body.notifySponsor !== false;
   if (shouldNotify && (action === 'deliver' || action === 'decline')) {
     try {
-      const firstName = message.firstName || 'your kid';
+      const firstNameSafe = escapeHtml(message.firstName || 'your kid');
       const shirtNumber = message.shirtNumber;
       const kidPageUrl = shirtNumber
         ? `${SITE_URL}/children/${shirtNumber}`
         : `${SITE_URL}/me`;
-      const greeting = message.sponsorName
-        ? `Hey ${message.sponsorName.split(' ')[0]},`
+      // Trim BEFORE splitting so a sponsor name of "  " doesn't
+      // yield "Hey ," with the stray comma and space. Also escape
+      // the fragment before it lands in the email HTML.
+      const firstWordOfName = message.sponsorName?.trim().split(/\s+/)[0];
+      const greeting = firstWordOfName
+        ? `Hey ${escapeHtml(firstWordOfName)},`
         : 'Hey,';
+      // Subject is plain text (no HTML), but the plain-text
+      // rendering of the kid's name should still be the actual
+      // name — so pass the unescaped version to the subject and
+      // the escaped version to the HTML body.
+      const firstNamePlain = message.firstName || 'your kid';
       const subject =
         action === 'deliver'
-          ? `Your note reached ${firstName}.`
+          ? `Your note reached ${firstNamePlain}.`
           : 'A note about your recent message';
       const html =
         action === 'deliver'
-          ? deliveredEmailHtml({ greeting, firstName, kidPageUrl })
-          : declinedEmailHtml({ greeting, firstName });
+          ? deliveredEmailHtml({
+              greeting,
+              firstName: firstNameSafe,
+              kidPageUrl,
+            })
+          : declinedEmailHtml({ greeting, firstName: firstNameSafe });
       await sendEmail({
         to: { email: message.sponsorEmail },
         from: { email: FROM_EMAIL, name: 'Kevin at Be A Number' },

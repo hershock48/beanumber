@@ -181,21 +181,45 @@ export async function POST(request: NextRequest) {
 
   const sponsorName = (body.sponsorName ?? '').trim() || null;
 
-  const inserted = await db
-    .insert(kidMessages)
-    .values({
-      sponsorEmail: email,
-      sponsorName,
-      childId: childRow.id,
-      direction: 'sponsor_to_kid',
-      bodyEn: rawBody,
-      status: 'pending',
-    })
-    .returning({ id: kidMessages.id, status: kidMessages.status });
+  try {
+    const inserted = await db
+      .insert(kidMessages)
+      .values({
+        sponsorEmail: email,
+        sponsorName,
+        childId: childRow.id,
+        direction: 'sponsor_to_kid',
+        bodyEn: rawBody,
+        status: 'pending',
+      })
+      .returning({ id: kidMessages.id, status: kidMessages.status });
 
-  return NextResponse.json({
-    ok: true,
-    id: inserted[0].id,
-    status: inserted[0].status,
-  });
+    return NextResponse.json({
+      ok: true,
+      id: inserted[0].id,
+      status: inserted[0].status,
+    });
+  } catch (err: unknown) {
+    // The partial unique index kid_messages_active_per_sponsor_kid_idx
+    // (see schema.ts docstring) enforces the same "one active note per
+    // sponsor+kid" invariant that the pre-check above enforces at the
+    // app layer. Two concurrent POSTs from the same sponsor can slip
+    // past the pre-check but the second insert violates the index and
+    // Postgres returns 23505 (unique_violation). Surface it as the
+    // same 409 the pre-check returns.
+    const pgCode =
+      typeof err === 'object' && err !== null && 'code' in err
+        ? String((err as { code: unknown }).code)
+        : '';
+    if (pgCode === '23505') {
+      return NextResponse.json(
+        {
+          error:
+            'You already have a note in the queue. Once it reaches the campus and gets delivered, you can write another.',
+        },
+        { status: 409 }
+      );
+    }
+    throw err;
+  }
 }
