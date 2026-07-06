@@ -403,7 +403,7 @@ export function RevealOverlay({ shirtNumber, childName, children }: RevealOverla
           onPointerCancel={releaseHold}
           onContextMenu={e => e.preventDefault()}
           onKeyDown={onKeyDown}
-          className="fixed inset-0 flex items-center justify-center z-10 cursor-pointer select-none focus:outline-none"
+          className="fixed inset-0 flex items-center justify-center z-50 cursor-pointer select-none focus:outline-none"
           style={{ touchAction: 'none' }}
         >
           <div
@@ -445,7 +445,7 @@ export function RevealOverlay({ shirtNumber, childName, children }: RevealOverla
           {/* Dim scrim — gives the tiles a clean backdrop so the gold
               reads strongly without competing with anything else. */}
           <div
-            className="fixed inset-0 z-10 pointer-events-none"
+            className="fixed inset-0 z-50 pointer-events-none"
             style={{
               background:
                 'radial-gradient(ellipse at center, rgba(13, 9, 5, 0.78) 0%, rgba(13, 9, 5, 0.55) 60%, rgba(13, 9, 5, 0.35) 100%)',
@@ -457,7 +457,7 @@ export function RevealOverlay({ shirtNumber, childName, children }: RevealOverla
           />
           {/* Split-flap board — centered, big, the hero of the moment */}
           <div
-            className="fixed inset-0 z-20 flex items-center justify-center pointer-events-none px-5"
+            className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none px-5"
             style={{
               animation:
                 stage === 'unblur'
