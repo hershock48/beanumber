@@ -547,13 +547,13 @@ export async function sendNewsletterNotificationEmailForLegacyDonor(params: {
 
     ${teaserBlock}
 
-    <p style="margin: 24px 0 16px 0;"><strong>Read the rest at <a href="${newsUrl}" style="color: #D4A843;">beanumber.org/news</a>.</strong> That&rsquo;s the dedicated campus feed &mdash; everything we&rsquo;ve been sending lives there.</p>
+    <p style="margin: 24px 0 16px 0;"><strong>Read it at <a href="${newsUrl}" style="color: #D4A843;">beanumber.org/news</a>.</strong> That&rsquo;s where every campus update lives.</p>
 
     <p style="margin: 24px 0;">
       <a href="${newsUrl}" style="display: inline-block; background: #D4A843; color: #0d0d0d; font-weight: bold; text-transform: uppercase; letter-spacing: 0.05em; padding: 14px 28px; text-decoration: none; font-size: 13px;">Read the newsletter</a>
     </p>
 
-    <p style="font-size: 14px; color: #555;">Curious about the kids the campus runs for? Browse them at <a href="${siteUrl}" style="color: #D4A843;">beanumber.org</a>. Every shirt sold matches its buyer to one of them by number &mdash; and if that&rsquo;s something you want in on, the sponsor button is on every kid&rsquo;s page. $25 a month, cancel anytime, runs the whole campus.</p>
+    <p style="font-size: 14px; color: #555;">How this works: every shirt at <a href="${siteUrl}" style="color: #D4A843;">beanumber.org</a> is tied to a kid at the campus by number. Buy one, and you&rsquo;ll meet the kid attached to it when it arrives. From there, $25/mo sponsorship is optional &mdash; cancel anytime, runs the whole campus.</p>
 
     <p>Kevin</p>
   `);
