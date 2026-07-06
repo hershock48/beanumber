@@ -44,6 +44,7 @@ import {
 import { AwardsTimeline } from './AwardsTimeline';
 import { SendNoteComposer } from './SendNoteComposer';
 import { NotesThread } from './NotesThread';
+import { ShareKidCard } from './ShareKidCard';
 import { resolveShirtToKid } from '@/lib/cycle';
 import { CANONICAL_ROSTER_MAX } from '@/lib/roster-config';
 import { db } from '@/lib/db/client';
@@ -1968,6 +1969,31 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
                 childRecordId={child.record_id}
                 childIdLegacy={child.child_id ?? null}
                 firstName={firstName}
+              />
+            </div>
+          )}
+
+        {/* ── Share this kid ──
+            The viral loop. Every sponsor is a potential recruiter for
+            the NEXT sponsor — the person who scrolls Instagram, sees
+            their friend post a card that says "I'm sponsoring so-and-so's
+            education at the campus in Northern Uganda," and clicks through
+            to /children/[N]. The card is rendered in the browser (no
+            server route needed), sized 1080×1080 for Instagram, and
+            works with the native share sheet on mobile or a PNG
+            download everywhere else. Gated to actual sponsors + holders
+            so the first-person copy ("I'm sponsoring…") is always
+            honest — non-sponsors don't see the surface at all.
+            Departed kids skip this so the page keeps its memorial
+            frame. */}
+        {!child.departed_at &&
+          (child.viewer_is_sponsor || child.viewer_is_holder) && (
+            <div className="mt-12 md:mt-16 py-8 md:py-12 border-t border-[#e8e0d4]">
+              <ShareKidCard
+                firstName={firstName}
+                displayName={displayName}
+                photoUrl={child.photo_url ?? null}
+                shirtNumber={Number(number)}
               />
             </div>
           )}

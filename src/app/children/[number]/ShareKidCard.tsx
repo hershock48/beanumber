@@ -1,0 +1,400 @@
+'use client';
+
+/**
+ * ShareKidCard — sponsor's marketing tool. Renders a 1080×1080 PNG in
+ * the browser via <canvas>, ready to download and drop into Instagram
+ * or a text thread. The image says "I'm sponsoring [Kid]'s education
+ * at the campus" and points back to beanumber.org/children/[N].
+ *
+ * The viral loop this sits inside
+ * ───────────────────────────────
+ * Kevin's whole retention/growth flywheel is: sponsor gets emotionally
+ * connected to a specific named kid → sponsor shares that kid with
+ * their network → someone in that network clicks through and becomes
+ * a sponsor themselves. This is the "share" arrow in that loop. It
+ * only exists on /children/[N] pages that the viewer already has a
+ * sponsorship or holder tie to — so the "I'm sponsoring" copy is
+ * always true from the person hitting Download.
+ *
+ * Why canvas, not a server ImageResponse
+ * ──────────────────────────────────────
+ * Satori (the engine behind next/og) requires fonts loaded as
+ * ArrayBuffers at every request. We already have Lora loaded in the
+ * browser via next/font/google — using it there is one less network
+ * dependency, no cold-start cost on the API, and the sponsor already
+ * has the fonts warm from browsing the site. Trade-off: no OG preview
+ * image URL for Twitter/Facebook link cards, but that's a separate
+ * problem that /children/[N]'s own metadata already handles.
+ *
+ * Photo handling
+ * ──────────────
+ * Kid photos live on Supabase Storage which serves CORS-friendly
+ * responses. We set crossOrigin='anonymous' so toDataURL doesn't
+ * throw a taint exception. If the photo fails to load — CORS,
+ * network — we still render the card with a placeholder tile so
+ * the sponsor always gets SOMETHING they can share.
+ *
+ * Share targets
+ * ─────────────
+ *   - Web Share API with file support (modern iOS/Android + some
+ *     desktops): opens the native share sheet, sponsor picks IG /
+ *     Messages / whatever.
+ *   - Everyone else: PNG download. Works on desktop; on mobile it
+ *     saves to Photos / Files.
+ *   - Plus a "copy link" for the kid page itself, since Instagram bio
+ *     links or a story sticker can carry a URL.
+ */
+
+import { useEffect, useRef, useState, useCallback } from 'react';
+
+interface ShareKidCardProps {
+  firstName: string;
+  displayName: string;
+  photoUrl: string | null;
+  shirtNumber: number;
+}
+
+const CARD_SIZE = 1080;
+const PHOTO_HEIGHT = 648; // 60% of card
+
+export function ShareKidCard({
+  firstName,
+  displayName,
+  photoUrl,
+  shirtNumber,
+}: ShareKidCardProps) {
+  const [open, setOpen] = useState(false);
+  const [rendering, setRendering] = useState(false);
+  const [canShareFiles, setCanShareFiles] = useState(false);
+  const [flash, setFlash] = useState<string | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  // Web Share API feature detection. We probe with a tiny 1x1 PNG
+  // file because navigator.canShare(...) requires a File instance —
+  // just checking that navigator.share exists isn't enough to know
+  // whether *file* sharing is supported (Safari desktop has share
+  // but no file support).
+  useEffect(() => {
+    try {
+      const probe = new File(
+        [new Uint8Array([137, 80, 78, 71])],
+        'probe.png',
+        { type: 'image/png' }
+      );
+      if (
+        typeof navigator !== 'undefined' &&
+        typeof navigator.canShare === 'function' &&
+        navigator.canShare({ files: [probe] })
+      ) {
+        setCanShareFiles(true);
+      }
+    } catch {
+      // Silently fall back to download-only UX.
+    }
+  }, []);
+
+  // Draw the card whenever the modal opens. We regenerate rather than
+  // caching so a photo swap (rare, but possible) reflects immediately
+  // without a page reload.
+  const draw = useCallback(async () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    setRendering(true);
+
+    canvas.width = CARD_SIZE;
+    canvas.height = CARD_SIZE;
+
+    // Cream background — matches the site's #FFF8F0. The bottom
+    // portion below the photo band shows this directly.
+    ctx.fillStyle = '#FFF8F0';
+    ctx.fillRect(0, 0, CARD_SIZE, CARD_SIZE);
+
+    // Photo band. Cover-fit into the top 60%. If the photo fails to
+    // load (CORS, dead URL, missing), we draw a soft placeholder so
+    // the composition doesn't collapse into text-only.
+    let photoDrawn = false;
+    if (photoUrl) {
+      try {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        await new Promise<void>((resolve, reject) => {
+          img.onload = () => resolve();
+          img.onerror = () => reject(new Error('photo load failed'));
+          img.src = photoUrl;
+        });
+        if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+          const targetAR = CARD_SIZE / PHOTO_HEIGHT;
+          const sourceAR = img.naturalWidth / img.naturalHeight;
+          let sx: number, sy: number, sw: number, sh: number;
+          if (sourceAR > targetAR) {
+            // Photo is wider than target — crop sides, use full height.
+            sh = img.naturalHeight;
+            sw = sh * targetAR;
+            sx = (img.naturalWidth - sw) / 2;
+            sy = 0;
+          } else {
+            // Photo is taller — crop top/bottom, use full width. Bias
+            // slightly toward the top so faces don't get cropped out.
+            sw = img.naturalWidth;
+            sh = sw / targetAR;
+            sx = 0;
+            sy = Math.max(0, (img.naturalHeight - sh) * 0.25);
+          }
+          ctx.drawImage(img, sx, sy, sw, sh, 0, 0, CARD_SIZE, PHOTO_HEIGHT);
+          photoDrawn = true;
+        }
+      } catch {
+        photoDrawn = false;
+      }
+    }
+    if (!photoDrawn) {
+      // Sand-tone placeholder tile with a subtle silhouette so the
+      // card still reads as "a person" even without their photo.
+      ctx.fillStyle = '#e8e0d4';
+      ctx.fillRect(0, 0, CARD_SIZE, PHOTO_HEIGHT);
+      ctx.fillStyle = '#c9beac';
+      ctx.font = 'bold 200px system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(firstName.charAt(0).toUpperCase(), CARD_SIZE / 2, PHOTO_HEIGHT / 2);
+    }
+
+    // Gold accent band between photo and caption — matches the
+    // #D4A843 label color used across the site.
+    ctx.fillStyle = '#D4A843';
+    ctx.fillRect(0, PHOTO_HEIGHT, CARD_SIZE, 8);
+
+    // Small "BE A NUMBER" wordmark, upper-left of the caption zone.
+    // Uppercase, gold, tracked wide — same treatment as the kicker
+    // labels on the /me KidCards.
+    ctx.fillStyle = '#D4A843';
+    ctx.font = 'bold 22px system-ui, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    // Approximate letter-spacing by drawing character by character.
+    // Canvas has no native letter-spacing shim.
+    const wordmark = 'BE A NUMBER';
+    const wordmarkTracking = 6;
+    let wmX = 60;
+    const wmY = PHOTO_HEIGHT + 40;
+    for (const ch of wordmark) {
+      ctx.fillText(ch, wmX, wmY);
+      wmX += ctx.measureText(ch).width + wordmarkTracking;
+    }
+
+    // Kid's first name — Lora if the browser has it loaded (which it
+    // does via next/font on this domain), Georgia otherwise.
+    ctx.fillStyle = '#0d0d0d';
+    ctx.font = 'bold 88px "Lora", Georgia, serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillText(firstName, CARD_SIZE / 2, PHOTO_HEIGHT + 100);
+
+    // Copy line — Kevin's voice: personal, direct, specific location.
+    // "I'm sponsoring [Kid]'s education at the campus in Northern
+    // Uganda." Split across two lines because it reads better on a
+    // 1080-wide poster than a single very-long line.
+    ctx.fillStyle = '#333333';
+    ctx.font = '34px Georgia, serif';
+    ctx.textAlign = 'center';
+    const l1 = `I'm sponsoring ${firstName}'s education`;
+    const l2 = 'at the campus in Northern Uganda.';
+    ctx.fillText(l1, CARD_SIZE / 2, PHOTO_HEIGHT + 220);
+    ctx.fillText(l2, CARD_SIZE / 2, PHOTO_HEIGHT + 270);
+
+    // Hairline separator above the URL.
+    ctx.fillStyle = '#e8e0d4';
+    ctx.fillRect(CARD_SIZE / 2 - 120, PHOTO_HEIGHT + 340, 240, 2);
+
+    // URL — same gold as the wordmark. Sponsors' friends type this
+    // in (or scan) to land on the kid's real page and see the whole
+    // story. Fixed to beanumber.org so it works whether the sponsor
+    // shared from prod or preview.
+    ctx.fillStyle = '#D4A843';
+    ctx.font = 'bold 30px Georgia, serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(
+      `beanumber.org/children/${shirtNumber}`,
+      CARD_SIZE / 2,
+      PHOTO_HEIGHT + 370
+    );
+
+    setRendering(false);
+  }, [firstName, photoUrl, shirtNumber]);
+
+  useEffect(() => {
+    if (open) draw();
+  }, [open, draw]);
+
+  const canvasToBlob = (): Promise<Blob | null> =>
+    new Promise(resolve => {
+      const canvas = canvasRef.current;
+      if (!canvas) {
+        resolve(null);
+        return;
+      }
+      canvas.toBlob(resolve, 'image/png');
+    });
+
+  const handleDownload = async () => {
+    const blob = await canvasToBlob();
+    if (!blob) {
+      setFlash("Couldn't render the image. Try refreshing the page.");
+      return;
+    }
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${firstName.toLowerCase().replace(/[^a-z0-9]/g, '')}-beanumber.png`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    // Revoke on the next tick to give the download a chance to start.
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    setFlash('Saved. Post it with a line about why this kid matters to you.');
+  };
+
+  const handleShareFile = async () => {
+    const blob = await canvasToBlob();
+    if (!blob) {
+      setFlash("Couldn't render the image.");
+      return;
+    }
+    try {
+      const file = new File([blob], `${firstName}-beanumber.png`, {
+        type: 'image/png',
+      });
+      await navigator.share({
+        files: [file],
+        text: `I'm sponsoring ${firstName}'s education at the campus in Northern Uganda. beanumber.org/children/${shirtNumber}`,
+      });
+      setFlash(null);
+    } catch (err) {
+      // User canceled the share sheet — not an error.
+      if (err instanceof DOMException && err.name === 'AbortError') return;
+      setFlash("Share didn't go through. You can download the image instead.");
+    }
+  };
+
+  const handleCopyLink = async () => {
+    const url = `https://www.beanumber.org/children/${shirtNumber}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      setFlash('Link copied.');
+    } catch {
+      setFlash("Couldn't copy. Long-press the URL to select.");
+    }
+  };
+
+  return (
+    <div className="w-full">
+      <div className="max-w-2xl mx-auto text-center">
+        <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-2">
+          Take {firstName} with you
+        </p>
+        <h3
+          className="text-2xl md:text-3xl text-[#0d0d0d] mb-3"
+          style={{ fontFamily: 'var(--font-lora), Georgia, serif', fontWeight: 600 }}
+        >
+          Share {firstName}&rsquo;s page with your world
+        </h3>
+        <p className="text-[#555] leading-relaxed mb-6" style={{ fontFamily: 'Georgia, serif' }}>
+          One friend seeing this is how the next sponsor finds {firstName}. Post the card
+          on your feed or send it to someone specific — say a sentence about why {firstName}{' '}
+          matters to you.
+        </p>
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="inline-block bg-[#0d0d0d] text-white px-6 py-3 font-bold uppercase tracking-wider text-sm hover:bg-[#D4A843] hover:text-[#0d0d0d] transition-colors"
+        >
+          Make the card
+        </button>
+      </div>
+
+      {open && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="share-kid-card-title"
+          className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4"
+          onClick={() => setOpen(false)}
+        >
+          <div
+            className="bg-[#FFF8F0] max-w-lg w-full max-h-[90vh] overflow-y-auto p-6 md:p-8 relative"
+            onClick={e => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() => setOpen(false)}
+              aria-label="Close"
+              className="absolute top-3 right-3 w-10 h-10 flex items-center justify-center text-[#555] hover:text-[#0d0d0d] text-2xl"
+            >
+              ×
+            </button>
+            <h2
+              id="share-kid-card-title"
+              className="text-xl md:text-2xl text-[#0d0d0d] mb-1"
+              style={{ fontFamily: 'var(--font-lora), Georgia, serif', fontWeight: 600 }}
+            >
+              Post {firstName}
+            </h2>
+            <p className="text-sm text-[#555] mb-4">
+              1080×1080. Made for Instagram, but works anywhere.
+            </p>
+
+            <div className="border border-[#e8e0d4] bg-white mb-4 overflow-hidden">
+              <canvas
+                ref={canvasRef}
+                aria-label={`Shareable card for ${displayName}`}
+                className="block w-full h-auto"
+              />
+              {rendering && (
+                <p className="text-center text-xs text-[#888] py-2">
+                  Rendering…
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              {canShareFiles && (
+                <button
+                  type="button"
+                  onClick={handleShareFile}
+                  disabled={rendering}
+                  className="w-full bg-[#D4A843] text-[#0d0d0d] px-4 py-3 font-bold uppercase tracking-wider text-sm hover:bg-[#c09635] transition-colors disabled:opacity-50"
+                >
+                  Share
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={handleDownload}
+                disabled={rendering}
+                className="w-full bg-[#0d0d0d] text-white px-4 py-3 font-bold uppercase tracking-wider text-sm hover:bg-[#333] transition-colors disabled:opacity-50"
+              >
+                Download PNG
+              </button>
+              <button
+                type="button"
+                onClick={handleCopyLink}
+                className="w-full border border-[#e8e0d4] text-[#0d0d0d] px-4 py-3 font-bold uppercase tracking-wider text-sm hover:bg-[#e8e0d4]/40 transition-colors"
+              >
+                Copy link to {firstName}&rsquo;s page
+              </button>
+            </div>
+
+            {flash && (
+              <p className="text-sm text-[#0d0d0d] mt-4 text-center" role="status">
+                {flash}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
