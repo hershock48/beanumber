@@ -338,8 +338,14 @@ export default async function MePage() {
   //      or link to '/meet/' (empty id).
   //   2. Newsletter within the last ~45 days → point at /news.
   //   3. Fallback → grow-your-campus (add another kid).
+  //
+  // The old "newsletter" state (2 → "Read this month's letter") was
+  // removed 2026-07-06 because /me already renders a full newsletter
+  // card below with the hero photo + title — a plain-text CTA above
+  // it just said the same thing twice with less signal. Kid update
+  // still fires as CTA #1 (it's the ONLY place that surface exists);
+  // if there's no kid update, we fall through directly to grow.
   const CTA_KID_UPDATE_FRESHNESS_MS = 60 * 86_400_000;
-  const CTA_NEWSLETTER_FRESHNESS_MS = 45 * 86_400_000;
   const now = Date.now();
 
   const kidWithFreshestUpdate = rows
@@ -361,11 +367,6 @@ export default async function MePage() {
       return bt.localeCompare(at);
     })[0];
 
-  const newsletterIsFresh =
-    latestNewsletter?.publishedAt
-      ? now - new Date(latestNewsletter.publishedAt).getTime() < CTA_NEWSLETTER_FRESHNESS_MS
-      : false;
-
   const ctaState: MeCTAState = kidWithFreshestUpdate
     ? {
         kind: 'kid-update',
@@ -374,8 +375,6 @@ export default async function MePage() {
           ? `/children/${kidWithFreshestUpdate.child.shirtNumber}`
           : `/meet/${kidWithFreshestUpdate.child.recordId}`,
       }
-    : newsletterIsFresh
-    ? { kind: 'newsletter', newsletterHref: '/news' }
     : { kind: 'grow' };
 
   return (
