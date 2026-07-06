@@ -666,11 +666,13 @@ export default async function MePage() {
                 <>
                   <div className="border-t border-[#3a2c1a] pt-6 mb-5">
                     <p className="text-xs font-bold uppercase tracking-[0.3em] text-[#D4A843] mb-2">
-                      Or meet a kid at the campus
+                      More kids to meet
                     </p>
                     <p className="text-sm text-[#d8cfc1] leading-relaxed max-w-xl">
-                      A few faces from the campus. Tap one to read
-                      their story and sponsor them if it lands.
+                      A few more kids from the campus. If you want to
+                      stay in another one&rsquo;s life, sponsor them &mdash;
+                      $25/mo, letters, updates, and photos, same as the
+                      kids you already have.
                     </p>
                   </div>
                   {/* Horizontal scroll strip. Cards use overflow-x-auto
