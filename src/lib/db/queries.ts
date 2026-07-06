@@ -862,6 +862,13 @@ export async function getNoteThreadPreviewsForSponsor(args: {
         bodyEn: kidMessages.bodyEn,
         status: kidMessages.status,
         createdAt: kidMessages.createdAt,
+        // Every state transition carries its own timestamp so the
+        // preview can say "translated 2 hours ago" using the actual
+        // translation time, not the write time. Without translatedAt
+        // in this SELECT, the "On its way — translated" copy read as
+        // the date the SPONSOR wrote it, which was misleading when
+        // Simon translated days later.
+        translatedAt: kidMessages.translatedAt,
         deliveredAt: kidMessages.deliveredAt,
         parentMessageId: kidMessages.parentMessageId,
       })
@@ -907,7 +914,30 @@ export async function getNoteThreadPreviewsForSponsor(args: {
     for (const [childId, b] of buckets) {
       if (!b.newest) continue;
       const isReply = b.newest.direction === 'kid_to_sponsor';
-      const dateSource = b.newest.deliveredAt ?? b.newest.createdAt;
+      // Pick the timestamp that MATCHES the status verb the sponsor
+      // sees. Replies are always 'delivered' at write time with
+      // deliveredAt set, so they're straightforward. Outbound has
+      // three visible states, each with its own timestamp — using
+      // the wrong one makes copy like "translated 5 days ago" lie
+      // about when Simon actually did the work.
+      let dateSource: Date | null = null;
+      if (isReply) {
+        dateSource = b.newest.deliveredAt ?? b.newest.createdAt;
+      } else {
+        switch (b.newest.status) {
+          case 'delivered':
+            dateSource =
+              b.newest.deliveredAt ?? b.newest.translatedAt ?? b.newest.createdAt;
+            break;
+          case 'translated':
+            dateSource = b.newest.translatedAt ?? b.newest.createdAt;
+            break;
+          case 'pending':
+          default:
+            dateSource = b.newest.createdAt;
+            break;
+        }
+      }
       out.set(childId, {
         latestKind: isReply ? 'reply' : 'sent',
         latestDate: dateSource

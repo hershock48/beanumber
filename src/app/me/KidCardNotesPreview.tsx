@@ -36,8 +36,12 @@ function formatShortDate(iso: string): string {
   try {
     const d = new Date(iso);
     const now = new Date();
-    const days = Math.floor(
-      (now.getTime() - d.getTime()) / (1000 * 60 * 60 * 24)
+    // Clamp to zero so a slightly-future timestamp (server clock skew,
+    // or a translation stamped microseconds ago that rounds forward)
+    // reads as "today" rather than "-1 days ago".
+    const days = Math.max(
+      0,
+      Math.floor((now.getTime() - d.getTime()) / (1000 * 60 * 60 * 24))
     );
     if (days === 0) return 'today';
     if (days === 1) return 'yesterday';
