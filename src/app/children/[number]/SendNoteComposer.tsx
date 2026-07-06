@@ -118,8 +118,10 @@ export function SendNoteComposer({
           </p>
           <p className="text-[#555] leading-relaxed max-w-md mx-auto">
             Simon batches deliveries at the campus each Sunday, so it
-            should reach {firstName} within about a week. We&rsquo;ll
-            email you the moment he hands it over.
+            should reach {firstName} within about a week.{' '}
+            <span className="text-[#0d0d0d] font-semibold">
+              We&rsquo;ll email you if {firstName} writes back.
+            </span>
           </p>
           <p className="text-[#888] leading-relaxed text-sm italic mt-4 max-w-md mx-auto">
             It has to travel farther than a text.{' '}
