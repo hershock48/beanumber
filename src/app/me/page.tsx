@@ -233,10 +233,17 @@ export default async function MePage() {
   // 15-min cache inside fetchOmoroWeather; the others are per-request.
   // If Open-Meteo is slow, the 4-sec internal timeout returns null
   // and the atmosphere widget gracefully drops the weather clause.
-  const [rawRows, recentNewsletters, weather] = await Promise.all([
+  const [rawRows, recentNewsletters, weather, allCampusKids] = await Promise.all([
     fetchSponsorshipsForEmail(email),
     getRecentCampusNewsletters(1),
     fetchOmoroWeather(),
+    // Small pool of campus kids for the "Explore the campus" carousel
+    // in the Grow section below. Filtered to kids with photos only —
+    // the carousel is a browse surface and placeholder-photo cards
+    // undermine the pitch. Full roster is small (~50), no pagination
+    // needed; we shuffle + slice client-side after excluding the
+    // sponsor's own kids.
+    listAllChildren({ onlyWithPhoto: true }),
   ]);
   const campusNowIso = serverCampusNow();
 
@@ -318,6 +325,28 @@ export default async function MePage() {
   const sponsors = rows.filter(r => r.monthlyOrHolder === 'monthly');
   const holders = rows.filter(r => r.monthlyOrHolder === 'holder');
   const latestNewsletter = recentNewsletters[0];
+
+  // Sample of campus kids the sponsor does NOT already have. Feeds the
+  // "Explore the campus" carousel in the Grow section. Excluded via
+  // recordId match — the sponsor's own kids shouldn't appear as
+  // "meet someone new" options. Departed kids also drop out. Shuffled
+  // so repeat visitors see different faces; capped at 6 to keep the
+  // carousel scannable. Empty array is fine — the render conditions
+  // on length.
+  const ownRecordIds = new Set(
+    rows.map(r => r.child.recordId).filter((v): v is string => !!v)
+  );
+  const campusSampleKids = allCampusKids
+    .filter(k => k.id && !ownRecordIds.has(k.id) && !k.departedAt)
+    .sort(() => Math.random() - 0.5)
+    .slice(0, 6)
+    .map(k => ({
+      recordId: k.id,
+      firstName: k.firstName || k.displayName?.split(' ')[0] || 'A kid',
+      displayName: k.displayName || k.firstName || 'A kid',
+      photoUrl: k.profilePhotoUrl,
+      shirtNumber: k.shirtNumber,
+    }));
 
   // Earliest sponsorship start → "part of the campus for N days."
   // Beats a hard-coded "Signed in" kicker: warm, dated, honest.
@@ -590,11 +619,98 @@ export default async function MePage() {
               </div>
             </section>
 
-            {/* ── One CTA, chosen by state ──────────────────────────
-                Points at the freshest thing waiting for the sponsor.
-                Fresh kid update > add-another (newsletter branch was
-                removed 2026-07-06 — see ctaState comment above). */}
+            {/* ── Contextual CTA (kid-update only) ─────────────────
+                Fires when one of the sponsor's kids has a fresh
+                published update (≤60 days). "See what's new with
+                {Kid}" pointing at the kid's page. Silent otherwise —
+                the Grow section below handles the "nothing new,
+                here's how to add more" moment. */}
             <MeContextualCTA state={ctaState} />
+
+            {/* ── Grow your campus ─────────────────────────────────
+                Two paths per CLAUDE.md #4: shirt-first (new number,
+                new reveal) and campus-browse (co-sponsor an existing
+                kid without a shirt). Primary button leads with the
+                shirt path — it's the classic entry and the only path
+                to a brand-new shirt-linked relationship. Carousel
+                below is the co-sponsor discovery surface: real kids
+                the sponsor doesn't already have, tap through to
+                /meet/[id] where they can read the profile and start
+                a sponsorship. Kevin's shape from 2026-07-06. */}
+            <section className="bg-[#1a1208] text-white px-6 md:px-10 py-8 md:py-10 mb-10 md:mb-14">
+              <p className="text-xs font-bold uppercase tracking-[0.3em] text-[#D4A843] mb-3">
+                Grow your campus
+              </p>
+              <h2
+                className="text-2xl md:text-3xl mb-3 leading-tight"
+                style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
+              >
+                Add another kid.
+              </h2>
+              <p className="text-[#d8cfc1] leading-relaxed max-w-xl mb-6">
+                Every shirt carries a different number. Every number is
+                a different kid. Nothing locks you to one.
+              </p>
+              <div className="mb-8">
+                <Link
+                  href="/shirts"
+                  className="inline-block bg-[#D4A843] hover:bg-[#c49a3a] text-[#0d0d0d] px-6 py-3 text-xs font-bold uppercase tracking-wider transition-colors"
+                >
+                  Shop another shirt
+                </Link>
+              </div>
+              {campusSampleKids.length > 0 && (
+                <>
+                  <div className="border-t border-[#3a2c1a] pt-6 mb-5">
+                    <p className="text-xs font-bold uppercase tracking-[0.3em] text-[#D4A843] mb-2">
+                      Or meet the campus
+                    </p>
+                    <p className="text-sm text-[#d8cfc1] leading-relaxed max-w-xl">
+                      Kids already at the campus. Tap through to read
+                      their story, and if you want to co-sponsor one,
+                      the button lives on their page.
+                    </p>
+                  </div>
+                  {/* Horizontal scroll strip. Cards use overflow-x-auto
+                      so mobile gets a swipe surface and desktop gets a
+                      scrollbar; either way the whole row fits inside
+                      the dark card without page-level scroll pressure. */}
+                  <div className="overflow-x-auto -mx-6 md:-mx-10 px-6 md:px-10 pb-2">
+                    <div className="flex gap-4">
+                      {campusSampleKids.map(kid => (
+                        <Link
+                          key={kid.recordId}
+                          href={`/meet/${kid.recordId}`}
+                          className="group block flex-shrink-0 w-40 md:w-44"
+                        >
+                          <div className="aspect-[4/5] bg-[#2a1f14] overflow-hidden relative mb-2">
+                            {kid.photoUrl ? (
+                              <Image
+                                src={kid.photoUrl}
+                                alt={kid.displayName}
+                                fill
+                                sizes="(max-width: 768px) 40vw, 20vw"
+                                className="object-cover group-hover:scale-105 transition-transform duration-500"
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-3xl opacity-30">
+                                👤
+                              </div>
+                            )}
+                          </div>
+                          <p
+                            className="text-sm text-white leading-tight group-hover:text-[#D4A843] transition-colors"
+                            style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
+                          >
+                            {kid.firstName}
+                          </p>
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
+            </section>
 
             {/* ── About the campus ─────────────────────────────────
                 Grounds /me in a real place. Two paragraphs pulled from
