@@ -99,9 +99,9 @@ export function SendNoteComposer({
           Write to {firstName}.
         </h2>
         <p className="text-[#666] mt-3 leading-relaxed max-w-lg mx-auto">
-          Simon and the team at the campus read every note, translate
-          it, and hand it to {firstName} in person. Deliveries happen
-          in weekly batches, usually on a Sunday.
+          The team at the campus reads every note, translates it, and
+          hands it to {firstName} in person. Deliveries happen in
+          weekly batches, usually on a Sunday.
         </p>
       </div>
 
@@ -117,7 +117,7 @@ export function SendNoteComposer({
             Your note is on its way to {firstName}.
           </p>
           <p className="text-[#555] leading-relaxed max-w-md mx-auto">
-            Simon batches deliveries at the campus each Sunday, so it
+            The campus batches deliveries each Sunday, so your note
             should reach {firstName} within about a week.{' '}
             <span className="text-[#0d0d0d] font-semibold">
               We&rsquo;ll email you if {firstName} writes back.

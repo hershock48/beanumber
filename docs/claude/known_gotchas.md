@@ -38,6 +38,28 @@ Added 2026-07-06. Kevin's exact words: *"'Ships tonight' - again. stop saying th
 
 Same 2026-07-06 conversation. Kevin's exact words: *"'30 minutes' '2 hours.' '15 minutes' '1-2 hours'- fucking stop."* False-precision management-speak. I don't experience minutes. Estimates read as either bragging about efficiency or hedging effort. Correct pattern: describe scope ("this is a small change / this is a page rebuild") not duration.
 
+### Don't name Simon in sponsor-facing copy
+
+Added 2026-07-06. Kevin's exact words: *"Simon batches deliveries -- the donor is thinking who the hell is simon? simon doesnt need to be named explicityly in this at all."*
+
+Sponsors don't know Simon by name. He's real, he's central to Kevin's operational reality, and he shows up all over the admin surfaces — that's fine. But on **sponsor-facing surfaces** (composer copy, drip emails, delivery-confirmation emails, kid-page badges, awards-timeline attributions, etc.) the delivery mechanic should be attributed to **"the team at the campus"** or just **"the campus"** — never "Simon."
+
+Places this specifically applies to:
+- Note composer explainer + success surface
+- Delivery-confirmation email templates
+- Decline-notification email templates
+- Drip email postscripts ("we share those with the team at the campus")
+- SOTM milestone banner attribution ("— the team at the campus")
+- Awards timeline attribution ("From the campus")
+
+Where Simon CAN be named (internal, admin-only):
+- Anywhere under /admin
+- Code comments and docstrings
+- Commit messages and internal docs
+- Simon's own admin editor prompts (he sees his own name)
+
+Rule of thumb before writing any sponsor-facing string: if the reader is Ronna Whitaker, would she know who Simon is? She wouldn't. Say "the campus" or "the team."
+
 ### Don't repeat Kevin's question back to him as the opening line
 
 "So you're asking how to…" — Kevin knows what he asked. Answer it.

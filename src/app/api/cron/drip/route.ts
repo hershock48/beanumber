@@ -185,12 +185,12 @@ function shirtNurtureEmail(
           : `<p>${recapPrefix} — you walked away with your shirt. A real kid is on the other side of the number printed on it. Neither of us knows who yet. Flip the shirt over. Find the number. Meet them at <a href="${SITE_URL}" style="color: #D4A843; font-weight: bold;">beanumber.org</a>.</p>`;
         // No "P.S. take a picture when you open it" — they already opened
         // it at the booth. The breadcrumb back to Simon's side.
-        postscript = `<p style="color: #777; font-size: 14px; margin-top: 24px;">P.S. If you took a photo at the booth, send it back — we share those with Simon at the campus so the kids see who&rsquo;s wearing their number.</p>`;
+        postscript = `<p style="color: #777; font-size: 14px; margin-top: 24px;">P.S. If you took a photo at the booth, send it back — we share those with the team at the campus so the kids see who&rsquo;s wearing their number.</p>`;
       } else {
         bodyParagraph = multi
           ? `<p>Your shirts are in the mail. A real kid is on the other side of each number printed on them. Neither of us knows who yet. Open the bag. Find the numbers. Meet them at <a href="${SITE_URL}" style="color: #D4A843; font-weight: bold;">beanumber.org</a>.</p>`
           : `<p>Your shirt&rsquo;s in the mail. A real kid is on the other side of the number printed on it. Neither of us knows who yet. Open the bag. Find the number. Meet them at <a href="${SITE_URL}" style="color: #D4A843; font-weight: bold;">beanumber.org</a>.</p>`;
-        postscript = `<p style="color: #777; font-size: 14px; margin-top: 24px;">P.S. When you open it, take a picture. We send those to Simon at the campus, and the kids see who&rsquo;s wearing their number.</p>`;
+        postscript = `<p style="color: #777; font-size: 14px; margin-top: 24px;">P.S. When you open it, take a picture. We send those to the team at the campus, and the kids see who&rsquo;s wearing their number.</p>`;
       }
 
       return {

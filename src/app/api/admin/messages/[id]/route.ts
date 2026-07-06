@@ -197,7 +197,7 @@ function deliveredEmailHtml({
 }): string {
   return wrap(`
     <p>${greeting}</p>
-    <p>Simon delivered your note to ${firstName} at the campus. He read it out loud, translated where it needed to be, and handed the paper over.</p>
+    <p>Your note reached ${firstName} at the campus today. The team read it out loud, translated it where it needed to be, and handed the paper over.</p>
     <p>You can write another whenever you want — the composer is on ${firstName}'s page.</p>
     <p style="text-align: center; margin: 24px 0;">
       <a href="${kidPageUrl}" style="display: inline-block; background: #D4A843; color: #0d0d0d; font-weight: bold; text-decoration: none; padding: 12px 28px; font-size: 14px; letter-spacing: 0.05em;">

@@ -280,7 +280,7 @@ export function sotmCurrentMilestone(
   return {
     kind: 'sotm-current',
     headline: `${kidFirstName} is Student of the Month${gradeClause}.`,
-    body: trimmedReason ? `“${trimmedReason}” — Simon` : null,
+    body: trimmedReason ? `“${trimmedReason}” — the team at the campus` : null,
     // Beats every other milestone in the same window. If a kid has
     // a birthday AND is SOTM, the SOTM banner leads.
     priority: 200,
