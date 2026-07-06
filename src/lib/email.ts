@@ -438,6 +438,8 @@ export async function sendNewsletterNotificationEmail(params: {
 
     ${kidLines}
 
+    <p style="margin-top: 24px; font-size: 14px; color: #555;">Or open your <strong>My Campus</strong> page at <a href="${siteUrl}/me" style="color: #D4A843;">beanumber.org/me</a> &mdash; your ${kids.length === 1 ? 'kid' : 'kids'}, the campus feed, and this newsletter all in one place. That&rsquo;s the home base.</p>
+
     <p style="margin-top: 24px; font-size: 14px; color: #888;">Reply to this email if anything&rsquo;s not loading or you want to write back to the campus &mdash; I read every one.</p>
 
     <p>Kevin</p>
@@ -495,6 +497,10 @@ export async function sendNewsletterNotificationEmailForNonSponsor(params: {
     <p style="margin: 24px 0;">
       <a href="${siteUrl}" style="display: inline-block; background: #D4A843; color: #0d0d0d; font-weight: bold; text-transform: uppercase; letter-spacing: 0.05em; padding: 14px 28px; text-decoration: none; font-size: 13px;">Type your number</a>
     </p>
+
+    <p style="font-size: 14px; color: #555;">Don&rsquo;t have the shirt handy? Read it at <a href="${siteUrl}/news" style="color: #D4A843;">beanumber.org/news</a> &mdash; same story, without the kid-page framing.</p>
+
+    <p style="font-size: 14px; color: #555;">And once you&rsquo;ve met your kid, your <strong>My Campus</strong> page at <a href="${siteUrl}/me" style="color: #D4A843;">beanumber.org/me</a> becomes your home for everything &mdash; your kid, the campus feed, and every newsletter I send.</p>
 
     <p style="font-size: 14px; color: #555;">If reading this makes you want to become a monthly sponsor of the kid on your shirt, that&rsquo;s a $25-a-month decision and the sponsor button is right there on their page. No pressure &mdash; the work runs either way. Just wanted you to know the door is open.</p>
 
@@ -554,6 +560,8 @@ export async function sendNewsletterNotificationEmailForLegacyDonor(params: {
     </p>
 
     <p style="font-size: 14px; color: #555;">How this works: every shirt at <a href="${siteUrl}" style="color: #D4A843;">beanumber.org</a> is tied to a kid at the campus by number. Buy one, and you&rsquo;ll meet the kid attached to it when it arrives. From there, $25/mo sponsorship is optional &mdash; cancel anytime, runs the whole campus.</p>
+
+    <p style="font-size: 14px; color: #555;">Every shirt buyer also gets a <strong>My Campus</strong> page &mdash; their kid, the campus feed, and every newsletter in one place. Take a peek at <a href="${siteUrl}/me" style="color: #D4A843;">beanumber.org/me</a> if you want to see what that looks like.</p>
 
     <p>Kevin</p>
   `);
