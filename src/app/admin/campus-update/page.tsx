@@ -11,20 +11,19 @@
  * minimum surface Simon needs: write what happened, attach a photo.
  */
 
-import { eq } from 'drizzle-orm';
+import { inArray } from 'drizzle-orm';
 import { AdminShell } from '../_components/AdminShell';
 import { getAdminRole } from '@/lib/admin-session';
 import { CampusUpdateEditor } from './CampusUpdateEditor';
 import { db } from '@/lib/db/client';
 import { newsletters } from '@/lib/db/schema';
+import {
+  buildCampusUpdateTitle,
+  candidateTitlesForMonth,
+} from '@/lib/newsletter-title';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
-
-function buildMonthTitle(d: Date): string {
-  const month = d.toLocaleString('en-US', { month: 'long' });
-  return `Campus update — ${month} ${d.getFullYear()}`;
-}
 
 async function loadThisMonth(): Promise<{
   exists: boolean;
@@ -33,10 +32,13 @@ async function loadThisMonth(): Promise<{
   heroPhotoUrl: string | null;
   lastEditedBySimon: string | null;
 }> {
-  const title = buildMonthTitle(new Date());
+  const title = buildCampusUpdateTitle(new Date());
   const empty = { exists: false, title, body: '', heroPhotoUrl: null, lastEditedBySimon: null };
 
   try {
+    // Match either the new "{Month} at the campus" title or the legacy
+    // "Campus update — <Month> <Year>" title so any draft already saved
+    // under the old name still loads into the same editor.
     const rows = await db
       .select({
         title: newsletters.title,
@@ -44,7 +46,7 @@ async function loadThisMonth(): Promise<{
         heroPhotoUrl: newsletters.heroPhotoUrl,
       })
       .from(newsletters)
-      .where(eq(newsletters.title, title))
+      .where(inArray(newsletters.title, candidateTitlesForMonth(new Date())))
       .limit(1);
     const row = rows[0];
     if (!row) return empty;

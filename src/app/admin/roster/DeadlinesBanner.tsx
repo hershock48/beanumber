@@ -14,14 +14,10 @@
  * page (no extra Airtable call).
  */
 
-import { eq } from 'drizzle-orm';
+import { inArray } from 'drizzle-orm';
 import { db } from '@/lib/db/client';
 import { newsletters } from '@/lib/db/schema';
-
-function buildMonthTitle(d: Date): string {
-  const month = d.toLocaleString('en-US', { month: 'long' });
-  return `Campus update — ${month} ${d.getFullYear()}`;
-}
+import { candidateTitlesForMonth } from '@/lib/newsletter-title';
 
 /** Next quarter-end (Mar 31, Jun 30, Sep 30, Dec 31) on/after today. */
 function nextReportCardDeadline(): Date {
@@ -83,12 +79,14 @@ function toneClasses(t: 'gray' | 'amber' | 'red' | 'green'): string {
 }
 
 async function fetchThisMonthUpdate(): Promise<{ exists: boolean; wordCount: number }> {
-  const title = buildMonthTitle(new Date());
+  // Match either the new "{Month} at the campus" title or the legacy
+  // "Campus update — <Month> <Year>" title so drafts under the old
+  // naming still light up the "Not started / Started" banner.
   try {
     const rows = await db
       .select({ bodyHtml: newsletters.bodyHtml })
       .from(newsletters)
-      .where(eq(newsletters.title, title))
+      .where(inArray(newsletters.title, candidateTitlesForMonth(new Date())))
       .limit(1);
     const row = rows[0];
     if (!row) return { exists: false, wordCount: 0 };

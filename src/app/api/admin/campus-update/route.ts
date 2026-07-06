@@ -27,22 +27,23 @@ import { verifyAdminToken } from '@/lib/auth';
 import { getAdminRole } from '@/lib/admin-session';
 import { db } from '@/lib/db/client';
 import { newsletters } from '@/lib/db/schema';
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import { uploadAttachment } from '@/lib/storage';
+import {
+  buildCampusUpdateTitle,
+  candidateTitlesForMonth,
+} from '@/lib/newsletter-title';
 
 const MAX_PHOTO_BASE64_BYTES = 5 * 1024 * 1024;
 
-function buildMonthTitle(d: Date): string {
-  const month = d.toLocaleString('en-US', { month: 'long' });
-  return `Campus update — ${month} ${d.getFullYear()}`;
-}
-
 async function findThisMonthDraft() {
-  const title = buildMonthTitle(new Date());
+  // Match either the new "{Month} at the campus" title or the legacy
+  // "Campus update — <Month> <Year>" title so a draft saved before the
+  // rename still loads into the same editor and gets updated in place.
   const rows = await db
     .select()
     .from(newsletters)
-    .where(eq(newsletters.title, title))
+    .where(inArray(newsletters.title, candidateTitlesForMonth(new Date())))
     .limit(1);
   return rows[0] || null;
 }
@@ -58,7 +59,7 @@ export async function GET(request: NextRequest) {
     if (!rec) {
       return NextResponse.json({
         exists: false,
-        title: buildMonthTitle(new Date()),
+        title: buildCampusUpdateTitle(new Date()),
       });
     }
     return NextResponse.json({
@@ -104,7 +105,7 @@ export async function POST(request: NextRequest) {
   const text = typeof body.body === 'string' ? body.body : '';
   const role = await getAdminRole();
   const now = new Date();
-  const title = buildMonthTitle(now);
+  const title = buildCampusUpdateTitle(now);
 
   try {
     let recordId: string;
