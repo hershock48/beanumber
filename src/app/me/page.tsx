@@ -648,7 +648,7 @@ export default async function MePage() {
                 className="text-2xl md:text-3xl mb-3 leading-tight"
                 style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
               >
-                Add another kid.
+                Help another kid.
               </h2>
               <p className="text-[#d8cfc1] leading-relaxed max-w-xl mb-6">
                 Every shirt carries a different number. Every number is
@@ -666,12 +666,11 @@ export default async function MePage() {
                 <>
                   <div className="border-t border-[#3a2c1a] pt-6 mb-5">
                     <p className="text-xs font-bold uppercase tracking-[0.3em] text-[#D4A843] mb-2">
-                      Or meet the campus
+                      Or meet a kid at the campus
                     </p>
                     <p className="text-sm text-[#d8cfc1] leading-relaxed max-w-xl">
-                      Kids already at the campus. Tap through to read
-                      their story, and if you want to co-sponsor one,
-                      the button lives on their page.
+                      A few faces from the campus. Tap one to read
+                      their story and sponsor them if it lands.
                     </p>
                   </div>
                   {/* Horizontal scroll strip. Cards use overflow-x-auto
