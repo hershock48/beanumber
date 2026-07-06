@@ -39,9 +39,14 @@
  *      successful payment, no overwrite of existing fields.
  *   6. Insert donation row (recurring=session.mode==='subscription').
  *   7. If subscription: insert sponsorship row + upsert subscription row.
- *   8. Enroll the donor in the shirt_nurture_inperson drip pipeline
- *      with dripStage=0 and dripNextSend=today+3d (matches the live
- *      webhook's in-person flow at /api/webhooks/stripe/route.ts ~L2576).
+ *   8. Enroll the donor in the appropriate drip pipeline with
+ *      dripStage=0 and dripNextSend=today+3d:
+ *        - subscription-mode sale → sponsor_onboard (they're already
+ *          a sponsor, so no shirt→sponsor conversion nudges).
+ *        - shirt-only, in-person → shirt_nurture_inperson.
+ *        - shirt-only, online → shirt_nurture.
+ *      Matches the live webhook's Christina-case migration at
+ *      /api/webhooks/stripe/route.ts ~L3600.
  *
  * What it does NOT do
  * ───────────────────
@@ -325,7 +330,24 @@ async function processOne(piId: string): Promise<BackfillSummary> {
 
   const orderType = meta.order_type || (isSubscription ? 'shirt_plus_monthly' : 'shirt');
   const soldInPerson = (meta.sold_in_person === 'true') || !meta.order_type;
-  const dripPipeline = soldInPerson ? 'shirt_nurture_inperson' : 'shirt_nurture';
+
+  // Drip pipeline routing. This mirrors what the live Stripe webhook
+  // (/api/webhooks/stripe/route.ts) does on customer.subscription.created:
+  //   - Any active-subscription buyer → sponsor_onboard, regardless of
+  //     whether they also bought a shirt in the same checkout. They ARE
+  //     already sponsors; conversion nudges are the wrong voice.
+  //   - Shirt-only buyer → shirt_nurture (or _inperson for booth sales).
+  //
+  // Bug this fixes: the old backfill unconditionally set shirt_nurture,
+  // stranding Marshall market sponsors (Amy L Anderson, Ronna Whitaker,
+  // and anyone the next backfill catches) on a "have you sponsored yet?"
+  // drip while they were, in fact, already paying $25/mo. That's the
+  // exact "Christina case" the live webhook has a fix for.
+  const dripPipeline = isSubscription
+    ? 'sponsor_onboard'
+    : soldInPerson
+      ? 'shirt_nurture_inperson'
+      : 'shirt_nurture';
 
   const donationSource = orderType === 'cart' ? 'Shirt Order'
     : orderType === 'shirt_plus_monthly' ? 'Shirt + Monthly'
