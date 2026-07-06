@@ -34,6 +34,14 @@ interface SponsorshipRow {
   monthlyAmount: number;
   monthlyOrHolder: 'monthly' | 'holder';
   startDate?: string;
+  /**
+   * Timestamp the viewer claimed this kid via /children/[N] Hold-to-Meet.
+   * Null when the sponsorship exists but the viewer never claimed a
+   * specific number — e.g. sponsored raw through /campus. The number
+   * badge only renders when this is set, because the shirt number
+   * belongs to whoever's holding a shirt, not to every sponsor.
+   */
+  revealedAt: string | null;
   child: {
     recordId: string;
     childId: string;
@@ -95,6 +103,9 @@ async function fetchSponsorshipsForEmail(email: string): Promise<SponsorshipRow[
         monthlyAmount,
         monthlyOrHolder,
         startDate: r.sponsorshipStartDate ?? undefined,
+        revealedAt: r.childRevealedAt
+          ? new Date(r.childRevealedAt).toISOString()
+          : null,
         child: {
           recordId: r.childRecordId ?? '',
           childId: r.childIdLegacy ?? '',
@@ -358,10 +369,19 @@ export default async function MePage() {
 }
 
 function KidCard({ row }: { row: SponsorshipRow }) {
-  const { child, monthlyOrHolder, monthlyAmount, startDate, latestUpdate } =
-    row;
+  const { child, monthlyOrHolder, startDate, latestUpdate, revealedAt } = row;
   const monthsActive = startDate ? monthsBetween(new Date(startDate), new Date()) : null;
-  const href = child.shirtNumber ? `/children/${child.shirtNumber}` : '#';
+  // The kid's page URL still uses the shirt number for anyone whose
+  // sponsorship is tied to a real shirt — but for viewers who haven't
+  // claimed via Hold-to-Meet we route through /meet/[id] so the URL
+  // itself doesn't leak a number they don't own. This keeps the
+  // buyer-claims-kid invariant clean end to end.
+  const hasClaimedNumber = !!revealedAt;
+  const href = hasClaimedNumber && child.shirtNumber
+    ? `/children/${child.shirtNumber}`
+    : child.recordId
+    ? `/meet/${child.recordId}`
+    : '#';
 
   return (
     <Link
@@ -384,7 +404,11 @@ function KidCard({ row }: { row: SponsorshipRow }) {
         )}
       </div>
       <div className="p-4">
-        {child.shirtNumber && (
+        {/* Number kicker only shows if THIS viewer claimed the number
+            via Hold-to-Meet. A raw sponsor who came in through /campus
+            without a shirt doesn't own a number — showing one would
+            imply admin-side matching, which we don't do. */}
+        {hasClaimedNumber && child.shirtNumber && (
           <p className="text-xs font-bold uppercase tracking-wider text-[#D4A843] mb-1">
             #{child.shirtNumber}
           </p>
@@ -398,7 +422,7 @@ function KidCard({ row }: { row: SponsorshipRow }) {
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-xs">
           {monthlyOrHolder === 'monthly' ? (
             <span className="inline-block bg-[#D4A843] text-[#0d0d0d] px-2 py-0.5 font-bold uppercase tracking-wider">
-              Sponsor · ${monthlyAmount}/mo
+              Sponsored monthly
             </span>
           ) : (
             <span className="inline-block bg-[#e8e0d4] text-[#0d0d0d] px-2 py-0.5 font-bold uppercase tracking-wider">
