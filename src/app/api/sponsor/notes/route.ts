@@ -90,7 +90,7 @@ export async function POST(request: NextRequest) {
   if (rawBody.length > MAX_BODY) {
     return NextResponse.json(
       {
-        error: `That's a long letter. Keep it under ${MAX_BODY} characters so Simon can translate quickly.`,
+        error: `That's a long letter. Keep it under ${MAX_BODY} characters so the campus team can translate it quickly.`,
       },
       { status: 400 }
     );
@@ -173,7 +173,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         error:
-          "You already have a note in the queue waiting for Simon. He'll deliver it, then you can write another.",
+          'You already have a note in the queue. Once it reaches the campus and gets delivered, you can write another.',
       },
       { status: 409 }
     );

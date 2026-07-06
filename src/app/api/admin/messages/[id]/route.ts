@@ -40,6 +40,9 @@ interface PatchBody {
   notifySponsor?: boolean;
 }
 
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -49,6 +52,13 @@ export async function PATCH(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
   const { id } = await params;
+  // Guard the URL param before the query hits Postgres. Without this,
+  // any request to /api/admin/messages/not-a-uuid throws inside the
+  // driver and returns a 500 instead of a proper 404. Cheap check,
+  // cleaner surface.
+  if (!UUID_RE.test(id)) {
+    return NextResponse.json({ error: 'Message not found.' }, { status: 404 });
+  }
 
   let body: PatchBody;
   try {
@@ -99,9 +109,9 @@ export async function PATCH(
       }
       patch.bodyTranslated = translation;
       patch.translatedAt = now;
-      // Keep status at 'pending' if this is the first translation
-      // pass and Simon hasn't marked delivered yet — 'translated'
-      // means it's ready for the campus batch.
+      // Move to 'translated' — the note is now ready for the campus
+      // delivery batch. Status stays there until Simon marks
+      // delivered (or declines).
       patch.status = 'translated';
       break;
     }
