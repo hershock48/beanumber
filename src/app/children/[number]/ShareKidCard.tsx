@@ -68,6 +68,7 @@ export function ShareKidCard({
   const [canShareFiles, setCanShareFiles] = useState(false);
   const [flash, setFlash] = useState<string | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const modalRef = useRef<HTMLDivElement | null>(null);
 
   // Web Share API feature detection. We probe with a tiny 1x1 PNG
   // file because navigator.canShare(...) requires a File instance —
@@ -261,11 +262,14 @@ export function ShareKidCard({
     if (open) draw();
   }, [open, draw]);
 
-  // Escape-to-close + body scroll lock while the modal is open.
-  // Backdrop click already closes; keyboard users expect Esc too.
-  // Locking body overflow prevents the iOS behind-scroll bug where
-  // the underlying page scrolls when the user drags on the modal's
-  // scrim.
+  // Escape-to-close + body scroll lock + initial focus while the
+  // modal is open. Backdrop click already closes; keyboard users
+  // expect Esc too. Locking body overflow prevents the iOS behind-
+  // scroll bug where the underlying page scrolls when the user drags
+  // on the modal's scrim. Focus moves into the modal container so
+  // screen readers announce the dialog title and tab lands inside
+  // the modal on the very next Tab press — otherwise focus stays on
+  // the "Make the card" button visually behind the overlay.
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -274,10 +278,24 @@ export function ShareKidCard({
     document.addEventListener('keydown', onKey);
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
+    // Defer focus so the modal has actually painted; without the
+    // rAF, the focus call can race the append and land on <body>.
+    const raf = requestAnimationFrame(() => {
+      modalRef.current?.focus();
+    });
     return () => {
+      cancelAnimationFrame(raf);
       document.removeEventListener('keydown', onKey);
       document.body.style.overflow = prevOverflow;
     };
+  }, [open]);
+
+  // Reset the flash message every time the modal opens or closes so
+  // a stale "Saved. Post it with a line…" from an earlier session
+  // isn't the first thing a sponsor sees when they come back to make
+  // another card for a different kid a week later.
+  useEffect(() => {
+    setFlash(null);
   }, [open]);
 
   const canvasToBlob = (): Promise<Blob | null> =>
@@ -287,7 +305,17 @@ export function ShareKidCard({
         resolve(null);
         return;
       }
-      canvas.toBlob(resolve, 'image/png');
+      // canvas.toBlob throws SecurityError synchronously if the
+      // canvas is tainted by a cross-origin image that didn't return
+      // proper CORS headers. Wrapping the call so a thrown error
+      // resolves to null instead of leaving the promise pending — an
+      // unresolved promise here means the Download / Share buttons
+      // hang forever until the sponsor reloads the page.
+      try {
+        canvas.toBlob(resolve, 'image/png');
+      } catch {
+        resolve(null);
+      }
     });
 
   const handleDownload = async () => {
@@ -377,14 +405,22 @@ export function ShareKidCard({
 
       {open && (
         <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="share-kid-card-title"
           className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4"
           onClick={() => setOpen(false)}
         >
+          {/* role="dialog" + aria-modal on the CARD, not the scrim —
+              screen readers should announce the dialog title when
+              focus lands here, and the tab-order should treat this
+              container (not the scrim) as the dialog root. tabIndex
+              -1 makes it programmatically focusable without joining
+              the natural tab sequence. */}
           <div
-            className="bg-[#FFF8F0] max-w-lg w-full max-h-[90vh] overflow-y-auto p-6 md:p-8 relative"
+            ref={modalRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="share-kid-card-title"
+            tabIndex={-1}
+            className="bg-[#FFF8F0] max-w-lg w-full max-h-[90vh] overflow-y-auto p-6 md:p-8 relative outline-none"
             onClick={e => e.stopPropagation()}
           >
             <button
