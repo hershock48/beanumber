@@ -144,7 +144,11 @@ export function PreviewMyCampus({
             This month at the campus
           </p>
           <Link
-            href="/news"
+            // back=me → /news breadcrumb swaps to "Back to My Campus"
+            // pointing at /me. Anon visitors land back on this preview;
+            // signed-in visitors land on their real /me. Same URL for
+            // both, /me handles the anon-vs-signed-in branch.
+            href="/news?back=me"
             className="group block bg-[#1a1208] text-white overflow-hidden hover:ring-2 hover:ring-[#D4A843] transition"
           >
             <div className="flex flex-col md:flex-row">
