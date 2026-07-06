@@ -728,6 +728,98 @@ export async function sendRecurringDonationThankYouEmail(
 }
 
 /**
+ * Admin alert to Kevin — a sponsor just wrote a note to their kid.
+ *
+ * Fires from src/app/api/sponsor/notes/route.ts POST right after the
+ * insert lands. Non-fatal: the caller ignores any failure so a Gmail
+ * blip doesn't take down the composer POST. The sponsor's write is
+ * what matters; this email is Kevin's notification path.
+ *
+ * Includes a truncated body preview (~200 chars) so Kevin can gauge
+ * urgency without opening the admin console for every note, plus a
+ * direct link into /admin/messages so he can review and translate.
+ *
+ * Recipient is hardcoded to kevin@beanumber.org — same address the
+ * existing admin order notification uses. Not templated because this
+ * is internal ops, not a user-facing template.
+ */
+function truncateForPreview(text: string, cap = 200): string {
+  const trimmed = (text || '').replace(/\s+/g, ' ').trim();
+  if (trimmed.length <= cap) return trimmed;
+  return `${trimmed.slice(0, cap - 1).trimEnd()}…`;
+}
+
+export async function sendKevinNoteAlert(params: {
+  noteId: string;
+  sponsorEmail: string;
+  sponsorName: string | null;
+  kidFirstName: string;
+  kidDisplayName: string;
+  shirtNumber: number | null;
+  bodyEn: string;
+}): Promise<EmailSendResult> {
+  const {
+    noteId,
+    sponsorEmail,
+    sponsorName,
+    kidFirstName,
+    kidDisplayName,
+    shirtNumber,
+    bodyEn,
+  } = params;
+
+  const kidLabel = shirtNumber
+    ? `${kidDisplayName || kidFirstName} (#${shirtNumber})`
+    : kidDisplayName || kidFirstName;
+  const preview = truncateForPreview(bodyEn, 240);
+  const sponsorDisplay = sponsorName?.trim() || sponsorEmail;
+
+  // Deep-link to the messages queue. There's no per-note URL yet, but
+  // /admin/messages surfaces pending items at the top ordered by age,
+  // so this new one will be the first thing Kevin sees.
+  const queueUrl = `${SITE_URL}/admin/messages`;
+
+  const html = wrapTransactionalEmail(`
+    <p style="margin-top: 0;">A new note landed in the sponsor queue.</p>
+
+    <p><strong>From:</strong> ${escapeHtmlLocal(sponsorDisplay)}${
+    sponsorName ? ` &lt;${escapeHtmlLocal(sponsorEmail)}&gt;` : ''
+  }<br>
+    <strong>To:</strong> ${escapeHtmlLocal(kidLabel)}</p>
+
+    <p style="background: #FFF8F0; border-left: 3px solid #D4A843; padding: 16px 20px; margin: 24px 0; font-style: italic; color: #555;">
+      &ldquo;${escapeHtmlLocal(preview)}&rdquo;
+    </p>
+
+    <p style="text-align: center; margin: 28px 0;">
+      <a href="${queueUrl}" style="display: inline-block; background: #D4A843; color: #0d0d0d; font-weight: bold; text-decoration: none; padding: 14px 32px; font-size: 15px; letter-spacing: 0.05em;">
+        Open the queue
+      </a>
+    </p>
+
+    <p style="color: #888; font-size: 12px;">Note ID: ${escapeHtmlLocal(noteId)}</p>
+  `);
+
+  return sendEmail({
+    to: { email: 'kevin@beanumber.org', name: 'Kevin' },
+    subject: `New sponsor note: ${sponsorDisplay} → ${kidFirstName}`,
+    html,
+  });
+}
+
+// Local escape because email.ts doesn't already export one. Kept
+// module-private to avoid competing with per-file escapers elsewhere.
+function escapeHtmlLocal(input: string | null | undefined): string {
+  if (input == null) return '';
+  return String(input)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+/**
  * Helper function to strip HTML tags for plain text fallback
  */
 function stripHtml(html: string): string {

@@ -38,6 +38,7 @@ import { cookies } from 'next/headers';
 import { and, eq, inArray, or, sql } from 'drizzle-orm';
 import { db } from '@/lib/db/client';
 import { kidMessages, sponsorships, children } from '@/lib/db/schema';
+import { sendKevinNoteAlert } from '@/lib/email';
 import { SESSION } from '@/lib/constants';
 
 const MIN_BODY = 10;
@@ -99,12 +100,22 @@ export async function POST(request: NextRequest) {
   // Resolve the kid — accept UUID or legacy id.
   const UUID_RE =
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-  let childRow: { id: string; firstName: string | null; childId: string | null } | undefined;
+  let childRow:
+    | {
+        id: string;
+        firstName: string | null;
+        displayName: string | null;
+        shirtNumber: number | null;
+        childId: string | null;
+      }
+    | undefined;
   if (body.childRecordId && UUID_RE.test(body.childRecordId)) {
     const r = await db
       .select({
         id: children.id,
         firstName: children.firstName,
+        displayName: children.displayName,
+        shirtNumber: children.shirtNumber,
         childId: children.childId,
       })
       .from(children)
@@ -116,6 +127,8 @@ export async function POST(request: NextRequest) {
       .select({
         id: children.id,
         firstName: children.firstName,
+        displayName: children.displayName,
+        shirtNumber: children.shirtNumber,
         childId: children.childId,
       })
       .from(children)
@@ -193,6 +206,29 @@ export async function POST(request: NextRequest) {
         status: 'pending',
       })
       .returning({ id: kidMessages.id, status: kidMessages.status });
+
+    // Fire the admin alert to Kevin — fully non-fatal. A Gmail blip or
+    // a slow SendGrid retry must NOT take down the composer POST; the
+    // sponsor's write is what matters. Errors are logged and swallowed.
+    // Await it inside the try so we don't leak an unhandled rejection
+    // when the runtime is teared down between requests.
+    try {
+      await sendKevinNoteAlert({
+        noteId: inserted[0].id,
+        sponsorEmail: email,
+        sponsorName,
+        kidFirstName: childRow.firstName || 'your kid',
+        kidDisplayName:
+          childRow.displayName || childRow.firstName || 'the kid',
+        shirtNumber: childRow.shirtNumber ?? null,
+        bodyEn: rawBody,
+      });
+    } catch (err) {
+      console.warn(
+        '[sponsor/notes] Kevin alert send failed (non-fatal):',
+        err instanceof Error ? err.message : String(err)
+      );
+    }
 
     return NextResponse.json({
       ok: true,

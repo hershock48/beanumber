@@ -140,6 +140,75 @@ export default async function AdminHomePage() {
             </Actions>
           </Card>
 
+          {/* ── Card: Sponsor notes queue ──────────────────────── */}
+          <Card
+            label="Sponsor notes queue"
+            error={data.messagesQueue.error}
+          >
+            {data.messagesQueue.pendingCount === 0 &&
+            data.messagesQueue.translatedCount === 0 ? (
+              <>
+                <Headline>The queue is empty.</Headline>
+                <p className="mt-2 text-sm text-[#666]">
+                  {data.messagesQueue.deliveredLast7Days > 0
+                    ? `${data.messagesQueue.deliveredLast7Days} note${
+                        data.messagesQueue.deliveredLast7Days === 1 ? '' : 's'
+                      } delivered in the last week.`
+                    : 'When a sponsor writes to their kid, this fills up.'}
+                </p>
+              </>
+            ) : (
+              <>
+                <Headline>
+                  {data.messagesQueue.pendingCount +
+                    data.messagesQueue.translatedCount}{' '}
+                  note
+                  {data.messagesQueue.pendingCount +
+                    data.messagesQueue.translatedCount ===
+                  1
+                    ? ''
+                    : 's'}{' '}
+                  waiting.
+                </Headline>
+                <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 text-sm text-[#666]">
+                  <GapLine
+                    label="Pending translation"
+                    count={data.messagesQueue.pendingCount}
+                  />
+                  <GapLine
+                    label="Ready to deliver"
+                    count={data.messagesQueue.translatedCount}
+                  />
+                </div>
+                {data.messagesQueue.oldestWaitingHours != null &&
+                  data.messagesQueue.oldestWaitingHours > 0 && (
+                    <p className="mt-3 text-sm text-[#666]">
+                      Oldest note has been waiting{' '}
+                      {data.messagesQueue.oldestWaitingHours < 24
+                        ? `${data.messagesQueue.oldestWaitingHours} hour${
+                            data.messagesQueue.oldestWaitingHours === 1
+                              ? ''
+                              : 's'
+                          }`
+                        : `${Math.floor(
+                            data.messagesQueue.oldestWaitingHours / 24
+                          )} day${
+                            Math.floor(
+                              data.messagesQueue.oldestWaitingHours / 24
+                            ) === 1
+                              ? ''
+                              : 's'
+                          }`}
+                      .
+                    </p>
+                  )}
+              </>
+            )}
+            <Actions>
+              <PrimaryLink href="/admin/messages">Open the queue</PrimaryLink>
+            </Actions>
+          </Card>
+
           {/* ── Card: Donor directory ──────────────────────────── */}
           <Card label="Donors">
             <Headline>Open a donor to see everything about them.</Headline>

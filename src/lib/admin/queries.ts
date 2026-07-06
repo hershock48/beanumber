@@ -22,6 +22,7 @@ import {
   childUpdates,
   donations,
   fulfillments,
+  kidMessages,
   newsletters,
   sponsorships,
 } from '@/lib/db/schema';
@@ -371,6 +372,102 @@ export async function getRosterGapsCard(): Promise<RosterGapsCard> {
 // ────────────────────────────────────────────────────────────────────────
 // Card: This month numbers
 // ────────────────────────────────────────────────────────────────────────
+
+// ────────────────────────────────────────────────────────────────────────
+// Card: Sponsor notes queue (correspondence engine — Kevin + Simon)
+// ────────────────────────────────────────────────────────────────────────
+//
+// Backs the "Sponsor notes queue" tile on /admin. Counts the outbound
+// pipeline in the two states that need admin attention (pending awaiting
+// translation, translated awaiting delivery) plus the age of the oldest
+// waiting item so Kevin can see at a glance whether anything has been
+// sitting too long. Also counts unread kid-to-sponsor replies — those
+// don't need admin action but are a "something new happened" signal.
+
+export interface MessagesQueueCard {
+  ok: boolean;
+  pendingCount: number;
+  translatedCount: number;
+  deliveredLast7Days: number;
+  // Age of the oldest actionable (pending or translated) note, in
+  // whole hours. Null when the queue is empty.
+  oldestWaitingHours: number | null;
+  error?: string;
+}
+
+export async function getMessagesQueueCard(): Promise<MessagesQueueCard> {
+  try {
+    // Two counts + one min(created_at) query. Cheaper as three separate
+    // targeted counts than a GROUP BY because status has an index and
+    // each count hits a small subset.
+    const [pendingRows, translatedRows, deliveredRows, oldestRows] =
+      await Promise.all([
+        db
+          .select({ n: sql<number>`count(*)::int` })
+          .from(kidMessages)
+          .where(
+            and(
+              eq(kidMessages.direction, 'sponsor_to_kid'),
+              eq(kidMessages.status, 'pending')
+            )
+          ),
+        db
+          .select({ n: sql<number>`count(*)::int` })
+          .from(kidMessages)
+          .where(
+            and(
+              eq(kidMessages.direction, 'sponsor_to_kid'),
+              eq(kidMessages.status, 'translated')
+            )
+          ),
+        db
+          .select({ n: sql<number>`count(*)::int` })
+          .from(kidMessages)
+          .where(
+            and(
+              eq(kidMessages.direction, 'sponsor_to_kid'),
+              eq(kidMessages.status, 'delivered'),
+              sql`${kidMessages.deliveredAt} > now() - interval '7 days'`
+            )
+          ),
+        db
+          .select({
+            createdAt: sql<string | null>`min(${kidMessages.createdAt})`,
+          })
+          .from(kidMessages)
+          .where(
+            and(
+              eq(kidMessages.direction, 'sponsor_to_kid'),
+              sql`${kidMessages.status} IN ('pending', 'translated')`
+            )
+          ),
+      ]);
+
+    const oldest = oldestRows[0]?.createdAt;
+    let oldestWaitingHours: number | null = null;
+    if (oldest) {
+      const ms = Date.now() - new Date(oldest).getTime();
+      oldestWaitingHours = Math.max(0, Math.floor(ms / (1000 * 60 * 60)));
+    }
+
+    return {
+      ok: true,
+      pendingCount: pendingRows[0]?.n ?? 0,
+      translatedCount: translatedRows[0]?.n ?? 0,
+      deliveredLast7Days: deliveredRows[0]?.n ?? 0,
+      oldestWaitingHours,
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      pendingCount: 0,
+      translatedCount: 0,
+      deliveredLast7Days: 0,
+      oldestWaitingHours: null,
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
+}
 
 export interface ThisMonthCard {
   ok: boolean;
@@ -824,6 +921,7 @@ export interface AdminHomeData {
   newsletterDue: NewsletterDueCard;
   sponsorActivity: SponsorActivityCard;
   rosterGaps: RosterGapsCard;
+  messagesQueue: MessagesQueueCard;
   thisMonth: ThisMonthCard;
 }
 
@@ -834,6 +932,7 @@ export async function getAdminHomeData(): Promise<AdminHomeData> {
     newsletterDue,
     sponsorActivity,
     rosterGaps,
+    messagesQueue,
     thisMonth,
   ] = await Promise.all([
     getPendingUpdatesCard(),
@@ -841,6 +940,7 @@ export async function getAdminHomeData(): Promise<AdminHomeData> {
     getNewsletterDueCard(),
     getSponsorActivityCard(),
     getRosterGapsCard(),
+    getMessagesQueueCard(),
     getThisMonthCard(),
   ]);
   return {
@@ -849,6 +949,7 @@ export async function getAdminHomeData(): Promise<AdminHomeData> {
     newsletterDue,
     sponsorActivity,
     rosterGaps,
+    messagesQueue,
     thisMonth,
   };
 }
