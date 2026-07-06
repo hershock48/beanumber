@@ -587,6 +587,12 @@ export const newsletters = pgTable(
 
     title: text('title').notNull(),
     subject: text('subject'),
+    // Hand-crafted 1–3 sentence teaser used as the pull quote in the
+    // notification emails (sponsor + non-sponsor variants). When null,
+    // the send loop's extractTeaser() falls back to auto-deriving from
+    // the first paragraph of body_html. Added 2026-07-06 (migration
+    // 0005) after Kevin wanted per-newsletter overrides again.
+    teaser: text('teaser'),
     bodyHtml: text('body_html'),
 
     // Hero photo URL on Supabase Storage.

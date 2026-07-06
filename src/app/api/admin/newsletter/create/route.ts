@@ -35,6 +35,7 @@ async function handler(request: NextRequest): Promise<NextResponse> {
   const body = bodyResult.data as {
     title?: string;
     subject?: string;
+    teaser?: string;
     bodyHtml?: string;
     author?: string;
     status?: 'Draft' | 'Scheduled';
@@ -55,6 +56,7 @@ async function handler(request: NextRequest): Promise<NextResponse> {
     .values({
       title: body.title.trim(),
       subject: body.subject.trim(),
+      teaser: body.teaser?.trim() || null,
       bodyHtml: body.bodyHtml,
       status,
       author: body.author?.trim() || null,

@@ -41,7 +41,7 @@ async function handler(request: NextRequest): Promise<NextResponse> {
     sendNotes: r.sendNotes || '',
     author: r.author || '',
     heroPhoto: r.heroPhotoUrl || null,
-    teaser: '', // teaser column not in Postgres schema; preserved as empty for UI compat
+    teaser: r.teaser || '',
   }));
 
   logger.apiResponse(method, path, 200);

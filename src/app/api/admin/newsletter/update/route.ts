@@ -38,6 +38,7 @@ async function handler(request: NextRequest): Promise<NextResponse> {
     id?: string;
     title?: string;
     subject?: string;
+    teaser?: string;
     bodyHtml?: string;
     author?: string;
     status?: 'Draft' | 'Scheduled';
@@ -60,6 +61,7 @@ async function handler(request: NextRequest): Promise<NextResponse> {
   const patch: Record<string, unknown> = {};
   if (body.title !== undefined) patch.title = body.title.trim();
   if (body.subject !== undefined) patch.subject = body.subject.trim();
+  if (body.teaser !== undefined) patch.teaser = body.teaser.trim();
   if (body.bodyHtml !== undefined) patch.bodyHtml = body.bodyHtml;
   if (body.author !== undefined) patch.author = body.author.trim();
   if (body.status !== undefined) patch.status = body.status;

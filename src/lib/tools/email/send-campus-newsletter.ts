@@ -504,11 +504,11 @@ export async function sendCampusNewsletterTool(
   );
   const childMap = await fetchChildrenByRecordIds(allChildIds);
 
-  // 3d. Build the teaser. Newsletters in Airtable had an explicit
-  // `Teaser` field; the migrated schema didn't include one, so we
-  // always derive from the body. (Re-add a teaser column to the
-  // schema if Kevin wants per-newsletter teaser overrides back.)
-  const teaser = extractTeaser(bodyHtml);
+  // 3d. Build the teaser. Prefer the hand-crafted teaser column when
+  // Kevin has filled it (added back 2026-07-06 via migration 0005),
+  // otherwise fall back to auto-extracting the first paragraph.
+  const teaser =
+    (newsletter.teaser ?? '').trim() || extractTeaser(bodyHtml);
 
   // 3e. Count the non-sponsor recipients upfront, split by variant.
   let nonSponsorRecipientCount = 0;
