@@ -26,8 +26,17 @@ export default async function AdminRosterPage() {
   const kids = await getRoster();
   const role = (await getAdminRole()) || 'admin';
   const totalKids = kids.length;
+  // Roster completeness — kept in sync with RosterGrid's REQUIRED_FIELDS.
+  // Adding grade here (2026-07-06) means null-grade kids are counted
+  // as incomplete, which surfaces them in Simon's "Needs finishing"
+  // filter so he can set them via the editor dropdown.
   const fullyComplete = kids.filter(k =>
-    k.has.photo && k.has.nameMeaning && k.has.familyContext && k.has.loves && k.has.notes
+    k.has.photo &&
+    k.has.nameMeaning &&
+    k.has.familyContext &&
+    k.has.loves &&
+    k.has.notes &&
+    k.has.gradeClass
   ).length;
   // A kid needs Kevin's review when Simon has touched the structured
   // fields recently, OR there's raw intake text sitting in the

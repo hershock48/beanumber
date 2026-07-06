@@ -42,12 +42,18 @@ const FILTER_STORAGE_KEY = 'ban-roster-filter-v1';
 // Required fields for a "complete" profile — matches the completion
 // check in getRoster's consumers. If we add or remove one, update the
 // LABELS map below to keep the Missing display in sync.
+//
+// Grade class is required (added 2026-07-06) because the SOTM per-
+// grade picker can't nominate kids whose grade is null — they fall
+// into the 'unknown' bucket. Surfacing this in the "Needs finishing"
+// filter is how Simon sees the kids he still needs to grade.
 const REQUIRED_FIELDS = [
   'photo',
   'nameMeaning',
   'familyContext',
   'loves',
   'notes',
+  'gradeClass',
 ] as const;
 
 const LABELS: Record<(typeof REQUIRED_FIELDS)[number], string> = {
@@ -56,6 +62,7 @@ const LABELS: Record<(typeof REQUIRED_FIELDS)[number], string> = {
   familyContext: 'family',
   loves: 'loves',
   notes: 'bio',
+  gradeClass: 'grade',
 };
 
 function isComplete(kid: RosterKid): boolean {

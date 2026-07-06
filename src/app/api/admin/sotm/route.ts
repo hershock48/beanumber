@@ -176,9 +176,15 @@ export async function POST(request: NextRequest) {
       )
       .map(r => r.id);
     for (const id of samePublishedOtherIds) {
+      // Clear ALL three SOTM fields, not just the month + reason.
+      // Leaving studentOfMonth = true here creates orphaned rows:
+      // no month text but a lingering boolean, which then rendered
+      // ghost SOTM badges on kid pages (compounded by the kid-page
+      // mapping bug fixed at the same time as this).
       await db
         .update(children)
         .set({
+          studentOfMonth: false,
           studentOfMonthMonth: null,
           studentOfMonthReason: null,
           updatedAt: new Date(),

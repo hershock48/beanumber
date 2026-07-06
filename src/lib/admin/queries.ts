@@ -260,6 +260,9 @@ export interface RosterGapsCard {
   missingFamilyContext: number;
   missingLoves: number;
   missingNotes: number;
+  // Kids with null grade_class. Required now that SOTM is per-grade —
+  // kids without a grade can't be nominated in a grade section.
+  missingGrade: number;
   fullyComplete: number;
   error?: string;
 }
@@ -280,6 +283,7 @@ export async function getRosterGapsCard(): Promise<RosterGapsCard> {
         familyContext: children.familyContext,
         loves: children.loves,
         notes: children.notes,
+        gradeClass: children.gradeClass,
       })
       .from(children)
       .where(isNotNull(children.shirtNumber));
@@ -290,6 +294,7 @@ export async function getRosterGapsCard(): Promise<RosterGapsCard> {
     let missingFamilyContext = 0;
     let missingLoves = 0;
     let missingNotes = 0;
+    let missingGrade = 0;
     let fullyComplete = 0;
     for (const r of rows) {
       const displayName = (r.displayName || r.firstName || '').trim();
@@ -302,12 +307,14 @@ export async function getRosterGapsCard(): Promise<RosterGapsCard> {
       const hasFamily = !!r.familyContext;
       const hasLoves = !!r.loves;
       const hasNotes = !!r.notes;
+      const hasGrade = !!r.gradeClass;
       if (!hasPhoto) missingPhoto++;
       if (!hasNameMeaning) missingNameMeaning++;
       if (!hasFamily) missingFamilyContext++;
       if (!hasLoves) missingLoves++;
       if (!hasNotes) missingNotes++;
-      if (hasPhoto && hasNameMeaning && hasFamily && hasLoves && hasNotes) {
+      if (!hasGrade) missingGrade++;
+      if (hasPhoto && hasNameMeaning && hasFamily && hasLoves && hasNotes && hasGrade) {
         fullyComplete++;
       }
     }
@@ -319,6 +326,7 @@ export async function getRosterGapsCard(): Promise<RosterGapsCard> {
       missingFamilyContext,
       missingLoves,
       missingNotes,
+      missingGrade,
       fullyComplete,
     };
   } catch (err) {
@@ -330,6 +338,7 @@ export async function getRosterGapsCard(): Promise<RosterGapsCard> {
       missingFamilyContext: 0,
       missingLoves: 0,
       missingNotes: 0,
+      missingGrade: 0,
       fullyComplete: 0,
       error: err instanceof Error ? err.message : String(err),
     };
@@ -436,6 +445,10 @@ export interface RosterKid {
     loves: boolean;
     childQuote: boolean;
     notes: boolean;
+    // Grade class is a required field — kids without one can't be
+    // nominated for Student of the Month (they fall into the
+    // 'unknown' grade bucket) and their US-side display renders blank.
+    gradeClass: boolean;
   };
   // True when Simon (or another YDO team member) has saved raw intake
   // notes on this kid that Kevin hasn't yet polished into the public
@@ -552,6 +565,12 @@ function rowToRosterKid(row: typeof children.$inferSelect): RosterKid {
       loves: !!row.loves,
       childQuote: !!row.childQuote,
       notes: !!row.notes,
+      // Grade is required for the SOTM-per-grade picker to work
+      // (kids with null grade fall into an 'unknown' bucket rather
+      // than being nominatable). Flagging it as required surfaces
+      // the null-grade kids in the roster grid's "Needs finishing"
+      // filter so Simon can set them via the editor dropdown.
+      gradeClass: !!row.gradeClass,
     },
     hasPendingIntake: !!row.intakeFromCampus,
     lastEditedBySimon: asIsoOrNull(row.lastEditedBySimon),

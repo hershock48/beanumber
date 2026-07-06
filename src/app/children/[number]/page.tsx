@@ -88,7 +88,13 @@ function childToAirtableFields(c: Child): AirtableChildRecord['fields'] {
     TeacherName: c.teacherName ?? undefined,
     TeacherQuote: c.teacherQuote ?? undefined,
     NameMeaning: c.nameMeaning ?? undefined,
-    StudentOfMonth: c.studentOfMonth ? 'true' : undefined,
+    // SOTM display uses the MONTH text ("July 2026"), not the boolean.
+    // The boolean is legacy schema — the SOTM approve endpoint writes
+    // both, but only studentOfMonthMonth carries the label we render
+    // in the badge ("Student of the Month · July 2026"). Reading the
+    // boolean here rendered "Student of the Month · true" for weeks.
+    // Falls through to undefined when there's no active award.
+    StudentOfMonth: c.studentOfMonthMonth || undefined,
     StudentOfMonthReason: c.studentOfMonthReason ?? undefined,
     DepartedAt: c.departedAt ? new Date(c.departedAt).toISOString() : undefined,
     DepartureNote: c.departureNote ?? undefined,
