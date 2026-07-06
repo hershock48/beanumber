@@ -1161,6 +1161,16 @@ export const kidMessages = pgTable(
     // See CREATE UNIQUE INDEX kid_messages_active_per_sponsor_kid_idx
     //   ON kid_messages (lower(sponsor_email), child_id)
     //   WHERE status IN ('pending', 'translated');
+    //
+    // Second partial unique index (added 2026-07-06 with phase 3c
+    // audit): one kid_to_sponsor reply per parent. Belt-and-suspenders
+    // with the pre-check in the reply POST endpoint so two admins
+    // simultaneously recording a reply on the same delivered note
+    // can't both slip through.
+    // See CREATE UNIQUE INDEX kid_messages_one_reply_per_parent_idx
+    //   ON kid_messages (parent_message_id)
+    //   WHERE direction = 'kid_to_sponsor'
+    //     AND parent_message_id IS NOT NULL;
   })
 );
 

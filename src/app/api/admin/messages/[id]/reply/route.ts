@@ -174,20 +174,45 @@ export async function POST(
   // sponsor + child pair as its parent. Status is 'delivered' from
   // the moment it's recorded — the campus IS the delivery point for
   // the kid's words, and there's no additional workflow.
-  const inserted = await db
-    .insert(kidMessages)
-    .values({
-      sponsorEmail: parent.sponsorEmail,
-      sponsorName: parent.sponsorName,
-      childId: parent.childId,
-      parentMessageId: parent.id,
-      direction: 'kid_to_sponsor',
-      bodyEn,
-      bodyTranslated: bodyOriginal,
-      status: 'delivered',
-      deliveredAt: now,
-    })
-    .returning({ id: kidMessages.id });
+  //
+  // Belt-and-suspenders on the one-reply-per-parent invariant:
+  //   1. Pre-check above rejects the obvious case (409).
+  //   2. Partial unique index kid_messages_one_reply_per_parent_idx
+  //      catches two-admins-clicking-simultaneously race conditions
+  //      that slip past the pre-check. Postgres returns 23505 and
+  //      we surface it as the same 409.
+  let inserted;
+  try {
+    inserted = await db
+      .insert(kidMessages)
+      .values({
+        sponsorEmail: parent.sponsorEmail,
+        sponsorName: parent.sponsorName,
+        childId: parent.childId,
+        parentMessageId: parent.id,
+        direction: 'kid_to_sponsor',
+        bodyEn,
+        bodyTranslated: bodyOriginal,
+        status: 'delivered',
+        deliveredAt: now,
+      })
+      .returning({ id: kidMessages.id });
+  } catch (err: unknown) {
+    const pgCode =
+      typeof err === 'object' && err !== null && 'code' in err
+        ? String((err as { code: unknown }).code)
+        : '';
+    if (pgCode === '23505') {
+      return NextResponse.json(
+        {
+          error:
+            'This note already has a reply on file. Edit it there instead of adding a second.',
+        },
+        { status: 409 }
+      );
+    }
+    throw err;
+  }
 
   const shouldNotify = body.notifySponsor !== false;
   if (shouldNotify) {

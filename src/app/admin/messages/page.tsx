@@ -76,7 +76,12 @@ export default async function AdminMessagesPage() {
         createdAt: kidMessages.createdAt,
       })
       .from(kidMessages)
-      .where(eq(kidMessages.direction, 'kid_to_sponsor')),
+      .where(eq(kidMessages.direction, 'kid_to_sponsor'))
+      // Ordered oldest-first so the Map .set() below leaves the
+      // NEWEST reply as the winner if a duplicate somehow exists
+      // (deterministic pick — belt-and-suspenders alongside the
+      // partial unique index that prevents the duplicate at insert).
+      .orderBy(asc(kidMessages.createdAt)),
   ]);
 
   const replyByParent = new Map<
