@@ -1038,7 +1038,7 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
   // Any other value falls through so a shared /children/[N] URL from
   // outside doesn't lie about where "back" goes.
   const backTarget = sp?.back === 'me'
-    ? { href: '/me', label: 'Back to My campus' }
+    ? { href: '/me', label: 'Back to My Campus' }
     : { href: '/', label: 'Back to home' };
   /** True for the redirect from the magic-link callback — used to
       switch the Holder/Sponsor view copy from "Welcome back" to

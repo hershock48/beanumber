@@ -388,7 +388,7 @@ export default async function MePage() {
             small footer strip lower on the page. */}
         <header className="mb-12 md:mb-16">
           <p className="text-xs font-bold uppercase tracking-[0.35em] text-[#D4A843] mb-3">
-            My campus
+            My Campus
           </p>
           {/* Live "postmark" — the campus is a real place, real time,
               real weather. Reads like a letter's dateline. Time
@@ -402,8 +402,15 @@ export default async function MePage() {
             className="text-4xl md:text-6xl text-[#0d0d0d] mb-4 leading-[1.05]"
             style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
           >
-            My campus.
+            My Campus.
           </h1>
+          {/* Single-line intro. The prior 3-branch version distinguished
+              sponsors from holders — "staying in the life of X kids and
+              holding Y more numbers" — which leaked internal jargon
+              ("holding a number") that didn't mean anything to the
+              reader. Now that the KidCards grid merges both populations,
+              the intro says one honest thing: how long you've been at
+              the campus, and how many kids you're in the life of. */}
           <p className="text-base md:text-lg text-[#555] leading-relaxed max-w-2xl">
             {daysSinceJoin !== null && daysSinceJoin > 0 ? (
               <>
@@ -416,35 +423,14 @@ export default async function MePage() {
             ) : (
               <>Welcome to the campus. </>
             )}
-            {sponsors.length > 0 && holders.length === 0 && (
+            {sponsors.length + holders.length > 0 && (
               <>
-                You&rsquo;re staying in the life of{' '}
+                You&rsquo;re staying with{' '}
                 <span className="font-bold text-[#0d0d0d]">
-                  {sponsors.length} kid{sponsors.length === 1 ? '' : 's'}
+                  {sponsors.length + holders.length} kid
+                  {sponsors.length + holders.length === 1 ? '' : 's'}
                 </span>{' '}
                 on the ground in Northern Uganda.
-              </>
-            )}
-            {sponsors.length > 0 && holders.length > 0 && (
-              <>
-                You&rsquo;re staying in the life of{' '}
-                <span className="font-bold text-[#0d0d0d]">
-                  {sponsors.length} kid{sponsors.length === 1 ? '' : 's'}
-                </span>
-                {' '}and holding{' '}
-                <span className="font-bold text-[#0d0d0d]">
-                  {holders.length} more number{holders.length === 1 ? '' : 's'}
-                </span>
-                .
-              </>
-            )}
-            {sponsors.length === 0 && holders.length > 0 && (
-              <>
-                You&rsquo;re holding{' '}
-                <span className="font-bold text-[#0d0d0d]">
-                  {holders.length} number{holders.length === 1 ? '' : 's'}
-                </span>{' '}
-                waiting on the kids behind them.
               </>
             )}
           </p>
@@ -480,45 +466,12 @@ export default async function MePage() {
           </div>
         ) : (
           <>
-            {/* ── Your kids — one unified section ─────────────────────
-                Previously split into "Your kids" (monthly sponsors)
-                and "Numbers you're holding" (shirt-only). Kevin's
-                call: don't distinguish. The relationship is real
-                either way; the pill INSIDE each card ("Sponsored
-                monthly" vs "Holder") carries the distinction if
-                anyone actually cares. Merged 2026-07-06. */}
-            <section className="mb-14">
-              <div className="flex items-baseline justify-between mb-6">
-                <h2
-                  className="text-2xl md:text-3xl text-[#0d0d0d] leading-none"
-                  style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
-                >
-                  Your kids.
-                </h2>
-                <p className="text-xs font-bold uppercase tracking-[0.25em] text-[#888]">
-                  {sponsors.length + holders.length}
-                </p>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                {[...sponsors, ...holders].map(row => (
-                  <KidCard
-                    key={row.recordId}
-                    row={row}
-                    milestone={milestoneByKidId.get(row.recordId) ?? null}
-                  />
-                ))}
-              </div>
-            </section>
-
-            {/* ── One CTA, chosen by state ──────────────────────────
-                Points at the freshest thing waiting for the sponsor.
-                Fresh kid update > fresh newsletter > add-another. */}
-            <MeContextualCTA state={ctaState} />
-
-            {/* ── Campus snapshot (newsletter) ──────────────────────
-                Now below the kids, above the recent-visits strip.
-                Renders the NEW pill when this browser hasn't opened
-                the letter yet. */}
+            {/* ── Campus newsletter — moved to top ─────────────────
+                Kevin: the campus letter is the freshest thing on the
+                page every month. Leading with it (above the kids grid)
+                means a returning sponsor sees "here's what happened
+                this month" first, then goes into their own kids. NEW
+                pill still renders when this browser hasn't opened it. */}
             {latestNewsletter && (
               <section className="mb-14">
                 <p className="text-xs font-bold uppercase tracking-[0.3em] text-[#D4A843] mb-4">
@@ -572,6 +525,83 @@ export default async function MePage() {
                 </Link>
               </section>
             )}
+
+            {/* ── Your kids — one unified section ─────────────────────
+                Previously split into "Your kids" (monthly sponsors)
+                and "Numbers you're holding" (shirt-only). Kevin's
+                call: don't distinguish. The relationship is real
+                either way; the pill INSIDE each card ("Sponsored
+                monthly" vs "Holder") carries the distinction if
+                anyone actually cares. Merged 2026-07-06. */}
+            <section className="mb-14">
+              <div className="flex items-baseline justify-between mb-6">
+                <h2
+                  className="text-2xl md:text-3xl text-[#0d0d0d] leading-none"
+                  style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
+                >
+                  Your kids.
+                </h2>
+                <p className="text-xs font-bold uppercase tracking-[0.25em] text-[#888]">
+                  {sponsors.length + holders.length}
+                </p>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                {[...sponsors, ...holders].map(row => (
+                  <KidCard
+                    key={row.recordId}
+                    row={row}
+                    milestone={milestoneByKidId.get(row.recordId) ?? null}
+                  />
+                ))}
+              </div>
+            </section>
+
+            {/* ── One CTA, chosen by state ──────────────────────────
+                Points at the freshest thing waiting for the sponsor.
+                Fresh kid update > add-another (newsletter branch was
+                removed 2026-07-06 — see ctaState comment above). */}
+            <MeContextualCTA state={ctaState} />
+
+            {/* ── About the campus ─────────────────────────────────
+                Grounds /me in a real place. Two paragraphs pulled from
+                /founder — the location (Omoro District, Northern
+                Uganda), the history (LRA war and its aftermath), and
+                who's running it (Simon + YDO). Points to the full
+                founder story for anyone who wants more. Sits below
+                the kids grid so the sponsor's own kids stay first;
+                this is context, not lead. */}
+            <section className="mb-14 mt-2 bg-white border border-[#e8e0d4] p-6 md:p-8">
+              <p className="text-xs font-bold uppercase tracking-[0.3em] text-[#D4A843] mb-3">
+                Where this is happening
+              </p>
+              <h2
+                className="text-2xl md:text-3xl text-[#0d0d0d] mb-4 leading-tight"
+                style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
+              >
+                Omoro District, Northern Uganda.
+              </h2>
+              <p className="text-[#555] leading-relaxed mb-4">
+                Six acres shared by a school built for 380 kids, a
+                medical clinic that&rsquo;s treated over 700 patients,
+                vocational training where 60 women are learning trades,
+                and the housing that keeps it running. It&rsquo;s the
+                Youth Development Organisation Uganda (YDO) campus, run
+                by Simon Peter Wilobo and a team of 30 local staff
+                who grew up in this community.
+              </p>
+              <p className="text-[#555] leading-relaxed mb-5">
+                For two decades Northern Uganda endured the LRA war.
+                Most organizations left when the fighting stopped.
+                Simon stayed and started YDO. The campus is what he
+                built.
+              </p>
+              <Link
+                href="/founder"
+                className="inline-block text-xs uppercase tracking-wider font-bold text-[#0d0d0d] hover:text-[#D4A843] transition-colors"
+              >
+                Read the founding story &rarr;
+              </Link>
+            </section>
 
             {/* ── Kids you've recently met (client-side localStorage) ── */}
             <RecentKidsStrip />

@@ -183,7 +183,7 @@ export function BANNavigationClient({
     // real sponsor sees — real roster kids, latest newsletter, framed
     // as the reason to buy a shirt. Sells the surface as a benefit of
     // being a number rather than hiding it behind sign-in.
-    { href: '/me', label: 'My campus' },
+    { href: '/me', label: 'My Campus' },
     { href: '/founder', label: 'Story' },
   ];
 

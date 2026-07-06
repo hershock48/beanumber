@@ -53,7 +53,7 @@ export function PreviewMyCampus({
           the same shape they'd land on after buying a shirt. */}
       <header className="mb-10 md:mb-14">
         <p className="text-xs font-bold uppercase tracking-[0.35em] text-[#D4A843] mb-3">
-          My campus &middot; Preview
+          My Campus &middot; Preview
         </p>
         {/* Live "postmark" — same widget as the signed-in header, so
             an anon visitor sees the campus reading as a real place
@@ -66,7 +66,7 @@ export function PreviewMyCampus({
           className="text-4xl md:text-6xl text-[#0d0d0d] mb-4 leading-[1.05]"
           style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
         >
-          My campus.
+          My Campus.
         </h1>
         <p className="text-base md:text-lg text-[#555] leading-relaxed max-w-2xl">
           This is where sponsors come back. Every shirt has a number.
