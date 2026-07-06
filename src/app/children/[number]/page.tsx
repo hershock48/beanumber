@@ -1950,11 +1950,12 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
             ) : (
               <div className="bg-[#FFF8F0] border border-[#e8e0d4] p-6 md:p-8 text-center">
                 <p className="text-[15px] md:text-base text-[#555] leading-relaxed">
-                  Once you&rsquo;re sponsoring {firstName}, this is where their
-                  handwritten letters, report cards, and personal photo
-                  updates appear — straight from the campus, three or four
-                  times a year. Sponsors get the inside view; visitors get
-                  the public campus newsletter below.
+                  Once you&rsquo;re sponsoring {firstName}, you can write to
+                  them and they write back &mdash; the campus team translates
+                  in both directions. Handwritten letters, personal photo
+                  updates, and report cards from the campus land here too,
+                  three or four times a year. Sponsors get the inside view;
+                  visitors get the public campus newsletter below.
                 </p>
               </div>
             )}
