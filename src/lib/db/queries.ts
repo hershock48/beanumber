@@ -828,6 +828,13 @@ export async function getNoteThreadForSponsorAndChild(args: {
   const email = args.sponsorEmail.trim().toLowerCase();
   if (!email || !args.childRecordId) return [];
   try {
+    // Exclude declined sponsor->kid notes from the thread. A declined
+    // note never reached the kid, and the sponsor already got a
+    // decline email — showing it in the thread anyway reads as
+    // "here's your correspondence" and confuses the sponsor. Pending
+    // and translated notes DO stay in the thread because the sponsor
+    // wrote them and they're on their way; declined is the only
+    // status that means "this didn't happen."
     const rows = await db
       .select({
         id: kidMessages.id,
@@ -843,7 +850,8 @@ export async function getNoteThreadForSponsorAndChild(args: {
       .where(
         and(
           sql`lower(${kidMessages.sponsorEmail}) = ${email}`,
-          eq(kidMessages.childId, args.childRecordId)
+          eq(kidMessages.childId, args.childRecordId),
+          sql`${kidMessages.status} != 'declined'`
         )
       )
       .orderBy(desc(kidMessages.createdAt));

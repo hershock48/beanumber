@@ -218,7 +218,11 @@ async function getViewerSponsorCode(): Promise<string | null> {
  * email + "Sponsorship for this specific child exists?" rather than
  * via the cookie's single sponsorCode (which is single-kid-bound).
  */
-async function getViewerEmail(): Promise<string | null> {
+// Wrapped in React cache() so multiple call sites in the same
+// server render (the sponsorship-resolution helper's Promise.all
+// AND the notes-thread fetch) dedupe to one cookie read instead of
+// two. Cache is per-request in Next.js server components.
+const getViewerEmail = cache(async (): Promise<string | null> => {
   try {
     const cookieStore = await cookies();
     const raw = cookieStore.get(SESSION.COOKIE_NAME);
@@ -230,7 +234,7 @@ async function getViewerEmail(): Promise<string | null> {
   } catch {
     return null;
   }
-}
+});
 
 /**
  * Multi-kid sponsor recognition. Given a signed-in email and a
