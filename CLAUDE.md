@@ -70,6 +70,10 @@ Read **`docs/claude/known_gotchas.md`** before going off-script. Things Kevin ha
 
 Read **`docs/claude/newsletter.md`** before authoring a newsletter, touching the send code, or changing how the body renders on the public kid pages. Covers the May 2026 model rewrite (body is public on every kid page + email is a short notification + two variants), the BodyHTML authoring rules (just use `<p>` and `<h2>` — no inline styles, no merge tags), the recipient lists (sponsors vs opt-out non-sponsors), the test-send flow, and the failure modes already encountered.
 
+## Where the product is heading — the app model
+
+Read **`docs/claude/app_model.md`** if Kevin is asking about the app direction, native vs. web, mandatory install, gift-giving flows, corporate sponsorships, or anything involving the number being a "bearer instrument." Not yet built — this is the shared design captured on 2026-07-06 so we don't re-derive it every time it comes up. If we ever start building against it, this doc gets promoted to a full spec.
+
 ## Reading order when you open a session
 
 1. This file (you're here).
