@@ -1906,15 +1906,16 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
         />
 
         {/* Mark this kid's updates as seen for the current browser —
-            but ONLY when the viewer is actually a sponsor of this kid.
+            but ONLY when the viewer actually has a relationship with
+            this kid (sponsor OR holder). Both see sponsor-gated content;
+            both should clear the pill by visiting.
             An anonymous visit to /children/17 (someone typing numbers
             into the site) shouldn't stamp localStorage "seen up to now"
             because they never got to see the sponsor-only updates.
-            If they later become the sponsor of #17, we'd wrongly
+            If they later became the sponsor of #17, we'd wrongly
             suppress the NEW pill for updates that pre-date their real
-            sign-in. Gated on child.viewer_is_sponsor so only real
-            sponsors clear their own read-state. */}
-        {child.viewer_is_sponsor && (
+            sign-in. */}
+        {(child.viewer_is_sponsor || child.viewer_is_holder) && (
           <MarkKidUpdatesSeen
             childIdLegacy={child.child_id ?? null}
           />
