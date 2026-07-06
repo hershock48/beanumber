@@ -1,6 +1,40 @@
 # Project state
 
-Last updated: June 22, 2026.
+Last updated: July 6, 2026.
+
+## 2026-07-06 — where the business actually is
+
+**BAN is live and has real paying customers.** Any sentence below this section that says "pre-launch" or "zero paying customers" is stale; treat this section as authoritative.
+
+Snapshot from the production Postgres as of 7/6:
+
+- **21 unique monthly sponsors** across **24 active/trialing subscriptions** (some sponsors on multiple kids)
+- **$600/month** recurring revenue committed
+- **44 unique shirt buyers**, **45 total shirt orders** all-time
+- **33 active sponsorships** (some pending kid-claim, which is normal — the buyer claims by visiting `/children/[N]`)
+- **159 donors** total in the CRM
+- **50 real kids** on the canonical roster (shirt numbers 1-53, 3 gaps not yet added)
+
+Growth trajectory (new monthly sponsors by start month):
+- April 2026: 3
+- May 2026: 8
+- June 2026: 12
+- July 2026: 1 (as of 7/6)
+
+Stripe is on **live keys** and has been for weeks. The Marshall farmers market booth is a live acquisition channel; cash + card buyers are backfilled into Postgres via `scripts/backfill-market-sales.ts` (patched 7/6 to route subscription buyers to `sponsor_onboard` drip, not `shirt_nurture`).
+
+Site channels currently active:
+- `/shirts` — primary conversion surface, two-button pattern
+- `/children/[N]` — sponsor identity + kid page + reveal flow (Hold-to-Meet)
+- `/me` — signed-in sponsor home (kid cards + campus snapshot + monthly stats)
+- `/campus` — browse mode, sign-in gated
+- `/news` — newsletter archive
+- Drip: 5 pipelines / 17 emails, live and firing
+- Newsletter: authored via `/admin/campus-update`, sent from `/admin/newsletter`, mirrors onto every kid page
+
+Zero-paying-customers language elsewhere in this file predates the launch and stays for historical context only. Do not quote it as current fact.
+
+---
 
 ## 2026-06-22 session — Postgres migration shipped (dual-write live)
 
@@ -139,7 +173,9 @@ Pull `git log --oneline -15` for current context.
 
 ## Known production users
 
-Zero paying customers yet. Pre-launch. Every $5 in Stripe is a test donation from Kevin. Stripe is on test mode keys. Switching to live is the next step (see "in flight" above).
+**Stale as of 7/6/2026 — see the 2026-07-06 section at the top for real numbers.** Left in place as historical context.
+
+~~Zero paying customers yet. Pre-launch. Every $5 in Stripe is a test donation from Kevin. Stripe is on test mode keys. Switching to live is the next step (see "in flight" above).~~
 
 ## Artifacts Kevin has that live outside the repo
 
