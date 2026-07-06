@@ -276,6 +276,15 @@ export const children = pgTable(
   },
   table => ({
     childIdIdx: uniqueIndex('children_child_id_idx').on(table.childId),
+    // Non-unique index for lookup speed. Uniqueness is enforced by a
+    // PARTIAL unique index applied via raw SQL migration:
+    //   CREATE UNIQUE INDEX children_shirt_number_unique_idx
+    //     ON children (shirt_number) WHERE shirt_number IS NOT NULL;
+    // Partial because shirt_number is nullable — kids between numbers
+    // (post-departure, pre-reveal) don't have one, and the constraint
+    // must only apply to assigned rows. Drizzle can't emit the WHERE
+    // clause on a unique index yet, so the index is applied via
+    // /drizzle/0003_children_shirt_number_unique.sql. See there.
     shirtNumberIdx: index('children_shirt_number_idx').on(table.shirtNumber),
     statusIdx: index('children_status_idx').on(table.status),
     departedAtIdx: index('children_departed_at_idx').on(table.departedAt),

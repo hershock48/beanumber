@@ -56,56 +56,104 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    // Find the lowest empty shirt number in the canonical roster range.
+    // Find the lowest empty shirt number in the canonical roster range
+    // and INSERT. The read-then-insert dance is inherently racy: two
+    // simultaneous +Add clicks read the same "filled" set and both
+    // try the same gap. Postgres now has a partial unique index on
+    // (shirt_number) WHERE shirt_number IS NOT NULL — see
+    // /drizzle/0003_children_shirt_number_unique.sql — so the second
+    // insert loses to error_code 23505 and we retry with the next
+    // gap. Bounded loop caps at CANONICAL_ROSTER_MAX attempts so a
+    // constraint-violation storm can't spin forever.
+    //
     // Historically this endpoint used MAX(shirt_number)+1, but the DB
     // has test rows at shirt_number 815-819 which pushed MAX+1 outside
     // the canonical range. That meant new kids created via +Add landed
     // at #820 and were invisible on /admin/roster. Now we always fill
     // the lowest gap first (#31, then #47, then #52 as of July 2026),
     // then extend upward, and error cleanly if the range is full.
-    const filledRows = await db
-      .select({ n: children.shirtNumber })
-      .from(children)
-      .where(
-        and(
-          gte(children.shirtNumber, CANONICAL_ROSTER_MIN),
-          lte(children.shirtNumber, CANONICAL_ROSTER_MAX)
-        )
-      );
-    const filled = new Set(filledRows.map(r => r.n));
+    const MAX_ATTEMPTS = CANONICAL_ROSTER_MAX - CANONICAL_ROSTER_MIN + 1;
+    const attemptedGaps = new Set<number>();
+    let inserted: { id: string }[] | null = null;
     let shirtNumber = 0;
-    for (let i = CANONICAL_ROSTER_MIN; i <= CANONICAL_ROSTER_MAX; i++) {
-      if (!filled.has(i)) {
-        shirtNumber = i;
-        break;
+    let childId = '';
+
+    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+      const filledRows = await db
+        .select({ n: children.shirtNumber })
+        .from(children)
+        .where(
+          and(
+            gte(children.shirtNumber, CANONICAL_ROSTER_MIN),
+            lte(children.shirtNumber, CANONICAL_ROSTER_MAX)
+          )
+        );
+      const filled = new Set(filledRows.map(r => r.n));
+      // Fold in gaps we already tried and lost the race on. Prevents
+      // an infinite loop when a concurrent insert claimed #31 and
+      // our re-scan sees #31 filled — we'd have picked it again
+      // otherwise.
+      for (const g of attemptedGaps) filled.add(g);
+
+      shirtNumber = 0;
+      for (let i = CANONICAL_ROSTER_MIN; i <= CANONICAL_ROSTER_MAX; i++) {
+        if (!filled.has(i)) {
+          shirtNumber = i;
+          break;
+        }
+      }
+      if (!shirtNumber) {
+        return NextResponse.json(
+          {
+            error:
+              `Roster is full (${CANONICAL_ROSTER_MAX} kids). To add more kids, ` +
+              `Kevin needs to widen the canonical roster range in lib/roster-config.ts.`,
+          },
+          { status: 409 }
+        );
+      }
+      childId = `HSP/BAN-${String(shirtNumber).padStart(3, '0')}`;
+
+      // intakeFromCampus has no first-class column in the Postgres schema
+      // — fold it into `notes` so Simon's words aren't dropped on the
+      // floor. Kevin's editor renders notes anyway.
+      try {
+        inserted = await db
+          .insert(children)
+          .values({
+            childId,
+            shirtNumber,
+            firstName,
+            displayName: displayName || firstName,
+            status: 'Active',
+            notes: intakeFromCampus || null,
+          })
+          .returning({ id: children.id });
+        break; // success
+      } catch (err: unknown) {
+        const pgCode =
+          typeof err === 'object' && err !== null && 'code' in err
+            ? String((err as { code: unknown }).code)
+            : '';
+        if (pgCode === '23505') {
+          // Another admin's insert beat us to this shirt_number.
+          // Remember the gap so we don't reselect it, then retry.
+          attemptedGaps.add(shirtNumber);
+          continue;
+        }
+        throw err;
       }
     }
-    if (!shirtNumber) {
+
+    if (!inserted) {
       return NextResponse.json(
         {
           error:
-            `Roster is full (${CANONICAL_ROSTER_MAX} kids). To add more kids, ` +
-            `Kevin needs to widen the canonical roster range in lib/roster-config.ts.`,
+            'Roster is filling faster than we can find a gap. Try again in a moment.',
         },
-        { status: 409 }
+        { status: 503 }
       );
     }
-    const childId = `HSP/BAN-${String(shirtNumber).padStart(3, '0')}`;
-
-    // intakeFromCampus has no first-class column in the Postgres schema
-    // — fold it into `notes` so Simon's words aren't dropped on the
-    // floor. Kevin's editor renders notes anyway.
-    const inserted = await db
-      .insert(children)
-      .values({
-        childId,
-        shirtNumber,
-        firstName,
-        displayName: displayName || firstName,
-        status: 'Active',
-        notes: intakeFromCampus || null,
-      })
-      .returning({ id: children.id });
     const recordId = inserted[0].id;
 
     const role = await getAdminRole();

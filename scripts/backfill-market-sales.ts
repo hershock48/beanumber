@@ -267,8 +267,20 @@ async function processOne(piId: string): Promise<BackfillSummary> {
   // backfill bit on this: 8 existing monthly sponsors got wrongly
   // enrolled. Skip them entirely here — Kevin can address those
   // separately if he wants to record the additional payment.
+  //
+  // NOTE: previously scoped to `pi.invoice == null` — the intent was
+  // "skip the invoice lookup for renewals since they clearly ARE
+  // subscriptions" — but that inverted the logic. Renewal PIs
+  // (pi.invoice != null) were skipping the guard entirely, session
+  // lookup returned null (renewals have no Checkout Session), and
+  // isSubscription evaluated false — routing sub-renewal payments
+  // into the shirt-nurture drip. Exact regression 2c6f630 was meant
+  // to prevent. Now the guard fires on every PI where we have a
+  // customer id. Belt-and-suspenders fallback for isSubscription
+  // detection below covers the case where the Stripe API blips and
+  // the guard fails open.
   const piCustomerId = typeof pi.customer === 'string' ? pi.customer : pi.customer?.id;
-  if (piCustomerId && pi.invoice == null) {
+  if (piCustomerId) {
     try {
       const subs = await stripe.subscriptions.list({ customer: piCustomerId, status: 'all', limit: 10 });
       const preexisting = subs.data.find(s => {
@@ -325,7 +337,18 @@ async function processOne(piId: string): Promise<BackfillSummary> {
     return summary;
   }
 
-  const isSubscription = session?.mode === 'subscription';
+  // isSubscription detection — two signals, OR'd. Checkout Session
+  // mode='subscription' covers new subscription creation via /shirts
+  // or /donate. pi.invoice != null covers renewal PIs (which have no
+  // Checkout Session — session lookup returns null and mode is
+  // undefined). Without the invoice signal, sub renewals slipped past
+  // both the existing-sponsor guard and the drip routing check and
+  // landed in shirt_nurture. Belt-and-suspenders — the existing-
+  // sponsor guard above should already have skipped renewals via
+  // Stripe's sub list, but if that API blips (fail-open at line 288)
+  // this catches renewals on the fallback path.
+  const isSubscription =
+    session?.mode === 'subscription' || pi.invoice != null;
   summary.isSubscription = isSubscription;
 
   const orderType = meta.order_type || (isSubscription ? 'shirt_plus_monthly' : 'shirt');
