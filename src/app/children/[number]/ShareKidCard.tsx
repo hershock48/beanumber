@@ -104,6 +104,37 @@ export function ShareKidCard({
 
     setRendering(true);
 
+    // Resolve Lora's actual font-family name from the CSS variable
+    // set by next/font/google in layout.tsx (variable: "--font-lora").
+    // The variable resolves to a scrambled family list — something
+    // like "__Lora_1234ab, __Lora_Fallback_1234ab" — because next/font
+    // hashes the CSS classname. Canvas ctx.font can't use the literal
+    // string "Lora" (nothing with that family name is loaded), so we
+    // read the resolved CSS value and interpolate. Falls back to
+    // Georgia if the variable isn't set (e.g., in an SSR-only
+    // rendering path, though this component is 'use client').
+    const loraFamily =
+      typeof window !== 'undefined'
+        ? getComputedStyle(document.body).getPropertyValue('--font-lora').trim()
+        : '';
+    const nameFontFamily = loraFamily
+      ? `${loraFamily}, Georgia, serif`
+      : 'Georgia, serif';
+
+    // Wait for the browser's font swap to complete before we paint text.
+    // next/font uses display: "swap" so the initial paint is Georgia
+    // and Lora fades in later. If we draw before the swap lands, the
+    // sponsor gets a Lora-branded button but a Georgia-rendered image.
+    // document.fonts.ready resolves once all pending font loads are done.
+    try {
+      if (typeof document !== 'undefined' && document.fonts?.ready) {
+        await document.fonts.ready;
+      }
+    } catch {
+      // Some browsers don't expose FontFaceSet; drawing with fallback
+      // is fine.
+    }
+
     canvas.width = CARD_SIZE;
     canvas.height = CARD_SIZE;
 
@@ -185,10 +216,11 @@ export function ShareKidCard({
       wmX += ctx.measureText(ch).width + wordmarkTracking;
     }
 
-    // Kid's first name — Lora if the browser has it loaded (which it
-    // does via next/font on this domain), Georgia otherwise.
+    // Kid's first name — Lora via the resolved next/font family name,
+    // Georgia otherwise. See the loraFamily lookup above for why we
+    // can't just say "Lora" here.
     ctx.fillStyle = '#0d0d0d';
-    ctx.font = 'bold 88px "Lora", Georgia, serif';
+    ctx.font = `bold 88px ${nameFontFamily}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
     ctx.fillText(firstName, CARD_SIZE / 2, PHOTO_HEIGHT + 100);
@@ -229,6 +261,25 @@ export function ShareKidCard({
     if (open) draw();
   }, [open, draw]);
 
+  // Escape-to-close + body scroll lock while the modal is open.
+  // Backdrop click already closes; keyboard users expect Esc too.
+  // Locking body overflow prevents the iOS behind-scroll bug where
+  // the underlying page scrolls when the user drags on the modal's
+  // scrim.
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('keydown', onKey);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [open]);
+
   const canvasToBlob = (): Promise<Blob | null> =>
     new Promise(resolve => {
       const canvas = canvasRef.current;
@@ -248,7 +299,16 @@ export function ShareKidCard({
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `${firstName.toLowerCase().replace(/[^a-z0-9]/g, '')}-beanumber.png`;
+    // Normalize accented characters to their ASCII base (José → jose)
+    // before stripping non-alphanumerics — otherwise ".replace(/[^a-z0-9]/)"
+    // strips the accented char and shortens the name.
+    const cleanName =
+      firstName
+        .normalize('NFD')
+        .replace(/[̀-ͯ]/g, '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, '') || 'kid';
+    link.download = `${cleanName}-beanumber.png`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
