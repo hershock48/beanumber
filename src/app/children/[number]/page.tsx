@@ -36,7 +36,10 @@ import {
   getChildByShirtNumber as getChildByShirtNumberFromDb,
   getChildByChildId,
   getDonorByStripeCustomerId,
+  getSotmHistoryForChild,
+  type SotmHistoryEntry,
 } from '@/lib/db/queries';
+import { AwardsTimeline } from './AwardsTimeline';
 import { resolveShirtToKid } from '@/lib/cycle';
 import { CANONICAL_ROSTER_MAX } from '@/lib/roster-config';
 import { db } from '@/lib/db/client';
@@ -1214,13 +1217,19 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
   // brings the total to max(each) and shaves hundreds of ms off the
   // mobile load. The biggest single perf win available on this page
   // without restructuring queries.
-  const [buyerBundle, portalData, recentNewsletters] = await Promise.all([
-    resolveBuyerBundle(child.viewer_is_sponsor, child.record_id),
-    resolvePortalData(child),
-    child.departed_at
-      ? Promise.resolve<CampusNewsletterEntry[]>([])
-      : getRecentCampusNewsletters(),
-  ]);
+  const [buyerBundle, portalData, recentNewsletters, sotmAwards] =
+    await Promise.all([
+      resolveBuyerBundle(child.viewer_is_sponsor, child.record_id),
+      resolvePortalData(child),
+      child.departed_at
+        ? Promise.resolve<CampusNewsletterEntry[]>([])
+        : getRecentCampusNewsletters(),
+      // Awards timeline is sponsor-gated so we only fetch when the
+      // viewer will actually see it. Zero-cost path for cold visitors.
+      (child.viewer_is_sponsor || child.viewer_is_holder) && child.record_id
+        ? getSotmHistoryForChild(child.record_id)
+        : Promise.resolve<SotmHistoryEntry[]>([]),
+    ]);
   const { buyerContext, showClaimCard } = buyerBundle;
   const buyerHint = buyerContext
     ? { customerId: buyerContext.customerId, email: buyerContext.email }
@@ -1883,6 +1892,21 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
             )}
           </div>
         )}
+
+        {/* ── Awards timeline ──
+            Every Student of the Month award the kid has earned,
+            newest first. The retention accumulator — a kid picked
+            three times over two years reads as a real person with
+            a growing story, not a static profile. Sponsor + holder
+            only; silent for cold visitors and when there's no
+            history yet. */}
+        {!child.departed_at &&
+          (child.viewer_is_sponsor || child.viewer_is_holder) &&
+          sotmAwards.length > 0 && (
+            <div className="mt-12 md:mt-16">
+              <AwardsTimeline firstName={firstName} awards={sotmAwards} />
+            </div>
+          )}
 
         {/* ── Public campus newsfeed ───────────────────────────────
             Visible to anyone — sponsor or not. The ask block above

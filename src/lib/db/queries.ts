@@ -26,6 +26,7 @@ import {
   donations,
   subscriptions,
   batches,
+  sotmHistory,
 } from './schema';
 
 // ─── Children ────────────────────────────────────────────────────
@@ -740,4 +741,54 @@ export async function getTodayPendingUpdateRequest(
     )
     .limit(1);
   return rows[0] ?? null;
+}
+
+// ─── SOTM history ────────────────────────────────────────────────
+
+/**
+ * All Student of the Month awards a kid has earned, newest first.
+ * Powers the "Awards from the campus" timeline block on the sponsor-
+ * gated view of the kid page.
+ *
+ * Only returns rows where the archive was written — kids who won
+ * SOTM before the sotm_history table existed (i.e. anyone Kevin
+ * approved during phase 1 before phase 2 shipped) won't appear here
+ * even if the CURRENT children row still has studentOfMonthMonth
+ * set. Acceptable seam: the archive is forward-looking from the
+ * phase-2 ship.
+ */
+export interface SotmHistoryEntry {
+  id: string;
+  gradeCode: string;
+  month: string;
+  reason: string;
+  awardedAt: string;
+}
+
+export async function getSotmHistoryForChild(
+  childRecordId: string
+): Promise<SotmHistoryEntry[]> {
+  if (!childRecordId) return [];
+  try {
+    const rows = await db
+      .select({
+        id: sotmHistory.id,
+        gradeCode: sotmHistory.gradeCode,
+        month: sotmHistory.month,
+        reason: sotmHistory.reason,
+        awardedAt: sotmHistory.awardedAt,
+      })
+      .from(sotmHistory)
+      .where(eq(sotmHistory.childId, childRecordId))
+      .orderBy(desc(sotmHistory.awardedAt));
+    return rows.map(r => ({
+      id: r.id,
+      gradeCode: r.gradeCode,
+      month: r.month,
+      reason: r.reason,
+      awardedAt: new Date(r.awardedAt).toISOString(),
+    }));
+  } catch {
+    return [];
+  }
 }
