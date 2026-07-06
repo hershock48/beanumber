@@ -58,7 +58,11 @@ export async function GET() {
   const sponsorships = await getViewerSponsorships(email);
   if (sponsorships.length === 0) return NextResponse.json({ items: [] });
 
-  // Collect the two kid identifiers each sponsorship carries.
+  // Collect both identifiers per sponsorship. A sponsorship carries a
+  // UUID FK to children AND the legacy HSP/BAN-XXX text id — updates
+  // are written against either or (typically) both. The client keys
+  // on legacy id, so at the end we ALWAYS emit legacy-keyed rows,
+  // even for updates that were only tagged with a UUID.
   const uuids = sponsorships
     .map(s => s.childRecordId)
     .filter((v): v is string => !!v);
@@ -66,13 +70,24 @@ export async function GET() {
     .map(s => s.childIdLegacy)
     .filter((v): v is string => !!v);
 
-  // Pull every published child update whose kid matches one of the
-  // viewer's sponsorships, on either identifier. Group and take max
-  // publishedAt per legacy id in one round-trip.
+  // Map each UUID → its legacy id (via the sponsorship join we already
+  // have in memory) so a UUID-only update can be surfaced under the
+  // legacy id the client uses as its localStorage key.
+  const uuidToLegacy = new Map<string, string>();
+  for (const s of sponsorships) {
+    if (s.childRecordId && s.childIdLegacy) {
+      uuidToLegacy.set(s.childRecordId, s.childIdLegacy);
+    }
+  }
+
+  // Pull the raw publishedAt per update, keyed by BOTH identifiers,
+  // and merge in code. This avoids the previous group-by-legacy-only
+  // trap that would silently drop UUID-only updates.
   const rows = await db
     .select({
-      childIdLegacy: sql<string>`coalesce(${childUpdates.childIdLegacy}, '')`,
-      latestPublishedAt: sql<Date>`max(${childUpdates.publishedAt})`,
+      childId: childUpdates.childId,
+      childIdLegacy: childUpdates.childIdLegacy,
+      publishedAt: childUpdates.publishedAt,
     })
     .from(childUpdates)
     .where(
@@ -87,15 +102,31 @@ export async function GET() {
         )
       )
     )
-    .groupBy(childUpdates.childIdLegacy)
-    .orderBy(desc(sql`max(${childUpdates.publishedAt})`));
+    .orderBy(desc(childUpdates.publishedAt));
 
-  const items = rows
-    .filter(r => !!r.childIdLegacy && !!r.latestPublishedAt)
-    .map(r => ({
-      childIdLegacy: r.childIdLegacy,
-      latestPublishedAt: new Date(r.latestPublishedAt).toISOString(),
-    }));
+  // Reduce to max(publishedAt) per legacy id. Prefer the update's own
+  // legacy; fall back to the sponsorship-derived legacy for UUID-only
+  // rows.
+  const latestByLegacy = new Map<string, Date>();
+  for (const r of rows) {
+    if (!r.publishedAt) continue;
+    const legacy =
+      r.childIdLegacy || (r.childId ? uuidToLegacy.get(r.childId) : undefined);
+    if (!legacy) continue;
+    const existing = latestByLegacy.get(legacy);
+    if (!existing || existing < r.publishedAt) {
+      latestByLegacy.set(legacy, r.publishedAt);
+    }
+  }
+
+  const items = Array.from(latestByLegacy.entries())
+    .map(([childIdLegacy, at]) => ({
+      childIdLegacy,
+      latestPublishedAt: new Date(at).toISOString(),
+    }))
+    // Newest first so a client with a hard cap on how many it inspects
+    // still sees the most recent activity.
+    .sort((a, b) => b.latestPublishedAt.localeCompare(a.latestPublishedAt));
 
   return NextResponse.json({ items });
 }

@@ -13,10 +13,13 @@
  * Client-only because the read/unread state lives in localStorage
  * (per-browser). Hydration guard renders nothing until we've read
  * localStorage — avoids a flash of NEW-then-not-NEW during SSR.
+ * Subscribes to SEEN_CHANGE_EVENT so in-tab writes (e.g., another
+ * kid card whose page the sponsor just visited) re-evaluate this
+ * one without a remount.
  */
 
-import { useEffect, useState } from 'react';
-import { isUnread } from '@/lib/updates-seen';
+import { useEffect, useState, useCallback } from 'react';
+import { isUnread, SEEN_CHANGE_EVENT } from '@/lib/updates-seen';
 
 export function KidCardUnreadBadge({
   childIdLegacy,
@@ -28,10 +31,24 @@ export function KidCardUnreadBadge({
   const [ready, setReady] = useState(false);
   const [unread, setUnread] = useState(false);
 
-  useEffect(() => {
+  const evaluate = useCallback(() => {
     setUnread(isUnread(childIdLegacy, latestUpdatePublishedAt));
-    setReady(true);
   }, [childIdLegacy, latestUpdatePublishedAt]);
+
+  useEffect(() => {
+    evaluate();
+    setReady(true);
+
+    const onChange = () => evaluate();
+    window.addEventListener(SEEN_CHANGE_EVENT, onChange);
+    window.addEventListener('storage', onChange);
+    document.addEventListener('visibilitychange', onChange);
+    return () => {
+      window.removeEventListener(SEEN_CHANGE_EVENT, onChange);
+      window.removeEventListener('storage', onChange);
+      document.removeEventListener('visibilitychange', onChange);
+    };
+  }, [evaluate]);
 
   if (!ready || !unread) return null;
 

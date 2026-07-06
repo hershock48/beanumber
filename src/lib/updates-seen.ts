@@ -35,6 +35,20 @@
 
 const STORAGE_KEY = 'ban-updates-seen-v1';
 
+/**
+ * Same-tab change event. localStorage's native `storage` event only
+ * fires in OTHER tabs — the tab that made the write gets nothing.
+ * So when we mark a kid seen in-place (e.g., landing on the kid page),
+ * the nav dot and the /me kid-card pill would stay red until a full
+ * navigation forced a remount. That's the exact UX bug Kevin would
+ * hit clicking through from /me to a kid page and back. This custom
+ * event, dispatched by every write helper, is the in-tab signal.
+ *
+ * Consumers: UnreadYourKidsDot, KidCardUnreadBadge,
+ * UnreadNewsletterPill. All subscribe on mount and re-evaluate.
+ */
+export const SEEN_CHANGE_EVENT = 'ban:updates-seen-change';
+
 type SeenMap = Record<string, string>; // childIdLegacy → ISO timestamp
 
 function readMap(): SeenMap {
@@ -58,6 +72,16 @@ function writeMap(map: SeenMap): void {
   }
 }
 
+function dispatchSeenChange(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.dispatchEvent(new CustomEvent(SEEN_CHANGE_EVENT));
+  } catch {
+    // dispatchEvent is safe in modern browsers, but the whole
+    // notification system tolerates a missing signal — silence it.
+  }
+}
+
 export function getSeenAt(childIdLegacy: string | null | undefined): string | null {
   if (!childIdLegacy) return null;
   return readMap()[childIdLegacy] ?? null;
@@ -74,6 +98,7 @@ export function markSeen(
   if (!current || current < ts) {
     map[childIdLegacy] = ts;
     writeMap(map);
+    dispatchSeenChange();
   }
 }
 

@@ -1905,13 +1905,20 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
           photoUrl={child.photo_url}
         />
 
-        {/* Mark this kid's updates as seen for the current browser.
-            Pairs with KidCardUnreadBadge + UnreadYourKidsDot: as soon
-            as the sponsor lands here, the red indicator for THIS kid
-            goes away everywhere. Pure mount side-effect. */}
-        <MarkKidUpdatesSeen
-          childIdLegacy={child.child_id ?? null}
-        />
+        {/* Mark this kid's updates as seen for the current browser —
+            but ONLY when the viewer is actually a sponsor of this kid.
+            An anonymous visit to /children/17 (someone typing numbers
+            into the site) shouldn't stamp localStorage "seen up to now"
+            because they never got to see the sponsor-only updates.
+            If they later become the sponsor of #17, we'd wrongly
+            suppress the NEW pill for updates that pre-date their real
+            sign-in. Gated on child.viewer_is_sponsor so only real
+            sponsors clear their own read-state. */}
+        {child.viewer_is_sponsor && (
+          <MarkKidUpdatesSeen
+            childIdLegacy={child.child_id ?? null}
+          />
+        )}
 
         </RevealOverlay>
         </ReassignReveal>

@@ -1,22 +1,23 @@
 'use client';
 
 /**
- * UnreadYourKidsDot — small red dot rendered next to the "Your kids"
+ * UnreadYourKidsDot — small red dot rendered next to the "My campus"
  * label in the top nav when at least one of the viewer's kids has a
  * personal update published after this browser's last visit to that
  * kid's page.
  *
  * Fetches /api/me/updates-digest on mount (server tells us the latest
- * publishedAt per sponsored kid). Combines with localStorage seen-map
- * to decide unread. Silent when no unread.
+ * publishedAt per sponsored kid). Caches the digest in state.
+ * Re-evaluates against localStorage every time seen-state changes —
+ * either from an in-tab mark-seen (SEEN_CHANGE_EVENT), a cross-tab
+ * storage event, or the tab regaining focus. Never re-fetches on
+ * seen-change; only the local view of "unread" changes.
  *
- * SSR-safe: renders nothing on first paint, then hydrates. The nav
- * link's clickable area doesn't shift — the dot is absolutely
- * positioned relative to a wrapper the parent provides.
+ * SSR-safe: renders nothing on first paint, then hydrates.
  */
 
-import { useEffect, useState } from 'react';
-import { isUnread } from '@/lib/updates-seen';
+import { useEffect, useState, useCallback, useRef } from 'react';
+import { isUnread, SEEN_CHANGE_EVENT } from '@/lib/updates-seen';
 
 type DigestItem = {
   childIdLegacy: string;
@@ -25,6 +26,14 @@ type DigestItem = {
 
 export function UnreadYourKidsDot() {
   const [hasUnread, setHasUnread] = useState(false);
+  const digestRef = useRef<DigestItem[]>([]);
+
+  const evaluate = useCallback(() => {
+    const anyUnread = digestRef.current.some(item =>
+      isUnread(item.childIdLegacy, item.latestPublishedAt)
+    );
+    setHasUnread(anyUnread);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -34,22 +43,26 @@ export function UnreadYourKidsDot() {
           cache: 'no-store',
           credentials: 'same-origin',
         });
-        if (!res.ok) return;
+        if (!res.ok || cancelled) return;
         const data = (await res.json()) as { items?: DigestItem[] };
-        const items = Array.isArray(data.items) ? data.items : [];
-        if (cancelled) return;
-        const anyUnread = items.some(item =>
-          isUnread(item.childIdLegacy, item.latestPublishedAt)
-        );
-        setHasUnread(anyUnread);
+        digestRef.current = Array.isArray(data.items) ? data.items : [];
+        evaluate();
       } catch {
         // Silent failure — no dot is a better UX than error state.
       }
     })();
+
+    const onChange = () => evaluate();
+    window.addEventListener(SEEN_CHANGE_EVENT, onChange);
+    window.addEventListener('storage', onChange);
+    document.addEventListener('visibilitychange', onChange);
     return () => {
       cancelled = true;
+      window.removeEventListener(SEEN_CHANGE_EVENT, onChange);
+      window.removeEventListener('storage', onChange);
+      document.removeEventListener('visibilitychange', onChange);
     };
-  }, []);
+  }, [evaluate]);
 
   if (!hasUnread) return null;
 

@@ -10,12 +10,25 @@
  * dot's "one of your kids did something" meaning doesn't get mixed
  * up with campus-wide newsletter freshness).
  *
- * SSR-safe; hydrates then decides.
+ * SSR-safe; hydrates then decides. Subscribes to the shared
+ * SEEN_CHANGE_EVENT so an in-tab MarkNewsletterSeen write (e.g., the
+ * sponsor navigates to /news and back) re-evaluates the pill without
+ * a hard reload.
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
+import { SEEN_CHANGE_EVENT } from '@/lib/updates-seen';
 
 const NEWSLETTER_SEEN_KEY = 'ban-newsletter-seen-v1';
+
+function readNewsletterSeenAt(): string | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    return window.localStorage.getItem(NEWSLETTER_SEEN_KEY);
+  } catch {
+    return null;
+  }
+}
 
 export function UnreadNewsletterPill({
   latestNewsletterPublishedAt,
@@ -25,19 +38,32 @@ export function UnreadNewsletterPill({
   const [ready, setReady] = useState(false);
   const [unread, setUnread] = useState(false);
 
-  useEffect(() => {
+  const evaluate = useCallback(() => {
     if (!latestNewsletterPublishedAt) {
-      setReady(true);
+      setUnread(false);
       return;
     }
-    try {
-      const seenAt = window.localStorage.getItem(NEWSLETTER_SEEN_KEY);
-      setUnread(!seenAt || seenAt < latestNewsletterPublishedAt);
-    } catch {
-      setUnread(false);
-    }
-    setReady(true);
+    const seenAt = readNewsletterSeenAt();
+    setUnread(!seenAt || seenAt < latestNewsletterPublishedAt);
   }, [latestNewsletterPublishedAt]);
+
+  useEffect(() => {
+    evaluate();
+    setReady(true);
+
+    // Re-evaluate on: in-tab mark-seen (custom event dispatched by
+    // MarkNewsletterSeen), cross-tab localStorage change (native),
+    // and tab visibility change (sponsor returned from another tab).
+    const onChange = () => evaluate();
+    window.addEventListener(SEEN_CHANGE_EVENT, onChange);
+    window.addEventListener('storage', onChange);
+    document.addEventListener('visibilitychange', onChange);
+    return () => {
+      window.removeEventListener(SEEN_CHANGE_EVENT, onChange);
+      window.removeEventListener('storage', onChange);
+      document.removeEventListener('visibilitychange', onChange);
+    };
+  }, [evaluate]);
 
   if (!ready || !unread) return null;
 
@@ -58,8 +84,9 @@ export function UnreadNewsletterPill({
 /**
  * Mark-seen side-effect component. Placed on /news (and inline on any
  * page that renders the full newsletter body). Stamps localStorage
- * with the newsletter's publishedAt so future /me visits clear the
- * pill for THIS browser.
+ * with the newsletter's publishedAt AND dispatches the shared
+ * SEEN_CHANGE_EVENT so the nav dot + /me pill re-evaluate immediately
+ * (in-tab), not just on next mount.
  */
 export function MarkNewsletterSeen({
   publishedAt,
@@ -72,6 +99,7 @@ export function MarkNewsletterSeen({
       const current = window.localStorage.getItem(NEWSLETTER_SEEN_KEY);
       if (!current || current < publishedAt) {
         window.localStorage.setItem(NEWSLETTER_SEEN_KEY, publishedAt);
+        window.dispatchEvent(new CustomEvent(SEEN_CHANGE_EVENT));
       }
     } catch {
       // Silent — private browsing or quota.

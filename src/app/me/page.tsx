@@ -201,21 +201,40 @@ export default async function MePage() {
     : null;
 
   // Contextual CTA. Priority chain:
-  //   1. Any kid with a published latest update → point at that kid.
-  //      Pick the kid whose latest update is newest so the CTA
-  //      surfaces the freshest thing, regardless of read state.
+  //   1. Any kid with a RECENT published latest update (≤ 60 days) →
+  //      point at that kid. "See what's new" pointing at a 4-month-
+  //      old post is a lie the sponsor catches immediately, so gate
+  //      on freshness. Also require a real first name and a routable
+  //      target so the CTA can't render "See what's new with them"
+  //      or link to '/meet/' (empty id).
   //   2. Newsletter within the last ~45 days → point at /news.
   //   3. Fallback → grow-your-campus (add another kid).
+  const CTA_KID_UPDATE_FRESHNESS_MS = 60 * 86_400_000;
+  const CTA_NEWSLETTER_FRESHNESS_MS = 45 * 86_400_000;
+  const now = Date.now();
+
   const kidWithFreshestUpdate = rows
-    .filter(r => r.latestUpdate && !r.child.departed)
+    .filter(r => {
+      if (!r.latestUpdate?.publishedAt) return false;
+      if (r.child.departed) return false;
+      // Freshness gate.
+      if (now - new Date(r.latestUpdate.publishedAt).getTime() > CTA_KID_UPDATE_FRESHNESS_MS) {
+        return false;
+      }
+      // Named kid + routable target — otherwise the CTA reads wrong.
+      const named = r.child.firstName && r.child.firstName !== 'them';
+      const routable = !!r.child.shirtNumber || !!r.child.recordId;
+      return named && routable;
+    })
     .sort((a, b) => {
       const at = a.latestUpdate?.publishedAt ?? '';
       const bt = b.latestUpdate?.publishedAt ?? '';
       return bt.localeCompare(at);
     })[0];
+
   const newsletterIsFresh =
     latestNewsletter?.publishedAt
-      ? Date.now() - new Date(latestNewsletter.publishedAt).getTime() < 45 * 86_400_000
+      ? now - new Date(latestNewsletter.publishedAt).getTime() < CTA_NEWSLETTER_FRESHNESS_MS
       : false;
 
   const ctaState: MeCTAState = kidWithFreshestUpdate
@@ -468,19 +487,23 @@ function KidCard({ row }: { row: SponsorshipRow }) {
   // sponsorship is tied to a real shirt — but for viewers who haven't
   // claimed via Hold-to-Meet we route through /meet/[id] so the URL
   // itself doesn't leak a number they don't own. This keeps the
-  // buyer-claims-kid invariant clean end to end.
+  // buyer-claims-kid invariant clean end to end. If we can't route
+  // anywhere (no shirt number AND no record id — should be rare, but
+  // possible for a sponsorship pointing at a deleted or half-migrated
+  // kid row), render as a non-interactive div rather than a dead
+  // href='#' link that scrolls to top on click.
   const hasClaimedNumber = !!revealedAt;
   const href = hasClaimedNumber && child.shirtNumber
     ? `/children/${child.shirtNumber}`
     : child.recordId
     ? `/meet/${child.recordId}`
-    : '#';
+    : null;
 
-  return (
-    <Link
-      href={href}
-      className="block bg-white border border-[#e8e0d4] hover:border-[#D4A843] transition-colors"
-    >
+  const cardClass = 'block bg-white border border-[#e8e0d4] transition-colors';
+  const linkClass = `${cardClass} hover:border-[#D4A843]`;
+
+  const cardBody = (
+    <>
       <div className="aspect-[4/5] bg-[#f5f0e8] overflow-hidden relative">
         {child.photoUrl ? (
           <Image
@@ -554,11 +577,23 @@ function KidCard({ row }: { row: SponsorshipRow }) {
           </div>
         )}
 
-        <p className="text-xs font-bold uppercase tracking-wider text-[#0d0d0d] hover:text-[#D4A843] transition-colors mt-3">
-          Open page &rarr;
-        </p>
+        {href && (
+          <p className="text-xs font-bold uppercase tracking-wider text-[#0d0d0d] hover:text-[#D4A843] transition-colors mt-3">
+            Open page &rarr;
+          </p>
+        )}
       </div>
+    </>
+  );
+
+  return href ? (
+    <Link href={href} className={linkClass}>
+      {cardBody}
     </Link>
+  ) : (
+    <div className={cardClass} aria-label={`${child.displayName} (page unavailable)`}>
+      {cardBody}
+    </div>
   );
 }
 
