@@ -99,27 +99,35 @@ export function SendNoteComposer({
           Write to {firstName}.
         </h2>
         <p className="text-[#666] mt-3 leading-relaxed max-w-lg mx-auto">
-          Simon translates each note and hands it to {firstName} at the
-          campus, usually on a Sunday. He reads every one before
-          delivery.
+          Simon and the team at the campus read every note, translate
+          it, and hand it to {firstName} in person. Deliveries happen
+          in weekly batches, usually on a Sunday.
         </p>
       </div>
 
       {stage === 'queued' ? (
         <div className="bg-[#f5efe4] border border-[#e8e0d4] p-6 md:p-7 text-center">
+          <p className="text-xs font-bold uppercase tracking-[0.3em] text-[#D4A843] mb-3">
+            Off to the campus
+          </p>
           <p
-            className="text-lg text-[#0d0d0d] leading-snug mb-2"
+            className="text-xl text-[#0d0d0d] leading-snug mb-3"
             style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
           >
-            Your note is in Simon&rsquo;s queue.
+            Your note is on its way to {firstName}.
           </p>
-          <p className="text-[#666] leading-relaxed text-sm">
-            It&rsquo;ll reach {firstName} within about a week. You&rsquo;ll
-            hear from us the day he delivers it.
+          <p className="text-[#555] leading-relaxed max-w-md mx-auto">
+            Simon batches deliveries at the campus each Sunday, so it
+            should reach {firstName} within about a week. We&rsquo;ll
+            email you the moment he hands it over.
+          </p>
+          <p className="text-[#888] leading-relaxed text-sm italic mt-4 max-w-md mx-auto">
+            It has to travel farther than a text.{' '}
+            <span className="not-italic">Worth the wait.</span>
           </p>
           <button
             type="button"
-            className="mt-5 text-xs font-bold uppercase tracking-[0.15em] text-[#888] hover:text-[#0d0d0d] transition-colors"
+            className="mt-6 text-xs font-bold uppercase tracking-[0.15em] text-[#888] hover:text-[#0d0d0d] transition-colors"
             onClick={() => {
               setStage('idle');
               setBody('');
@@ -188,7 +196,7 @@ export function SendNoteComposer({
                 disabled={stage === 'sending' || overCap}
                 className="inline-block bg-[#D4A843] hover:bg-[#c49a3a] disabled:opacity-50 disabled:cursor-not-allowed text-[#0d0d0d] px-6 py-2.5 text-xs font-bold uppercase tracking-wider transition-colors"
               >
-                {stage === 'sending' ? 'Sending…' : 'Send to Simon'}
+                {stage === 'sending' ? 'Sending…' : 'Send to Campus'}
               </button>
             </div>
           </div>
