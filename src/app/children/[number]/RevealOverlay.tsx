@@ -7,6 +7,17 @@ import { SplitFlapBoard } from '@/components/SplitFlapBoard';
 interface RevealOverlayProps {
   shirtNumber: number;
   childName: string;
+  /**
+   * When true, skip the Hold-to-Meet gate entirely and render the
+   * children bare. Set server-side when the viewer is an existing
+   * sponsor OR holder of this specific kid — they already know who
+   * this kid is, no reveal needed. Without this, a co-sponsor who
+   * lands here via their /me KidCard would be forced to Hold-to-Meet
+   * on a kid they already sponsor, which reads as broken.
+   * Independent of the client-side localStorage revealed flag; both
+   * are OR'd for the "skip" decision.
+   */
+  skipReveal?: boolean;
   children: React.ReactNode;
 }
 
@@ -213,7 +224,7 @@ type Stage = 'idle' | 'board' | 'unblur' | 'done';
 // How long the user has to hold (anywhere) before reveal fires.
 const HOLD_DURATION_MS = 1500;
 
-export function RevealOverlay({ shirtNumber, childName, children }: RevealOverlayProps) {
+export function RevealOverlay({ shirtNumber, childName, skipReveal = false, children }: RevealOverlayProps) {
   const storageKey = `ban-revealed-${shirtNumber}`;
   const [checked, setChecked] = useState(false);
   const [alreadyRevealed, setAlreadyRevealed] = useState(false);
@@ -344,7 +355,12 @@ export function RevealOverlay({ shirtNumber, childName, children }: RevealOverla
   useEffect(() => () => stopRaf(), [stopRaf]);
 
   if (!checked) return <div className="min-h-[60vh]" />;
-  if (alreadyRevealed || stage === 'done') return <>{children}</>;
+  // Server-side skipReveal short-circuits the whole overlay. Any
+  // existing sponsor / holder of THIS kid gets the page bare — no
+  // hold-to-meet gate, no scrim, nothing to click through. The
+  // client-side localStorage flag still handles the "you've done
+  // this once on this browser" case for cold buyers.
+  if (skipReveal || alreadyRevealed || stage === 'done') return <>{children}</>;
 
   return (
     <div className="relative">

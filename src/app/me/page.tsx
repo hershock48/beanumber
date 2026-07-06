@@ -481,58 +481,35 @@ export default async function MePage() {
           </div>
         ) : (
           <>
-            {/* ── Kids first ─────────────────────────────────────────
-                Sponsors come here to see their kids. Newsletter and
-                CTA sit around them, not above them. */}
-            {sponsors.length > 0 && (
-              <section className="mb-14">
-                <div className="flex items-baseline justify-between mb-6">
-                  <h2
-                    className="text-2xl md:text-3xl text-[#0d0d0d] leading-none"
-                    style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
-                  >
-                    Your kids.
-                  </h2>
-                  <p className="text-xs font-bold uppercase tracking-[0.25em] text-[#888]">
-                    {sponsors.length} sponsored
-                  </p>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {sponsors.map(row => (
-                    <KidCard
-                      key={row.recordId}
-                      row={row}
-                      milestone={milestoneByKidId.get(row.recordId) ?? null}
-                    />
-                  ))}
-                </div>
-              </section>
-            )}
-
-            {holders.length > 0 && (
-              <section className="mb-14">
-                <div className="flex items-baseline justify-between mb-6">
-                  <h2
-                    className="text-xl md:text-2xl text-[#0d0d0d] leading-none"
-                    style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
-                  >
-                    Numbers you&rsquo;re holding.
-                  </h2>
-                  <p className="text-xs font-bold uppercase tracking-[0.25em] text-[#888]">
-                    {holders.length}
-                  </p>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {holders.map(row => (
-                    <KidCard
-                      key={row.recordId}
-                      row={row}
-                      milestone={milestoneByKidId.get(row.recordId) ?? null}
-                    />
-                  ))}
-                </div>
-              </section>
-            )}
+            {/* ── Your kids — one unified section ─────────────────────
+                Previously split into "Your kids" (monthly sponsors)
+                and "Numbers you're holding" (shirt-only). Kevin's
+                call: don't distinguish. The relationship is real
+                either way; the pill INSIDE each card ("Sponsored
+                monthly" vs "Holder") carries the distinction if
+                anyone actually cares. Merged 2026-07-06. */}
+            <section className="mb-14">
+              <div className="flex items-baseline justify-between mb-6">
+                <h2
+                  className="text-2xl md:text-3xl text-[#0d0d0d] leading-none"
+                  style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
+                >
+                  Your kids.
+                </h2>
+                <p className="text-xs font-bold uppercase tracking-[0.25em] text-[#888]">
+                  {sponsors.length + holders.length}
+                </p>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                {[...sponsors, ...holders].map(row => (
+                  <KidCard
+                    key={row.recordId}
+                    row={row}
+                    milestone={milestoneByKidId.get(row.recordId) ?? null}
+                  />
+                ))}
+              </div>
+            </section>
 
             {/* ── One CTA, chosen by state ──────────────────────────
                 Points at the freshest thing waiting for the sponsor.
@@ -651,10 +628,24 @@ function KidCard({
   // kid row), render as a non-interactive div rather than a dead
   // href='#' link that scrolls to top on click.
   const hasClaimedNumber = !!revealedAt;
-  const href = hasClaimedNumber && child.shirtNumber
-    ? `/children/${child.shirtNumber}`
+  // Every sponsored kid — shirt-holder or co-sponsor — routes to
+  // /children/[N] when the kid has a shirt number. Previously
+  // co-sponsors were dumped on /meet/[id], a stripped-down surface
+  // without the composer, newsletter, or timeline. The reveal moment
+  // is suppressed for anyone the server marks as a sponsor or holder
+  // (see child.viewer_is_sponsor / viewer_is_holder in
+  // /children/[number]/page.tsx), so a co-sponsor lands directly on
+  // the full page without a Hold-to-Meet gate. Fallback to
+  // /meet/[recordId] only when the kid has no shirt number at all
+  // (rare, out-of-canonical-range).
+  //
+  // back=me lets the kid page render "Back to My campus" instead of
+  // the generic "Back to home" — makes /me → kid → back feel like
+  // returning to the same surface instead of teleporting.
+  const href = child.shirtNumber
+    ? `/children/${child.shirtNumber}?back=me`
     : child.recordId
-    ? `/meet/${child.recordId}`
+    ? `/meet/${child.recordId}?back=me`
     : null;
 
   const cardClass = 'block bg-white border border-[#e8e0d4] transition-colors';

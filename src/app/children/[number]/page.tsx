@@ -142,7 +142,18 @@ function sponsorshipToAirtableFields(
 
 interface ChildPageProps {
   params: Promise<{ number: string }>;
-  searchParams?: Promise<{ gift?: string; from?: string; just_signed_in?: string }>;
+  searchParams?: Promise<{
+    gift?: string;
+    from?: string;
+    just_signed_in?: string;
+    /**
+     * When set to 'me', the visitor arrived from /me and the "Back
+     * to home" link on the not-found + main pages swaps to "Back to
+     * My campus" pointing at /me. Any other value falls through to
+     * the default. Set by the KidCard href in /me/page.tsx.
+     */
+    back?: string;
+  }>;
 }
 
 interface AirtableChildRecord {
@@ -1022,6 +1033,13 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
   const sp = searchParams ? await searchParams : {};
   const isGiftReveal = sp?.gift === 'true' || sp?.gift === '1';
   const gifterFromQuery = (sp?.from || '').toString().trim().slice(0, 80);
+  // Smart back-link. When the visitor arrived from /me (KidCard link
+  // sets ?back=me), the top back-link returns to /me instead of /.
+  // Any other value falls through so a shared /children/[N] URL from
+  // outside doesn't lie about where "back" goes.
+  const backTarget = sp?.back === 'me'
+    ? { href: '/me', label: 'Back to My campus' }
+    : { href: '/', label: 'Back to home' };
   /** True for the redirect from the magic-link callback — used to
       switch the Holder/Sponsor view copy from "Welcome back" to
       "You own #N now" on the first sign-in. The flag only lasts for
@@ -1041,13 +1059,13 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
 
         <main className="max-w-3xl mx-auto px-5 py-16 md:py-24">
           <Link
-            href="/"
+            href={backTarget.href}
             className="inline-flex items-center gap-2 text-sm text-[#aaa] hover:text-[#D4A843] transition-colors mb-10"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
             </svg>
-            Back to home
+            {backTarget.label}
           </Link>
 
           <div className="text-center mb-16">
@@ -1143,13 +1161,13 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
 
         <main className="max-w-3xl mx-auto px-5 py-16 md:py-24">
           <Link
-            href="/"
+            href={backTarget.href}
             className="inline-flex items-center gap-2 text-sm text-[#aaa] hover:text-[#D4A843] transition-colors mb-10"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
             </svg>
-            Back to home
+            {backTarget.label}
           </Link>
 
           <div className="text-center">
@@ -1315,15 +1333,16 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
           which fires when LastReassignedAt is set and
           ChildRevealedAt is empty. Same magic, no picking. */}
       <main className="max-w-5xl mx-auto px-5 py-6 md:py-16">
-        {/* Breadcrumb */}
+        {/* Breadcrumb — points at wherever the visitor came from
+            (query param ?back=me → /me, otherwise home). */}
         <Link
-          href="/"
+          href={backTarget.href}
           className="inline-flex items-center gap-2 text-sm text-[#aaa] hover:text-[#D4A843] transition-colors mb-8"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
           </svg>
-          Back to home
+          {backTarget.label}
         </Link>
 
         {/* Stockpile model claim card. Renders when the visitor has a
@@ -1370,7 +1389,17 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
           newChildName={displayName}
           previousChildName={child.previous_kid_name ?? null}
         >
-        <RevealOverlay shirtNumber={Number(number)} childName={displayName}>
+        <RevealOverlay
+          shirtNumber={Number(number)}
+          childName={displayName}
+          // Skip the Hold-to-Meet gate for anyone who already sponsors
+          // or holds this kid. They know who this is; forcing them
+          // through the reveal on their own kid reads as broken.
+          // Cold visitors (viewer_is_sponsor === false AND
+          // viewer_is_holder === false) still get the full reveal
+          // moment on first visit per the number-is-identity model.
+          skipReveal={!!child.viewer_is_sponsor || !!child.viewer_is_holder}
+        >
         {/* Centered hero: photo on top, everything (name, meaning, globe,
             location, age/grade) stacked centered below. Pulls the eye
             into a single reading lane instead of zigzagging between
