@@ -1226,8 +1226,13 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
         ? Promise.resolve<CampusNewsletterEntry[]>([])
         : getRecentCampusNewsletters(),
       // Awards timeline is sponsor-gated so we only fetch when the
-      // viewer will actually see it. Zero-cost path for cold visitors.
-      (child.viewer_is_sponsor || child.viewer_is_holder) && child.record_id
+      // viewer will actually see it. Zero-cost path for cold visitors
+      // AND for departed kids (whose timeline isn't rendered — the
+      // relationship has a different frame there). Kept in sync with
+      // the same-shape newsletter gate two lines above.
+      !child.departed_at &&
+      (child.viewer_is_sponsor || child.viewer_is_holder) &&
+      child.record_id
         ? getSotmHistoryForChild(child.record_id)
         : Promise.resolve<SotmHistoryEntry[]>([]),
     ]);
