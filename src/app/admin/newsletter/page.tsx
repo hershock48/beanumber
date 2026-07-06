@@ -442,9 +442,9 @@ export default function AdminNewsletterPage() {
 
               {/* Hero photo upload — single image at the top of the
                   newsletter (both email and on-page). Only available
-                  once the newsletter has been saved (so we have an
-                  Airtable record ID to attach to). Replacing uploads
-                  a new image; clearing requires going to Airtable. */}
+                  once the newsletter has been saved. Uploads to
+                  Supabase Storage; the returned URL is written to
+                  heroPhotoUrl in Postgres. */}
               <div>
                 <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1">
                   Hero photo (optional)
@@ -462,6 +462,32 @@ export default function AdminNewsletterPage() {
                 ) : (
                   <p className="text-xs text-gray-400 italic">
                     Save the draft first, then you can upload a hero photo.
+                  </p>
+                )}
+              </div>
+
+              {/* Inline body images — upload one at a time, get a URL
+                  back on your clipboard, paste into an <img src="…">
+                  tag in the BodyHTML field below. Multiple uploads
+                  land in the same Supabase Storage folder scoped by
+                  newsletter id so they cluster together. */}
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1">
+                  Inline body images (optional)
+                </label>
+                <p className="text-xs text-gray-500 mb-2">
+                  Upload an image, copy the URL that appears, paste it
+                  into an <code>&lt;img src=&quot;URL&quot;&gt;</code> tag inside the
+                  Body (HTML) field. Repeat for each inline photo.
+                </p>
+                {selectedId ? (
+                  <BodyImageUploader
+                    newsletterId={selectedId}
+                    disabled={isReadOnly}
+                  />
+                ) : (
+                  <p className="text-xs text-gray-400 italic">
+                    Save the draft first, then you can upload body images.
                   </p>
                 )}
               </div>
@@ -679,6 +705,102 @@ function HeroPhotoUploader({
         </label>
       )}
       {status && <p className="mt-2 text-sm text-gray-500">{status}</p>}
+      {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
+    </div>
+  );
+}
+
+// ─── Inline body image uploader ──────────────────────────────────
+//
+// Uploads one image at a time to Supabase Storage under the scope of
+// the current newsletter, returns the public URL, auto-copies it to
+// the clipboard, and shows the URL so Kevin can also paste manually.
+// No DB write — the URL only exists inside the BodyHTML the operator
+// composes.
+
+function BodyImageUploader({
+  newsletterId,
+  disabled,
+}: {
+  newsletterId: string;
+  disabled?: boolean;
+}) {
+  const [uploading, setUploading] = useState(false);
+  const [lastUrl, setLastUrl] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setError(null);
+    setCopied(false);
+
+    if (file.size > 3.7 * 1024 * 1024) {
+      setError('Image too large (max 3.7 MB). Compress and try again.');
+      e.target.value = '';
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const base64 = await fileToBase64(file);
+      const res = await fetch('/api/admin/newsletter/upload-body-image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          newsletterId,
+          filename: file.name,
+          contentType: file.type || 'application/octet-stream',
+          data: base64,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || `Upload failed: ${res.status}`);
+      const url = data?.result?.url as string | undefined;
+      if (!url) throw new Error('Upload succeeded but no URL returned.');
+      setLastUrl(url);
+      try {
+        await navigator.clipboard.writeText(url);
+        setCopied(true);
+      } catch {
+        // Clipboard permission denied or unavailable — the URL is
+        // still visible below and can be manually copied.
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Upload failed.');
+    } finally {
+      setUploading(false);
+      e.target.value = '';
+    }
+  }
+
+  return (
+    <div>
+      <label className="inline-flex items-center justify-center bg-white text-gray-900 font-semibold text-xs uppercase tracking-wider px-3 py-2 border border-gray-300 rounded hover:border-gray-900 cursor-pointer transition-colors">
+        <input
+          type="file"
+          className="sr-only"
+          accept="image/*"
+          onChange={onFile}
+          disabled={uploading || disabled}
+        />
+        {uploading ? 'Uploading…' : 'Upload body image'}
+      </label>
+      {lastUrl && (
+        <div className="mt-3">
+          <p className="text-xs text-gray-500 mb-1">
+            {copied ? 'URL copied to your clipboard. Paste into an <img src="…"> tag.' : 'URL (copy this into an <img src="…"> tag):'}
+          </p>
+          <input
+            type="text"
+            readOnly
+            value={lastUrl}
+            onFocus={(e) => e.currentTarget.select()}
+            className="w-full text-xs font-mono px-2 py-1.5 border border-gray-300 rounded bg-gray-50 text-gray-700"
+          />
+        </div>
+      )}
       {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
     </div>
   );
