@@ -842,7 +842,6 @@ export interface KidCardNotePreview {
   latestReplyId: string | null; // for the "reply exists" callout
   outboundCount: number;
   replyCount: number;
-  hasUnreadReply: boolean; // whether the newest event IS a reply
 }
 
 export async function getNoteThreadPreviewsForSponsor(args: {
@@ -948,7 +947,6 @@ export async function getNoteThreadPreviewsForSponsor(args: {
         latestReplyId: isReply ? b.newest.id : null,
         outboundCount: b.outboundCount,
         replyCount: b.replyCount,
-        hasUnreadReply: isReply,
       });
     }
     return out;

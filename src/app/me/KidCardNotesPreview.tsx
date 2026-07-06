@@ -21,8 +21,8 @@
  * "Open page →" affordance.
  */
 
-import Link from 'next/link';
 import type { KidCardNotePreview } from '@/lib/db/queries';
+import { KidCardNoteReplyBadge } from './KidCardNoteReplyBadge';
 
 const MAX_SNIPPET = 90;
 
@@ -73,10 +73,18 @@ export function KidCardNotesPreview({
   preview,
   firstName,
   kidHref,
+  childIdLegacy,
 }: {
   preview: KidCardNotePreview | null;
   firstName: string;
   kidHref: string | null;
+  /**
+   * The kid's legacy id ("HSP/BAN-017"). Used by the client-side
+   * reply-freshness badge to look up whether the sponsor has visited
+   * this kid's page since the reply arrived. Null when the kid doesn't
+   * have one yet (rare, pre-migration).
+   */
+  childIdLegacy: string | null;
 }) {
   if (!preview) return null;
 
@@ -87,14 +95,31 @@ export function KidCardNotesPreview({
 
   return (
     <div className="mt-3 pt-3 border-t border-[#e8e0d4]">
+      {/* Kicker: server-rendered as a neutral "Reply from [Kid]" — the
+          "NEW" pill next to it is client-only and only shows when the
+          reply arrived after this viewer's last visit to the kid page.
+          That way sponsors who already read the reply on /children/[N]
+          come back to /me and see the card without a stale "new" claim.
+          Outbound uses the same tracking-color as the existing "Latest"
+          kicker so it reads as ambient status, not an alert. */}
       <p
         className={
           isReply
-            ? 'text-[10px] font-bold uppercase tracking-[0.2em] text-[#c0392b] mb-1'
+            ? 'text-[10px] font-bold uppercase tracking-[0.2em] text-[#c0392b] mb-1 flex items-center'
             : 'text-[10px] font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-1'
         }
       >
-        {isReply ? `New reply from ${firstName}` : 'Your correspondence'}
+        {isReply ? (
+          <>
+            <span>Reply from {firstName}</span>
+            <KidCardNoteReplyBadge
+              childIdLegacy={childIdLegacy}
+              replyArrivedAt={preview.latestDate}
+            />
+          </>
+        ) : (
+          'Your correspondence'
+        )}
       </p>
       <p className="text-xs text-[#0d0d0d] font-semibold leading-snug mb-1">
         {statusLine(preview, firstName)}

@@ -753,6 +753,7 @@ function KidCard({
             preview={notePreview ?? null}
             firstName={child.firstName || child.displayName}
             kidHref={href}
+            childIdLegacy={child.childId || null}
           />
         )}
 
