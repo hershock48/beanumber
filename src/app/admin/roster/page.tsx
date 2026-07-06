@@ -14,10 +14,10 @@
 
 import Link from 'next/link';
 import { AdminShell } from '../_components/AdminShell';
-import { getRoster, type RosterKid } from '@/lib/admin/queries';
+import { getRoster } from '@/lib/admin/queries';
 import { getAdminRole } from '@/lib/admin-session';
-import { AddKidButton } from './AddKidButton';
 import { DeadlinesBanner } from './DeadlinesBanner';
+import { RosterGrid } from './RosterGrid';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -73,199 +73,11 @@ export default async function AdminRosterPage() {
           role={role}
         />
 
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {kids.map(kid => (
-            <RosterCard key={kid.recordId} kid={kid} role={role} />
-          ))}
-          <AddKidButton />
-        </div>
+        {/* Client-side wrapper: filter (All / Needs finishing), sort
+            incompletes to the top, plain-language 'Missing' text on
+            each incomplete card. See RosterGrid for the full logic. */}
+        <RosterGrid kids={kids} role={role} />
       </div>
     </AdminShell>
-  );
-}
-
-function RosterCard({ kid, role }: { kid: RosterKid; role: 'admin' | 'simon' }) {
-  const completeness =
-    Number(kid.has.photo) +
-    Number(kid.has.nameMeaning) +
-    Number(kid.has.familyContext) +
-    Number(kid.has.loves) +
-    Number(kid.has.notes);
-  const total = 5;
-
-  // Per-field pending status. Photo doesn't go through the pending
-  // tracker — uploads are immediate and don't need polish — so it
-  // can only be empty or published.
-  const isPending = (key: string) =>
-    role === 'admin' && kid.pendingFields.includes(key);
-
-  // "Fully complete and reviewed" — all 5 dots are content-filled AND
-  // none of the four content-tracked fields are pending review. That
-  // earns the kid a celebration badge in place of the dot strip.
-  const allFilledAndReviewed =
-    completeness === total &&
-    !isPending('NameMeaning') &&
-    !isPending('FamilyContext') &&
-    !isPending('Loves') &&
-    !isPending('Notes');
-
-  const isDeparted = !!kid.departedAt;
-  const hasDepartureRequest =
-    role === 'admin' && !isDeparted && !!kid.departureRequestedAt;
-
-  return (
-    <Link
-      href={`/admin/roster/${kid.shirtNumber}`}
-      className={`block bg-white border ${
-        isDeparted
-          ? 'border-[#aaa] opacity-60 grayscale-[40%]'
-          : hasDepartureRequest
-            ? 'border-amber-400 ring-2 ring-amber-100'
-            : role === 'admin' && (kid.hasPendingIntake || !!kid.lastEditedBySimon)
-              ? 'border-red-400 ring-2 ring-red-100'
-              : 'border-[#e8e0d4]'
-      } hover:border-[#D4A843] transition-colors overflow-hidden relative`}
-    >
-      <div className="aspect-[4/5] bg-[#f5f0e8] relative">
-        {kid.photoUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={kid.photoUrl}
-            alt={kid.displayName}
-            className="w-full h-full object-cover"
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center">
-            <p className="text-3xl opacity-30">👤</p>
-          </div>
-        )}
-        {role === 'admin' && (kid.hasPendingIntake || !!kid.lastEditedBySimon) && (
-          <div className="absolute top-2 left-2 w-3 h-3 rounded-full bg-red-500 ring-2 ring-white" title="Simon edited this kid — review and polish" />
-        )}
-        {role === 'admin' && kid.deletionRequestedAt && (
-          <div
-            className="absolute bottom-2 left-2 inline-flex items-center justify-center bg-red-600 text-white w-6 h-6 text-xs ring-2 ring-white"
-            title="Deletion requested — review in editor"
-            aria-hidden
-          >
-            🗑
-          </div>
-        )}
-        {isDeparted && (
-          <div
-            className="absolute bottom-2 right-2 bg-[#666] text-white text-[10px] font-bold uppercase tracking-wider px-2 py-1"
-            title="Departed — no longer at the campus"
-          >
-            Departed
-          </div>
-        )}
-        {hasDepartureRequest && (
-          <div
-            className="absolute bottom-2 right-2 bg-amber-600 text-white text-[10px] font-bold uppercase tracking-wider px-2 py-1"
-            title="Departure requested — review in editor"
-          >
-            Departure?
-          </div>
-        )}
-        {/* Gold ★ for the current Student of the Month; red ★ for a
-            pending pick (admin sees both, Simon sees only the gold). */}
-        {kid.studentOfMonth && (
-          <span
-            className="absolute top-2 right-2 inline-flex items-center justify-center bg-[#D4A843] text-[#0d0d0d] w-7 h-7 text-base font-bold ring-2 ring-white"
-            title={`Student of the Month · ${kid.studentOfMonth}`}
-            aria-hidden
-          >
-            ★
-          </span>
-        )}
-        {role === 'admin' && !kid.studentOfMonth && kid.pendingSOTMMonth && (
-          <span
-            className="absolute top-2 right-2 inline-flex items-center justify-center bg-red-500 text-white w-7 h-7 text-base font-bold ring-2 ring-white"
-            title={`Pending SOTM pick · ${kid.pendingSOTMMonth}`}
-            aria-hidden
-          >
-            ★
-          </span>
-        )}
-      </div>
-
-      <div className="p-3">
-        <div className="flex items-baseline justify-between gap-2">
-          <p
-            className="text-base text-[#0d0d0d] leading-snug truncate min-w-0"
-            style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
-          >
-            {kid.displayName}
-          </p>
-          {role === 'admin' && (
-            <span
-              className="text-xs font-bold text-[#D4A843] tabular-nums flex-shrink-0"
-              title={`Shirt #${kid.shirtNumber}`}
-            >
-              #{kid.shirtNumber}
-            </span>
-          )}
-        </div>
-        {kid.gradeClass && (
-          <p className="text-xs text-[#888] mt-1 truncate">{kid.gradeClass}</p>
-        )}
-
-        {/* Completeness indicator. Three dot states:
-             - gray:   field empty
-             - red:    field has unpublished Simon edits (admin only)
-             - orange: field filled and reviewed (published)
-            When all five are filled AND reviewed, the strip collapses
-            into a single green check badge — the celebration state. */}
-        {allFilledAndReviewed ? (
-          <div className="flex items-center gap-2 mt-3">
-            <span
-              className="inline-flex items-center gap-1.5 bg-green-50 text-green-700 text-xs font-bold uppercase tracking-wider px-2 py-1 border border-green-200"
-              title="All five fields filled and reviewed"
-            >
-              <svg className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor" aria-hidden>
-                <path fillRule="evenodd" d="M16.7 5.3a1 1 0 010 1.4l-7 7a1 1 0 01-1.4 0l-3-3a1 1 0 011.4-1.4L9 11.6l6.3-6.3a1 1 0 011.4 0z" clipRule="evenodd" />
-              </svg>
-              Complete
-            </span>
-            <span className="ml-auto text-xs text-[#aaa] tabular-nums">{completeness}/{total}</span>
-          </div>
-        ) : (
-          <div
-            className="flex items-center gap-1 mt-3"
-            aria-label={`${completeness} of ${total} fields complete`}
-          >
-            {[
-              { has: kid.has.photo, label: 'Photo', pendingKey: null },
-              { has: kid.has.nameMeaning, label: 'Name meaning', pendingKey: 'NameMeaning' },
-              { has: kid.has.familyContext, label: 'Family', pendingKey: 'FamilyContext' },
-              { has: kid.has.loves, label: 'Loves', pendingKey: 'Loves' },
-              { has: kid.has.notes, label: 'Bio', pendingKey: 'Notes' },
-            ].map((dot, i) => {
-              const pending = dot.pendingKey ? isPending(dot.pendingKey) : false;
-              const color = pending
-                ? 'bg-red-500'
-                : dot.has
-                  ? 'bg-[#D4A843]'
-                  : 'bg-[#e8e0d4]';
-              const status = pending
-                ? 'unpublished — Simon edited'
-                : dot.has
-                  ? '✓'
-                  : '—';
-              return (
-                <span
-                  key={i}
-                  title={`${dot.label}: ${status}`}
-                  className={`block w-2 h-2 rounded-full ${color}`}
-                />
-              );
-            })}
-            <span className="ml-auto text-xs text-[#aaa] tabular-nums">
-              {completeness}/{total}
-            </span>
-          </div>
-        )}
-      </div>
-    </Link>
   );
 }
