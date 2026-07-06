@@ -1056,6 +1056,88 @@ export const sotmHistory = pgTable(
 );
 
 // ─────────────────────────────────────────────────────────────────
+//  Kid messages — sponsor-to-kid correspondence
+// ─────────────────────────────────────────────────────────────────
+
+/**
+ * Two-way relationship engine. A sponsor writes a short note to
+ * their kid via the composer on /children/[N] or /me. The note
+ * lands here with status 'pending'. Simon picks it up in the
+ * /admin/messages queue, translates it into Acholi/English as
+ * appropriate, and marks it delivered once the kid has actually
+ * received it (usually a Sunday batch at the campus).
+ *
+ * Status lifecycle:
+ *   pending    — sponsor submitted, not yet reviewed
+ *   translated — Simon translated + reviewed but not delivered
+ *   delivered  — physically handed to the kid; sponsor gets an email
+ *   declined   — Simon or Kevin flagged as inappropriate; no delivery,
+ *                sponsor gets a soft explanation email
+ *
+ * Direction is stored so the same table can hold kid→sponsor
+ * replies later (phase 4). MVP writes only 'sponsor_to_kid'.
+ *
+ * Rate limiting lives outside the schema — one active pending note
+ * per (sponsor_email, child_id) is enforced at the write path.
+ * Sponsors can queue a new one after Simon delivers the current.
+ */
+export const kidMessages = pgTable(
+  'kid_messages',
+  {
+    id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+    // Who wrote it. Lower-cased at write time to match how we key
+    // donors + sponsorships elsewhere.
+    sponsorEmail: text('sponsor_email').notNull(),
+    // Optional — a friendly name to render on the admin queue so
+    // Simon can eyeball who's writing to whom without joining donors.
+    sponsorName: text('sponsor_name'),
+    // Which kid the note is for. Cascade delete so an archived kid's
+    // messages go with them.
+    childId: uuid('child_id')
+      .notNull()
+      .references(() => children.id, { onDelete: 'cascade' }),
+    // 'sponsor_to_kid' | 'kid_to_sponsor' (phase 4 only)
+    direction: text('direction').notNull().default('sponsor_to_kid'),
+    // Sponsor's raw text. Not sanitized further at write time
+    // — Simon reviews before delivery.
+    bodyEn: text('body_en').notNull(),
+    // Simon's translation for delivery. Nullable while pending.
+    bodyTranslated: text('body_translated'),
+    // pending | translated | delivered | declined
+    status: text('status').notNull().default('pending'),
+    // Simon's internal notes to himself/Kevin. Not shown to the
+    // sponsor. Optional decline explanation lives here too.
+    simonNotes: text('simon_notes'),
+    // Timestamps for each state transition. delivered_at + declined_at
+    // are mutually exclusive; whichever fires drives the sponsor email.
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+    translatedAt: timestamp('translated_at', { withTimezone: true }),
+    deliveredAt: timestamp('delivered_at', { withTimezone: true }),
+    declinedAt: timestamp('declined_at', { withTimezone: true }),
+  },
+  table => ({
+    // Simon's queue is ordered by status then age. Composite index
+    // over (status, created_at) matches that access pattern.
+    statusCreatedIdx: index('kid_messages_status_created_idx').on(
+      table.status,
+      table.createdAt
+    ),
+    // Per-kid lookup for the sponsor's own "sent notes" view (phase 4)
+    // and rate-limit check at write time.
+    childIdx: index('kid_messages_child_idx').on(table.childId),
+    // Per-sponsor lookup for the same reasons.
+    sponsorEmailIdx: index('kid_messages_sponsor_email_idx').on(
+      sql`lower(${table.sponsorEmail})`
+    ),
+  })
+);
+
+// ─────────────────────────────────────────────────────────────────
 //  Type exports — for use across the app
 // ─────────────────────────────────────────────────────────────────
 
@@ -1097,3 +1179,6 @@ export type NewAdminUser = typeof adminUsers.$inferInsert;
 
 export type SotmHistoryRow = typeof sotmHistory.$inferSelect;
 export type NewSotmHistoryRow = typeof sotmHistory.$inferInsert;
+
+export type KidMessage = typeof kidMessages.$inferSelect;
+export type NewKidMessage = typeof kidMessages.$inferInsert;

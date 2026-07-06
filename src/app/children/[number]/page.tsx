@@ -40,6 +40,7 @@ import {
   type SotmHistoryEntry,
 } from '@/lib/db/queries';
 import { AwardsTimeline } from './AwardsTimeline';
+import { SendNoteComposer } from './SendNoteComposer';
 import { resolveShirtToKid } from '@/lib/cycle';
 import { CANONICAL_ROSTER_MAX } from '@/lib/roster-config';
 import { db } from '@/lib/db/client';
@@ -1905,6 +1906,24 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
           sotmAwards.length > 0 && (
             <div className="mt-12 md:mt-16">
               <AwardsTimeline firstName={firstName} awards={sotmAwards} />
+            </div>
+          )}
+
+        {/* ── Send a note ──
+            Sponsor writes to the kid; Simon translates + delivers.
+            The correspondence half of the retention engine — this
+            is what turns sponsorship from watching into
+            participating. Sponsor + holder only; departed kids
+            don't get new notes. */}
+        {!child.departed_at &&
+          (child.viewer_is_sponsor || child.viewer_is_holder) &&
+          child.record_id && (
+            <div className="mt-12 md:mt-16">
+              <SendNoteComposer
+                childRecordId={child.record_id}
+                childIdLegacy={child.child_id ?? null}
+                firstName={firstName}
+              />
             </div>
           )}
 

@@ -24,6 +24,7 @@ export type AdminTab =
   | 'review'
   | 'campus-update'
   | 'sotm'
+  | 'messages'
   // Legacy tabs — kept in the type so existing pages compile, but no
   // longer rendered in the nav. Pages still exist on direct URLs.
   | 'updates'
@@ -36,6 +37,7 @@ const ALL_TABS: Array<{ id: AdminTab; label: string; href: string; visibleTo: Ar
   { id: 'roster', label: 'Roster', href: '/admin/roster', visibleTo: ['admin', 'simon'] },
   { id: 'review', label: 'Review queue', href: '/admin/review', visibleTo: ['admin'] },
   { id: 'sotm', label: 'Student of the month', href: '/admin/sotm', visibleTo: ['admin', 'simon'] },
+  { id: 'messages', label: 'Sponsor notes', href: '/admin/messages', visibleTo: ['admin', 'simon'] },
   { id: 'campus-update', label: 'Monthly update', href: '/admin/campus-update', visibleTo: ['simon'] },
   { id: 'fulfillment', label: 'Fulfillment', href: '/admin/fulfillment', visibleTo: ['admin'] },
 ];
