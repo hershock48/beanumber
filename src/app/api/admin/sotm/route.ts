@@ -230,13 +230,20 @@ export async function POST(request: NextRequest) {
     // is a re-approval of the same grade+month (e.g., Kevin corrected
     // the reason), the new reason lands in the same slot rather than
     // creating a duplicate row.
-    if (reasonToPublish) {
+    // Skip history write for 'unknown' grade — a kid without a
+    // canonical grade code shouldn't pollute the archive with an
+    // empty grade_code (which would collide with every other unknown-
+    // grade winner in the same month via the unique index). The
+    // children-row update still lands so the badge appears; the
+    // archive row gets written on a later re-approval AFTER Simon
+    // sets the kid's grade in the roster editor.
+    if (reasonToPublish && targetGradeKey !== 'unknown') {
       try {
         await db
           .insert(sotmHistory)
           .values({
             childId: target.id,
-            gradeCode: targetGradeKey === 'unknown' ? '' : targetGradeKey,
+            gradeCode: targetGradeKey,
             month,
             reason: reasonToPublish,
           })
@@ -257,6 +264,10 @@ export async function POST(request: NextRequest) {
           histErr instanceof Error ? histErr.message : String(histErr)
         );
       }
+    } else if (reasonToPublish && targetGradeKey === 'unknown') {
+      console.warn(
+        `[SOTM] approve without grade — history skipped for kid ${target.id} ("${target.firstName ?? ''}"). Set the kid's grade in the roster editor to enable archival.`
+      );
     }
     return NextResponse.json({ ok: true, action, shirtNumber, month });
   } catch (err) {
