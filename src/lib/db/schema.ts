@@ -62,6 +62,7 @@ import {
   timestamp,
   uniqueIndex,
   uuid,
+  type AnyPgColumn,
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 
@@ -1096,8 +1097,21 @@ export const kidMessages = pgTable(
     childId: uuid('child_id')
       .notNull()
       .references(() => children.id, { onDelete: 'cascade' }),
-    // 'sponsor_to_kid' | 'kid_to_sponsor' (phase 4 only)
+    // 'sponsor_to_kid' | 'kid_to_sponsor'
+    // sponsor_to_kid rows are what a sponsor writes via the composer.
+    // kid_to_sponsor rows are what the campus team records after the
+    // kid replies to a delivered note. Same table, threaded via
+    // parent_message_id below.
     direction: text('direction').notNull().default('sponsor_to_kid'),
+    // When this row is a reply, points to the sponsor_to_kid row it
+    // answers. Nullable — sponsor-authored rows have no parent.
+    // Cascade delete so a purged conversation removes cleanly.
+    // Self-reference needs an AnyPgColumn type annotation to break
+    // the circular type inference — Drizzle resolves this at runtime.
+    parentMessageId: uuid('parent_message_id').references(
+      (): AnyPgColumn => kidMessages.id,
+      { onDelete: 'cascade' }
+    ),
     // Sponsor's raw text. Not sanitized further at write time
     // — Simon reviews before delivery.
     bodyEn: text('body_en').notNull(),

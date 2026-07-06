@@ -27,6 +27,7 @@ import {
   subscriptions,
   batches,
   sotmHistory,
+  kidMessages,
 } from './schema';
 
 // ─── Children ────────────────────────────────────────────────────
@@ -788,6 +789,89 @@ export async function getSotmHistoryForChild(
       reason: r.reason,
       awardedAt: new Date(r.awardedAt).toISOString(),
     }));
+  } catch {
+    return [];
+  }
+}
+
+// ─── Kid messages / thread view ─────────────────────────────────
+
+export interface NoteThreadEntry {
+  id: string;
+  direction: 'sponsor_to_kid' | 'kid_to_sponsor';
+  bodyEn: string;
+  bodyOriginal: string | null;
+  status: string;
+  createdAt: string;
+  deliveredAt: string | null;
+  parentMessageId: string | null;
+}
+
+/**
+ * Every message in the thread between a specific sponsor email and
+ * a specific kid, newest first. Includes BOTH sponsor-to-kid rows
+ * (the sponsor's notes) and their kid-to-sponsor replies. Rows are
+ * fully mixed by timestamp — the kid page renders them chronologically
+ * so a sponsor sees each pair together.
+ *
+ * Used by /children/[N] to surface the "Your thread with [Kid]"
+ * section on the sponsor-gated view. Also used by /me later for
+ * per-kid thread previews.
+ *
+ * Returns [] on failure or missing inputs — the caller renders
+ * quietly when there's no thread yet.
+ */
+export async function getNoteThreadForSponsorAndChild(args: {
+  sponsorEmail: string;
+  childRecordId: string;
+}): Promise<NoteThreadEntry[]> {
+  const email = args.sponsorEmail.trim().toLowerCase();
+  if (!email || !args.childRecordId) return [];
+  try {
+    const rows = await db
+      .select({
+        id: kidMessages.id,
+        direction: kidMessages.direction,
+        bodyEn: kidMessages.bodyEn,
+        bodyTranslated: kidMessages.bodyTranslated,
+        status: kidMessages.status,
+        createdAt: kidMessages.createdAt,
+        deliveredAt: kidMessages.deliveredAt,
+        parentMessageId: kidMessages.parentMessageId,
+      })
+      .from(kidMessages)
+      .where(
+        and(
+          sql`lower(${kidMessages.sponsorEmail}) = ${email}`,
+          eq(kidMessages.childId, args.childRecordId)
+        )
+      )
+      .orderBy(desc(kidMessages.createdAt));
+    return rows
+      .filter(
+        r =>
+          r.direction === 'sponsor_to_kid' ||
+          r.direction === 'kid_to_sponsor'
+      )
+      .map(r => ({
+        id: r.id,
+        direction: r.direction as 'sponsor_to_kid' | 'kid_to_sponsor',
+        bodyEn: r.bodyEn,
+        // For a kid->sponsor row, body_translated carries the untranslated
+        // original transcription (Acholi/Luo) that Simon typed. For a
+        // sponsor->kid row, body_translated is Simon's Acholi/Luo
+        // translation of the sponsor's English. In both cases the value
+        // is "the version in the kid's language."
+        bodyOriginal: r.bodyTranslated,
+        status: r.status,
+        createdAt: r.createdAt
+          ? new Date(r.createdAt).toISOString()
+          : new Date().toISOString(),
+        deliveredAt: r.deliveredAt
+          ? new Date(r.deliveredAt).toISOString()
+          : null,
+        parentMessageId: r.parentMessageId,
+      }));
   } catch {
     return [];
   }

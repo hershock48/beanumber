@@ -1,11 +1,10 @@
 /**
  * GET /api/me/updates-digest
  *
- * For the signed-in viewer, returns the latest published personal
- * update timestamp per kid they sponsor or hold. Powers the "there's
- * something new" indicators on the Your Kids nav tab and (later, if
- * we surface it that way) any other client widget that needs to know
- * whether the viewer has unread updates.
+ * For the signed-in viewer, returns the latest campus-activity
+ * timestamp per kid they sponsor or hold. Powers the "there's
+ * something new" indicators on the Your Kids nav tab and the
+ * per-card NEW pill on /me.
  *
  * Shape:
  *   {
@@ -15,22 +14,30 @@
  *     ]
  *   }
  *
+ * "Latest campus activity" combines two signals:
+ *   1. A published, sponsor-visible personal child update
+ *      (child_updates.publishedAt)
+ *   2. A kid-to-sponsor reply delivered to THIS viewer's email
+ *      (kid_messages.deliveredAt where sponsor_email matches the
+ *      viewer and direction is kid_to_sponsor)
+ * The client uses a single localStorage seen-key per kid, so both
+ * signals get cleared together when the viewer visits the kid page.
+ *
  * Notes
  * ─────
- *   - Only PERSONAL updates count. Newsletters are their own signal
- *     and go through /news; they don't drive the per-kid dot.
- *   - Kids with zero published updates are omitted (client treats
- *     missing kid as "nothing to be unread about").
- *   - Not signed in → 200 with empty items. That way the nav dot
- *     component can call this unconditionally without needing to
- *     branch on auth state.
+ *   - Newsletters are their own signal (their own UnreadNewsletterPill
+ *     with its own storage key). They do NOT drive the per-kid dot.
+ *   - Kids with zero published updates AND zero replies are omitted —
+ *     the client treats a missing kid as "nothing to be unread about."
+ *   - Not signed in → 200 with empty items so the client can call
+ *     unconditionally.
  */
 
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db/client';
-import { childUpdates } from '@/lib/db/schema';
-import { and, desc, eq, inArray, or, sql } from 'drizzle-orm';
+import { childUpdates, kidMessages } from '@/lib/db/schema';
+import { and, desc, eq, inArray, isNotNull, or, sql } from 'drizzle-orm';
 import { SESSION } from '@/lib/constants';
 import { getViewerSponsorships } from '@/lib/db/queries';
 
@@ -80,43 +87,71 @@ export async function GET() {
     }
   }
 
-  // Pull the raw publishedAt per update, keyed by BOTH identifiers,
-  // and merge in code. This avoids the previous group-by-legacy-only
-  // trap that would silently drop UUID-only updates.
-  const rows = await db
-    .select({
-      childId: childUpdates.childId,
-      childIdLegacy: childUpdates.childIdLegacy,
-      publishedAt: childUpdates.publishedAt,
-    })
-    .from(childUpdates)
-    .where(
-      and(
-        eq(childUpdates.status, 'Published'),
-        eq(childUpdates.visibleToSponsor, true),
-        or(
-          uuids.length > 0 ? inArray(childUpdates.childId, uuids) : sql`false`,
-          legacies.length > 0
-            ? inArray(childUpdates.childIdLegacy, legacies)
+  // Run the two source queries in parallel — updates (any published
+  // update for any kid the viewer sponsors) and replies (any kid-to-
+  // sponsor delivery keyed on THIS viewer's email).
+  const [updateRows, replyRows] = await Promise.all([
+    db
+      .select({
+        childId: childUpdates.childId,
+        childIdLegacy: childUpdates.childIdLegacy,
+        publishedAt: childUpdates.publishedAt,
+      })
+      .from(childUpdates)
+      .where(
+        and(
+          eq(childUpdates.status, 'Published'),
+          eq(childUpdates.visibleToSponsor, true),
+          or(
+            uuids.length > 0
+              ? inArray(childUpdates.childId, uuids)
+              : sql`false`,
+            legacies.length > 0
+              ? inArray(childUpdates.childIdLegacy, legacies)
+              : sql`false`
+          )
+        )
+      )
+      .orderBy(desc(childUpdates.publishedAt)),
+    db
+      .select({
+        childId: kidMessages.childId,
+        deliveredAt: kidMessages.deliveredAt,
+      })
+      .from(kidMessages)
+      .where(
+        and(
+          eq(kidMessages.direction, 'kid_to_sponsor'),
+          sql`lower(${kidMessages.sponsorEmail}) = ${email}`,
+          isNotNull(kidMessages.deliveredAt),
+          uuids.length > 0
+            ? inArray(kidMessages.childId, uuids)
             : sql`false`
         )
       )
-    )
-    .orderBy(desc(childUpdates.publishedAt));
+      .orderBy(desc(kidMessages.deliveredAt)),
+  ]);
 
-  // Reduce to max(publishedAt) per legacy id. Prefer the update's own
-  // legacy; fall back to the sponsorship-derived legacy for UUID-only
-  // rows.
+  // Reduce to max(activity) per legacy id. Two-pass: first pass
+  // ingests updates (which carry both identifiers), second pass
+  // ingests replies (which carry only the UUID and need lookup).
   const latestByLegacy = new Map<string, Date>();
-  for (const r of rows) {
+  const bumpLegacy = (legacy: string, at: Date) => {
+    const existing = latestByLegacy.get(legacy);
+    if (!existing || existing < at) latestByLegacy.set(legacy, at);
+  };
+  for (const r of updateRows) {
     if (!r.publishedAt) continue;
     const legacy =
       r.childIdLegacy || (r.childId ? uuidToLegacy.get(r.childId) : undefined);
     if (!legacy) continue;
-    const existing = latestByLegacy.get(legacy);
-    if (!existing || existing < r.publishedAt) {
-      latestByLegacy.set(legacy, r.publishedAt);
-    }
+    bumpLegacy(legacy, r.publishedAt);
+  }
+  for (const r of replyRows) {
+    if (!r.deliveredAt || !r.childId) continue;
+    const legacy = uuidToLegacy.get(r.childId);
+    if (!legacy) continue;
+    bumpLegacy(legacy, r.deliveredAt);
   }
 
   const items = Array.from(latestByLegacy.entries())

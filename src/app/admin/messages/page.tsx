@@ -25,42 +25,86 @@ export const revalidate = 0;
 export default async function AdminMessagesPage() {
   const role = (await getAdminRole()) || 'admin';
 
-  const rows = await db
-    .select({
-      id: kidMessages.id,
-      sponsorEmail: kidMessages.sponsorEmail,
-      sponsorName: kidMessages.sponsorName,
-      direction: kidMessages.direction,
-      bodyEn: kidMessages.bodyEn,
-      bodyTranslated: kidMessages.bodyTranslated,
-      status: kidMessages.status,
-      simonNotes: kidMessages.simonNotes,
-      createdAt: kidMessages.createdAt,
-      translatedAt: kidMessages.translatedAt,
-      deliveredAt: kidMessages.deliveredAt,
-      declinedAt: kidMessages.declinedAt,
-      kidRecordId: children.id,
-      kidFirstName: children.firstName,
-      kidDisplayName: children.displayName,
-      kidShirtNumber: children.shirtNumber,
-      kidPhotoUrl: children.profilePhotoUrl,
-    })
-    .from(kidMessages)
-    .leftJoin(children, eq(children.id, kidMessages.childId))
-    .orderBy(
-      sql`
-        case ${kidMessages.status}
-          when 'pending'    then 0
-          when 'translated' then 1
-          when 'delivered'  then 2
-          when 'declined'   then 3
-          else 4
-        end
-      `,
-      asc(kidMessages.createdAt)
-    );
+  // Fetch every sponsor->kid row (the queue) plus every kid->sponsor
+  // row (replies). Attach replies to their parents in-memory so the
+  // client renders each thread as a single card. Two queries beats
+  // a self-join here because the queue and reply lists have their
+  // own natural orderings.
+  const [outboundRows, replyRows] = await Promise.all([
+    db
+      .select({
+        id: kidMessages.id,
+        sponsorEmail: kidMessages.sponsorEmail,
+        sponsorName: kidMessages.sponsorName,
+        direction: kidMessages.direction,
+        bodyEn: kidMessages.bodyEn,
+        bodyTranslated: kidMessages.bodyTranslated,
+        status: kidMessages.status,
+        simonNotes: kidMessages.simonNotes,
+        createdAt: kidMessages.createdAt,
+        translatedAt: kidMessages.translatedAt,
+        deliveredAt: kidMessages.deliveredAt,
+        declinedAt: kidMessages.declinedAt,
+        kidRecordId: children.id,
+        kidFirstName: children.firstName,
+        kidDisplayName: children.displayName,
+        kidShirtNumber: children.shirtNumber,
+        kidPhotoUrl: children.profilePhotoUrl,
+      })
+      .from(kidMessages)
+      .leftJoin(children, eq(children.id, kidMessages.childId))
+      .where(eq(kidMessages.direction, 'sponsor_to_kid'))
+      .orderBy(
+        sql`
+          case ${kidMessages.status}
+            when 'pending'    then 0
+            when 'translated' then 1
+            when 'delivered'  then 2
+            when 'declined'   then 3
+            else 4
+          end
+        `,
+        asc(kidMessages.createdAt)
+      ),
+    db
+      .select({
+        id: kidMessages.id,
+        parentMessageId: kidMessages.parentMessageId,
+        bodyEn: kidMessages.bodyEn,
+        bodyTranslated: kidMessages.bodyTranslated,
+        deliveredAt: kidMessages.deliveredAt,
+        createdAt: kidMessages.createdAt,
+      })
+      .from(kidMessages)
+      .where(eq(kidMessages.direction, 'kid_to_sponsor')),
+  ]);
 
-  const messages = rows.map(r => ({
+  const replyByParent = new Map<
+    string,
+    {
+      id: string;
+      bodyEn: string;
+      bodyOriginal: string | null;
+      deliveredAt: string | null;
+      createdAt: string | null;
+    }
+  >();
+  for (const r of replyRows) {
+    if (!r.parentMessageId) continue;
+    replyByParent.set(r.parentMessageId, {
+      id: r.id,
+      bodyEn: r.bodyEn,
+      // body_translated on a kid->sponsor row holds the ORIGINAL
+      // (untranslated) transcription of what the kid actually said,
+      // which is helpful audit context but not the primary reader-
+      // facing text.
+      bodyOriginal: r.bodyTranslated,
+      deliveredAt: r.deliveredAt ? new Date(r.deliveredAt).toISOString() : null,
+      createdAt: r.createdAt ? new Date(r.createdAt).toISOString() : null,
+    });
+  }
+
+  const messages = outboundRows.map(r => ({
     id: r.id,
     sponsorEmail: r.sponsorEmail,
     sponsorName: r.sponsorName,
@@ -80,6 +124,7 @@ export default async function AdminMessagesPage() {
       shirtNumber: r.kidShirtNumber,
       photoUrl: r.kidPhotoUrl,
     },
+    reply: replyByParent.get(r.id) ?? null,
   }));
 
   const pendingCount = messages.filter(m => m.status === 'pending').length;

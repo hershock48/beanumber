@@ -39,6 +39,18 @@ interface MessageRow {
     shirtNumber: number | null;
     photoUrl: string | null;
   };
+  /**
+   * When the kid has replied to this sponsor-to-kid note, the reply
+   * lives on this field. Null until Simon records the reply via the
+   * inline composer on the delivered-message card.
+   */
+  reply: {
+    id: string;
+    bodyEn: string;
+    bodyOriginal: string | null;
+    deliveredAt: string | null;
+    createdAt: string | null;
+  } | null;
 }
 
 export function MessagesQueue({
@@ -472,9 +484,206 @@ function MessageCard({
               .
             </p>
           )}
+
+          {/* Reply section — only on delivered messages. Shows the
+              recorded reply if one exists, otherwise exposes a
+              composer for Simon to write what the kid said. Kid-to-
+              sponsor replies are auto-delivered + email the sponsor. */}
+          {message.status === 'delivered' && (
+            <ReplySection
+              message={message}
+              onLocalUpdate={onLocalUpdate}
+            />
+          )}
         </div>
       )}
     </article>
+  );
+}
+
+function ReplySection({
+  message,
+  onLocalUpdate,
+}: {
+  message: MessageRow;
+  onLocalUpdate: (id: string, updates: Partial<MessageRow>) => void;
+}) {
+  const [composerOpen, setComposerOpen] = useState(false);
+  const [replyBody, setReplyBody] = useState('');
+  const [replyOriginal, setReplyOriginal] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  if (message.reply) {
+    return (
+      <div className="mt-4 pt-4 border-t border-[#e8e0d4]">
+        <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-2">
+          {message.kid.firstName ?? 'The kid'} wrote back
+        </p>
+        <blockquote
+          className="text-[15px] text-[#333] leading-relaxed italic bg-[#f5efe4] border-l-2 border-[#D4A843] pl-4 py-3"
+          style={{ fontFamily: 'Georgia, serif' }}
+        >
+          {message.reply.bodyEn}
+        </blockquote>
+        {message.reply.bodyOriginal && (
+          <details className="mt-2">
+            <summary className="text-xs text-[#888] cursor-pointer hover:text-[#0d0d0d]">
+              Show original transcription
+            </summary>
+            <p
+              className="text-xs text-[#666] mt-2 italic leading-relaxed pl-4"
+              style={{ fontFamily: 'Georgia, serif' }}
+            >
+              {message.reply.bodyOriginal}
+            </p>
+          </details>
+        )}
+        {message.reply.deliveredAt && (
+          <p className="text-xs text-[#888] italic mt-2">
+            Recorded{' '}
+            {new Date(message.reply.deliveredAt).toLocaleString('en-US', {
+              month: 'short',
+              day: 'numeric',
+            })}
+            . Sponsor was emailed.
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  async function submitReply() {
+    const trimmed = replyBody.trim();
+    if (trimmed.length < 3) {
+      setError('Reply needs at least a few characters of translated text.');
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/admin/messages/${message.id}/reply`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({
+          bodyEn: trimmed,
+          bodyOriginal: replyOriginal.trim() || undefined,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.error || 'Something went wrong. Try again.');
+        setSaving(false);
+        return;
+      }
+      // Mirror the server-side insert into local state so the UI
+      // flips to the read-only reply view without a re-fetch.
+      onLocalUpdate(message.id, {
+        reply: {
+          id: data.id,
+          bodyEn: trimmed,
+          bodyOriginal: replyOriginal.trim() || null,
+          deliveredAt: new Date().toISOString(),
+          createdAt: new Date().toISOString(),
+        },
+      });
+      setSaving(false);
+      setComposerOpen(false);
+      setReplyBody('');
+      setReplyOriginal('');
+    } catch {
+      setError('Network hiccup. Try again.');
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="mt-4 pt-4 border-t border-[#e8e0d4]">
+      {composerOpen ? (
+        <div>
+          <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-2">
+            Record {message.kid.firstName ?? 'the kid'}&rsquo;s reply
+          </p>
+          <label
+            htmlFor={`reply-en-${message.id}`}
+            className="block text-xs text-[#666] mb-1"
+          >
+            Translated reply (in English — this is what the sponsor sees)
+          </label>
+          <textarea
+            id={`reply-en-${message.id}`}
+            value={replyBody}
+            onChange={e => {
+              setReplyBody(e.target.value);
+              if (error) setError(null);
+            }}
+            rows={4}
+            disabled={saving}
+            className="w-full px-3 py-2 bg-white border border-[#e8e0d4] focus:outline-none focus:border-[#D4A843] focus:ring-1 focus:ring-[#D4A843] text-base"
+            placeholder="What did the kid say back?"
+            style={{ fontFamily: 'Georgia, serif' }}
+          />
+          <label
+            htmlFor={`reply-orig-${message.id}`}
+            className="block text-xs text-[#666] mb-1 mt-3"
+          >
+            Original transcription (optional — Acholi, Luo, etc.)
+          </label>
+          <textarea
+            id={`reply-orig-${message.id}`}
+            value={replyOriginal}
+            onChange={e => setReplyOriginal(e.target.value)}
+            rows={2}
+            disabled={saving}
+            className="w-full px-3 py-2 bg-white border border-[#e8e0d4] focus:outline-none focus:border-[#D4A843] focus:ring-1 focus:ring-[#D4A843] text-sm"
+            placeholder="Kept for audit — sponsor sees this on request."
+            style={{ fontFamily: 'Georgia, serif' }}
+          />
+          {error && (
+            <p className="text-sm text-[#c0392b] mt-2 leading-relaxed">
+              {error}
+            </p>
+          )}
+          <div className="flex flex-wrap gap-2 mt-3">
+            <button
+              type="button"
+              onClick={submitReply}
+              disabled={saving || replyBody.trim().length < 3}
+              className="inline-block bg-[#D4A843] hover:bg-[#c49a3a] text-[#0d0d0d] disabled:opacity-50 px-4 py-2 text-xs font-bold uppercase tracking-wider transition-colors"
+            >
+              {saving ? 'Sending…' : 'Save & notify sponsor'}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setComposerOpen(false);
+                setReplyBody('');
+                setReplyOriginal('');
+                setError(null);
+              }}
+              disabled={saving}
+              className="text-xs font-bold uppercase tracking-[0.15em] text-[#888] hover:text-[#0d0d0d] px-4 py-2 transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <p className="text-xs text-[#666] italic">
+            No reply on file yet.
+          </p>
+          <button
+            type="button"
+            onClick={() => setComposerOpen(true)}
+            className="inline-block bg-white border border-[#0d0d0d] hover:bg-[#0d0d0d] hover:text-white text-[#0d0d0d] px-4 py-2 text-xs font-bold uppercase tracking-wider transition-colors"
+          >
+            Record their reply
+          </button>
+        </div>
+      )}
+    </div>
   );
 }
 

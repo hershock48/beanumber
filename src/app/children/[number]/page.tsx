@@ -37,10 +37,13 @@ import {
   getChildByChildId,
   getDonorByStripeCustomerId,
   getSotmHistoryForChild,
+  getNoteThreadForSponsorAndChild,
   type SotmHistoryEntry,
+  type NoteThreadEntry,
 } from '@/lib/db/queries';
 import { AwardsTimeline } from './AwardsTimeline';
 import { SendNoteComposer } from './SendNoteComposer';
+import { NotesThread } from './NotesThread';
 import { resolveShirtToKid } from '@/lib/cycle';
 import { CANONICAL_ROSTER_MAX } from '@/lib/roster-config';
 import { db } from '@/lib/db/client';
@@ -1218,7 +1221,12 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
   // brings the total to max(each) and shaves hundreds of ms off the
   // mobile load. The biggest single perf win available on this page
   // without restructuring queries.
-  const [buyerBundle, portalData, recentNewsletters, sotmAwards] =
+  // Viewer email used both by the notes-thread fetch and by any
+  // future per-sponsor query. Resolved before Promise.all so the
+  // notes fetch can be included as a fourth peer.
+  const viewerEmailForThread = await getViewerEmail();
+
+  const [buyerBundle, portalData, recentNewsletters, sotmAwards, noteThread] =
     await Promise.all([
       resolveBuyerBundle(child.viewer_is_sponsor, child.record_id),
       resolvePortalData(child),
@@ -1235,6 +1243,18 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
       child.record_id
         ? getSotmHistoryForChild(child.record_id)
         : Promise.resolve<SotmHistoryEntry[]>([]),
+      // Note thread — same gate as awards. Only pulls messages sent
+      // BY THIS viewer's email, so a sponsor doesn't see another
+      // sponsor's thread with the same kid.
+      !child.departed_at &&
+      (child.viewer_is_sponsor || child.viewer_is_holder) &&
+      child.record_id &&
+      viewerEmailForThread
+        ? getNoteThreadForSponsorAndChild({
+            sponsorEmail: viewerEmailForThread,
+            childRecordId: child.record_id,
+          })
+        : Promise.resolve<NoteThreadEntry[]>([]),
     ]);
   const { buyerContext, showClaimCard } = buyerBundle;
   const buyerHint = buyerContext
@@ -1914,10 +1934,26 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
             </div>
           )}
 
+        {/* ── Notes thread ──
+            Every note this specific sponsor has written and every
+            reply the kid has written back. Silent when there's no
+            history yet — the composer below is enough signal that
+            the surface exists. Rendered above the composer so a
+            sponsor arriving from a "you got a reply" email sees the
+            reply front-and-center without scrolling past a fresh
+            composer they don't need. */}
+        {!child.departed_at &&
+          (child.viewer_is_sponsor || child.viewer_is_holder) &&
+          noteThread.length > 0 && (
+            <div className="mt-12 md:mt-16">
+              <NotesThread firstName={firstName} thread={noteThread} />
+            </div>
+          )}
+
         {/* ── Send a note ──
-            Sponsor writes to the kid; Simon translates + delivers.
-            The correspondence half of the retention engine — this
-            is what turns sponsorship from watching into
+            Sponsor writes to the kid; the campus team translates and
+            delivers. The correspondence half of the retention engine
+            — this is what turns sponsorship from watching into
             participating. Sponsor + holder only; departed kids
             don't get new notes. */}
         {!child.departed_at &&
