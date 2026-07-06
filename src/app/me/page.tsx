@@ -28,7 +28,10 @@ import {
   getViewerSponsorships,
   getLatestUpdateForChild,
   listAllChildren,
+  getNoteThreadPreviewsForSponsor,
+  type KidCardNotePreview,
 } from '@/lib/db/queries';
+import { KidCardNotesPreview } from './KidCardNotesPreview';
 import { fetchOmoroWeather, serverCampusNow } from '@/lib/omoro';
 import { pickKidMilestone, type Milestone } from '@/lib/milestones';
 import {
@@ -86,6 +89,12 @@ interface SponsorshipRow {
    * new with each of my kids &mdash; instead of a static roster.
    */
   latestUpdate?: ChildUpdateSnapshot | null;
+  /**
+   * Compact summary of the sponsor's correspondence with this kid.
+   * Populated by getNoteThreadPreviewsForSponsor in a single batch
+   * query. Null when the sponsor hasn't written to this kid.
+   */
+  notePreview?: KidCardNotePreview | null;
 }
 
 interface ChildUpdateSnapshot {
@@ -252,12 +261,22 @@ export default async function MePage() {
   }
   const rows = Array.from(byKidRecord.values());
 
-  // Hydrate each row with the latest published Child Update for its
-  // kid. Done in parallel so a sponsor with 6 kids doesn&rsquo;t pay 6×
-  // serial round-trips. Each lookup is independent; one failure
-  // leaves that card without a digest line and renders normally.
-  await Promise.all(
-    rows.map(async r => {
+  // Hydrate each row with:
+  //   1. The latest published Child Update for the kid (per-kid
+  //      queries, parallelized).
+  //   2. A compact preview of the sponsor's correspondence with the
+  //      kid (single batch query across all kids at once — one
+  //      roundtrip regardless of how many kids the sponsor has).
+  // Failures are non-fatal: a card just renders without that block.
+  const childRecordIdsForPreviews = rows
+    .map(r => r.child.recordId)
+    .filter((v): v is string => !!v);
+  const [notePreviewsResult] = await Promise.all([
+    getNoteThreadPreviewsForSponsor({
+      sponsorEmail: email,
+      childRecordIds: childRecordIdsForPreviews,
+    }).catch(() => new Map<string, KidCardNotePreview>()),
+    ...rows.map(async r => {
       try {
         r.latestUpdate = await getLatestUpdateForChild({
           id: r.child.recordId,
@@ -266,8 +285,11 @@ export default async function MePage() {
       } catch {
         r.latestUpdate = null;
       }
-    })
-  );
+    }),
+  ]);
+  for (const r of rows) {
+    r.notePreview = notePreviewsResult.get(r.child.recordId) ?? null;
+  }
 
   // Compute the strongest milestone per kid (SOTM this month wins if
   // active, otherwise tenure, birthday, or welcome). Pure computation,
@@ -610,7 +632,14 @@ function KidCard({
   row: SponsorshipRow;
   milestone: Milestone | null;
 }) {
-  const { child, monthlyOrHolder, startDate, latestUpdate, revealedAt } = row;
+  const {
+    child,
+    monthlyOrHolder,
+    startDate,
+    latestUpdate,
+    revealedAt,
+    notePreview,
+  } = row;
   const monthsActive = startDate ? monthsBetween(new Date(startDate), new Date()) : null;
   // The kid's page URL still uses the shirt number for anyone whose
   // sponsorship is tied to a real shirt — but for viewers who haven't
@@ -711,6 +740,20 @@ function KidCard({
               {latestUpdate.title}
             </p>
           </div>
+        )}
+
+        {/* Per-kid correspondence preview — silent until the sponsor
+            has written to this kid at least once. When present, shows
+            the newest event (their latest sent note OR the kid's reply,
+            whichever is more recent), with a snippet and a "see all" hint
+            when the thread has multiple entries. Departed kids skip this
+            so the section stays focused on live relationships. */}
+        {!child.departed && (
+          <KidCardNotesPreview
+            preview={notePreview ?? null}
+            firstName={child.firstName || child.displayName}
+            kidHref={href}
+          />
         )}
 
         {href && (

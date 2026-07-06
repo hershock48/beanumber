@@ -14,7 +14,7 @@
  *     strings.
  */
 
-import { and, desc, eq, isNotNull, or, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNotNull, or, sql } from 'drizzle-orm';
 import { db } from './client';
 import {
   children,
@@ -821,6 +821,112 @@ export interface NoteThreadEntry {
  * Returns [] on failure or missing inputs — the caller renders
  * quietly when there's no thread yet.
  */
+/**
+ * Compact preview of a sponsor's correspondence with one specific
+ * kid — powers the "correspondence" block on each /me KidCard.
+ *
+ * For each kid, returns the SINGLE most recent event (either the
+ * sponsor's most recent sent note OR the kid's most recent reply)
+ * plus a small count for the "see all N" affordance. Hidden entirely
+ * when the sponsor has never written to that kid.
+ *
+ * Batches every kid into one query — the /me render pattern already
+ * has the child UUIDs in memory, so we look them up in a single
+ * inArray call and group in code. Zero N+1.
+ */
+export interface KidCardNotePreview {
+  latestKind: 'sent' | 'reply';
+  latestDate: string;
+  latestBody: string;
+  latestStatus: string; // outbound rows carry status; replies default 'delivered'
+  latestReplyId: string | null; // for the "reply exists" callout
+  outboundCount: number;
+  replyCount: number;
+  hasUnreadReply: boolean; // whether the newest event IS a reply
+}
+
+export async function getNoteThreadPreviewsForSponsor(args: {
+  sponsorEmail: string;
+  childRecordIds: string[];
+}): Promise<Map<string, KidCardNotePreview>> {
+  const email = args.sponsorEmail.trim().toLowerCase();
+  const uuids = args.childRecordIds.filter(v => !!v);
+  const out = new Map<string, KidCardNotePreview>();
+  if (!email || uuids.length === 0) return out;
+  try {
+    const rows = await db
+      .select({
+        id: kidMessages.id,
+        childId: kidMessages.childId,
+        direction: kidMessages.direction,
+        bodyEn: kidMessages.bodyEn,
+        status: kidMessages.status,
+        createdAt: kidMessages.createdAt,
+        deliveredAt: kidMessages.deliveredAt,
+        parentMessageId: kidMessages.parentMessageId,
+      })
+      .from(kidMessages)
+      .where(
+        and(
+          sql`lower(${kidMessages.sponsorEmail}) = ${email}`,
+          inArray(kidMessages.childId, uuids),
+          // Declined outbound rows are not part of the visible
+          // correspondence — same rule the sponsor-facing NotesThread
+          // uses on /children/[N]. Kid-to-sponsor rows never carry
+          // 'declined' so no special-case needed for them.
+          or(
+            eq(kidMessages.direction, 'kid_to_sponsor'),
+            sql`${kidMessages.status} != 'declined'`
+          )
+        )
+      )
+      .orderBy(desc(kidMessages.createdAt));
+
+    // Group per kid, remembering the newest event and running counts.
+    interface Bucket {
+      newest:
+        | typeof rows[number]
+        | null;
+      outboundCount: number;
+      replyCount: number;
+    }
+    const buckets = new Map<string, Bucket>();
+    for (const r of rows) {
+      let b = buckets.get(r.childId);
+      if (!b) {
+        b = { newest: null, outboundCount: 0, replyCount: 0 };
+        buckets.set(r.childId, b);
+      }
+      if (r.direction === 'sponsor_to_kid') b.outboundCount++;
+      else if (r.direction === 'kid_to_sponsor') b.replyCount++;
+      // rows are already sorted desc by createdAt, so the first row
+      // per bucket is the newest.
+      if (!b.newest) b.newest = r;
+    }
+
+    for (const [childId, b] of buckets) {
+      if (!b.newest) continue;
+      const isReply = b.newest.direction === 'kid_to_sponsor';
+      const dateSource = b.newest.deliveredAt ?? b.newest.createdAt;
+      out.set(childId, {
+        latestKind: isReply ? 'reply' : 'sent',
+        latestDate: dateSource
+          ? new Date(dateSource).toISOString()
+          : new Date().toISOString(),
+        latestBody: b.newest.bodyEn,
+        latestStatus: b.newest.status,
+        latestReplyId: isReply ? b.newest.id : null,
+        outboundCount: b.outboundCount,
+        replyCount: b.replyCount,
+        hasUnreadReply: isReply,
+      });
+    }
+    return out;
+  } catch {
+    return out;
+  }
+}
+
 export async function getNoteThreadForSponsorAndChild(args: {
   sponsorEmail: string;
   childRecordId: string;
