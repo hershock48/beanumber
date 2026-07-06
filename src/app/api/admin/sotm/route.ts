@@ -34,8 +34,8 @@ function gradeBucket(raw: string | null | undefined): GradeCode | 'unknown' {
   return isGradeCode(raw) ? (raw as GradeCode) : 'unknown';
 }
 import { db } from '@/lib/db/client';
-import { children } from '@/lib/db/schema';
-import { eq, isNotNull } from 'drizzle-orm';
+import { children, sotmHistory } from '@/lib/db/schema';
+import { eq, isNotNull, sql as drizzleSql } from 'drizzle-orm';
 
 function currentMonthLabel(): string {
   const d = new Date();
@@ -220,6 +220,44 @@ export async function POST(request: NextRequest) {
         updatedAt: new Date(),
       })
       .where(eq(children.id, target.id));
+
+    // Also record the award in the sotm_history archive. This is the
+    // durable record — the children row only carries CURRENT SOTM
+    // state, so once next month's winner is picked the previous
+    // month's award vanishes from the kid row. History persists.
+    //
+    // Idempotent on (grade_code, month) via the unique index; if this
+    // is a re-approval of the same grade+month (e.g., Kevin corrected
+    // the reason), the new reason lands in the same slot rather than
+    // creating a duplicate row.
+    if (reasonToPublish) {
+      try {
+        await db
+          .insert(sotmHistory)
+          .values({
+            childId: target.id,
+            gradeCode: targetGradeKey === 'unknown' ? '' : targetGradeKey,
+            month,
+            reason: reasonToPublish,
+          })
+          .onConflictDoUpdate({
+            target: [sotmHistory.gradeCode, sotmHistory.month],
+            set: {
+              childId: target.id,
+              reason: reasonToPublish,
+              awardedAt: drizzleSql`now()`,
+            },
+          });
+      } catch (histErr) {
+        // History write is best-effort; the children row is the
+        // primary. Log and continue — Kevin sees the approval land
+        // even if the archive burped.
+        console.warn(
+          '[SOTM] history write failed (non-fatal):',
+          histErr instanceof Error ? histErr.message : String(histErr)
+        );
+      }
+    }
     return NextResponse.json({ ok: true, action, shirtNumber, month });
   } catch (err) {
     return NextResponse.json(

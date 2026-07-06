@@ -31,6 +31,11 @@ import {
 } from '@/lib/db/queries';
 import { fetchOmoroWeather, serverCampusNow } from '@/lib/omoro';
 import { pickKidMilestone, type Milestone } from '@/lib/milestones';
+import {
+  gradeLabelForSponsor,
+  isGradeCode,
+  type GradeCode,
+} from '@/lib/grades';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -64,6 +69,16 @@ interface SponsorshipRow {
      * for the kid yet — milestones layer handles null gracefully.
      */
     dateOfBirth: string | null;
+    /**
+     * Canonical grade code (LK/UK/P1–P5) or null when unset.
+     * Displayed to sponsors via gradeLabelForSponsor and used to
+     * decorate the SOTM milestone banner ("in 3rd Grade").
+     */
+    gradeCode: GradeCode | null;
+    /** Current-month SOTM award data. Both null when the kid isn't
+     *  actively SOTM this month. */
+    sotmMonth: string | null;
+    sotmReason: string | null;
   };
   /**
    * Most recent published, sponsor-visible Child Update for this
@@ -134,6 +149,11 @@ async function fetchSponsorshipsForEmail(email: string): Promise<SponsorshipRow[
           dateOfBirth: r.childDateOfBirth
             ? new Date(r.childDateOfBirth).toISOString()
             : null,
+          gradeCode: isGradeCode(r.childGradeClass)
+            ? (r.childGradeClass as GradeCode)
+            : null,
+          sotmMonth: r.childSotmMonth ?? null,
+          sotmReason: r.childSotmReason ?? null,
         },
       };
     });
@@ -249,9 +269,10 @@ export default async function MePage() {
     })
   );
 
-  // Compute the strongest milestone per kid (birthday, tenure, or
-  // welcome). Pure computation, no I/O. Departed kids don't get
-  // milestones — the relationship has a different frame.
+  // Compute the strongest milestone per kid (SOTM this month wins if
+  // active, otherwise tenure, birthday, or welcome). Pure computation,
+  // no I/O. Departed kids don't get milestones — the relationship has
+  // a different frame.
   const milestoneByKidId = new Map<string, Milestone>();
   for (const r of rows) {
     if (r.child.departed) continue;
@@ -259,6 +280,11 @@ export default async function MePage() {
       startDate: r.startDate,
       dateOfBirth: r.child.dateOfBirth,
       kidFirstName: r.child.firstName,
+      sotmMonth: r.child.sotmMonth,
+      sotmReason: r.child.sotmReason,
+      gradeSponsorLabel: r.child.gradeCode
+        ? gradeLabelForSponsor(r.child.gradeCode)
+        : null,
     });
     if (m) milestoneByKidId.set(r.recordId, m);
   }

@@ -41,7 +41,8 @@ export type MilestoneKind =
   | 'birthday-today'
   | 'birthday-upcoming'
   | 'birthday-recent'
-  | 'welcome';
+  | 'welcome'
+  | 'sotm-current';
 
 export interface Milestone {
   kind: MilestoneKind;
@@ -250,6 +251,43 @@ export function welcomeMilestone(
 }
 
 /**
+ * Current-month Student of the Month. Fires when `sotmMonth` matches
+ * the current calendar month label (the same format Kevin's approval
+ * flow writes: "July 2026"). Highest priority milestone available
+ * because SOTM is a real once-in-a-while ceremony — outranks
+ * anniversaries and birthdays for the month it's live.
+ *
+ * `gradeSponsorLabel` is the US-audience label passed in by the
+ * caller (already translated) so the headline reads warmly for the
+ * sponsor without this pure-fn depending on the grades lib.
+ */
+export function sotmCurrentMilestone(
+  sotmMonth: string | null | undefined,
+  sotmReason: string | null | undefined,
+  gradeSponsorLabel: string | null,
+  kidFirstName: string
+): Milestone | null {
+  if (!sotmMonth) return null;
+  const now = new Date();
+  const currentLabel = `${now.toLocaleString('en-US', { month: 'long' })} ${now.getFullYear()}`;
+  if (sotmMonth.trim() !== currentLabel) return null;
+  const gradeClause = gradeSponsorLabel ? ` in ${gradeSponsorLabel}` : '';
+  // Reason gets rendered as an italic pull-quote below the headline.
+  // Simon's phrasing might already start with "because" / "for" / etc.,
+  // so we don't add a lead-in verb — the banner headline provides the
+  // "why" context and the quote lets his words stand.
+  const trimmedReason = (sotmReason || '').trim();
+  return {
+    kind: 'sotm-current',
+    headline: `${kidFirstName} is Student of the Month${gradeClause}.`,
+    body: trimmedReason ? `“${trimmedReason}” — Simon` : null,
+    // Beats every other milestone in the same window. If a kid has
+    // a birthday AND is SOTM, the SOTM banner leads.
+    priority: 200,
+  };
+}
+
+/**
  * Pick the single strongest milestone for a kid card. Returns null
  * when nothing qualifies (the card renders without a banner).
  */
@@ -257,8 +295,17 @@ export function pickKidMilestone(args: {
   startDate: string | Date | null | undefined;
   dateOfBirth: string | Date | null | undefined;
   kidFirstName: string;
+  sotmMonth?: string | null;
+  sotmReason?: string | null;
+  gradeSponsorLabel?: string | null;
 }): Milestone | null {
   const candidates = [
+    sotmCurrentMilestone(
+      args.sotmMonth,
+      args.sotmReason,
+      args.gradeSponsorLabel ?? null,
+      args.kidFirstName
+    ),
     tenureMilestone(args.startDate, args.kidFirstName),
     birthdayMilestone(args.dateOfBirth, args.kidFirstName),
     welcomeMilestone(args.startDate, args.kidFirstName),

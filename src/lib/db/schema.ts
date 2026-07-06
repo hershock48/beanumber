@@ -983,6 +983,79 @@ export const idMapping = pgTable(
 );
 
 // ─────────────────────────────────────────────────────────────────
+//  Student of the Month history
+// ─────────────────────────────────────────────────────────────────
+
+/**
+ * Immutable archive of every SOTM award ever granted. The `children`
+ * table columns (student_of_month, student_of_month_month,
+ * student_of_month_reason) only carry the CURRENT award — when Simon
+ * nominates + Kevin approves next month's winner, the previous
+ * month's is overwritten. That's fine for "who's SOTM right now?"
+ * but destroys the retention lever of "look back at every time your
+ * kid was chosen."
+ *
+ * This table holds one row per (grade_code, month) — the per-grade
+ * design guarantees uniqueness. A kid can accumulate multiple rows
+ * across months and grades (as they advance through the campus).
+ *
+ * Written by the SOTM approve endpoint inside the same transaction
+ * as the children-row update. Never mutated after write — corrections
+ * happen by inserting a new row for the same (grade, month) after
+ * deleting the old one (with an audit trail entry).
+ *
+ * Read by:
+ *   - Kid page: "Past awards" timeline block on the sponsor view.
+ *   - /me: SOTM milestone banner for current-month winners.
+ *   - Newsletter integration (phase 3): "This month's students"
+ *     roundup.
+ */
+export const sotmHistory = pgTable(
+  'sotm_history',
+  {
+    id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+    // The kid who won. FK to children.id so a departed kid's history
+    // is still queryable via the join even if the child row is
+    // eventually archived.
+    childId: uuid('child_id')
+      .notNull()
+      .references(() => children.id, { onDelete: 'cascade' }),
+    // Canonical grade code the kid was IN at the time of the award
+    // (LK, UK, P1–P5). Not derived from the current children row —
+    // stored explicitly here because grades advance over time and
+    // "Emmanuel won P3 in April 2026" is a fixed historical fact
+    // even after he moves up to P4.
+    gradeCode: text('grade_code').notNull(),
+    // Month label matching studentOfMonthMonth on children ("July 2026").
+    // Text rather than date because Kevin/Simon type "July 2026" not
+    // a first-of-the-month date, and using text lets both surfaces
+    // share the same string.
+    month: text('month').notNull(),
+    // Simon's one-sentence reason. Required — an award without a
+    // reason is empty ceremony.
+    reason: text('reason').notNull(),
+    // When Kevin approved. Distinct from created_at because a manual
+    // backfill could stamp older awards with their actual month.
+    awardedAt: timestamp('awarded_at', { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+  },
+  table => ({
+    // Only one winner per grade per month. If Kevin needs to change
+    // a pick after approving, delete-then-insert.
+    gradeMonthUnique: uniqueIndex('sotm_history_grade_month_idx').on(
+      table.gradeCode,
+      table.month
+    ),
+    // Fast per-kid lookup for the timeline view.
+    childIdx: index('sotm_history_child_idx').on(table.childId),
+  })
+);
+
+// ─────────────────────────────────────────────────────────────────
 //  Type exports — for use across the app
 // ─────────────────────────────────────────────────────────────────
 
@@ -1021,3 +1094,6 @@ export type NewBatch = typeof batches.$inferInsert;
 
 export type AdminUser = typeof adminUsers.$inferSelect;
 export type NewAdminUser = typeof adminUsers.$inferInsert;
+
+export type SotmHistoryRow = typeof sotmHistory.$inferSelect;
+export type NewSotmHistoryRow = typeof sotmHistory.$inferInsert;

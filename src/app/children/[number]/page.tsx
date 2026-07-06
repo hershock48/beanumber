@@ -1442,7 +1442,15 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
               <div className="mb-3 flex flex-col items-center">
                 <p className="inline-flex items-center gap-1.5 bg-[#D4A843] text-[#0d0d0d] text-xs font-bold uppercase tracking-wider px-3 py-1.5">
                   <span aria-hidden>★</span>
-                  Student of the Month · {child.student_of_month}
+                  Student of the Month
+                  {child.grade_class && isGradeCode(child.grade_class) && (
+                    <>
+                      {' '}·{' '}
+                      {gradeLabelForSponsor(child.grade_class as GradeCode)}
+                    </>
+                  )}
+                  {' '}·{' '}
+                  {child.student_of_month}
                 </p>
                 {child.student_of_month_reason && (
                   <p

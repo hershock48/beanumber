@@ -203,6 +203,12 @@ export async function getViewerSponsorships(viewerEmail: string) {
       // the YDO intake form for this kid hasn't been filled out yet,
       // which is fine: milestones layer returns null too.
       childDateOfBirth: sql<Date | null>`coalesce(${children.dateOfBirth}, child_legacy.date_of_birth)`,
+      // Current SOTM state (used by /me's milestone banner + the kid
+      // card badge on public surfaces). Both fields nullable; when
+      // studentOfMonthMonth is set, the kid is currently SOTM.
+      childSotmMonth: sql<string | null>`coalesce(${children.studentOfMonthMonth}, child_legacy.student_of_month_month)`,
+      childSotmReason: sql<string | null>`coalesce(${children.studentOfMonthReason}, child_legacy.student_of_month_reason)`,
+      childGradeClass: sql<string | null>`coalesce(${children.gradeClass}, child_legacy.grade_class)`,
     })
     .from(sponsorships)
     .leftJoin(children, eq(children.id, sponsorships.childId))
