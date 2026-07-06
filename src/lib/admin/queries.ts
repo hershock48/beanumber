@@ -26,6 +26,7 @@ import {
   sponsorships,
 } from '@/lib/db/schema';
 import { parsePendingDraft } from './pending-draft';
+import { CANONICAL_ROSTER_MAX } from '@/lib/roster-config';
 
 // ────────────────────────────────────────────────────────────────────────
 // Card: Updates pending publish
@@ -591,19 +592,10 @@ function rowToRosterKid(row: typeof children.$inferSelect): RosterKid {
   };
 }
 
-/**
- * Cap on canonical shirt numbers. Anything past this is a cycle
- * record (Trap 3.5 / core_model.md §2) — a shirt-number representation
- * of a canonical kid, NOT a separate person. Cycle rows pollute the
- * admin roster with duplicate, sparse profiles ("Aaron #12" vs
- * "Aaron #116" — same kid, same data, but the cycle copy looks
- * incomplete in the UI).
- *
- * Adjust upward only when YDO actually adds new on-campus kids past
- * shirt #53. Until then this gate keeps the admin roster honest:
- * one profile per real kid.
- */
-const CANONICAL_ROSTER_MAX = 53;
+// CANONICAL_ROSTER_MAX now lives in @/lib/roster-config so bumping
+// the roster size is a one-place change. See that file for the full
+// note on why this cap matters (cycle records past it must resolve
+// via Batches, not via direct row lookup).
 
 export async function getRoster(): Promise<RosterKid[]> {
   // Pull every canonical kid with a positive shirt number and a name.

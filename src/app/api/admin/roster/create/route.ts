@@ -26,7 +26,8 @@ import { getAdminRole } from '@/lib/admin-session';
 import { db } from '@/lib/db/client';
 import { children } from '@/lib/db/schema';
 import { audit } from '@/lib/db/mutations';
-import { sql } from 'drizzle-orm';
+import { CANONICAL_ROSTER_MIN, CANONICAL_ROSTER_MAX } from '@/lib/roster-config';
+import { and, gte, lte } from 'drizzle-orm';
 
 export async function POST(request: NextRequest) {
   if (!verifyAdminToken(request)) {
@@ -53,12 +54,40 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    // Single-query max(shirt_number) — cheap on Postgres with the
-    // children_shirt_number_idx index.
-    const maxRow = await db
-      .select({ max: sql<number | null>`max(${children.shirtNumber})` })
-      .from(children);
-    const shirtNumber = Number(maxRow[0]?.max ?? 0) + 1;
+    // Find the lowest empty shirt number in the canonical roster range.
+    // Historically this endpoint used MAX(shirt_number)+1, but the DB
+    // has test rows at shirt_number 815-819 which pushed MAX+1 outside
+    // the canonical range. That meant new kids created via +Add landed
+    // at #820 and were invisible on /admin/roster. Now we always fill
+    // the lowest gap first (#31, then #47, then #52 as of July 2026),
+    // then extend upward, and error cleanly if the range is full.
+    const filledRows = await db
+      .select({ n: children.shirtNumber })
+      .from(children)
+      .where(
+        and(
+          gte(children.shirtNumber, CANONICAL_ROSTER_MIN),
+          lte(children.shirtNumber, CANONICAL_ROSTER_MAX)
+        )
+      );
+    const filled = new Set(filledRows.map(r => r.n));
+    let shirtNumber = 0;
+    for (let i = CANONICAL_ROSTER_MIN; i <= CANONICAL_ROSTER_MAX; i++) {
+      if (!filled.has(i)) {
+        shirtNumber = i;
+        break;
+      }
+    }
+    if (!shirtNumber) {
+      return NextResponse.json(
+        {
+          error:
+            `Roster is full (${CANONICAL_ROSTER_MAX} kids). To add more kids, ` +
+            `Kevin needs to widen the canonical roster range in lib/roster-config.ts.`,
+        },
+        { status: 409 }
+      );
+    }
     const childId = `HSP/BAN-${String(shirtNumber).padStart(3, '0')}`;
 
     // intakeFromCampus has no first-class column in the Postgres schema

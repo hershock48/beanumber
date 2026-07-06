@@ -32,6 +32,7 @@ import {
   getDonorByStripeCustomerId,
 } from '@/lib/db/queries';
 import { resolveShirtToKid } from '@/lib/cycle';
+import { CANONICAL_ROSTER_MAX } from '@/lib/roster-config';
 import { db } from '@/lib/db/client';
 import {
   children as childrenTable,
@@ -580,15 +581,10 @@ function canonicalShirtNumber(n: number): number | null {
   return ((n - 151) % 53) + 1;
 }
 
-// Canonical roster max — anything past this is a cycle number that
-// MUST resolve to a canonical kid via the Batches table, not via a
-// direct row lookup. Prior to July 2026 the children table had
-// duplicate rows past this cap (stale copies of canonical kids),
-// which meant /children/106 read a frozen photocopy of Marvin rather
-// than live Marvin. The dedupe migration cleared those rows and this
-// gate keeps them from ever winning again — even if a future
-// migration accidentally re-inserts one.
-const CANONICAL_ROSTER_MAX = 53;
+// Canonical roster max — see @/lib/roster-config. Anything past this
+// is a cycle number that MUST resolve to a canonical kid via the
+// Batches table, not via a direct row lookup.
+// (CANONICAL_ROSTER_MAX imported at the top of the file.)
 
 // React cache() deduplicates calls within a single server request.
 // Both generateMetadata() and the page component call this function,
