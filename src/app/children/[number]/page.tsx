@@ -873,12 +873,42 @@ const getChildByShirtNumber = cache(async function getChildByShirtNumber(shirtNu
     const sponsorCodeMatchHolder =
       sponsorCodeMatches && sponsorship?.Status === 'Holder';
 
+    // "Sponsor" for the purpose of this page = Active status AND paying
+    // monthly. Two ways this can lie about $0/mo Active sponsorships
+    // (comp'd, paused-but-not-cancelled, wire transfer arrangements)
+    // if we only check Status:
+    //   1. UX bug: composer + notes thread + updates section all render
+    //      for the sponsor, they hit send, the API 403s because
+    //      /api/sponsor/notes requires monthlyAmount > 0.
+    //   2. Model drift: /me KidCard's monthlyOrHolder='monthly' also
+    //      requires amount > 0, so /me and /children/[N] would disagree
+    //      about who counts as a sponsor.
+    // Both fixed by folding the monthly check in here at the definition
+    // site. Anyone Active-but-$0 is treated as a Holder for the
+    // correspondence + updates surfaces, matching every other place in
+    // the app.
+    const sponsorCandidateAmount =
+      (sponsorCodeMatchActive
+        ? Number(sponsorship?.MonthlyAmount ?? 0)
+        : 0) ||
+      (matchedStatus === 'Active'
+        ? Number(emailMatchedSponsorship?.MonthlyAmount ?? 0)
+        : 0);
     const viewerIsSponsor = Boolean(
-      sponsorCodeMatchActive || matchedStatus === 'Active'
+      (sponsorCodeMatchActive || matchedStatus === 'Active') &&
+        sponsorCandidateAmount > 0
     );
     const viewerIsHolder =
       !viewerIsSponsor &&
-      Boolean(sponsorCodeMatchHolder || matchedStatus === 'Holder');
+      Boolean(
+        sponsorCodeMatchHolder ||
+          matchedStatus === 'Holder' ||
+          // Active-but-$0 falls back to holder for the render — they
+          // still get the reveal, the campus feed, and the awards
+          // timeline, they just don't get the correspondence engine.
+          sponsorCodeMatchActive ||
+          matchedStatus === 'Active'
+      );
 
     // If recognition came via the email path, use THAT sponsorship's
     // details for the rest of the render — sponsor code, kid display
@@ -1952,10 +1982,9 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
                 <p className="text-[15px] md:text-base text-[#555] leading-relaxed">
                   Once you&rsquo;re sponsoring {firstName}, you can write to
                   them and they write back &mdash; the campus team translates
-                  in both directions. Handwritten letters, personal photo
-                  updates, and report cards from the campus land here too,
-                  three or four times a year. Sponsors get the inside view;
-                  visitors get the public campus newsletter below.
+                  in both directions. Personal photo updates from the campus
+                  land here too, a few times a year. Sponsors get the inside
+                  view; visitors get the public campus newsletter below.
                 </p>
               </div>
             )}

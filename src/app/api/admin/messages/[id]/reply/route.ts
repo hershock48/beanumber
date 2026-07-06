@@ -37,7 +37,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, desc, eq, or, sql } from 'drizzle-orm';
 import { db } from '@/lib/db/client';
 import { kidMessages, children, sponsorships } from '@/lib/db/schema';
 import { getAdminRole } from '@/lib/admin-session';
@@ -115,6 +115,12 @@ export async function POST(
       childId: kidMessages.childId,
       firstName: children.firstName,
       displayName: children.displayName,
+      // childIdLegacy needed for the sponsorship channel-tag lookup
+      // below — some legacy sponsorship rows are joined via the legacy
+      // string id rather than the uuid. Matching the same OR pattern
+      // /api/sponsor/notes uses avoids a bogus "Co-sponsor" tag for a
+      // shirt-holder whose row only has childIdLegacy populated.
+      childIdLegacy: children.childId,
       shirtNumber: children.shirtNumber,
     })
     .from(kidMessages)
@@ -269,15 +275,27 @@ export async function POST(
     // treat it as "we don't know" and fall through as co-sponsor.
     let sponsorHoldsShirt = false;
     try {
+      // Match either uuid childId OR legacy childIdLegacy so shirt-
+      // holder sponsorships whose row uses only the legacy id
+      // (a real historical shape) also resolve. Order by
+      // childRevealedAt DESC nulls last so if the sponsor has both a
+      // shirt-linked row AND a co-sponsor row for the same kid, the
+      // shirt-linked one wins the tag.
       const spRows = await db
         .select({ childRevealedAt: sponsorships.childRevealedAt })
         .from(sponsorships)
         .where(
           and(
             sql`lower(${sponsorships.sponsorEmail}) = lower(${parent.sponsorEmail})`,
-            eq(sponsorships.childId, parent.childId)
+            or(
+              eq(sponsorships.childId, parent.childId),
+              parent.childIdLegacy
+                ? eq(sponsorships.childIdLegacy, parent.childIdLegacy)
+                : sql`false`
+            )
           )
         )
+        .orderBy(desc(sponsorships.childRevealedAt))
         .limit(1);
       sponsorHoldsShirt = !!spRows[0]?.childRevealedAt;
     } catch {

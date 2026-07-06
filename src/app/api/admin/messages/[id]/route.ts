@@ -24,7 +24,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, desc, eq, or, sql } from 'drizzle-orm';
 import { db } from '@/lib/db/client';
 import { kidMessages, children, sponsorships } from '@/lib/db/schema';
 import { getAdminRole } from '@/lib/admin-session';
@@ -105,6 +105,8 @@ export async function PATCH(
       childId: kidMessages.childId,
       firstName: children.firstName,
       displayName: children.displayName,
+      // childIdLegacy for the channel-tag sponsorship lookup below.
+      childIdLegacy: children.childId,
       shirtNumber: children.shirtNumber,
     })
     .from(kidMessages)
@@ -121,7 +123,12 @@ export async function PATCH(
     updatedAt: now,
   };
 
-  if (typeof body.simonNotes === 'string') {
+  // simonNotes: only overwrite when the client submitted a non-empty
+  // string. An empty submission on decline used to blow away a prior
+  // reason and made the Kevin decline alert read "No reason logged"
+  // even when Simon had left notes earlier. Trimmed comparison so
+  // whitespace-only submissions don't clobber either.
+  if (typeof body.simonNotes === 'string' && body.simonNotes.trim().length > 0) {
     patch.simonNotes = body.simonNotes;
   }
 
@@ -274,15 +281,25 @@ export async function PATCH(
       // Non-fatal — falls through as co-sponsor on error.
       let sponsorHoldsShirt = false;
       try {
+        // Match uuid childId OR legacy childIdLegacy — same OR pattern
+        // as /api/sponsor/notes so shirt-holder sponsorships joined via
+        // the legacy id still resolve. Order by childRevealedAt DESC
+        // so a shirt-linked row beats a co-sponsor row when both exist.
         const spRows = await db
           .select({ childRevealedAt: sponsorships.childRevealedAt })
           .from(sponsorships)
           .where(
             and(
               sql`lower(${sponsorships.sponsorEmail}) = lower(${message.sponsorEmail})`,
-              eq(sponsorships.childId, message.childId)
+              or(
+                eq(sponsorships.childId, message.childId),
+                message.childIdLegacy
+                  ? eq(sponsorships.childIdLegacy, message.childIdLegacy)
+                  : sql`false`
+              )
             )
           )
+          .orderBy(desc(sponsorships.childRevealedAt))
           .limit(1);
         sponsorHoldsShirt = !!spRows[0]?.childRevealedAt;
       } catch {

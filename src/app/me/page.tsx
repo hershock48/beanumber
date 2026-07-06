@@ -475,8 +475,8 @@ export default async function MePage() {
               Numbers yet.
             </p>
             <p className="text-[#666] mb-6 max-w-md mx-auto">
-              Get a Shirt, and the Number on the back becomes yours.
-              Or sponsor a kid directly without a Shirt.
+              Get a Shirt. The Number on the back is a real kid at the
+              campus &mdash; you meet them when the shirt arrives.
             </p>
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
               <Link

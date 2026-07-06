@@ -72,8 +72,8 @@ export function PreviewMyCampus({
           This is where sponsors come back. Every shirt has a number.
           Every number is a kid at the campus in Northern Uganda. When
           you buy a shirt, this page becomes yours &mdash; updates,
-          letters, the monthly newsletter, and the specific kid you got
-          matched with, all in one place.
+          letters, the monthly newsletter, and the specific kid your
+          number belongs to, all in one place.
         </p>
       </header>
 

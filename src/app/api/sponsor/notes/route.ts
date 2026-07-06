@@ -169,7 +169,14 @@ export async function POST(request: NextRequest) {
         sql`lower(${sponsorships.sponsorEmail}) = ${email}`,
         or(
           eq(sponsorships.childId, childRow.id),
-          eq(sponsorships.childIdLegacy, childRow.childId ?? '')
+          // Only include the legacy branch when we actually have a
+          // legacy id to match. eq(childIdLegacy, '') would otherwise
+          // match sponsorships whose legacy field is literally the
+          // empty string — probably nothing in prod, but a real
+          // false-positive surface if a bad row ever slipped in.
+          childRow.childId
+            ? eq(sponsorships.childIdLegacy, childRow.childId)
+            : sql`false`
         ),
         eq(sponsorships.status, 'Active')
       )
