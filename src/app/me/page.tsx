@@ -619,6 +619,47 @@ export default async function MePage() {
                       milestone={milestoneByKidId.get(row.recordId) ?? null}
                     />
                   ))}
+                {/* Ghost tile — matches KidCard footprint so the grid
+                    ends visually with "…and there's room for one more"
+                    instead of a flat wall of real cards. Points at
+                    /campus so the sponsor's next click lands on the
+                    explore-and-pick surface, not a hard shirt CTA
+                    (the shirt path lives in the Grow section below).
+                    Dashed border + gold hover keeps it obviously
+                    interactive without competing with real photos. */}
+                <Link
+                  href="/campus?back=me"
+                  className="group block border-2 border-dashed border-[#e8e0d4] hover:border-[#D4A843] transition-colors bg-white/40"
+                >
+                  <div className="aspect-[4/5] flex items-center justify-center bg-[#FFF8F0] group-hover:bg-[#faf1e0] transition-colors">
+                    <div className="text-center px-4">
+                      <div
+                        className="text-5xl md:text-6xl text-[#e8d5a0] group-hover:text-[#D4A843] transition-colors mb-1"
+                        style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
+                      >
+                        +
+                      </div>
+                      <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#c9beac] group-hover:text-[#0d0d0d] transition-colors">
+                        Who&rsquo;s next?
+                      </p>
+                    </div>
+                  </div>
+                  <div className="p-4">
+                    <p
+                      className="text-lg md:text-xl text-[#0d0d0d] mb-1 leading-tight"
+                      style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
+                    >
+                      Meet another kid.
+                    </p>
+                    <p className="text-xs text-[#666] leading-relaxed mb-3">
+                      Explore the campus and find a kid whose life
+                      you want to be in.
+                    </p>
+                    <p className="text-xs font-bold uppercase tracking-wider text-[#0d0d0d] group-hover:text-[#D4A843] transition-colors">
+                      Explore the campus &rarr;
+                    </p>
+                  </div>
+                </Link>
               </div>
             </section>
 
