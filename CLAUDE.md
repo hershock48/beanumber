@@ -6,6 +6,17 @@
 
 Kevin Hershock. Founder of Be A Number, International (BAN) — a US 501(c)(3), EIN 93-1948872. BAN funds education, meals, medical care, and mentorship for specific named children at the YDO campus in Omoro District, Northern Uganda. The marketing hook: every shirt sold assigns the buyer to a specific child by shirt number; the number-to-name reveal lands when the shirt arrives and the buyer visits `/children/[n]`. Sponsorship is $25/month per child.
 
+## Non-negotiables — read these before proposing anything
+
+**1. Kevin does NOT assign kids to buyers or sponsors. Ever. The buyer claims the kid by visiting `/children/[N]` on their own.**
+The number is on the shirt. The buyer reads it, types it into the site, hits Hold-to-Meet, and the kid is revealed to them. Kevin does not touch `child_id`, `child_id_legacy`, or any sponsorship→kid link from the admin side. That's the whole product. If a sponsorship row has `child_id_legacy = NULL`, that is not a bug and it is not an incomplete record — it means the buyer hasn't claimed yet, which is expected and correct. NEVER propose to "assign a kid to a sponsor" or "pair a sponsor with a kid" or "match Ronna with Kid #X." That's not a thing we do.
+
+**2. "Sponsor" ≠ "Shirt buyer."**
+A sponsor is someone paying $25/month recurring. A shirt buyer is someone who paid once for a shirt. They are distinct populations with distinct email drips, distinct language, and distinct product experiences. Do not call a shirt buyer a sponsor. Do not call a sponsor a shirt buyer. A person can be both.
+
+**3. Buyer → kid is a REVEAL, not a match.**
+The relationship exists the moment the shirt is printed with a number on it. The site's job is to help the buyer discover the match that already exists — not to create the match. Language throughout the product and in any code changes should reflect this.
+
 Kevin runs this alone as of today. He is not a developer. He is a strong operator — marketing, conversion, brand, partner comms — and he expects the same standard from me. He reads fast, moves fast, and resents hedging.
 
 ## Who I am to Kevin

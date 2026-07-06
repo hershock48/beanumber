@@ -69,9 +69,29 @@ Write like Kevin writes: conversational, warm, flowing sentences, natural pauses
 
 Kevin decided on April 18 to remove the 96.7% program efficiency stat from all marketing pages. It's a 2025 number that will shift as the org scales toward 80/20, and proactively advertising it invites people to wonder where the other 3.3% goes instead of focusing on the work. The stat stays on the financial summary report and governance page — where people go looking for it. Don't add it back to marketing copy.
 
-### STOP SAYING "WE'LL MATCH THEM TO A KID"
+### STOP SAYING "WE'LL MATCH THEM TO A KID" — restated 2026-07-06
 
-This came up 2026-06-07. I kept slipping back into the per-kid matching framing — "we can't create the Sponsorship yet because we don't know which kid," "this needs Kevin's manual matching step," etc. Kevin's exact words: *"WE ARE NOT MATCHING PEOPLE TO CHILDREN. WE USED TO DO THAT. WE ARE NOT MATCHING PEOPLE TO CHILDREN UNLESS THEY GO IN AND SPECIFICALLY CHOOSE A CHILD."* See `core_model.md` §0. **Sponsorship records get created at purchase. `Children` link blank. Done.** Any code or copy that implies otherwise is wrong.
+Also cross-listed as Non-negotiable #1 in `CLAUDE.md`. If I've read that, this section shouldn't be news. It's here so the message survives even if `CLAUDE.md` gets rewritten.
+
+**Kevin does not assign kids to buyers or sponsors. Ever.** The buyer claims the kid by visiting `/children/[N]` and hitting Hold-to-Meet. That's the entire product. Kevin doesn't touch `child_id`, `child_id_legacy`, or any sponsorship→kid link from the admin side.
+
+Consequences for how I read the data and talk to Kevin:
+
+- A sponsorship row with `child_id_legacy = NULL` is **NOT** a bug, **NOT** an incomplete record, and **NOT** something that needs my attention. It means the buyer hasn't claimed yet. That's the normal, correct steady state.
+- I do **NOT** suggest "assigning a kid to Ronna" or "pairing this sponsor with Kid #X" or "picking a next unassigned shirt number for her." Every version of that framing is wrong.
+- I do **NOT** describe a fresh sponsorship row as "waiting for kid assignment." It isn't waiting for me. It's waiting for the buyer.
+- I do **NOT** ask Kevin whether he wants me to auto-assign or manually assign. Neither is an option. There is no assignment.
+
+**Language substitutions:**
+- "Assign a kid" → "claim a kid" (buyer-side verb, not admin-side).
+- "Match this sponsor with a child" → not something we do; delete the sentence.
+- "This sponsor doesn't have a kid yet" → "this buyer hasn't claimed yet" (or often just: no comment needed at all).
+
+**History of this same lesson:**
+- 2026-06-07: first documented. Kevin's exact words: *"WE ARE NOT MATCHING PEOPLE TO CHILDREN. WE USED TO DO THAT. WE ARE NOT MATCHING PEOPLE TO CHILDREN UNLESS THEY GO IN AND SPECIFICALLY CHOOSE A CHILD."*
+- 2026-07-06: repeated on the Ronna Whitaker / Amy L Anderson email-typo thread. Kevin's exact words: *"no shit. remember. and this is me saying this way too many times now. this needs to be in the front and center of your .md or something, because we do not assign people to kids. they can claim them once they look up the number, but on my end, i dont keep track of what number she has or what numbers are going out. its up to the buyer to look up the number and claim the number if they choose."*
+
+If I catch myself typing anything that implies admin-side pairing, I stop and rewrite the sentence. See `core_model.md` §0. **Sponsorship records get created at purchase. `Children` link blank. Done.**
 
 ### Don't make up "fixes" without reading the code first
 
