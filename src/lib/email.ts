@@ -757,13 +757,14 @@ export async function sendKevinNoteAlert(params: {
   kidDisplayName: string;
   shirtNumber: number | null;
   /**
-   * True when the sponsor holds the shirt for THIS kid — i.e., they
-   * claimed the number via Hold-to-Meet. False for add-on sponsorships
-   * where the sponsor is paying $25/mo for a kid whose shirt is held
-   * by someone else. CLAUDE.md non-negotiable #4: shirt-first is the
-   * only door in, but existing sponsors can add shirt-less
-   * sponsorships for other kids at the campus. Kevin should be able
-   * to tell the two apart at a glance in the alert.
+   * True when the sponsor holds the shirt for THIS specific kid —
+   * i.e., they claimed this kid's number via Hold-to-Meet. False
+   * when they added the sponsorship without owning the shirt (a
+   * co-sponsor). Both are equally-real sponsorships per CLAUDE.md
+   * non-negotiable #4 — numbers are exclusive, sponsorships are not.
+   * Kevin uses the distinction to gauge which channel the note came
+   * through and for retention analysis; both channels get the same
+   * warmth in any follow-up.
    */
   sponsorHoldsShirt: boolean;
   bodyEn: string;
@@ -788,9 +789,17 @@ export async function sendKevinNoteAlert(params: {
     : kidDisplayName || kidFirstName;
   const preview = truncateForPreview(bodyEn, 240);
   const sponsorDisplay = sponsorName?.trim() || sponsorEmail;
+  // Channel tag — factual, not hierarchical. "Holds #N" for the
+  // shirt-linked sponsor (they physically hold the shirt with this
+  // kid's number). "Co-sponsor" for a sponsor who added the kid
+  // without owning the shirt. Both are equally-real sponsorships;
+  // the tag just tells Kevin which channel the note came through.
+  const holderTag = shirtNumber
+    ? `Holds #${shirtNumber}`
+    : `Shirt-linked`;
   const channelTag = sponsorHoldsShirt
-    ? `<span style="display: inline-block; background: #D4A843; color: #0d0d0d; padding: 2px 8px; font-size: 11px; font-weight: bold; letter-spacing: 0.05em; text-transform: uppercase; margin-left: 6px;">Shirt-holder</span>`
-    : `<span style="display: inline-block; background: #e8e0d4; color: #333; padding: 2px 8px; font-size: 11px; font-weight: bold; letter-spacing: 0.05em; text-transform: uppercase; margin-left: 6px;">Add-on sponsor</span>`;
+    ? `<span style="display: inline-block; background: #D4A843; color: #0d0d0d; padding: 2px 8px; font-size: 11px; font-weight: bold; letter-spacing: 0.05em; text-transform: uppercase; margin-left: 6px;">${escapeHtmlLocal(holderTag)}</span>`
+    : `<span style="display: inline-block; background: #e8e0d4; color: #333; padding: 2px 8px; font-size: 11px; font-weight: bold; letter-spacing: 0.05em; text-transform: uppercase; margin-left: 6px;">Co-sponsor</span>`;
 
   // Deep-link to the messages queue. There's no per-note URL yet, but
   // /admin/messages surfaces pending items at the top ordered by age,

@@ -17,12 +17,17 @@ A sponsor is someone paying $25/month recurring. A shirt buyer is someone who pa
 **3. Buyer → kid is a REVEAL, not a match.**
 The relationship exists the moment the shirt is printed with a number on it. The site's job is to help the buyer discover the match that already exists — not to create the match. Language throughout the product and in any code changes should reflect this.
 
-**4. Shirt-first is the ONLY door in. Add-on sponsorships are shirt-less on purpose.**
-Every new sponsor has to enter through a shirt — buy a shirt, get a number, meet the kid the number belongs to, then convert to $25/mo. There is no cold-direct sponsorship path. `/sponsorship` redirects to `/shirts`. `/campus` is sign-in gated (cold visitors get bounced to `/shirts`). `/meet/[id]` pages are individually shareable but the Sponsor button is signed-in only, and `/api/create-sponsor-checkout` returns 401 → `/shirts` if there's no valid sponsor session or one-tap shirt-buyer context. This is enforced at the API layer, not just UI.
+**4. Sponsorships are shirt-first. Shirts are not sponsorship-mandatory. Numbers are exclusive; sponsorships are not.**
 
-The add-on case is different but consistent: once someone is already a sponsor (they came through a shirt for kid A), they can browse `/campus` or land on `/meet/[N]` for kid B and start a second sponsorship for kid B. That second sponsorship does NOT get a number attached — kid B's shirt number still belongs to whoever holds kid B's shirt. The add-on sponsor sees kid B on their `/me` KidCard without the `#N` badge (because they haven't claimed that number via Hold-to-Meet). Adding a sponsorship is not the same as owning the kid's shirt.
+*Becoming a sponsor requires a shirt first.* Every new sponsorship traces back to a shirt purchase. Buy shirt → shirt arrives with a specific kid's number → Hold-to-Meet reveals the kid → optional convert to $25/mo. There is no cold-direct sponsorship path. `/sponsorship` redirects to `/shirts`. `/campus` is sign-in gated. `/meet/[id]` Sponsor button is signed-in only. `/api/create-sponsor-checkout` returns 401 → `/shirts` unless there's a sponsor session or one-tap shirt-buyer context. Enforced at the API layer, not just UI.
 
-Practical consequence for docs and copy: "your kid" only lands cleanly when the sponsor has exactly one shirt-linked kid. Language for the add-on case should say "the kid" or use the kid's name — not "your kid," which implies ownership of the number.
+*Buying a shirt does not require sponsorship.* A shirt buyer can stay a shirt holder forever — hold the number, meet the kid, and never convert to $25/mo. That's a valid end state. "Holder" is a real status, not a stalled sponsor.
+
+*Once you're a sponsor, add-on sponsorships are open.* An existing sponsor can browse `/campus` or land on `/meet/[N]` for kid B and start a second sponsorship for kid B without another shirt. Multiple sponsors on one kid is normal — a kid can have 1 shirt-holder-sponsor plus N co-sponsors, or (if the shirt-holder never converted) 0 shirt-linked sponsors plus N co-sponsors.
+
+*The exclusivity is the NUMBER, not the RELATIONSHIP.* The kid's shirt number is a 1-to-1 physical object with a single holder. Sponsorships are many-to-1 (many sponsors can support one kid) and one-to-many (one sponsor can support many kids). A co-sponsor's `/me` KidCard for that kid does NOT show the `#N` badge (because they don't hold the shirt) — but the sponsorship itself is fully real and "your kid" language is fine for every kid a sponsor sponsors. The relationship is real; only the number-to-shirt binding is exclusive.
+
+Practical consequence: "your kid / your kids" is safe copy for any sponsored kid. What you can't do is imply a co-sponsor holds the number — no `#N` badge on their card for that kid, no "the number belongs to you" language for a kid they added later.
 
 Kevin runs this alone as of today. He is not a developer. He is a strong operator — marketing, conversion, brand, partner comms — and he expects the same standard from me. He reads fast, moves fast, and resents hedging.
 
