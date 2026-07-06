@@ -181,8 +181,13 @@ function MessageCard({
   }
 
   async function decline() {
+    // The decline endpoint auto-sends a static template email to
+    // the sponsor — it does NOT include this reason. Anything typed
+    // here is stored on simon_notes for admin reference only.
+    // Prompt copy reflects that so Simon doesn't think it's being
+    // used to personalize the sponsor's explanation.
     const reason = prompt(
-      "What's wrong with this note? Kevin will use your notes to draft the sponsor's explanation. (Optional — hit Cancel to skip.)"
+      "Anything to note internally? Kevin can reference this if the sponsor asks — the sponsor's decline email is a static template and won't include what you type here. (Optional — hit Cancel to skip.)"
     );
     if (reason === null) return;
     const nextNotes = reason ? `${notes}\n\nDecline reason: ${reason}`.trim() : notes;
