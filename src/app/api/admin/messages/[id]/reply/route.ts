@@ -201,21 +201,21 @@ export async function POST(
       const greeting = firstWordOfName
         ? `Hey ${escapeHtml(firstWordOfName)},`
         : 'Hey,';
-      const bodySafe = escapeHtml(bodyEn);
+      // Teaser only — no body preview. The reply itself lives on the
+      // site so sponsors have to click through to read it. Keeps the
+      // emotional pull ("[Kid] wrote you back") without giving away
+      // the moment in Gmail, and gets them back to /children/[N]
+      // where the whole thread + kid page context sits.
       await sendEmail({
         to: { email: parent.sponsorEmail },
         from: { email: FROM_EMAIL, name: 'Kevin at Be A Number' },
         subject: `${firstNamePlain} wrote you back.`,
         html: wrap(`
           <p>${greeting}</p>
-          <p>${firstNameSafe} sat down at the campus and wrote you a reply. The team translated it and here it is:</p>
-          <blockquote style="border-left: 3px solid #D4A843; margin: 20px 0; padding: 6px 20px; color: #333; font-style: italic;">
-            ${bodySafe}
-          </blockquote>
-          <p>The full thread lives on ${firstNameSafe}&rsquo;s page.</p>
-          <p style="text-align: center; margin: 24px 0;">
-            <a href="${kidPageUrl}" style="display: inline-block; background: #D4A843; color: #0d0d0d; font-weight: bold; text-decoration: none; padding: 12px 28px; font-size: 14px; letter-spacing: 0.05em;">
-              Open ${firstNameSafe}&rsquo;s page
+          <p>${firstNameSafe} sat down at the campus this week and wrote you a reply. The team translated it and it&rsquo;s waiting for you on their page.</p>
+          <p style="text-align: center; margin: 28px 0;">
+            <a href="${kidPageUrl}" style="display: inline-block; background: #D4A843; color: #0d0d0d; font-weight: bold; text-decoration: none; padding: 14px 32px; font-size: 15px; letter-spacing: 0.05em;">
+              Read ${firstNameSafe}&rsquo;s reply
             </a>
           </p>
           <p>Write back whenever you want.</p>
