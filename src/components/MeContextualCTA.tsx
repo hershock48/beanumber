@@ -60,14 +60,42 @@ export function MeContextualCTA({ state }: { state: MeCTAState }) {
     );
   }
 
+  // Grow state — two honest paths per Kevin's feedback. A shirt is
+  // the classic entry point (new number, new kid, new reveal); browsing
+  // the campus is the add-on path for a sponsor who already has kids
+  // and wants to co-sponsor another. Both are valid; the CTA offers
+  // both instead of pretending there's just one.
   return (
-    <CTABlock
-      kicker="Grow your campus"
-      headline="Add another kid."
-      body="Every shirt carries a different number. Every number is a different kid. Nothing locks you to one."
-      ctaHref="/shirts"
-      ctaLabel="Shop another shirt"
-    />
+    <section className="bg-[#1a1208] text-white px-6 md:px-10 py-8 md:py-10 mb-10 md:mb-14">
+      <p className="text-xs font-bold uppercase tracking-[0.3em] text-[#D4A843] mb-3">
+        Grow your campus
+      </p>
+      <h2
+        className="text-2xl md:text-3xl mb-3 leading-tight"
+        style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
+      >
+        Add another kid.
+      </h2>
+      <p className="text-[#d8cfc1] leading-relaxed max-w-xl mb-6">
+        Grab another shirt for a fresh number-to-kid reveal, or browse
+        the campus and pick a kid to co-sponsor. Either way, nothing
+        locks you to one.
+      </p>
+      <div className="flex flex-col sm:flex-row gap-3">
+        <Link
+          href="/shirts"
+          className="inline-block bg-[#D4A843] hover:bg-[#c49a3a] text-[#0d0d0d] px-6 py-3 text-xs font-bold uppercase tracking-wider transition-colors text-center"
+        >
+          Shop another shirt
+        </Link>
+        <Link
+          href="/campus"
+          className="inline-block bg-transparent border border-[#d8cfc1] hover:border-white hover:bg-white/5 text-white px-6 py-3 text-xs font-bold uppercase tracking-wider transition-colors text-center"
+        >
+          Explore the campus
+        </Link>
+      </div>
+    </section>
   );
 }
 

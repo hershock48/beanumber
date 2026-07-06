@@ -512,14 +512,18 @@ export default async function MePage() {
                         />
                       </p>
                       <p
-                        className="text-xl md:text-2xl leading-tight mb-3"
+                        className="text-xl md:text-2xl leading-tight mb-4"
                         style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
                       >
                         {latestNewsletter.title || latestNewsletter.subject || 'Latest from Uganda'}
                       </p>
-                      <p className="text-xs uppercase tracking-wider text-[#D4A843] font-bold group-hover:underline">
+                      {/* Explicit button-style affordance instead of the
+                          previous subtle "text with hover-underline"
+                          — Kevin flagged the old one as reading like
+                          decorative text rather than a click target. */}
+                      <span className="inline-block bg-[#D4A843] hover:bg-[#c49a3a] text-[#0d0d0d] px-5 py-2.5 text-xs font-bold uppercase tracking-wider transition-colors">
                         Read this issue &rarr;
-                      </p>
+                      </span>
                     </div>
                   </div>
                 </Link>
@@ -539,20 +543,50 @@ export default async function MePage() {
                   className="text-2xl md:text-3xl text-[#0d0d0d] leading-none"
                   style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
                 >
-                  Your kids.
+                  Your Kids.
                 </h2>
                 <p className="text-xs font-bold uppercase tracking-[0.25em] text-[#888]">
                   {sponsors.length + holders.length}
                 </p>
               </div>
+              {/* Order:
+                    1. Kids you HOLD THE SHIRT for (revealedAt set),
+                       ascending by shirt number.
+                    2. Co-sponsors (no shirt claim), ascending by
+                       sponsorship start date so earlier relationships
+                       come first.
+                  Kevin's call: the shirt-holder relationship is the
+                  primary story ("I met this kid via my number"); those
+                  cards should lead. Co-sponsors follow in the order
+                  they entered the sponsor's life. */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                {[...sponsors, ...holders].map(row => (
-                  <KidCard
-                    key={row.recordId}
-                    row={row}
-                    milestone={milestoneByKidId.get(row.recordId) ?? null}
-                  />
-                ))}
+                {[...sponsors, ...holders]
+                  .sort((a, b) => {
+                    const aHoldsShirt = !!a.revealedAt;
+                    const bHoldsShirt = !!b.revealedAt;
+                    if (aHoldsShirt !== bHoldsShirt) return aHoldsShirt ? -1 : 1;
+                    if (aHoldsShirt) {
+                      return (
+                        (a.child.shirtNumber ?? Number.MAX_SAFE_INTEGER) -
+                        (b.child.shirtNumber ?? Number.MAX_SAFE_INTEGER)
+                      );
+                    }
+                    // Co-sponsors — earlier startDate first.
+                    const aDate = a.startDate
+                      ? new Date(a.startDate).getTime()
+                      : Number.MAX_SAFE_INTEGER;
+                    const bDate = b.startDate
+                      ? new Date(b.startDate).getTime()
+                      : Number.MAX_SAFE_INTEGER;
+                    return aDate - bDate;
+                  })
+                  .map(row => (
+                    <KidCard
+                      key={row.recordId}
+                      row={row}
+                      milestone={milestoneByKidId.get(row.recordId) ?? null}
+                    />
+                  ))}
               </div>
             </section>
 
