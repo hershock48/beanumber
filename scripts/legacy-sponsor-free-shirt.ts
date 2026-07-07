@@ -43,6 +43,13 @@ const DRY_RUN = process.argv.includes('--dry-run');
 
 // The 3 external sponsors + their Stripe customers + sponsored kid.
 // Kevin's own account (kevin@beanumber.org) intentionally omitted.
+//
+// The kidFirstName is only used for email personalization ("you sponsored
+// Ismail, so skip the continue-monthly toggle since you're already
+// sponsoring him"). The shirt they receive will carry WHATEVER kid number
+// is in inventory at fulfillment — NOT their sponsored kid's number.
+// Their existing sponsorship of the named kid is unchanged; the shirt
+// introduces them to a second kid via hold-to-meet.
 const SPONSORS = [
   {
     email: 'khersh52@gmail.com',
@@ -50,7 +57,6 @@ const SPONSORS = [
     firstName: 'Dad',
     stripeCustomerId: 'cus_UcZtfwSn5fP7wJ',
     kidFirstName: 'Ismail',
-    kidShirtNumber: 48,
     codeSlug: 'KEVINSR',
   },
   {
@@ -59,7 +65,6 @@ const SPONSORS = [
     firstName: 'Karen',
     stripeCustomerId: 'cus_Ufbh3tHOUBKtyN',
     kidFirstName: 'Angel',
-    kidShirtNumber: 36,
     codeSlug: 'KAREN',
   },
   {
@@ -68,7 +73,6 @@ const SPONSORS = [
     firstName: 'Jason',
     stripeCustomerId: 'cus_UW2WXxCE0QPFd6',
     kidFirstName: 'Konshens',
-    kidShirtNumber: 37,
     codeSlug: 'JASON',
   },
 ];
@@ -215,13 +219,12 @@ async function main() {
     });
 
     if (DRY_RUN) {
-      console.log(`  [dry-run] Would email ${r.email} with code ${code} for ${r.kidFirstName} #${r.kidShirtNumber}`);
+      console.log(`  [dry-run] Would email ${r.email} with code ${code} (sponsors ${r.kidFirstName})`);
     } else {
       const result = await sendLegacySponsorFreeShirtEmail({
         recipientEmail: r.email,
         recipientName: r.name,
         kidFirstName: r.kidFirstName,
-        kidShirtNumber: r.kidShirtNumber,
         promoCode: code,
       });
       if (result.success) {
@@ -261,12 +264,21 @@ async function main() {
     console.log();
   }
 
-  console.log('=== Sponsor fulfillment mapping (print for Kevin) ===\n');
-  SPONSORS.forEach(r => {
-    console.log(`  ${r.name.padEnd(24)} → ship a shirt with #${r.kidShirtNumber} (${r.kidFirstName})`);
-  });
+  console.log('=== Done ===');
   console.log(
-    '\n  (Legacy donors: no specific kid — ship any shirt; they meet the kid via hold-to-meet.)\n'
+    '  All 8 shirts get a number from inventory at fulfillment. The 3 sponsors'
+  );
+  console.log(
+    '  (Kevin Sr, Karen, Jason) keep their existing sponsorships of Ismail/'
+  );
+  console.log(
+    '  Angel/Konshens unchanged; the shirt introduces them to a second kid'
+  );
+  console.log(
+    '  via hold-to-meet. The 5 Donorbox donors have no existing sponsorship'
+  );
+  console.log(
+    '  — the shirt is their first kid connection. No mapping to print.\n'
   );
 }
 

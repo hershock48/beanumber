@@ -578,36 +578,30 @@ export async function sendNewsletterNotificationEmailForLegacyDonor(params: {
  * specific kid before the shirt-first model existed (never bought a shirt).
  *
  * They get a Stripe promotion code (100% off shirt, customer-bound,
- * single-use) plus copy that ties the free shirt back to the kid they've
- * already been sponsoring. When they redeem, Kevin ships them a shirt with
- * their sponsored kid's number so hold-to-meet reveals the same kid.
+ * single-use). The shirt they receive carries WHATEVER kid number is in
+ * inventory at fulfillment time — NOT their sponsored kid's number. So
+ * the copy frames it as a chance to meet a SECOND kid; their existing
+ * sponsorship of the first kid is unchanged.
  */
 export async function sendLegacySponsorFreeShirtEmail(params: {
   recipientEmail: string;
   recipientName: string;
   kidFirstName: string;
-  kidShirtNumber: number;
   promoCode: string;
 }): Promise<EmailSendResult> {
-  const {
-    recipientEmail,
-    recipientName,
-    kidFirstName,
-    kidShirtNumber,
-    promoCode,
-  } = params;
+  const { recipientEmail, recipientName, kidFirstName, promoCode } = params;
   const firstName = (recipientName || 'Friend').trim().split(/\s+/)[0] || 'Friend';
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.beanumber.org';
-  const subject = `A shirt for ${kidFirstName}, on us`;
+  const subject = `A shirt on us`;
 
   const html = wrapTransactionalEmail(`
     <p style="margin-top: 0;">Hey ${escapeHtml(firstName)},</p>
 
     <p>Before we had shirts, you sponsored ${escapeHtml(kidFirstName)}. That was months ago &mdash; thank you for staying with ${escapeHtml(kidFirstName)} the whole time.</p>
 
-    <p>Since then, every shirt at Be A Number ties its buyer to a kid. Number on the back, hold-to-meet on beanumber.org, and the kid shows up. It&rsquo;s the whole point of the model now &mdash; and you should have that moment with ${escapeHtml(kidFirstName)}.</p>
+    <p>Since then, every shirt at Be A Number ties its buyer to a kid by number. Number on the back, hold-to-meet on beanumber.org, and the kid shows up. It&rsquo;s the whole model now &mdash; and you should have that moment too.</p>
 
-    <p>Here&rsquo;s a code for a free shirt with ${escapeHtml(kidFirstName)}&rsquo;s number on the back:</p>
+    <p>Here&rsquo;s a code for a free shirt on us:</p>
 
     <p style="margin: 24px 0; text-align: center;">
       <span style="display: inline-block; background: #0d0d0d; color: #D4A843; font-family: 'SF Mono', Menlo, monospace; font-size: 18px; font-weight: bold; letter-spacing: 0.1em; padding: 16px 28px; border-radius: 4px;">${escapeHtml(promoCode)}</span>
@@ -615,7 +609,7 @@ export async function sendLegacySponsorFreeShirtEmail(params: {
 
     <p>Pick your style at <a href="${siteUrl}/shirts" style="color: #D4A843; font-weight: bold;">beanumber.org/shirts</a>, add to cart, and enter the code at checkout. Shipping is $5. Skip the &ldquo;continue monthly&rdquo; toggle &mdash; you&rsquo;re already sponsoring ${escapeHtml(kidFirstName)}.</p>
 
-    <p>When it arrives, hit hold-to-meet on <a href="${siteUrl}/${kidShirtNumber}" style="color: #D4A843;">beanumber.org/${kidShirtNumber}</a> and ${escapeHtml(kidFirstName)} will be right there &mdash; the same kid you&rsquo;ve been sponsoring.</p>
+    <p>When it arrives, look at the number on the back and hit hold-to-meet on <strong>beanumber.org/&lt;that number&gt;</strong>. You&rsquo;ll meet a different kid than ${escapeHtml(kidFirstName)} &mdash; someone new. ${escapeHtml(kidFirstName)} stays yours; this just adds another kid to the family.</p>
 
     <p style="margin-top: 24px; font-size: 14px; color: #888;">Reply to this email if you hit any snag. The code is tied to your account, so it only works from ${escapeHtml(recipientEmail)} and only once.</p>
 
