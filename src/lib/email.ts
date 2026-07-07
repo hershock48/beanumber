@@ -640,8 +640,15 @@ export async function sendLegacyDonorFreeShirtEmail(params: {
   recipientEmail: string;
   recipientName: string;
   promoCode: string;
+  /** How many times the code can be redeemed. Defaults to 1. */
+  maxRedemptions?: number;
 }): Promise<EmailSendResult> {
-  const { recipientEmail, recipientName, promoCode } = params;
+  const {
+    recipientEmail,
+    recipientName,
+    promoCode,
+    maxRedemptions = 1,
+  } = params;
   const firstName = (recipientName || 'Friend').trim().split(/\s+/)[0] || 'Friend';
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.beanumber.org';
   const subject = `A shirt on us`;
@@ -663,7 +670,11 @@ export async function sendLegacyDonorFreeShirtEmail(params: {
 
     <p>When it arrives, look at the number on the back, hit hold-to-meet on <strong>beanumber.org/&lt;that number&gt;</strong>, and meet the kid it belongs to.</p>
 
-    <p style="margin-top: 24px; font-size: 14px; color: #888;">Reply to this email if you hit any snag. The code is one-time use.</p>
+    <p style="margin-top: 24px; font-size: 14px; color: #888;">Reply to this email if you hit any snag. ${
+      maxRedemptions === 1
+        ? 'The code is one-time use.'
+        : `The code works up to ${maxRedemptions} times &mdash; enough for the whole household.`
+    }</p>
 
     <p>Kevin</p>
   `);

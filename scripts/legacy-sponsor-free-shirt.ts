@@ -82,7 +82,8 @@ const LEGACY_DONORS = [
   { email: 'laundawheatley@gmail.com', name: 'launda Wheatley', codeSlug: 'WHEATLEY' },
   { email: 'lhetke1993@gmail.com', name: 'Luke Hetke', codeSlug: 'HETKE' },
   { email: 'josephjeffreys91@gmail.com', name: 'Joseph Jeffreys', codeSlug: 'JEFFREYS' },
-  { email: 'juliaamting@gmail.com', name: 'Julia & Kenny Morgensai', codeSlug: 'MORGENSAI' },
+  // Julia & Kenny are a couple — two shirts, one code.
+  { email: 'juliaamting@gmail.com', name: 'Julia & Kenny Morgensai', codeSlug: 'MORGENSAI', maxRedemptions: 2 },
   { email: 'trueformchiropractic@gmail.com', name: 'Joseph Vear', codeSlug: 'VEAR' },
 ];
 
@@ -135,13 +136,15 @@ async function createPromotionCode(params: {
   stripeCustomerId?: string;
   codeSlug: string;
   program: string;
+  maxRedemptions?: number;
 }): Promise<string> {
   const code = `LEGACY-${params.codeSlug}-${randomSuffix()}`;
+  const maxRedemptions = params.maxRedemptions ?? 1;
 
   if (DRY_RUN) {
     const binding = params.stripeCustomerId
       ? `bound to ${params.stripeCustomerId}`
-      : 'unbound (random-code single-use)';
+      : `unbound (random-code, ${maxRedemptions === 1 ? 'single-use' : `${maxRedemptions} uses`})`;
     console.log(`  [dry-run] Would create promo code: ${code} ${binding}`);
     return code;
   }
@@ -184,7 +187,7 @@ async function createPromotionCode(params: {
     coupon: params.couponId,
     code,
     ...(params.stripeCustomerId ? { customer: params.stripeCustomerId } : {}),
-    max_redemptions: 1,
+    max_redemptions: maxRedemptions,
     expires_at: expiresAt,
     metadata: {
       program: params.program,
@@ -237,6 +240,7 @@ async function main() {
       couponId,
       codeSlug: d.codeSlug,
       program: 'legacy_donor_free_shirt',
+      maxRedemptions: d.maxRedemptions,
     });
 
     if (DRY_RUN) {
@@ -246,6 +250,7 @@ async function main() {
         recipientEmail: d.email,
         recipientName: d.name,
         promoCode: code,
+        maxRedemptions: d.maxRedemptions,
       });
       if (result.success) {
         console.log(`  ✓ Sent to ${d.email}`);
