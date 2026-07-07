@@ -254,6 +254,9 @@ export async function POST(request: NextRequest) {
         shipping_options: shippingOptions,
         mode: 'payment',
         customer_creation: 'always',
+        // Stripe-native promotion codes (e.g. legacy-sponsor free-shirt codes).
+        // Payment-mode only — matches the same flag on create-shirt-checkout.
+        allow_promotion_codes: true,
         payment_intent_data: {
           setup_future_usage: 'off_session',
           metadata,

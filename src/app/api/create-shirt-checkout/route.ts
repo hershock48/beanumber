@@ -133,6 +133,15 @@ export async function POST(request: NextRequest) {
         shipping_options: [{ shipping_rate_data: { type: 'fixed_amount' as const, fixed_amount: { amount: 500, currency: 'usd' }, display_name: 'Standard shipping (USPS)' } }],
         mode: 'payment',
         customer_creation: 'always',
+        // Stripe-native promotion codes (e.g. legacy-sponsor free-shirt codes
+        // created via /ops/legacy-shirt-promo). The inline promo_code system
+        // in @/lib/promo-codes covers the shirt-price-only discounts (WIN10,
+        // etc.); this flag turns on the "Add promotion code" field at
+        // Stripe's checkout UI so customer-bound single-use codes managed in
+        // Stripe can also be entered. Payment-mode only — subscription-mode
+        // (shirt+monthly) intentionally omits it to avoid month-1 discounts
+        // colliding with the fixed $25/mo product framing.
+        allow_promotion_codes: true,
         payment_intent_data: {
           setup_future_usage: 'off_session',
           metadata: sharedMetadata,
