@@ -603,13 +603,15 @@ export async function sendLegacySponsorFreeShirtEmail(params: {
 
     <p>The old model didn&rsquo;t include a shirt. This one does &mdash; and we want to make that up to you. ${escapeHtml(kidFirstName)} stays yours, the sponsorship is unchanged, and now you&rsquo;ve got a shirt with ${escapeHtml(kidFirstName)}&rsquo;s number on the back to actually wear.</p>
 
-    <p>Here&rsquo;s a code for a free shirt on us:</p>
+    <p><strong>This is our thank-you. The shirt is free, shipping is on us, no charge at all.</strong></p>
 
     <p style="margin: 24px 0; text-align: center;">
       <span style="display: inline-block; background: #0d0d0d; color: #D4A843; font-family: 'SF Mono', Menlo, monospace; font-size: 18px; font-weight: bold; letter-spacing: 0.1em; padding: 16px 28px; border-radius: 4px;">${escapeHtml(promoCode)}</span>
     </p>
 
-    <p>Pick your style at <a href="${siteUrl}/shirts" style="color: #D4A843; font-weight: bold;">beanumber.org/shirts</a>, add to cart, and enter the code at checkout. Shipping is $5. Skip the &ldquo;continue monthly&rdquo; toggle &mdash; you&rsquo;re already sponsoring ${escapeHtml(kidFirstName)}.</p>
+    <p>Pick your style at <a href="${siteUrl}/shirts" style="color: #D4A843; font-weight: bold;">beanumber.org/shirts</a>, add to cart, and enter the code at checkout. Skip the &ldquo;continue monthly&rdquo; toggle &mdash; you&rsquo;re already sponsoring ${escapeHtml(kidFirstName)}.</p>
+
+    <p style="font-size: 14px; color: #555;">One note on the checkout page: you may see $5 for shipping. We cover it &mdash; a refund lands back on your card as soon as the order goes through.</p>
 
     <p>When it arrives, look at the number on the back, hit hold-to-meet on <strong>beanumber.org/&lt;that number&gt;</strong>, and ${escapeHtml(kidFirstName)} will be right there &mdash; the same kid you&rsquo;ve been sponsoring the whole time. Rock it, share it, and pull people into the story.</p>
 
@@ -652,17 +654,21 @@ export async function sendLegacyDonorFreeShirtEmail(params: {
   const html = wrapTransactionalEmail(`
     <p style="margin-top: 0;">Hey ${escapeHtml(firstName)},</p>
 
-    <p>You&rsquo;ve been supporting Be A Number for a long time &mdash; thank you. Whether it was one gift or many, it&rsquo;s part of what got us this far.</p>
+    <p>You&rsquo;ve been giving monthly to Be A Number for a long time &mdash; thank you. That kind of steady support is a big part of what got us this far.</p>
 
     <p>We&rsquo;ve built out a shirt-first model since those early days. Every shirt sold at Be A Number ties its buyer to a specific kid by the number on the back. Hold-to-meet on beanumber.org, and the kid shows up. It&rsquo;s how the whole thing works now &mdash; and it&rsquo;s way more fun than clicking &ldquo;give.&rdquo;</p>
 
-    <p>You&rsquo;ve been part of this a while, and we want to make sure you&rsquo;re pulled all the way in. Here&rsquo;s a code for a free shirt on us:</p>
+    <p>You&rsquo;ve been part of this a while and we want to make sure you&rsquo;re pulled all the way in.</p>
+
+    <p><strong>This is our thank-you. The shirt is free, shipping is on us, no charge at all.</strong></p>
 
     <p style="margin: 24px 0; text-align: center;">
       <span style="display: inline-block; background: #0d0d0d; color: #D4A843; font-family: 'SF Mono', Menlo, monospace; font-size: 18px; font-weight: bold; letter-spacing: 0.1em; padding: 16px 28px; border-radius: 4px;">${escapeHtml(promoCode)}</span>
     </p>
 
-    <p>Pick your style at <a href="${siteUrl}/shirts" style="color: #D4A843; font-weight: bold;">beanumber.org/shirts</a>, add to cart, and enter the code at checkout. Shipping is $5. Skip the &ldquo;continue monthly&rdquo; toggle unless you want to layer that on &mdash; this code covers the shirt.</p>
+    <p>Pick your style at <a href="${siteUrl}/shirts" style="color: #D4A843; font-weight: bold;">beanumber.org/shirts</a>, add to cart, and enter the code at checkout. Skip the &ldquo;continue monthly&rdquo; toggle unless you want to layer another sponsorship on top &mdash; this code covers the shirt.</p>
+
+    <p style="font-size: 14px; color: #555;">One note on the checkout page: you may see $5 for shipping. We cover it &mdash; a refund lands back on your card as soon as the order goes through.</p>
 
     <p>When it arrives, look at the number on the back, hit hold-to-meet on <strong>beanumber.org/&lt;that number&gt;</strong>, and meet the kid it belongs to. Rock the shirt, share the story, and pull more people in.</p>
 
