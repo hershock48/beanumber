@@ -44,6 +44,32 @@ import {
 // teaser + per-kid link list — every newsletter becomes a reason for
 // the sponsor to come back to their kid's page.
 
+/**
+ * Emails that should NOT receive the standard newsletter variants. Used
+ * for the legacy free-shirt program — those 8 people get a combined
+ * email (newsletter + free-shirt code) sent separately via
+ * scripts/legacy-sponsor-free-shirt.ts, so they'd otherwise get two
+ * emails for the same event. Filtering them here means one email each.
+ *
+ * Once the free-shirt program has run and everyone has redeemed (or the
+ * codes have expired), this list can go back to empty.
+ */
+const LEGACY_SHIRT_SUPPRESS_EMAILS = new Set(
+  [
+    // Sponsor track — combined email includes the newsletter content
+    // above the free-shirt thank-you.
+    'khersh52@gmail.com',
+    'ksmy1959@gmail.com',
+    'jfreese1985@gmail.com',
+    // Donorbox donor track — same combined-email treatment.
+    'laundawheatley@gmail.com',
+    'lhetke1993@gmail.com',
+    'josephjeffreys91@gmail.com',
+    'juliaamting@gmail.com',
+    'trueformchiropractic@gmail.com',
+  ].map(e => e.toLowerCase())
+);
+
 // ─── Helpers ──────────────────────────────────────────────────────────
 
 /**
@@ -483,7 +509,14 @@ export async function sendCampusNewsletterTool(
   // boolean.
   //
   // Structure preserved so the tightening is a one-line change.
-  const recipients: GroupedRecipient[] = candidateRecipients;
+  //
+  // Legacy free-shirt suppression: those 8 people get a combined
+  // "newsletter + free-shirt code" email from the ops script instead
+  // of the standard variant, so we exclude them here to avoid a
+  // duplicate send.
+  const recipients: GroupedRecipient[] = candidateRecipients.filter(
+    r => !LEGACY_SHIRT_SUPPRESS_EMAILS.has(r.email.trim().toLowerCase())
+  );
   const suppressedCount = 0;
 
   // 3c. Resolve every linked child record to (firstName, shirtNumber).
@@ -512,9 +545,15 @@ export async function sendCampusNewsletterTool(
       fetchEmailableDonors(),
       fetchEmailsWithStripeDonations(),
     ]);
-    const nonSponsorList = emailableDonorsCached.filter(
-      d => !sponsorEmailSet.has(d.email.trim().toLowerCase())
-    );
+    const nonSponsorList = emailableDonorsCached.filter(d => {
+      const emailLower = d.email.trim().toLowerCase();
+      // Skip anyone already covered by the sponsor track.
+      if (sponsorEmailSet.has(emailLower)) return false;
+      // Skip the legacy free-shirt cohort — they get a combined email
+      // from the ops script that includes newsletter content.
+      if (LEGACY_SHIRT_SUPPRESS_EMAILS.has(emailLower)) return false;
+      return true;
+    });
     nonSponsorRecipientCount = nonSponsorList.length;
     for (const d of nonSponsorList) {
       const email = d.email.trim().toLowerCase();
@@ -729,9 +768,14 @@ export async function sendCampusNewsletterTool(
       emailableDonorsCached.length > 0 ? emailableDonorsCached : await fetchEmailableDonors();
     const stripeEmails =
       stripeEmailsCached.size > 0 ? stripeEmailsCached : await fetchEmailsWithStripeDonations();
-    const nonSponsorRecipients = emailableDonors.filter(
-      d => !sponsorEmailSet.has(d.email.trim().toLowerCase())
-    );
+    const nonSponsorRecipients = emailableDonors.filter(d => {
+      const emailLower = d.email.trim().toLowerCase();
+      if (sponsorEmailSet.has(emailLower)) return false;
+      // Same legacy free-shirt suppression as the count step above —
+      // keeps the actual sends aligned with what the dry-run reports.
+      if (LEGACY_SHIRT_SUPPRESS_EMAILS.has(emailLower)) return false;
+      return true;
+    });
 
     logger.info('Newsletter non-sponsor send starting', {
       newsletterId: newsletter.id,

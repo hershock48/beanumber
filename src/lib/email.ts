@@ -588,14 +588,47 @@ export async function sendLegacySponsorFreeShirtEmail(params: {
   recipientName: string;
   kidFirstName: string;
   promoCode: string;
+  /**
+   * Optional newsletter section shown ABOVE the free-shirt content. When
+   * present, the email starts with a "This month at the campus" block
+   * (hero photo + teaser + read-more link to /news) so the recipient
+   * gets the newsletter content plus the thank-you in one email.
+   */
+  newsletter?: {
+    title: string;
+    teaser: string;
+    heroPhotoUrl?: string;
+    newsUrl: string;
+  };
 }): Promise<EmailSendResult> {
-  const { recipientEmail, recipientName, kidFirstName, promoCode } = params;
+  const { recipientEmail, recipientName, kidFirstName, promoCode, newsletter } = params;
   const firstName = (recipientName || 'Friend').trim().split(/\s+/)[0] || 'Friend';
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.beanumber.org';
-  const subject = `A shirt for you, on us`;
+  const subject = newsletter
+    ? `A shirt for you, on us — plus this month at the campus`
+    : `A shirt for you, on us`;
+
+  const newsletterBlock = newsletter
+    ? `
+    <h2 style="font-size: 20px; margin: 0 0 12px 0;">First — this month at the campus</h2>
+    <p>The July update just went live: <strong>${escapeHtml(newsletter.title)}</strong>. Read the full thing at <a href="${escapeHtml(newsletter.newsUrl)}" style="color: #D4A843; font-weight: bold;">beanumber.org/news</a>.</p>
+    ${
+      newsletter.heroPhotoUrl
+        ? `<img src="${escapeAttr(newsletter.heroPhotoUrl)}" alt="From the campus" style="display:block;width:100%;max-width:560px;height:auto;border-radius:4px;margin:16px 0 20px 0;">`
+        : ''
+    }
+    <p style="color: #555; font-style: italic; border-left: 3px solid #D4A843; padding-left: 16px; margin: 20px 0;">${escapeHtml(newsletter.teaser)}</p>
+
+    <hr style="border: none; border-top: 1px solid #ddd; margin: 32px 0;">
+
+    <h2 style="font-size: 20px; margin: 0 0 12px 0;">And &mdash; a shirt for you, on us</h2>
+    `
+    : '';
 
   const html = wrapTransactionalEmail(`
     <p style="margin-top: 0;">Hey ${escapeHtml(firstName)},</p>
+
+    ${newsletterBlock}
 
     <p>Back when you signed up, our model let you pick a specific kid to sponsor &mdash; that&rsquo;s how you ended up with ${escapeHtml(kidFirstName)}, and ${escapeHtml(kidFirstName)} has stayed with you the whole time. Thank you for that.</p>
 
@@ -638,19 +671,48 @@ export async function sendLegacyDonorFreeShirtEmail(params: {
   promoCode: string;
   /** How many times the code can be redeemed. Defaults to 1. */
   maxRedemptions?: number;
+  /** Optional newsletter section shown above the free-shirt content. */
+  newsletter?: {
+    title: string;
+    teaser: string;
+    heroPhotoUrl?: string;
+    newsUrl: string;
+  };
 }): Promise<EmailSendResult> {
   const {
     recipientEmail,
     recipientName,
     promoCode,
     maxRedemptions = 1,
+    newsletter,
   } = params;
   const firstName = (recipientName || 'Friend').trim().split(/\s+/)[0] || 'Friend';
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.beanumber.org';
-  const subject = `A shirt on us`;
+  const subject = newsletter
+    ? `A shirt on us — plus this month at the campus`
+    : `A shirt on us`;
+
+  const newsletterBlock = newsletter
+    ? `
+    <h2 style="font-size: 20px; margin: 0 0 12px 0;">First — this month at the campus</h2>
+    <p>The July update just went live: <strong>${escapeHtml(newsletter.title)}</strong>. Read the full thing at <a href="${escapeHtml(newsletter.newsUrl)}" style="color: #D4A843; font-weight: bold;">beanumber.org/news</a>.</p>
+    ${
+      newsletter.heroPhotoUrl
+        ? `<img src="${escapeAttr(newsletter.heroPhotoUrl)}" alt="From the campus" style="display:block;width:100%;max-width:560px;height:auto;border-radius:4px;margin:16px 0 20px 0;">`
+        : ''
+    }
+    <p style="color: #555; font-style: italic; border-left: 3px solid #D4A843; padding-left: 16px; margin: 20px 0;">${escapeHtml(newsletter.teaser)}</p>
+
+    <hr style="border: none; border-top: 1px solid #ddd; margin: 32px 0;">
+
+    <h2 style="font-size: 20px; margin: 0 0 12px 0;">And &mdash; a shirt on us</h2>
+    `
+    : '';
 
   const html = wrapTransactionalEmail(`
     <p style="margin-top: 0;">Hey ${escapeHtml(firstName)},</p>
+
+    ${newsletterBlock}
 
     <p>You&rsquo;ve been giving monthly to Be A Number for a long time &mdash; thank you. That kind of steady support is a big part of what got us this far.</p>
 

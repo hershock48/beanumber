@@ -30,6 +30,8 @@
 import { config } from 'dotenv';
 config({ path: '.env.local' });
 import Stripe from 'stripe';
+import postgres from 'postgres';
+import { readFileSync } from 'node:fs';
 import {
   sendLegacySponsorFreeShirtEmail,
   sendLegacyDonorFreeShirtEmail,
@@ -38,6 +40,51 @@ import {
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2025-12-15.clover' as Stripe.LatestApiVersion,
 });
+
+// The current newsletter to embed at the top of each combined email.
+// Overridable via --newsletter-id=<uuid>; defaults to the July issue.
+const NEWSLETTER_ID_ARG = process.argv
+  .find(a => a.startsWith('--newsletter-id='))
+  ?.split('=')[1];
+const NEWSLETTER_ID =
+  NEWSLETTER_ID_ARG || '9e57a1b3-694b-4140-b293-054ee7dd9704';
+
+async function fetchNewsletterForEmbed(): Promise<{
+  title: string;
+  teaser: string;
+  heroPhotoUrl?: string;
+  newsUrl: string;
+} | undefined> {
+  // Read DATABASE_URL from .env.local — dotenv doesn't grab it in every path.
+  const envRaw = readFileSync(new URL('../.env.local', import.meta.url), 'utf8');
+  const dbUrl = envRaw
+    .split('\n')
+    .find(l => l.startsWith('DATABASE_URL='))
+    ?.split('=')
+    .slice(1)
+    .join('=')
+    .replace(/^"|"$/g, '');
+  if (!dbUrl) return undefined;
+
+  const sql = postgres(dbUrl, { prepare: false, max: 1 });
+  try {
+    const [row] = await sql`
+      SELECT title, teaser, hero_photo_url
+        FROM newsletters
+       WHERE id = ${NEWSLETTER_ID}
+    `;
+    if (!row) return undefined;
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.beanumber.org';
+    return {
+      title: row.title || '',
+      teaser: row.teaser || '',
+      heroPhotoUrl: row.hero_photo_url || undefined,
+      newsUrl: `${siteUrl}/news`,
+    };
+  } finally {
+    await sql.end();
+  }
+}
 
 const DRY_RUN = process.argv.includes('--dry-run');
 
@@ -207,7 +254,16 @@ async function createPromotionCode(params: {
 async function main() {
   console.log(`\n=== Legacy Sponsor Free-Shirt Program ${DRY_RUN ? '(DRY RUN)' : ''} ===\n`);
 
-  console.log('Step 1: Ensure coupon');
+  console.log('Step 0: Load current newsletter to embed at top of each email');
+  const newsletter = await fetchNewsletterForEmbed();
+  if (newsletter) {
+    console.log(`  Loaded: "${newsletter.title}" (${newsletter.teaser.slice(0, 60)}${newsletter.teaser.length > 60 ? '…' : ''})`);
+    if (newsletter.heroPhotoUrl) console.log(`  Hero: ${newsletter.heroPhotoUrl.slice(0, 80)}…`);
+  } else {
+    console.log('  No newsletter loaded (either DB not reachable or ID missing). Emails will skip the newsletter block.');
+  }
+
+  console.log('\nStep 1: Ensure coupon');
   const couponId = await ensureCoupon();
 
   console.log('\nStep 2: Sponsors (pre-shirt-first cohort — customer-bound codes)\n');
@@ -228,6 +284,7 @@ async function main() {
         recipientName: r.name,
         kidFirstName: r.kidFirstName,
         promoCode: code,
+        newsletter,
       });
       if (result.success) {
         console.log(`  ✓ Sent to ${r.email}`);
@@ -256,6 +313,7 @@ async function main() {
         recipientName: d.name,
         promoCode: code,
         maxRedemptions: d.maxRedemptions,
+        newsletter,
       });
       if (result.success) {
         console.log(`  ✓ Sent to ${d.email}`);
