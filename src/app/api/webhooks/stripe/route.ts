@@ -1873,11 +1873,23 @@ async function refundLegacyShippingIfApplicable(
           ? d.promotion_code
           : d.promotion_code?.id;
       if (!promoCodeId) continue;
-      const pc = await stripe.promotionCodes.retrieve(promoCodeId, {
-        expand: ['coupon'],
-      });
-      const coupon = pc.coupon;
+      // Stripe SDK v20 nests the coupon under `promotion.coupon` (was
+      // top-level `coupon` in v19 and earlier). The API sometimes still
+      // returns the legacy shape for backwards compatibility, so we
+      // check both locations and use whichever is populated. Expanding
+      // both paths is safe — Stripe ignores unknown expand entries.
+      const pc = (await stripe.promotionCodes.retrieve(promoCodeId, {
+        expand: ['promotion.coupon', 'coupon'],
+      })) as Stripe.PromotionCode & {
+        coupon?: string | Stripe.Coupon | null;
+      };
+      const coupon = pc.promotion?.coupon ?? pc.coupon;
+      // Belt-and-suspenders null guard: typeof null === 'object' in JS,
+      // so a bare typeof check isn't safe. The promotion code should
+      // always have a coupon in practice — this just prevents an
+      // exception if Stripe ever returns an unexpected shape.
       if (
+        coupon &&
         typeof coupon === 'object' &&
         coupon.metadata?.lookup_key === 'legacy_sponsor_free_shirt_v1'
       ) {
@@ -1937,7 +1949,9 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
 
   // Kick off the zero-touch legacy shipping refund in parallel with the
   // main flow. Detects the coupon on the session and refunds shipping if
-  // it matches. Non-blocking — main flow doesn't wait on it.
+  // it matches. Non-blocking through the main body — we await in the
+  // finally block below so it lands regardless of which return path
+  // fires or whether the main flow throws.
   const stripeClient = await getStripe();
   const shippingRefundPromise = refundLegacyShippingIfApplicable(
     session,
@@ -3397,21 +3411,25 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
         }
       }
 
-      // Ensure the legacy shipping refund (kicked off at the top of this
-      // handler) settles before we return control to the webhook handler.
-      // On Vercel/serverless, dangling promises can be cut off — awaiting
-      // here guarantees the refund lands.
-      await shippingRefundPromise;
-
       return { donorId, donationId };
     }
   } catch (error: any) {
     console.error('[WH] CRASH msg:', String(error?.message || error).slice(0, 300));
     console.error('[WH] CRASH stack:', String(error?.stack || '').slice(0, 500));
-    // Even if the main flow crashes, still let the refund promise settle so
-    // it doesn't get orphaned. Errors inside it are already swallowed.
-    await shippingRefundPromise.catch(() => {});
     throw error;
+  } finally {
+    // The handler has SEVEN distinct return branches inside the try
+    // (cart, shirt, shirt+monthly, sponsorship, portal_repeat, merch,
+    // gift, donation) and a throw path. Awaiting the shipping refund
+    // in a finally block covers all of them — no matter which branch
+    // fires or whether the main flow throws, the refund promise
+    // settles before this function returns control to Vercel, so
+    // serverless can't cut the refund off mid-flight.
+    //
+    // .catch on the await is defense-in-depth — the helper already
+    // swallows its own errors, but if a bug ever escapes, the finally
+    // shouldn't mask the primary error/return with a rejection.
+    await shippingRefundPromise.catch(() => {});
   }
 }
 
