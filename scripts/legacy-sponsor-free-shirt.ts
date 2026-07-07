@@ -30,7 +30,10 @@
 import { config } from 'dotenv';
 config({ path: '.env.local' });
 import Stripe from 'stripe';
-import { sendLegacySponsorFreeShirtEmail } from '../src/lib/email';
+import {
+  sendLegacySponsorFreeShirtEmail,
+  sendLegacyDonorFreeShirtEmail,
+} from '../src/lib/email';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2025-12-15.clover' as Stripe.LatestApiVersion,
@@ -40,7 +43,7 @@ const DRY_RUN = process.argv.includes('--dry-run');
 
 // The 3 external sponsors + their Stripe customers + sponsored kid.
 // Kevin's own account (kevin@beanumber.org) intentionally omitted.
-const RECIPIENTS = [
+const SPONSORS = [
   {
     email: 'khersh52@gmail.com',
     name: 'Kevin Hershock Sr',
@@ -68,6 +71,19 @@ const RECIPIENTS = [
     kidShirtNumber: 37,
     codeSlug: 'JASON',
   },
+];
+
+// Legacy Donorbox recurring donors. No Stripe customer ID (they give
+// through Donorbox), so promotion codes can't be customer-bound. They're
+// single-use with unpredictable random codes instead. No kid-to-shirt
+// binding at fulfillment — they'll meet a random kid via hold-to-meet
+// when the shirt arrives, which is how the shirt-first model works.
+const LEGACY_DONORS = [
+  { email: 'laundawheatley@gmail.com', name: 'launda Wheatley', codeSlug: 'WHEATLEY' },
+  { email: 'lhetke1993@gmail.com', name: 'Luke Hetke', codeSlug: 'HETKE' },
+  { email: 'josephjeffreys91@gmail.com', name: 'Joseph Jeffreys', codeSlug: 'JEFFREYS' },
+  { email: 'juliaamting@gmail.com', name: 'Julia & Kenny Morgensai', codeSlug: 'MORGENSAI' },
+  { email: 'trueformchiropractic@gmail.com', name: 'Joseph Vear', codeSlug: 'VEAR' },
 ];
 
 const COUPON_LOOKUP_KEY = 'legacy_sponsor_free_shirt_v1';
@@ -116,38 +132,62 @@ function randomSuffix(len = 6): string {
 
 async function createPromotionCode(params: {
   couponId: string;
-  stripeCustomerId: string;
+  stripeCustomerId?: string;
   codeSlug: string;
+  program: string;
 }): Promise<string> {
   const code = `LEGACY-${params.codeSlug}-${randomSuffix()}`;
 
   if (DRY_RUN) {
-    console.log(`  [dry-run] Would create promo code: ${code} bound to ${params.stripeCustomerId}`);
+    const binding = params.stripeCustomerId
+      ? `bound to ${params.stripeCustomerId}`
+      : 'unbound (random-code single-use)';
+    console.log(`  [dry-run] Would create promo code: ${code} ${binding}`);
     return code;
   }
 
-  // Check if a promotion code already exists for this customer+coupon so
-  // re-runs don't create duplicates. Match by customer + coupon.
-  const existing = await stripe.promotionCodes.list({
-    customer: params.stripeCustomerId,
-    coupon: params.couponId,
-    limit: 5,
-  });
-  if (existing.data.length > 0) {
-    const first = existing.data[0];
-    console.log(`  Promo code exists for ${params.codeSlug}: ${first.code}`);
-    return first.code;
+  // Idempotence — search existing promo codes for a match. When bound to
+  // a customer, we match by customer + coupon. When unbound, match by
+  // metadata (program + slug) so we don't create duplicates on re-run.
+  if (params.stripeCustomerId) {
+    const existing = await stripe.promotionCodes.list({
+      customer: params.stripeCustomerId,
+      coupon: params.couponId,
+      limit: 5,
+    });
+    if (existing.data.length > 0) {
+      const first = existing.data[0];
+      console.log(`  Promo code exists for ${params.codeSlug}: ${first.code}`);
+      return first.code;
+    }
+  } else {
+    // Unbound lookup — search all promo codes on this coupon, filter by
+    // metadata. Stripe doesn't index metadata, so we page through. Fine
+    // at this scale.
+    const existing = await stripe.promotionCodes.list({
+      coupon: params.couponId,
+      limit: 100,
+    });
+    const match = existing.data.find(
+      p =>
+        p.metadata?.program === params.program &&
+        p.metadata?.sponsor_slug === params.codeSlug
+    );
+    if (match) {
+      console.log(`  Promo code exists for ${params.codeSlug}: ${match.code}`);
+      return match.code;
+    }
   }
 
-  const expiresAt = Math.floor(Date.now() / 1000) + 60 * 24 * 60 * 60; // 60 days
+  const expiresAt = Math.floor(Date.now() / 1000) + 90 * 24 * 60 * 60; // 90 days
   const created = await stripe.promotionCodes.create({
     coupon: params.couponId,
     code,
-    customer: params.stripeCustomerId,
+    ...(params.stripeCustomerId ? { customer: params.stripeCustomerId } : {}),
     max_redemptions: 1,
     expires_at: expiresAt,
     metadata: {
-      program: 'legacy_sponsor_free_shirt',
+      program: params.program,
       sponsor_slug: params.codeSlug,
     },
   });
@@ -161,13 +201,14 @@ async function main() {
   console.log('Step 1: Ensure coupon');
   const couponId = await ensureCoupon();
 
-  console.log('\nStep 2: Create promotion codes + send emails\n');
-  for (const r of RECIPIENTS) {
+  console.log('\nStep 2: Sponsors (pre-shirt-first cohort — customer-bound codes)\n');
+  for (const r of SPONSORS) {
     console.log(`— ${r.name} <${r.email}>`);
     const code = await createPromotionCode({
       couponId,
       stripeCustomerId: r.stripeCustomerId,
       codeSlug: r.codeSlug,
+      program: 'legacy_sponsor_free_shirt',
     });
 
     if (DRY_RUN) {
@@ -189,11 +230,39 @@ async function main() {
     console.log();
   }
 
-  console.log('=== Fulfillment mapping (print for Kevin) ===\n');
-  RECIPIENTS.forEach(r => {
+  console.log('\nStep 3: Legacy Donorbox donors (unbound codes)\n');
+  for (const d of LEGACY_DONORS) {
+    console.log(`— ${d.name} <${d.email}>`);
+    const code = await createPromotionCode({
+      couponId,
+      codeSlug: d.codeSlug,
+      program: 'legacy_donor_free_shirt',
+    });
+
+    if (DRY_RUN) {
+      console.log(`  [dry-run] Would email ${d.email} with code ${code}`);
+    } else {
+      const result = await sendLegacyDonorFreeShirtEmail({
+        recipientEmail: d.email,
+        recipientName: d.name,
+        promoCode: code,
+      });
+      if (result.success) {
+        console.log(`  ✓ Sent to ${d.email}`);
+      } else {
+        console.error(`  ✗ Failed to send to ${d.email}: ${result.error}`);
+      }
+    }
+    console.log();
+  }
+
+  console.log('=== Sponsor fulfillment mapping (print for Kevin) ===\n');
+  SPONSORS.forEach(r => {
     console.log(`  ${r.name.padEnd(24)} → ship a shirt with #${r.kidShirtNumber} (${r.kidFirstName})`);
   });
-  console.log();
+  console.log(
+    '\n  (Legacy donors: no specific kid — ship any shirt; they meet the kid via hold-to-meet.)\n'
+  );
 }
 
 main().catch(err => {

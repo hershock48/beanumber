@@ -630,6 +630,52 @@ export async function sendLegacySponsorFreeShirtEmail(params: {
 }
 
 /**
+ * Legacy DONOR free-shirt email — sent to long-time supporters (typically
+ * Donorbox recurring donors) who aren't in the shirt-first Stripe flow. No
+ * specific kid to reference (they haven't sponsored one) — the shirt they
+ * receive will introduce them to a random kid via hold-to-meet, which is
+ * the whole point of the model.
+ */
+export async function sendLegacyDonorFreeShirtEmail(params: {
+  recipientEmail: string;
+  recipientName: string;
+  promoCode: string;
+}): Promise<EmailSendResult> {
+  const { recipientEmail, recipientName, promoCode } = params;
+  const firstName = (recipientName || 'Friend').trim().split(/\s+/)[0] || 'Friend';
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.beanumber.org';
+  const subject = `A shirt on us`;
+
+  const html = wrapTransactionalEmail(`
+    <p style="margin-top: 0;">Hey ${escapeHtml(firstName)},</p>
+
+    <p>You&rsquo;ve been giving to Be A Number for a while now &mdash; thank you. That means more than you know.</p>
+
+    <p>Since the early days, we&rsquo;ve built a shirt-first model where every shirt ties its buyer to a specific kid by number. Number on the back, hold-to-meet on beanumber.org, and the kid shows up. It&rsquo;s how we&rsquo;re building the connection between the people funding this and the kids on the ground.</p>
+
+    <p>We&rsquo;d love for you to have that moment. Here&rsquo;s a code for a free shirt on us:</p>
+
+    <p style="margin: 24px 0; text-align: center;">
+      <span style="display: inline-block; background: #0d0d0d; color: #D4A843; font-family: 'SF Mono', Menlo, monospace; font-size: 18px; font-weight: bold; letter-spacing: 0.1em; padding: 16px 28px; border-radius: 4px;">${escapeHtml(promoCode)}</span>
+    </p>
+
+    <p>Pick your style at <a href="${siteUrl}/shirts" style="color: #D4A843; font-weight: bold;">beanumber.org/shirts</a>, add to cart, and enter the code at checkout. Shipping is $5. Skip the &ldquo;continue monthly&rdquo; toggle unless you want to layer that on &mdash; this code is just for the shirt.</p>
+
+    <p>When it arrives, look at the number on the back, hit hold-to-meet on <strong>beanumber.org/&lt;that number&gt;</strong>, and meet the kid it belongs to.</p>
+
+    <p style="margin-top: 24px; font-size: 14px; color: #888;">Reply to this email if you hit any snag. The code is one-time use.</p>
+
+    <p>Kevin</p>
+  `);
+
+  return sendEmail({
+    to: { email: recipientEmail, name: recipientName },
+    subject,
+    html,
+  });
+}
+
+/**
  * Send update notification to sponsor
  */
 export async function sendUpdateNotificationEmail(
