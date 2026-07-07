@@ -44,12 +44,14 @@ const DRY_RUN = process.argv.includes('--dry-run');
 // The 3 external sponsors + their Stripe customers + sponsored kid.
 // Kevin's own account (kevin@beanumber.org) intentionally omitted.
 //
-// The kidFirstName is only used for email personalization ("you sponsored
-// Ismail, so skip the continue-monthly toggle since you're already
-// sponsoring him"). The shirt they receive will carry WHATEVER kid number
-// is in inventory at fulfillment — NOT their sponsored kid's number.
-// Their existing sponsorship of the named kid is unchanged; the shirt
-// introduces them to a second kid via hold-to-meet.
+// At fulfillment, Kevin picks a shirt whose number cycles to the sponsor's
+// specific kid — the kid roster of ~50 real kids cycles through the 300-cap
+// shirt-number space every ~53 shirts, so each kid lives at multiple shirt
+// numbers. The canonical low-cycle numbers (Ismail #48, Angel #36, Konshens
+// #37) are already claimed by other buyers, so Kevin grabs a higher-cycle
+// shirt (mod 53 = same kid) from inventory. Hold-to-meet on the new number
+// still reveals the sponsored kid — the shirt closes the loop on the
+// pre-shirt-first sponsorship.
 const SPONSORS = [
   {
     email: 'khersh52@gmail.com',
@@ -264,22 +266,15 @@ async function main() {
     console.log();
   }
 
-  console.log('=== Done ===');
-  console.log(
-    '  All 8 shirts get a number from inventory at fulfillment. The 3 sponsors'
-  );
-  console.log(
-    '  (Kevin Sr, Karen, Jason) keep their existing sponsorships of Ismail/'
-  );
-  console.log(
-    '  Angel/Konshens unchanged; the shirt introduces them to a second kid'
-  );
-  console.log(
-    '  via hold-to-meet. The 5 Donorbox donors have no existing sponsorship'
-  );
-  console.log(
-    '  — the shirt is their first kid connection. No mapping to print.\n'
-  );
+  console.log('=== Sponsor fulfillment mapping ===\n');
+  console.log('  Pick a higher-cycle shirt from inventory whose number mod 53');
+  console.log('  lands on the target kid — that way hold-to-meet on the new');
+  console.log('  shirt number still reveals the same kid they sponsor:\n');
+  SPONSORS.forEach(r => {
+    console.log(`  ${r.name.padEnd(24)} → ship a shirt for ${r.kidFirstName}`);
+  });
+  console.log('\n  (Legacy Donorbox donors have no existing sponsorship — any');
+  console.log('  shirt works; hold-to-meet reveals whichever kid maps to it.)\n');
 }
 
 main().catch(err => {
