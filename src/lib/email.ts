@@ -611,9 +611,7 @@ export async function sendLegacySponsorFreeShirtEmail(params: {
 
     <p>Pick your style at <a href="${siteUrl}/shirts" style="color: #D4A843; font-weight: bold;">beanumber.org/shirts</a>, add to cart, and enter the code at checkout. Skip the &ldquo;continue monthly&rdquo; toggle &mdash; you&rsquo;re already sponsoring ${escapeHtml(kidFirstName)}.</p>
 
-    <p style="font-size: 14px; color: #555;">One note on the checkout page: you may see $5 for shipping. We cover it &mdash; a refund lands back on your card as soon as the order goes through.</p>
-
-    <p>When it arrives, look at the number on the back, hit hold-to-meet on <strong>beanumber.org/&lt;that number&gt;</strong>, and ${escapeHtml(kidFirstName)} will be right there &mdash; the same kid you&rsquo;ve been sponsoring the whole time. Rock it, share it, and pull people into the story.</p>
+<p>When it arrives, look at the number on the back, hit hold-to-meet on <strong>beanumber.org/&lt;that number&gt;</strong>, and ${escapeHtml(kidFirstName)} will be right there &mdash; the same kid you&rsquo;ve been sponsoring the whole time. Rock it, share it, and pull people into the story.</p>
 
     <p style="margin-top: 24px; font-size: 14px; color: #888;">Reply to this email if you hit any snag. The code is tied to your account, so it only works from ${escapeHtml(recipientEmail)} and only once.</p>
 
@@ -668,9 +666,7 @@ export async function sendLegacyDonorFreeShirtEmail(params: {
 
     <p>Pick your style at <a href="${siteUrl}/shirts" style="color: #D4A843; font-weight: bold;">beanumber.org/shirts</a>, add to cart, and enter the code at checkout. Skip the &ldquo;continue monthly&rdquo; toggle unless you want to layer another sponsorship on top &mdash; this code covers the shirt.</p>
 
-    <p style="font-size: 14px; color: #555;">One note on the checkout page: you may see $5 for shipping. We cover it &mdash; a refund lands back on your card as soon as the order goes through.</p>
-
-    <p>When it arrives, look at the number on the back, hit hold-to-meet on <strong>beanumber.org/&lt;that number&gt;</strong>, and meet the kid it belongs to. Rock the shirt, share the story, and pull more people in.</p>
+<p>When it arrives, look at the number on the back, hit hold-to-meet on <strong>beanumber.org/&lt;that number&gt;</strong>, and meet the kid it belongs to. Rock the shirt, share the story, and pull more people in.</p>
 
     <p style="margin-top: 24px; font-size: 14px; color: #888;">Reply to this email if you hit any snag. ${
       maxRedemptions === 1

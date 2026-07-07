@@ -1833,9 +1833,116 @@ async function sendAdminOrderNotification(data: {
   }
 }
 
+/**
+ * Zero-touch shipping refund for the legacy free-shirt program.
+ *
+ * When a checkout uses a promotion code whose coupon carries the
+ * lookup_key 'legacy_sponsor_free_shirt_v1' (created by
+ * scripts/legacy-sponsor-free-shirt.ts), the shirt line item is 100% off
+ * but shipping ($5) remains. This helper detects that scenario and
+ * refunds the shipping amount from the payment intent so the recipient
+ * pays $0 net.
+ *
+ * Idempotent — uses a deterministic Stripe idempotency key derived from
+ * the session ID, so webhook retries and duplicate deliveries won't
+ * refund twice.
+ *
+ * Non-fatal — any error is logged and swallowed so the main checkout
+ * flow continues unaffected.
+ */
+async function refundLegacyShippingIfApplicable(
+  session: Stripe.Checkout.Session,
+  stripe: Stripe
+): Promise<void> {
+  try {
+    // Only payment-mode sessions have shipping; subscription mode has none.
+    if (session.mode !== 'payment') return;
+
+    // The applied promotion codes ride on session.discounts. Fast-exit
+    // when no discounts were applied — most sessions have none.
+    const discounts = session.discounts || [];
+    if (discounts.length === 0) return;
+
+    // Look up each applied promotion code and check the coupon's
+    // lookup_key metadata. As soon as we find a legacy-program coupon,
+    // trigger the refund path.
+    let isLegacyCoupon = false;
+    for (const d of discounts) {
+      const promoCodeId =
+        typeof d.promotion_code === 'string'
+          ? d.promotion_code
+          : d.promotion_code?.id;
+      if (!promoCodeId) continue;
+      const pc = await stripe.promotionCodes.retrieve(promoCodeId, {
+        expand: ['coupon'],
+      });
+      const coupon = pc.coupon;
+      if (
+        typeof coupon === 'object' &&
+        coupon.metadata?.lookup_key === 'legacy_sponsor_free_shirt_v1'
+      ) {
+        isLegacyCoupon = true;
+        break;
+      }
+    }
+    if (!isLegacyCoupon) return;
+
+    // Nothing to refund if shipping was already $0 (e.g. someone chose
+    // a free-shipping option manually).
+    const shippingAmount = session.shipping_cost?.amount_total || 0;
+    if (shippingAmount <= 0) return;
+
+    const paymentIntentId =
+      typeof session.payment_intent === 'string'
+        ? session.payment_intent
+        : session.payment_intent?.id;
+    if (!paymentIntentId) return;
+
+    // Deterministic idempotency key — Stripe will return the SAME refund
+    // if this key is reused, so webhook retries won't double-refund.
+    const idempotencyKey = `legacy_ship_refund_${session.id}`;
+
+    const refund = await stripe.refunds.create(
+      {
+        payment_intent: paymentIntentId,
+        amount: shippingAmount,
+        reason: 'requested_by_customer',
+        metadata: {
+          legacy_shipping_refund: 'true',
+          session_id: session.id,
+          program: 'legacy_sponsor_free_shirt_v1',
+        },
+      },
+      { idempotencyKey }
+    );
+    console.log(
+      `[WH] Legacy shipping refund issued: ${refund.id} for $${
+        shippingAmount / 100
+      } on session ${session.id}`
+    );
+  } catch (err) {
+    // Non-fatal — main checkout flow continues. Kevin will still see
+    // the completed order; the $5 shipping refund can be issued
+    // manually if this failed.
+    console.error(
+      '[WH] Legacy shipping refund failed (non-fatal):',
+      err instanceof Error ? err.message : String(err)
+    );
+  }
+}
+
 // Handle successful checkout session
 async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) {
   console.log('[WH] S0: checkout', session.id, 'mode=' + session.mode, 'type=' + (session.metadata?.order_type || 'donation'));
+
+  // Kick off the zero-touch legacy shipping refund in parallel with the
+  // main flow. Detects the coupon on the session and refunds shipping if
+  // it matches. Non-blocking — main flow doesn't wait on it.
+  const stripeClient = await getStripe();
+  const shippingRefundPromise = refundLegacyShippingIfApplicable(
+    session,
+    stripeClient
+  );
 
   try {
     // Extract donor information directly from the session object.
@@ -3290,11 +3397,20 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
         }
       }
 
+      // Ensure the legacy shipping refund (kicked off at the top of this
+      // handler) settles before we return control to the webhook handler.
+      // On Vercel/serverless, dangling promises can be cut off — awaiting
+      // here guarantees the refund lands.
+      await shippingRefundPromise;
+
       return { donorId, donationId };
     }
   } catch (error: any) {
     console.error('[WH] CRASH msg:', String(error?.message || error).slice(0, 300));
     console.error('[WH] CRASH stack:', String(error?.stack || '').slice(0, 500));
+    // Even if the main flow crashes, still let the refund promise settle so
+    // it doesn't get orphaned. Errors inside it are already swallowed.
+    await shippingRefundPromise.catch(() => {});
     throw error;
   }
 }
