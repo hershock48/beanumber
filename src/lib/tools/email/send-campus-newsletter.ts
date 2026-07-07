@@ -471,32 +471,20 @@ export async function sendCampusNewsletterTool(
   }
   const candidateRecipients = Array.from(byEmail.values());
 
-  // 3b. Apply the marketing opt-out list. A sponsor who clicked
-  // unsubscribe has their donor row's communicationOptIn flipped to
-  // false; we must not mail them again. Look donors up one at a time;
-  // failures fall open so a single hiccup doesn't nuke the whole send.
-  const recipients: GroupedRecipient[] = [];
-  let suppressedCount = 0;
-  for (const r of candidateRecipients) {
-    try {
-      const emailLower = r.email.toLowerCase();
-      const donorRows = await db
-        .select({ communicationOptIn: donorsTable.communicationOptIn })
-        .from(donorsTable)
-        .where(sql`lower(${donorsTable.email}) = ${emailLower}`)
-        .limit(1);
-      if (donorRows[0] && donorRows[0].communicationOptIn === false) {
-        suppressedCount += 1;
-        continue;
-      }
-    } catch (err) {
-      logger.warn('Donor opt-in lookup failed; proceeding with send', {
-        email: logger.maskEmail(r.email),
-        error: err instanceof Error ? err.message : String(err),
-      });
-    }
-    recipients.push(r);
-  }
+  // 3b. Opt-out gate. Intentionally a no-op today, matching the
+  // fetchEmailableDonors (non-sponsor) path — see the long docstring
+  // there for why. Short version: the Stripe webhook defaults
+  // communication_opt_in=false at insert time, so we can't
+  // distinguish "never asked" from "actively unsubscribed" using
+  // this column alone. Suppressing on it would drop every sponsor
+  // (as it did before 2026-07-06). Once we add an unsubscribed_at
+  // column and route the /api/unsubscribe endpoint through it, this
+  // block tightens to filter on THAT signal instead of the opt-in
+  // boolean.
+  //
+  // Structure preserved so the tightening is a one-line change.
+  const recipients: GroupedRecipient[] = candidateRecipients;
+  const suppressedCount = 0;
 
   // 3c. Resolve every linked child record to (firstName, shirtNumber).
   const allChildIds = Array.from(
