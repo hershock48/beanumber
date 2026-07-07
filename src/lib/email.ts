@@ -597,9 +597,11 @@ export async function sendLegacySponsorFreeShirtEmail(params: {
   const html = wrapTransactionalEmail(`
     <p style="margin-top: 0;">Hey ${escapeHtml(firstName)},</p>
 
-    <p>Before we had shirts, you sponsored ${escapeHtml(kidFirstName)}. That was months ago &mdash; thank you for staying with ${escapeHtml(kidFirstName)} the whole time.</p>
+    <p>Back when you signed up, our model let you pick a specific kid to sponsor &mdash; that&rsquo;s how you ended up with ${escapeHtml(kidFirstName)}, and ${escapeHtml(kidFirstName)} has stayed with you the whole time. Thank you for that.</p>
 
-    <p>Since then, every shirt at Be A Number ties its buyer to a kid by number. Number on the back, hold-to-meet on beanumber.org, and the kid shows up. It&rsquo;s the whole model now &mdash; and you should have that moment with ${escapeHtml(kidFirstName)}.</p>
+    <p>Since then we&rsquo;ve moved to a shirt-first model: every shirt sold at Be A Number ties its buyer to a kid by the number on the back. Hold-to-meet on beanumber.org, and the kid shows up. It&rsquo;s how we&rsquo;re building the connection now.</p>
+
+    <p>The old model didn&rsquo;t include a shirt. This one does &mdash; and we want to make that up to you. ${escapeHtml(kidFirstName)} stays yours, the sponsorship is unchanged, and now you&rsquo;ve got a shirt with ${escapeHtml(kidFirstName)}&rsquo;s number on the back to actually wear.</p>
 
     <p>Here&rsquo;s a code for a free shirt on us:</p>
 
@@ -609,7 +611,7 @@ export async function sendLegacySponsorFreeShirtEmail(params: {
 
     <p>Pick your style at <a href="${siteUrl}/shirts" style="color: #D4A843; font-weight: bold;">beanumber.org/shirts</a>, add to cart, and enter the code at checkout. Shipping is $5. Skip the &ldquo;continue monthly&rdquo; toggle &mdash; you&rsquo;re already sponsoring ${escapeHtml(kidFirstName)}.</p>
 
-    <p>We&rsquo;ll ship a shirt with ${escapeHtml(kidFirstName)}&rsquo;s number on the back. When it arrives, look at the number, hit hold-to-meet on <strong>beanumber.org/&lt;that number&gt;</strong>, and ${escapeHtml(kidFirstName)} will be right there &mdash; the same kid you&rsquo;ve been sponsoring the whole time.</p>
+    <p>When it arrives, look at the number on the back, hit hold-to-meet on <strong>beanumber.org/&lt;that number&gt;</strong>, and ${escapeHtml(kidFirstName)} will be right there &mdash; the same kid you&rsquo;ve been sponsoring the whole time. Rock it, share it, and pull people into the story.</p>
 
     <p style="margin-top: 24px; font-size: 14px; color: #888;">Reply to this email if you hit any snag. The code is tied to your account, so it only works from ${escapeHtml(recipientEmail)} and only once.</p>
 
@@ -650,19 +652,19 @@ export async function sendLegacyDonorFreeShirtEmail(params: {
   const html = wrapTransactionalEmail(`
     <p style="margin-top: 0;">Hey ${escapeHtml(firstName)},</p>
 
-    <p>You&rsquo;ve been giving to Be A Number for a while now &mdash; thank you. That means more than you know.</p>
+    <p>You&rsquo;ve been supporting Be A Number for a long time &mdash; thank you. Whether it was one gift or many, it&rsquo;s part of what got us this far.</p>
 
-    <p>Since the early days, we&rsquo;ve built a shirt-first model where every shirt ties its buyer to a specific kid by number. Number on the back, hold-to-meet on beanumber.org, and the kid shows up. It&rsquo;s how we&rsquo;re building the connection between the people funding this and the kids on the ground.</p>
+    <p>We&rsquo;ve built out a shirt-first model since those early days. Every shirt sold at Be A Number ties its buyer to a specific kid by the number on the back. Hold-to-meet on beanumber.org, and the kid shows up. It&rsquo;s how the whole thing works now &mdash; and it&rsquo;s way more fun than clicking &ldquo;give.&rdquo;</p>
 
-    <p>We&rsquo;d love for you to have that moment. Here&rsquo;s a code for a free shirt on us:</p>
+    <p>You&rsquo;ve been part of this a while, and we want to make sure you&rsquo;re pulled all the way in. Here&rsquo;s a code for a free shirt on us:</p>
 
     <p style="margin: 24px 0; text-align: center;">
       <span style="display: inline-block; background: #0d0d0d; color: #D4A843; font-family: 'SF Mono', Menlo, monospace; font-size: 18px; font-weight: bold; letter-spacing: 0.1em; padding: 16px 28px; border-radius: 4px;">${escapeHtml(promoCode)}</span>
     </p>
 
-    <p>Pick your style at <a href="${siteUrl}/shirts" style="color: #D4A843; font-weight: bold;">beanumber.org/shirts</a>, add to cart, and enter the code at checkout. Shipping is $5. Skip the &ldquo;continue monthly&rdquo; toggle unless you want to layer that on &mdash; this code is just for the shirt.</p>
+    <p>Pick your style at <a href="${siteUrl}/shirts" style="color: #D4A843; font-weight: bold;">beanumber.org/shirts</a>, add to cart, and enter the code at checkout. Shipping is $5. Skip the &ldquo;continue monthly&rdquo; toggle unless you want to layer that on &mdash; this code covers the shirt.</p>
 
-    <p>When it arrives, look at the number on the back, hit hold-to-meet on <strong>beanumber.org/&lt;that number&gt;</strong>, and meet the kid it belongs to.</p>
+    <p>When it arrives, look at the number on the back, hit hold-to-meet on <strong>beanumber.org/&lt;that number&gt;</strong>, and meet the kid it belongs to. Rock the shirt, share the story, and pull more people in.</p>
 
     <p style="margin-top: 24px; font-size: 14px; color: #888;">Reply to this email if you hit any snag. ${
       maxRedemptions === 1
