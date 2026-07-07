@@ -592,7 +592,7 @@ export async function sendLegacySponsorFreeShirtEmail(params: {
   const { recipientEmail, recipientName, kidFirstName, promoCode } = params;
   const firstName = (recipientName || 'Friend').trim().split(/\s+/)[0] || 'Friend';
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.beanumber.org';
-  const subject = `A shirt for ${kidFirstName}, on us`;
+  const subject = `A shirt for you, on us`;
 
   const html = wrapTransactionalEmail(`
     <p style="margin-top: 0;">Hey ${escapeHtml(firstName)},</p>
