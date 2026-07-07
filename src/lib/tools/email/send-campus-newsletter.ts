@@ -23,7 +23,7 @@
  * force=true to override (not generally recommended).
  */
 
-import { and, eq, isNotNull, ne, or, sql } from 'drizzle-orm';
+import { and, eq, inArray, isNotNull, ne, or, sql } from 'drizzle-orm';
 import { logger } from '../../logger';
 import {
   sendNewsletterNotificationEmail,
@@ -162,7 +162,7 @@ async function fetchChildrenByRecordIds(
         shirtNumber: childrenTable.shirtNumber,
       })
       .from(childrenTable)
-      .where(sql`${childrenTable.id} = ANY(${chunk}::uuid[])`);
+      .where(inArray(childrenTable.id, chunk));
     for (const r of rows) {
       map.set(r.id, {
         shirtNumber: r.shirtNumber ?? null,
