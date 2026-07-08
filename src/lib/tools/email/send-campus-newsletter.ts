@@ -823,6 +823,37 @@ export async function sendCampusNewsletterTool(
   sentCount += nonSponsorSent;
   failedCount += nonSponsorFailed;
 
+  // 5c. Push notification fan-out. Best-effort: any failure logs and
+  //     continues so the email-side result stays authoritative. Fires
+  //     once per newsletter, aggregating every sponsor + non-sponsor
+  //     recipient we actually attempted an email to. Recipients
+  //     without a mobile_users row are filtered out inside
+  //     resolveMobileUserIdsForEmails.
+  try {
+    const { sendPush, resolveMobileUserIdsForEmails } = await import(
+      '@/lib/push/send'
+    );
+    const pushEmails = Array.from(
+      new Set([
+        ...recipients.map(r => r.email),
+      ])
+    );
+    const recipientUserIds = await resolveMobileUserIdsForEmails(pushEmails);
+    if (recipientUserIds.length > 0) {
+      const monthLabel = title.replace(/ at the campus.*$/i, '').trim() || title;
+      await sendPush({
+        kind: 'newsletterPublished',
+        newsletterId: newsletter.id,
+        monthLabel,
+        recipientUserIds,
+      });
+    }
+  } catch (err) {
+    logger.warn('Newsletter push fan-out failed (non-fatal)', {
+      err: err instanceof Error ? err.message : String(err),
+    });
+  }
+
   // 6. Write back the result.
   const finalStatus: 'Sent' | 'Failed' = sentCount > 0 ? 'Sent' : 'Failed';
   const sendNotes =

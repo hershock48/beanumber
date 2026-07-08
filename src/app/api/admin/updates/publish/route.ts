@@ -25,6 +25,10 @@ import { getAdminRole } from '@/lib/admin-session';
 import { db } from '@/lib/db/client';
 import { childUpdates, children, sponsorships } from '@/lib/db/schema';
 import { eq, and, or } from 'drizzle-orm';
+import {
+  sendPush,
+  resolveKidRecipientMobileUserIds,
+} from '@/lib/push/send';
 
 async function handler(request: NextRequest): Promise<NextResponse> {
   const method = 'POST';
@@ -138,6 +142,38 @@ async function handler(request: NextRequest): Promise<NextResponse> {
     childId: update.childIdLegacy ?? update.childId,
     title: updated[0]?.title,
   });
+
+  // Fire push to every sponsor + holder of this kid. Best-effort —
+  // a push failure must not block the publish response. Non-mobile
+  // sponsors are resolved-away by resolveKidRecipientMobileUserIds
+  // (it filters on "has a live push device"), so we don't queue
+  // rows we can't ship.
+  if (child) {
+    try {
+      const recipientUserIds = await resolveKidRecipientMobileUserIds(
+        child.id,
+        child.childId ?? null
+      );
+      if (recipientUserIds.length > 0) {
+        const captionFirstLine =
+          updated[0]?.title ||
+          update.summary ||
+          update.content ||
+          `New update from ${child.firstName ?? 'them'}.`;
+        await sendPush({
+          kind: 'kidUpdate',
+          kidId: child.id,
+          recipientUserIds,
+          captionFirstLine,
+        });
+      }
+    } catch (err) {
+      logger.warn('[updates/publish] push send failed (non-fatal)', {
+        err: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
   logger.apiResponse(method, path, 200);
 
   return createSuccessResponse(

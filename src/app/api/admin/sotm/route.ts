@@ -36,6 +36,11 @@ function gradeBucket(raw: string | null | undefined): GradeCode | 'unknown' {
 import { db } from '@/lib/db/client';
 import { children, sotmHistory } from '@/lib/db/schema';
 import { eq, isNotNull, sql as drizzleSql } from 'drizzle-orm';
+import {
+  sendPush,
+  resolveKidRecipientMobileUserIds,
+} from '@/lib/push/send';
+import { gradeLabelForSponsor } from '@/lib/grades';
 
 // Both the writer (this) and the /me milestone reader must anchor to
 // the same calendar. The ceremony is a Uganda event — Africa/Kampala
@@ -282,6 +287,34 @@ export async function POST(request: NextRequest) {
         `[SOTM] approve without grade — history skipped for kid ${target.id} ("${target.firstName ?? ''}"). Set the kid's grade in the roster editor to enable archival.`
       );
     }
+
+    // Push to every sponsor + holder of the kid. Best-effort — a push
+    // failure must not block the approval response.
+    try {
+      const recipientUserIds = await resolveKidRecipientMobileUserIds(
+        target.id,
+        target.childId ?? null
+      );
+      if (recipientUserIds.length > 0) {
+        const gradeLabel =
+          targetGradeKey !== 'unknown'
+            ? gradeLabelForSponsor(targetGradeKey as GradeCode)
+            : 'Primary';
+        await sendPush({
+          kind: 'kidSotm',
+          kidId: target.id,
+          recipientUserIds,
+          gradeLabel,
+          monthLabel: month,
+        });
+      }
+    } catch (err) {
+      console.warn(
+        '[SOTM] push send failed (non-fatal):',
+        err instanceof Error ? err.message : String(err)
+      );
+    }
+
     return NextResponse.json({ ok: true, action, shirtNumber, month });
   } catch (err) {
     return NextResponse.json(

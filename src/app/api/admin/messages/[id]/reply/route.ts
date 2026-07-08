@@ -42,6 +42,7 @@ import { db } from '@/lib/db/client';
 import { kidMessages, children, sponsorships } from '@/lib/db/schema';
 import { getAdminRole } from '@/lib/admin-session';
 import { sendEmail, sendKevinReplyAlert } from '@/lib/email';
+import { sendPush, resolveMobileUserIdForEmail } from '@/lib/push/send';
 
 const SITE_URL =
   process.env.NEXT_PUBLIC_SITE_URL || 'https://www.beanumber.org';
@@ -257,6 +258,28 @@ export async function POST(
     } catch (err) {
       console.warn(
         '[messages/reply] sponsor notification failed (non-fatal):',
+        err instanceof Error ? err.message : String(err)
+      );
+    }
+
+    // Push notification — best-effort, mirrors the email. If the
+    // sponsor has the app installed and permissions granted, they
+    // get the "[Kid] wrote you back" tap-to-open card.
+    try {
+      const sponsorUserId = await resolveMobileUserIdForEmail(
+        parent.sponsorEmail
+      );
+      if (sponsorUserId) {
+        await sendPush({
+          kind: 'kidReplied',
+          kidId: parent.childId,
+          sponsorUserId,
+          notePreview: bodyEn,
+        });
+      }
+    } catch (err) {
+      console.warn(
+        '[messages/reply] push notification failed (non-fatal):',
         err instanceof Error ? err.message : String(err)
       );
     }
