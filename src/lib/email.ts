@@ -1016,6 +1016,81 @@ export async function sendKevinNoteAlert(params: {
 }
 
 /**
+ * Campus-side alert to Simon — a new penpal note landed for a kid.
+ *
+ * Simon is the YDO team member who translates, reviews, and hand-carries
+ * the sponsor's message to the actual child, then types the child's
+ * reply back into the admin queue. Without this alert he only sees new
+ * notes if he happens to log into /admin/messages — which means real
+ * delay between "sponsor sends" and "kid gets it."
+ *
+ * Non-fatal — if Gmail is down or SIMON_EMAIL is unset, the note still
+ * lands in the queue and Kevin still gets his own alert; Simon just
+ * won't be pinged this cycle.
+ *
+ * Recipient defaults to scholarship.uganda@gmail.com (Simon's stable
+ * campus address) but the SIMON_EMAIL env var overrides — makes team
+ * changes a config swap, not a code push.
+ */
+export async function sendSimonNoteAlert(params: {
+  noteId: string;
+  sponsorName: string | null;
+  sponsorEmail: string;
+  kidFirstName: string;
+  kidDisplayName: string;
+  shirtNumber: number | null;
+  bodyEn: string;
+}): Promise<EmailSendResult | { success: false; error: string }> {
+  const {
+    noteId,
+    sponsorName,
+    sponsorEmail,
+    kidFirstName,
+    kidDisplayName,
+    shirtNumber,
+    bodyEn,
+  } = params;
+
+  const simonEmail =
+    process.env.SIMON_EMAIL || 'scholarship.uganda@gmail.com';
+
+  const kidLabel = shirtNumber
+    ? `${kidDisplayName || kidFirstName} (#${shirtNumber})`
+    : kidDisplayName || kidFirstName;
+  const preview = truncateForPreview(bodyEn, 320);
+  const sponsorDisplay = sponsorName?.trim() || sponsorEmail;
+
+  const queueUrl = `${SITE_URL}/admin/messages`;
+
+  const html = wrapTransactionalEmail(`
+    <p style="margin-top: 0;">A new penpal note is waiting for ${escapeHtmlLocal(kidFirstName)} at the campus.</p>
+
+    <p><strong>From:</strong> ${escapeHtmlLocal(sponsorDisplay)}<br>
+    <strong>To:</strong> ${escapeHtmlLocal(kidLabel)}</p>
+
+    <p style="background: #FFF8F0; border-left: 3px solid #D4A843; padding: 16px 20px; margin: 24px 0; font-style: italic; color: #555;">
+      &ldquo;${escapeHtmlLocal(preview)}&rdquo;
+    </p>
+
+    <p>Please translate this note into ${escapeHtmlLocal(kidFirstName)}&rsquo;s language, hand it to them, and type their reply back into the queue when it comes.</p>
+
+    <p style="text-align: center; margin: 28px 0;">
+      <a href="${queueUrl}" style="display: inline-block; background: #D4A843; color: #0d0d0d; font-weight: bold; text-decoration: none; padding: 14px 32px; font-size: 15px; letter-spacing: 0.05em;">
+        Open the queue
+      </a>
+    </p>
+
+    <p style="color: #888; font-size: 12px;">Note ID: ${escapeHtmlLocal(noteId)}</p>
+  `);
+
+  return sendEmail({
+    to: { email: simonEmail, name: 'Simon' },
+    subject: `New penpal note for ${kidFirstName} — please translate`,
+    html,
+  });
+}
+
+/**
  * Admin alert to Kevin — a kid just replied to a sponsor.
  *
  * Fires from src/app/api/admin/messages/[id]/reply/route.ts alongside

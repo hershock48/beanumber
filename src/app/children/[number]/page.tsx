@@ -47,6 +47,7 @@ import {
 import { AwardsTimeline } from './AwardsTimeline';
 import { SendNoteComposer } from './SendNoteComposer';
 import { NotesThread } from './NotesThread';
+import { PenpalBox } from './PenpalBox';
 import { ShareKidCard } from './ShareKidCard';
 import { resolveShirtToKid } from '@/lib/cycle';
 import { CANONICAL_ROSTER_MAX } from '@/lib/roster-config';
@@ -2030,43 +2031,43 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
             </div>
           )}
 
-        {/* ── Notes thread ──
-            Every note this specific sponsor has written and every
-            reply the kid has written back. Silent when there's no
-            history yet — the composer below is enough signal that
-            the surface exists. Rendered above the composer so a
-            sponsor arriving from a "you got a reply" email sees the
-            reply front-and-center without scrolling past a fresh
-            composer they don't need.
-            Monthly-sponsor only (2026-07-06 rule change). Holders
-            can't write, so they wouldn't have a thread to view. */}
-        {!child.departed_at &&
-          child.viewer_is_sponsor &&
-          noteThread.length > 0 && (
-            <div className="mt-12 md:mt-16">
-              <NotesThread firstName={firstName} thread={noteThread} />
-            </div>
-          )}
-
-        {/* ── Send a note ──
-            Sponsor writes to the kid; the campus team translates and
-            delivers. The correspondence half of the retention engine
-            — this is what turns sponsorship from watching into
-            participating. Monthly-sponsor only per 2026-07-06 rule
-            change — holders can't write. If they want to unlock notes,
-            they can convert to monthly. Departed kids don't get new
-            notes. */}
-        {!child.departed_at &&
-          child.viewer_is_sponsor &&
-          child.record_id && (
-            <div className="mt-12 md:mt-16">
-              <SendNoteComposer
-                childRecordId={child.record_id}
-                childIdLegacy={child.child_id ?? null}
-                firstName={firstName}
-              />
-            </div>
-          )}
+        {/* ── Penpal box ──
+            The primary conversion surface. Placed directly under the
+            child's bio/info block. Three viewer states, all handled
+            by the PenpalBox component:
+              - Sponsor: real NotesThread + SendNoteComposer.
+              - Holder:  blurred sample thread + "Sponsor {firstName}"
+                         CTA ($25/mo). They already own the shirt so
+                         the ask is unlock the penpal thread.
+              - Anon:    blurred sample thread + "Sign in to write"
+                         CTA. Sign-in funnels them into the buyer
+                         claim / conversion flow.
+            The value prop line ("You get a penpal, monthly photos,
+            report cards, and campus updates. $25/month.") is used
+            verbatim across the site per Kevin (2026-07-08).
+            Departed kids skip the box entirely. */}
+        {!child.departed_at && (
+          <PenpalBox
+            firstName={firstName}
+            shirtNumber={Number(number)}
+            thread={
+              child.viewer_is_sponsor && noteThread.length > 0
+                ? noteThread
+                : undefined
+            }
+            childRecordId={
+              child.viewer_is_sponsor ? child.record_id : undefined
+            }
+            childIdLegacy={child.child_id ?? null}
+            viewerState={
+              child.viewer_is_sponsor
+                ? 'sponsor'
+                : child.viewer_is_holder || child.viewer_signed_in
+                  ? 'holder'
+                  : 'anon'
+            }
+          />
+        )}
 
         {/* ── Share this kid ──
             The viral loop. Every sponsor is a potential recruiter for

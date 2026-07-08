@@ -29,7 +29,7 @@ import {
   getNoteThreadForSponsorAndChild,
 } from '@/lib/db/queries';
 import { canonicalShirtNumber } from '@/lib/mobile/shirt-cycle';
-import { sendKevinNoteAlert } from '@/lib/email';
+import { sendKevinNoteAlert, sendSimonNoteAlert } from '@/lib/email';
 import type { Child } from '@/lib/db/schema';
 
 export const dynamic = 'force-dynamic';
@@ -339,6 +339,24 @@ async function postHandler(
     } catch (err) {
       logger.warn(
         `[mobile/thread] Kevin alert send failed (non-fatal): ${err instanceof Error ? err.message : String(err)}`
+      );
+    }
+
+    // Simon (campus-side reviewer) also gets the ping so notes coming
+    // in overnight in Uganda time don't wait for him to open the queue.
+    try {
+      await sendSimonNoteAlert({
+        noteId: inserted[0].id,
+        sponsorEmail: viewer.email,
+        sponsorName: null,
+        kidFirstName: child.firstName || 'the kid',
+        kidDisplayName: child.displayName || child.firstName || 'the kid',
+        shirtNumber: child.shirtNumber ?? null,
+        bodyEn: bodyText,
+      });
+    } catch (err) {
+      logger.warn(
+        `[mobile/thread] Simon alert send failed (non-fatal): ${err instanceof Error ? err.message : String(err)}`
       );
     }
 

@@ -38,7 +38,7 @@ import { cookies } from 'next/headers';
 import { and, eq, inArray, or, sql } from 'drizzle-orm';
 import { db } from '@/lib/db/client';
 import { kidMessages, sponsorships, children } from '@/lib/db/schema';
-import { sendKevinNoteAlert } from '@/lib/email';
+import { sendKevinNoteAlert, sendSimonNoteAlert } from '@/lib/email';
 import { SESSION } from '@/lib/constants';
 
 const MIN_BODY = 10;
@@ -260,6 +260,27 @@ export async function POST(request: NextRequest) {
     } catch (err) {
       console.warn(
         '[sponsor/notes] Kevin alert send failed (non-fatal):',
+        err instanceof Error ? err.message : String(err)
+      );
+    }
+
+    // Simon (campus-side reviewer) also gets the ping so a note that
+    // came in mid-Kampala-morning doesn't wait for him to happen to
+    // open the queue. Same non-fatal posture as the Kevin alert.
+    try {
+      await sendSimonNoteAlert({
+        noteId: inserted[0].id,
+        sponsorEmail: email,
+        sponsorName,
+        kidFirstName: childRow.firstName || 'the kid',
+        kidDisplayName:
+          childRow.displayName || childRow.firstName || 'the kid',
+        shirtNumber: childRow.shirtNumber ?? null,
+        bodyEn: rawBody,
+      });
+    } catch (err) {
+      console.warn(
+        '[sponsor/notes] Simon alert send failed (non-fatal):',
         err instanceof Error ? err.message : String(err)
       );
     }
