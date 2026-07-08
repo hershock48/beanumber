@@ -162,6 +162,15 @@ export default function SponsorHome() {
                     title={item.title}
                     body={item.body}
                     photoUrl={item.photoUrl}
+                    onPhotoPress={photoUrl =>
+                      router.push({
+                        pathname: '/photo',
+                        params: {
+                          url: photoUrl,
+                          caption: item.body || item.title,
+                        },
+                      })
+                    }
                     onCardPress={
                       item.kidRef
                         ? () =>

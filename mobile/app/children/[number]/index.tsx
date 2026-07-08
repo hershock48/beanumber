@@ -335,9 +335,18 @@ export default function KidPage() {
             kidFirstName={kid.firstName}
             update={updates[0]}
             totalCount={updates.length}
-            onSeeAllPress={() => {
-              /* TODO route: /children/[N]/updates */
-            }}
+            onSeeAllPress={() =>
+              router.push(`/children/${shirtNumber}/updates`)
+            }
+            onPhotoPress={photoUrl =>
+              router.push({
+                pathname: '/photo',
+                params: {
+                  url: photoUrl,
+                  caption: updates[0]?.caption ?? '',
+                },
+              })
+            }
             locked={canReadUpdates ? null : 'holderOnly'}
           />
         </View>

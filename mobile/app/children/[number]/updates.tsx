@@ -103,20 +103,33 @@ export default function KidUpdatesList() {
 
 function UpdateCard({ update }: { update: KidUpdate }) {
   const router = useRouter();
+  const openPhoto = () => {
+    if (!update.photoUrl) return;
+    router.push({
+      pathname: '/photo',
+      params: { url: update.photoUrl, caption: update.caption ?? '' },
+    });
+  };
   return (
     <Card variant="large" padded={false} style={{ overflow: 'hidden' }}>
       {update.photoUrl ? (
-        <Image
-          source={{ uri: update.photoUrl }}
-          style={{
-            width: '100%',
-            aspectRatio: 3 / 2,
-            backgroundColor: COLORS.sand,
-          }}
-          contentFit="cover"
-          transition={200}
-          onError={() => {}}
-        />
+        <Pressable
+          onPress={openPhoto}
+          accessibilityRole="image"
+          accessibilityLabel="Open photo"
+        >
+          <Image
+            source={{ uri: update.photoUrl }}
+            style={{
+              width: '100%',
+              aspectRatio: 3 / 2,
+              backgroundColor: COLORS.sand,
+            }}
+            contentFit="cover"
+            transition={200}
+            onError={() => {}}
+          />
+        </Pressable>
       ) : null}
       <View style={{ padding: SPACING.l }}>
         <Text variant="body" color="ink">

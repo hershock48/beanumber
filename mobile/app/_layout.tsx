@@ -116,6 +116,16 @@ export default function RootLayout() {
                 animation: 'slide_from_bottom',
               }}
             />
+            <Stack.Screen
+              name="photo"
+              options={{
+                presentation: 'transparentModal',
+                headerShown: false,
+                animation: 'fade',
+                contentStyle: { backgroundColor: 'transparent' },
+                gestureEnabled: false,
+              }}
+            />
           </Stack>
         </AuthProvider>
       </SafeAreaProvider>
