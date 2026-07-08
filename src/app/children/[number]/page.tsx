@@ -1876,82 +1876,90 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
                 </div>
               )
             ) : child.viewer_is_sponsor ? (
-              /* Active monthly sponsor: acknowledgment, no $25/mo ask
-                 because they're already paying it. */
-              <div className="bg-white border-2 border-[#D4A843]/30 p-7">
-                <p className="text-xs font-bold uppercase tracking-[0.25em] text-[#D4A843] mb-3">
-                  {justSignedIn ? 'Welcome' : 'Signed in'}
-                </p>
-                <p
-                  className="text-2xl md:text-[28px] text-[#0d0d0d] mb-3 leading-tight"
-                  style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
+              /* Active monthly sponsor: slim signed-in strip. The big
+                 acknowledgment card lived here before 2026-07-08 — Kevin's
+                 read was that it duplicated the state already communicated
+                 by the top-nav SIGN OUT button + everything the PenpalBox
+                 above gives them. Slim strip preserves the warmth without
+                 the visual weight of a full white bordered card.
+                 Sponsor variant: names the relationship + points at /me
+                 for subscription management + giving statements. */
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 py-4 border-y border-[#e8e0d4]">
+                <div>
+                  <span className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mr-3">
+                    {justSignedIn ? 'Welcome' : 'Signed in'}
+                  </span>
+                  <span className="text-[15px] text-[#555]">
+                    You&rsquo;re {firstName}&rsquo;s sponsor. Thank you.
+                  </span>
+                </div>
+                <Link
+                  href="/me"
+                  className="text-sm font-bold text-[#D4A843] hover:underline whitespace-nowrap"
                 >
-                  You&rsquo;re {firstName}&rsquo;s sponsor.
-                </p>
-                <p className="text-[#555] leading-relaxed mb-5">
-                  Through your $25/month, {firstName} has school fees, books,
-                  a uniform, morning porridge and a hot meal every day, access to
-                  the on-site medical center, and a classroom where teachers know{' '}
-                  {firstName}&rsquo;s name.
-                </p>
-                <p className="text-xs text-[#888] leading-relaxed">
-                  Need to manage your subscription, see updates, or
-                  download a giving statement? Tap{' '}
-                  <Link href="/me" className="text-[#D4A843] hover:underline font-bold">
-                    Your kids
-                  </Link>{' '}
-                  in the nav.
-                </p>
-                <p className="text-center text-xs text-[#bbb] mt-5">
-                  On behalf of our entire team &mdash; thank you.
-                </p>
+                  Your campus &rarr;
+                </Link>
               </div>
             ) : child.viewer_is_holder ? (
-              /* Holder: they own this number but aren't paying monthly.
-                 Acknowledge them by name, no aggressive ask, soft
-                 upsell to monthly. Copy switches between first-time
-                 ("you own #N now") and returning ("welcome back"). */
-              <div className="bg-white border-2 border-[#D4A843]/30 p-7">
-                <p className="text-xs font-bold uppercase tracking-[0.25em] text-[#D4A843] mb-3">
-                  {justSignedIn ? 'You own this number' : 'Signed in'}
-                </p>
-                <p
-                  className="text-2xl md:text-[28px] text-[#0d0d0d] mb-3 leading-tight"
-                  style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
+              /* Holder: slim strip too. The card version (Kevin's
+                 2026-07-08 feedback) was doing double duty with the
+                 PenpalBox above — that box already has the $25/mo CTA
+                 and unlocks everything. The strip acknowledges state
+                 without repeating the sell. Copy switches between
+                 first-time ("you own #N now") and returning
+                 ("welcome back"). */
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 py-4 border-y border-[#e8e0d4]">
+                <div>
+                  <span className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mr-3">
+                    {justSignedIn ? 'You own this number' : 'Signed in'}
+                  </span>
+                  <span className="text-[15px] text-[#555]">
+                    {justSignedIn
+                      ? `#${number} is yours. ${firstName} too.`
+                      : `Welcome back — ${firstName} is yours.`}
+                  </span>
+                </div>
+                <Link
+                  href="/me"
+                  className="text-sm font-bold text-[#D4A843] hover:underline whitespace-nowrap"
                 >
-                  {justSignedIn
-                    ? `#${number} is yours. ${firstName} too.`
-                    : `Welcome back. ${firstName} is yours.`}
-                </p>
-                <p className="text-[#555] leading-relaxed mb-5">
-                  Ready to unlock the penpal thread and campus updates
-                  above? $25/month.
-                </p>
-                <SponsorButton
-                  childRecordId={child.record_id}
-                  childId={child.child_id}
-                  childDisplayName={displayName}
-                  firstName={firstName}
-                  shirtAssigned={viewerLooksLikeBuyer}
-                  existingCustomerId={buyerHint?.customerId || undefined}
-                  buyerEmail={buyerHint?.email || undefined}
-                />
+                  Your campus &rarr;
+                </Link>
               </div>
             ) : (
-              /* Not authenticated for this kid.
-                 Conversion ladder: meet → know → CLAIM → stay.
-                 Buyers see a ClaimGate over the bio + this card
-                 (see ClaimGate wrapper around the parent grid). The
-                 ask below is the "stay with X" rung — buyers reach
-                 it after claiming or dismissing the gate; cold
-                 visitors reach it directly. The inline
-                 ClaimThisNumberCard used to sit above this card; the
-                 gate replaces it. */
+              /* Not authenticated for this kid — the cold-visitor path.
+                 Kevin's 2026-07-08 restructure: symmetric slim strip
+                 with the signed-in variants above, then a compact
+                 "want your own number?" beat that keeps the shirt
+                 mechanic honest (per CLAUDE.md non-negotiable #4:
+                 becoming a sponsor requires a shirt first). The
+                 SponsorButton path stays for buyers who already have
+                 a shirt in-hand and land on the page cold; cold
+                 visitors without a shirt route through /shirts. */
               <>
+                {/* Parity strip — matches the signed-in variants. */}
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 py-4 border-y border-[#e8e0d4] mb-7">
+                  <div>
+                    <span className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mr-3">
+                      Not signed in
+                    </span>
+                    <span className="text-[15px] text-[#555]">
+                      Have a Be A Number shirt? Sign in to claim your number.
+                    </span>
+                  </div>
+                  <Link
+                    href={`/sponsor/login?next=${encodeURIComponent(`/children/${number}`)}`}
+                    className="text-sm font-bold text-[#D4A843] hover:underline whitespace-nowrap"
+                  >
+                    Sign in &rarr;
+                  </Link>
+                </div>
+
+                {/* Compact cold-visitor pitch — was a full sales column
+                    before 2026-07-08. Slimmed to preserve the shirt
+                    mechanic without repeating what the PenpalBox above
+                    already sells. */}
                 <div className="bg-[#FFF8F0] border-2 border-[#D4A843] p-7 shadow-sm">
-                {/* Brand tagline — the two-trade line from the shirt insert,
-                    used everywhere it fits one line per the Jobs-filter
-                    launch spec (docs/claude/mystery_copy.md §0). */}
                 <p
                   className="text-base text-[#0d0d0d] mb-4 italic text-center leading-snug"
                   style={{ fontFamily: 'var(--font-lora), serif' }}
@@ -1963,29 +1971,15 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
                   className="text-2xl text-[#0d0d0d] mb-4"
                   style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
                 >
-                  You know {firstName} now. They&rsquo;ve been waiting for you. Stay in their life.
-                </p>
-
-                <p className="text-[#555] leading-relaxed mb-4">
-                  $25 a month covers {firstName}&rsquo;s school day: fees, lunch,
-                  the clinic when malaria hits.
+                  Want {firstName} to be yours?
                 </p>
 
                 <p className="text-[#555] leading-relaxed mb-5">
-                  Stay, and you&rsquo;ll keep meeting them. The first letter from
-                  their teacher. A photo from the campus. The report card at the
-                  end of term. You don&rsquo;t get those any other way.
+                  Get a Be A Number shirt with {firstName}&rsquo;s number on
+                  the back and this whole page &mdash; the penpal thread, the
+                  photos, the report cards &mdash; is yours. $25/month covers
+                  {firstName}&rsquo;s school day.
                 </p>
-
-                <div className="flex items-baseline gap-1 mb-4">
-                  <span
-                    className="text-4xl text-[#D4A843]"
-                    style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 700 }}
-                  >
-                    $25
-                  </span>
-                  <span className="text-[#aaa]">/month &middot; cancel anytime</span>
-                </div>
 
                 <SponsorButton
                   childRecordId={child.record_id}
