@@ -1930,16 +1930,18 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
                   ? noteThread
                   : undefined
               }
-              childRecordId={
-                child.viewer_is_sponsor ? child.record_id : undefined
-              }
+              childRecordId={child.record_id}
               childIdLegacy={child.child_id ?? null}
+              childId={child.child_id ?? null}
+              childDisplayName={displayName}
               viewerState={
                 child.viewer_is_sponsor
                   ? 'sponsor'
-                  : child.viewer_is_holder || child.viewer_signed_in
+                  : child.viewer_is_holder
                     ? 'holder'
-                    : 'anon'
+                    : child.viewer_signed_in
+                      ? 'signed_in_visitor'
+                      : 'anon'
               }
               sponsorPortal={
                 child.viewer_is_sponsor && portalData ? (

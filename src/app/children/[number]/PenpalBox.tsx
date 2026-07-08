@@ -32,6 +32,7 @@ import Link from 'next/link';
 import type { NoteThreadEntry } from '@/lib/db/queries';
 import { NotesThread } from './NotesThread';
 import { SendNoteComposer } from './SendNoteComposer';
+import { PenpalBoxSponsorCta } from './PenpalBoxSponsorCta';
 
 export interface PenpalBoxProps {
   firstName: string;
@@ -42,11 +43,30 @@ export interface PenpalBoxProps {
   childRecordId?: string;
   childIdLegacy?: string | null;
   /**
+   * Legacy child_id (e.g. "HSP/BAN-017"). Required for the holder
+   * and signed-in-visitor conversion CTA — /api/create-sponsor-
+   * checkout expects both the record id and this legacy string id
+   * in the POST body.
+   */
+  childId?: string | null;
+  /**
+   * Display name used in the checkout session's line item description.
+   */
+  childDisplayName?: string;
+  /**
    * Which surface the viewer sees. Determines whether we render the
    * real thread+composer, the holder-oriented conversion preview, or
    * the anon-oriented sign-in preview.
+   *
+   * 'signed_in_visitor' is a fourth state added 2026-07-08 (audit
+   * fix): the visitor is signed in as a sponsor of some OTHER kid,
+   * viewing this kid's page. Kevin's audit caught that folding this
+   * case into 'holder' misled them into "sponsor to start writing"
+   * copy with a broken CTA. The signed-in-visitor copy makes the
+   * add-on nature explicit ("Sponsor {firstName} too — $25/month")
+   * and the same checkout flow runs.
    */
-  viewerState: 'sponsor' | 'holder' | 'anon';
+  viewerState: 'sponsor' | 'holder' | 'signed_in_visitor' | 'anon';
   /**
    * Renders BELOW the thread + composer for active monthly sponsors.
    * Used to inline the "personal photo updates from the campus" block
@@ -67,6 +87,8 @@ export function PenpalBox({
   thread,
   childRecordId,
   childIdLegacy,
+  childId,
+  childDisplayName,
   viewerState,
   sponsorPortal,
 }: PenpalBoxProps) {
@@ -95,22 +117,30 @@ export function PenpalBox({
     );
   }
 
-  // Holder or anon: blurred preview + CTA.
-  const isHolder = viewerState === 'holder';
-  const ctaHref = isHolder
-    ? `/children/${shirtNumber}?intent=sponsor`
-    : `/children/${shirtNumber}?intent=sign-in`;
-  const ctaLabel = isHolder
-    ? `Sponsor ${firstName} — $25/month`
-    : `Sign in to write ${firstName}`;
-  // Holder heading must NOT duplicate the outer SectionHeader
-  // ("Write {firstName}. {firstName} writes back.") — for the holder
-  // that title is the promise, and the overlay heading is the reason
-  // to click. Anon gets a slightly different frame since they haven't
-  // even claimed the number yet.
-  const heading = isHolder
-    ? `Sponsor to start writing ${firstName}.`
-    : `You could be ${firstName}'s penpal.`;
+  // Holder / signed-in visitor / anon: blurred preview + CTA.
+  //
+  // The three states have distinct copy but only two CTA behaviors:
+  //   - anon                → link to /signin?n=N (magic-link flow)
+  //   - holder + signed_in  → POST to /api/create-sponsor-checkout
+  //     _visitor              via the PenpalBoxSponsorCta client
+  //                           component
+  //
+  // Heading is chosen to NOT duplicate the outer SectionHeader
+  // ("Write {firstName}. {firstName} writes back."), which is the
+  // promise; the overlay heading is the CTA-adjacent reason to click.
+  let heading: string;
+  if (viewerState === 'holder') {
+    heading = `Sponsor to start writing ${firstName}.`;
+  } else if (viewerState === 'signed_in_visitor') {
+    heading = `Add ${firstName} to your campus.`;
+  } else {
+    heading = `You could be ${firstName}'s penpal.`;
+  }
+
+  // Anon-only href. Holder + signed_in_visitor use the client CTA
+  // component below, which POSTs to create-sponsor-checkout.
+  const anonCtaHref = `/signin?n=${shirtNumber}`;
+  const anonCtaLabel = `Sign in to write ${firstName}`;
 
   return (
     <div className="mt-12 md:mt-16">
@@ -172,12 +202,32 @@ export function PenpalBox({
               <span className="font-bold text-[#0d0d0d]">$25/month.</span>{' '}
               Cancel anytime.
             </p>
-            <Link
-              href={ctaHref}
-              className="inline-block bg-[#D4A843] text-[#0d0d0d] font-bold uppercase tracking-wider py-4 px-8 hover:bg-[#c49a3a] transition-colors"
-            >
-              {ctaLabel}
-            </Link>
+            {viewerState === 'anon' ? (
+              <Link
+                href={anonCtaHref}
+                className="inline-block bg-[#D4A843] text-[#0d0d0d] font-bold uppercase tracking-wider py-4 px-8 hover:bg-[#c49a3a] transition-colors"
+              >
+                {anonCtaLabel}
+              </Link>
+            ) : childRecordId && childId && childDisplayName ? (
+              <PenpalBoxSponsorCta
+                firstName={firstName}
+                childRecordId={childRecordId}
+                childId={childId}
+                childDisplayName={childDisplayName}
+                variant={viewerState === 'holder' ? 'holder' : 'signed_in_visitor'}
+              />
+            ) : (
+              /* Missing checkout props (shouldn't happen given page.tsx
+                 always passes them for signed-in viewers). Fall back
+                 to /shirts as the shirt-first entry point. */
+              <Link
+                href="/shirts"
+                className="inline-block bg-[#D4A843] text-[#0d0d0d] font-bold uppercase tracking-wider py-4 px-8 hover:bg-[#c49a3a] transition-colors"
+              >
+                Get a shirt to sponsor {firstName}
+              </Link>
+            )}
             <p className="text-xs text-[#888] mt-4 leading-relaxed">
               The campus team translates in both directions.
             </p>
