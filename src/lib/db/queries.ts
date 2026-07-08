@@ -28,6 +28,7 @@ import {
   batches,
   sotmHistory,
   kidMessages,
+  fulfillments,
 } from './schema';
 
 // ─── Children ────────────────────────────────────────────────────
@@ -1022,4 +1023,375 @@ export async function getNoteThreadForSponsorAndChild(args: {
   } catch {
     return [];
   }
+}
+
+// ─── Mobile (v1) — dedicated read helpers for /api/mobile/v1/* ───
+
+/**
+ * Kids the viewer sponsors OR holds — the "Your kids" list on the
+ * mobile home tab. Mirrors the dual-key join used by
+ * getViewerSponsorships (UUID FK first, legacy ChildID text second)
+ * so transition-state rows still render.
+ *
+ * Excludes departed kids so the mobile home doesn't surface a card for
+ * someone who's no longer on campus (the web /me makes the same call).
+ * Returns rows sorted shirt-holders first, then most-recent-first,
+ * matching the web /me ordering.
+ */
+export interface MobileMineKidRow {
+  sponsorshipId: string;
+  childRecordId: string | null;
+  childIdLegacy: string | null;
+  firstName: string | null;
+  displayName: string | null;
+  shirtNumber: number | null;
+  profilePhotoUrl: string | null;
+  gradeClass: string | null;
+  dateOfBirth: Date | null;
+  status: string;
+  monthlyAmount: string | null;
+  childRevealedAt: Date | null;
+  createdAt: Date;
+}
+
+export async function getMobileMineKidsForEmail(
+  viewerEmail: string
+): Promise<MobileMineKidRow[]> {
+  if (!viewerEmail) return [];
+  const emailLower = viewerEmail.toLowerCase();
+  const rows = await db
+    .select({
+      sponsorshipId: sponsorships.id,
+      childRecordId: sql<string | null>`coalesce(${children.id}, child_legacy.id)`,
+      childIdLegacy: sql<
+        string | null
+      >`coalesce(${children.childId}, child_legacy.child_id)`,
+      firstName: sql<
+        string | null
+      >`coalesce(${children.firstName}, child_legacy.first_name)`,
+      displayName: sql<
+        string | null
+      >`coalesce(${children.displayName}, child_legacy.display_name)`,
+      shirtNumber: sql<
+        number | null
+      >`coalesce(${children.shirtNumber}, child_legacy.shirt_number)`,
+      profilePhotoUrl: sql<
+        string | null
+      >`coalesce(${children.profilePhotoUrl}, child_legacy.profile_photo_url)`,
+      gradeClass: sql<
+        string | null
+      >`coalesce(${children.gradeClass}, child_legacy.grade_class)`,
+      dateOfBirth: sql<
+        Date | null
+      >`coalesce(${children.dateOfBirth}, child_legacy.date_of_birth)`,
+      childDepartedAt: sql<
+        Date | null
+      >`coalesce(${children.departedAt}, child_legacy.departed_at)`,
+      status: sponsorships.status,
+      monthlyAmount: sponsorships.monthlyAmount,
+      childRevealedAt: sponsorships.childRevealedAt,
+      createdAt: sponsorships.createdAt,
+    })
+    .from(sponsorships)
+    .leftJoin(children, eq(children.id, sponsorships.childId))
+    .leftJoin(
+      sql`children as child_legacy`,
+      sql`child_legacy.child_id = ${sponsorships.childIdLegacy}`
+    )
+    .where(
+      and(
+        sql`lower(${sponsorships.sponsorEmail}) = ${emailLower}`,
+        or(
+          eq(sponsorships.status, 'Active'),
+          eq(sponsorships.status, 'Holder')
+        )
+      )
+    );
+
+  return rows
+    .filter(r => !r.childDepartedAt)
+    .sort((a, b) => {
+      // Shirt-holder-sponsors first (they claimed this number physically),
+      // then by createdAt desc.
+      const aHolds = a.childRevealedAt ? 1 : 0;
+      const bHolds = b.childRevealedAt ? 1 : 0;
+      if (aHolds !== bHolds) return bHolds - aHolds;
+      const at = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const bt = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return bt - at;
+    })
+    .map(r => ({
+      sponsorshipId: r.sponsorshipId,
+      childRecordId: r.childRecordId,
+      childIdLegacy: r.childIdLegacy,
+      firstName: r.firstName,
+      displayName: r.displayName,
+      shirtNumber: r.shirtNumber,
+      profilePhotoUrl: r.profilePhotoUrl,
+      gradeClass: r.gradeClass,
+      dateOfBirth: r.dateOfBirth,
+      status: r.status,
+      monthlyAmount: r.monthlyAmount,
+      childRevealedAt: r.childRevealedAt,
+      createdAt: r.createdAt,
+    }));
+}
+
+/**
+ * Latest N published updates across every kid — mobile campus feed.
+ * Optionally exclude a specific email's kids (not typically used —
+ * feed is global across kids the viewer follows and doesn't). Returns
+ * newest first with an optional `before` cursor for pagination.
+ */
+export interface CampusFeedUpdateRow {
+  id: string;
+  publishedAt: Date;
+  title: string | null;
+  summary: string | null;
+  positiveHighlight: string | null;
+  content: string | null;
+  photoUrls: string[] | null;
+  childRecordId: string | null;
+  childIdLegacy: string | null;
+  childFirstName: string | null;
+  childShirtNumber: number | null;
+}
+
+export async function getCampusFeedUpdates(args: {
+  limit: number;
+  before?: Date | null;
+}): Promise<CampusFeedUpdateRow[]> {
+  const conditions = [
+    eq(childUpdates.visibleToSponsor, true),
+    isNotNull(childUpdates.publishedAt),
+  ];
+  if (args.before) {
+    conditions.push(sql`${childUpdates.publishedAt} < ${args.before}`);
+  }
+  const rows = await db
+    .select({
+      id: childUpdates.id,
+      publishedAt: childUpdates.publishedAt,
+      title: childUpdates.title,
+      summary: childUpdates.summary,
+      positiveHighlight: childUpdates.positiveHighlight,
+      content: childUpdates.content,
+      photoUrls: childUpdates.photoUrls,
+      childRecordId: sql<
+        string | null
+      >`coalesce(${children.id}, child_legacy.id)`,
+      childIdLegacy: sql<
+        string | null
+      >`coalesce(${children.childId}, child_legacy.child_id)`,
+      childFirstName: sql<
+        string | null
+      >`coalesce(${children.firstName}, child_legacy.first_name)`,
+      childShirtNumber: sql<
+        number | null
+      >`coalesce(${children.shirtNumber}, child_legacy.shirt_number)`,
+    })
+    .from(childUpdates)
+    .leftJoin(children, eq(children.id, childUpdates.childId))
+    .leftJoin(
+      sql`children as child_legacy`,
+      sql`child_legacy.child_id = ${childUpdates.childIdLegacy}`
+    )
+    .where(and(...conditions))
+    .orderBy(desc(childUpdates.publishedAt))
+    .limit(args.limit);
+  return rows.map(r => ({
+    id: r.id,
+    publishedAt: r.publishedAt as Date,
+    title: r.title,
+    summary: r.summary,
+    positiveHighlight: r.positiveHighlight,
+    content: r.content,
+    photoUrls: (r.photoUrls as string[] | null) ?? null,
+    childRecordId: r.childRecordId,
+    childIdLegacy: r.childIdLegacy,
+    childFirstName: r.childFirstName,
+    childShirtNumber: r.childShirtNumber,
+  }));
+}
+
+/**
+ * All SOTM awards across the campus, newest first — used to interleave
+ * with campus feed updates when we mix event types.
+ */
+export interface CampusFeedSotmRow {
+  id: string;
+  awardedAt: Date;
+  month: string;
+  gradeCode: string;
+  reason: string;
+  childRecordId: string;
+  childFirstName: string | null;
+  childShirtNumber: number | null;
+  childPhotoUrl: string | null;
+}
+
+export async function getCampusFeedSotm(args: {
+  limit: number;
+  before?: Date | null;
+}): Promise<CampusFeedSotmRow[]> {
+  const conditions = [sql`1=1`];
+  if (args.before) {
+    conditions.push(sql`${sotmHistory.awardedAt} < ${args.before}`);
+  }
+  const rows = await db
+    .select({
+      id: sotmHistory.id,
+      awardedAt: sotmHistory.awardedAt,
+      month: sotmHistory.month,
+      gradeCode: sotmHistory.gradeCode,
+      reason: sotmHistory.reason,
+      childRecordId: sotmHistory.childId,
+      childFirstName: children.firstName,
+      childShirtNumber: children.shirtNumber,
+      childPhotoUrl: children.profilePhotoUrl,
+    })
+    .from(sotmHistory)
+    .leftJoin(children, eq(children.id, sotmHistory.childId))
+    .where(and(...conditions))
+    .orderBy(desc(sotmHistory.awardedAt))
+    .limit(args.limit);
+  return rows.map(r => ({
+    id: r.id,
+    awardedAt: r.awardedAt,
+    month: r.month,
+    gradeCode: r.gradeCode,
+    reason: r.reason,
+    childRecordId: r.childRecordId,
+    childFirstName: r.childFirstName,
+    childShirtNumber: r.childShirtNumber,
+    childPhotoUrl: r.childPhotoUrl,
+  }));
+}
+
+/**
+ * The signed-in viewer's Buyer Home data. Purchase rows come from the
+ * `fulfillments` table (source of truth for shirts shipped) with the
+ * matching `donations.amount` when we can resolve the pair. Billing
+ * fields come off the linked `donors` row's Stripe customer.
+ */
+export interface MobileMePurchaseRow {
+  fulfillmentId: string;
+  orderNumber: number | null;
+  size: string | null;
+  color: string | null;
+  design: string | null;
+  orderDate: Date | null;
+  createdAt: Date;
+}
+
+export async function getPurchasesForEmail(
+  viewerEmail: string
+): Promise<MobileMePurchaseRow[]> {
+  if (!viewerEmail) return [];
+  const emailLower = viewerEmail.toLowerCase();
+  const rows = await db
+    .select({
+      fulfillmentId: fulfillments.id,
+      orderNumber: fulfillments.orderNumber,
+      size: fulfillments.size,
+      color: fulfillments.shirtColor,
+      design: fulfillments.design,
+      orderDate: fulfillments.orderDate,
+      createdAt: fulfillments.createdAt,
+    })
+    .from(fulfillments)
+    .where(sql`lower(${fulfillments.buyerEmail}) = ${emailLower}`)
+    .orderBy(desc(fulfillments.orderDate), desc(fulfillments.createdAt));
+  return rows.map(r => ({
+    fulfillmentId: r.fulfillmentId,
+    orderNumber: r.orderNumber,
+    size: r.size,
+    color: r.color,
+    design: r.design,
+    orderDate: r.orderDate ? new Date(r.orderDate) : null,
+    createdAt: r.createdAt,
+  }));
+}
+
+/**
+ * Kids browsable in the Explore tab — Active, on-campus kids with a
+ * profile photo. Optionally excludes a set of childRecordIds so the
+ * viewer's sponsored kids don't show up again in Explore.
+ */
+export interface MobileExploreKidRow {
+  id: string;
+  firstName: string | null;
+  shirtNumber: number | null;
+  profilePhotoUrl: string | null;
+  gradeClass: string | null;
+  dateOfBirth: Date | null;
+}
+
+export async function getExploreKids(args: {
+  limit: number;
+  excludeChildIds?: string[];
+}): Promise<MobileExploreKidRow[]> {
+  const conditions = [
+    or(
+      eq(children.status, 'Active'),
+      eq(children.status, 'active'),
+      eq(children.status, 'New')
+    ),
+    sql`${children.departedAt} IS NULL`,
+    isNotNull(children.profilePhotoUrl),
+    isNotNull(children.shirtNumber),
+  ];
+  const excluded = (args.excludeChildIds ?? []).filter(v => !!v);
+  if (excluded.length > 0) {
+    conditions.push(sql`${children.id} NOT IN (${sql.join(
+      excluded.map(id => sql`${id}`),
+      sql`, `
+    )})`);
+  }
+  const rows = await db
+    .select({
+      id: children.id,
+      firstName: children.firstName,
+      shirtNumber: children.shirtNumber,
+      profilePhotoUrl: children.profilePhotoUrl,
+      gradeClass: children.gradeClass,
+      dateOfBirth: children.dateOfBirth,
+    })
+    .from(children)
+    .where(and(...conditions))
+    .orderBy(children.shirtNumber)
+    .limit(args.limit);
+  return rows.map(r => ({
+    id: r.id,
+    firstName: r.firstName,
+    shirtNumber: r.shirtNumber,
+    profilePhotoUrl: r.profilePhotoUrl,
+    gradeClass: r.gradeClass,
+    dateOfBirth: r.dateOfBirth ? new Date(r.dateOfBirth) : null,
+  }));
+}
+
+/**
+ * Total delivered notes count for a (sponsor, kid) pair. Used by
+ * mobile /kids/mine to compute unread-updates count later — for now
+ * we return a placeholder of 0 unread; when the read-state table
+ * exists this helper will do the real math.
+ */
+export async function countDeliveredKidReplies(args: {
+  sponsorEmail: string;
+  childRecordId: string;
+}): Promise<number> {
+  const email = args.sponsorEmail.toLowerCase();
+  if (!email || !args.childRecordId) return 0;
+  const rows = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(kidMessages)
+    .where(
+      and(
+        sql`lower(${kidMessages.sponsorEmail}) = ${email}`,
+        eq(kidMessages.childId, args.childRecordId),
+        eq(kidMessages.direction, 'kid_to_sponsor')
+      )
+    );
+  return rows[0]?.n ?? 0;
 }
