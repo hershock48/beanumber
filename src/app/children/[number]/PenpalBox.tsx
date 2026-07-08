@@ -153,8 +153,18 @@ export function PenpalBox({
 
   return (
     <div className="mt-12 md:mt-16">
-      <SectionHeader firstName={firstName} />
-      <div className="relative mt-6 border border-[#e8e0d4] bg-white">
+      {/* SectionHeader intentionally omitted for holder / anon /
+          signed_in_visitor variants (2026-07-08 fix).
+          The frosted overlay heading below already IS the primary
+          message for these audiences ("Sponsor Marvin. Meet him
+          for real." etc.), and the anon two-CTA overlay content
+          was tall enough to overflow the frosted card and step
+          on the SectionHeader h2 above it — Kevin's screenshot
+          showed "Write Marvin. Marvin writes back." rendering on
+          top of "Sponsor Marvin. Meet him for real."
+          Sponsor branch above still renders SectionHeader as
+          the anchor for the real thread + composer. */}
+      <div className="relative border border-[#e8e0d4] bg-white">
         {/* Frosted preview — a fake sample thread. Reads like the
             real surface would look. */}
         <div
