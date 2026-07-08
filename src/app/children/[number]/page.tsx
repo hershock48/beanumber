@@ -11,7 +11,11 @@ import { detectPlatform } from '@/lib/deferred-link';
 import { headers } from 'next/headers';
 import { RevealOverlay } from './RevealOverlay';
 import { ReassignReveal } from './ReassignReveal';
-import { SponsorButton } from './SponsorButton';
+// SponsorButton import removed 2026-07-08 — the only remaining
+// render path (the cold-visitor "Want {firstName} to be yours?" box
+// above) was folded into PenpalBox's anon variant, so the button
+// component isn't needed on the page. File itself stays in the tree
+// (unchanged) for future reuse.
 import { ClaimMatchCard } from './ClaimMatchCard';
 import { SponsorPortalSections } from './SponsorPortalSections';
 import { CampusNewsfeed } from './CampusNewsfeed';
@@ -2020,65 +2024,22 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
                  meeting the kid, not after. */
               null
             ) : (
-              /* Not authenticated for this kid — cold-visitor path.
-                 Slim strip moved above the hero (matches sponsor +
-                 holder treatment); the shirt-buying pitch below is
-                 what's left. Per CLAUDE.md non-negotiable #4:
-                 becoming a sponsor requires a shirt first. Cold
-                 visitors without a shirt route through /shirts; the
-                 SponsorButton path stays for buyers who already have
-                 a shirt in-hand and land on the page cold. */
-              <>
-                {/* Compact cold-visitor pitch — was a full sales column
-                    before 2026-07-08. Slimmed to preserve the shirt
-                    mechanic without repeating what the PenpalBox above
-                    already sells. */}
-                <div className="bg-[#FFF8F0] border-2 border-[#D4A843] p-7 shadow-sm">
-                <p
-                  className="text-base text-[#0d0d0d] mb-4 italic text-center leading-snug"
-                  style={{ fontFamily: 'var(--font-lora), serif' }}
-                >
-                  The shirt is how you meet them. $25 a month is how you stay.
-                </p>
+              /* Cold-visitor pitch removed 2026-07-08 (Kevin round 2).
+                 The "Want {firstName} to be yours?" card lived here
+                 and duplicated the exact ask PenpalBox now makes:
+                 both showed the value prop, both offered a Sponsor
+                 CTA. The PenpalBox anon variant carries both entry
+                 points now — sign-in for existing sponsors and
+                 sponsor-for-$25/mo for new visitors — so this
+                 additional card was pure redundancy.
 
-                <p
-                  className="text-2xl text-[#0d0d0d] mb-4"
-                  style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
-                >
-                  Want {firstName} to be yours?
-                </p>
-
-                <p className="text-[#555] leading-relaxed mb-5">
-                  Get a Be A Number shirt with {firstName}&rsquo;s number on
-                  the back and this whole page &mdash; the penpal thread, the
-                  photos, the report cards &mdash; is yours. $25/month covers
-                  {firstName}&rsquo;s school day.
-                </p>
-
-                <SponsorButton
-                  childRecordId={child.record_id}
-                  childId={child.child_id}
-                  childDisplayName={displayName}
-                  firstName={firstName}
-                  shirtAssigned={viewerLooksLikeBuyer}
-                  existingCustomerId={buyerHint?.customerId || undefined}
-                  buyerEmail={buyerHint?.email || undefined}
-                />
-
-                <p className="text-center text-xs text-[#bbb] mt-3 mb-5">
-                  Continuing is your choice. No pressure if not now.
-                </p>
-
-                {/* Tiny contextual nudge for existing sponsors on a
-                    new device. Quiet, not pushy — points them to the
-                    Sign in button in the top nav. */}
-                <p className="text-center text-xs text-[#666] border-t border-[#e8e0d4] pt-4">
-                  Sponsoring monthly? Your sponsorship is intact —
-                  tap <span className="font-bold">Sign in</span> at the top
-                  of the page to see your view.
-                </p>
-              </div>
-              </>
+                 Preserving null here (not an empty fragment) so the
+                 layout collapses cleanly and the AwardsTimeline /
+                 SotmTimeline sections below sit closer to the bio.
+                 If we ever want a cold-visitor pitch back, it belongs
+                 as a variant INSIDE PenpalBox, not as a separate
+                 card that competes for the same click. */
+              null
             )}
           </div>
         </div>

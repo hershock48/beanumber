@@ -203,12 +203,38 @@ export function PenpalBox({
               Cancel anytime.
             </p>
             {viewerState === 'anon' ? (
-              <Link
-                href={anonCtaHref}
-                className="inline-block bg-[#D4A843] text-[#0d0d0d] font-bold uppercase tracking-wider py-4 px-8 hover:bg-[#c49a3a] transition-colors"
-              >
-                {anonCtaLabel}
-              </Link>
+              /* Anon variant: TWO CTAs stacked. Anon covers both
+                 populations:
+                   - Existing sponsors on a new device / signed out
+                     → primary "Sign in to write" (magic link)
+                   - Cold visitors who don't yet sponsor
+                     → secondary "Sponsor {firstName} — $25/month"
+                     which routes through /shirts (shirt-first per
+                     non-negotiable #4).
+                 Split visually so the choice is obvious — the same
+                 button pretending to be both roles was Kevin's
+                 complaint in the previous round. */
+              <div className="flex flex-col gap-3 items-center">
+                <Link
+                  href={anonCtaHref}
+                  className="inline-block w-full max-w-xs text-center bg-[#D4A843] text-[#0d0d0d] font-bold uppercase tracking-wider py-4 px-8 hover:bg-[#c49a3a] transition-colors"
+                >
+                  {anonCtaLabel}
+                </Link>
+                <p className="text-xs uppercase tracking-[0.15em] text-[#888] font-bold">
+                  or, new here?
+                </p>
+                <Link
+                  href="/shirts"
+                  className="inline-block w-full max-w-xs text-center bg-white border-2 border-[#0d0d0d] text-[#0d0d0d] font-bold uppercase tracking-wider py-4 px-8 hover:bg-[#0d0d0d] hover:text-white transition-colors"
+                >
+                  Sponsor {firstName} &mdash; $25/month
+                </Link>
+                <p className="text-xs text-[#888] leading-relaxed max-w-xs text-center mt-1">
+                  We&rsquo;ll ship you a shirt with {firstName}&rsquo;s number
+                  on the back. Then this whole page is yours.
+                </p>
+              </div>
             ) : childRecordId && childId && childDisplayName ? (
               <PenpalBoxSponsorCta
                 firstName={firstName}
