@@ -91,20 +91,26 @@ export function NotesThread({
                     loading="lazy"
                     className="block w-full h-auto max-w-full border border-[#e8e0d4] bg-white"
                   />
-                  <figcaption
-                    className="text-[13px] md:text-sm text-[#555] leading-relaxed italic mt-3"
-                    style={{ fontFamily: 'var(--font-lora), serif' }}
-                  >
-                    <span className="not-italic text-[10px] font-bold uppercase tracking-[0.2em] text-[#888] block mb-2">
-                      Translated
-                    </span>
-                    {entry.bodyEn.split('\n').map((line, i, arr) => (
-                      <span key={i}>
-                        {line}
-                        {i < arr.length - 1 && <br />}
+                  {/* Translation caption is skipped entirely when
+                      Simon marked the letter as already in English
+                      (the scan IS the readable content). Otherwise
+                      the translation renders below as a caption. */}
+                  {entry.bodyEn.trim().length > 0 && (
+                    <figcaption
+                      className="text-[13px] md:text-sm text-[#555] leading-relaxed italic mt-3"
+                      style={{ fontFamily: 'var(--font-lora), serif' }}
+                    >
+                      <span className="not-italic text-[10px] font-bold uppercase tracking-[0.2em] text-[#888] block mb-2">
+                        Translated
                       </span>
-                    ))}
-                  </figcaption>
+                      {entry.bodyEn.split('\n').map((line, i, arr) => (
+                        <span key={i}>
+                          {line}
+                          {i < arr.length - 1 && <br />}
+                        </span>
+                      ))}
+                    </figcaption>
+                  )}
                 </figure>
               ) : (
                 <p

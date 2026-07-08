@@ -599,12 +599,19 @@ function ReplySection({
             />
           </a>
         ) : null}
-        <blockquote
-          className="text-[15px] text-[#333] leading-relaxed italic bg-[#f5efe4] border-l-2 border-[#D4A843] pl-4 py-3"
-          style={{ fontFamily: 'Georgia, serif' }}
-        >
-          {message.reply.bodyEn}
-        </blockquote>
+        {message.reply.bodyEn.trim().length > 0 ? (
+          <blockquote
+            className="text-[15px] text-[#333] leading-relaxed italic bg-[#f5efe4] border-l-2 border-[#D4A843] pl-4 py-3"
+            style={{ fontFamily: 'Georgia, serif' }}
+          >
+            {message.reply.bodyEn}
+          </blockquote>
+        ) : (
+          <p className="text-xs text-[#888] italic mt-1">
+            No translation typed — the kid wrote in English (see the
+            scanned letter above).
+          </p>
+        )}
         {message.reply.bodyOriginal && (
           <details className="mt-2">
             <summary className="text-xs text-[#888] cursor-pointer hover:text-[#0d0d0d]">
@@ -634,17 +641,20 @@ function ReplySection({
 
   async function submitReply() {
     const trimmed = replyBody.trim();
-    if (trimmed.length < 3) {
-      setError('Reply needs at least a few characters of translated text.');
-      return;
-    }
     // Photo is required in the 2026-07-08 workflow. The kid's
-    // handwritten letter IS the reply; the typed translation is a
-    // caption. If Simon skipped the upload we block here rather
-    // than record a text-only reply that has no photo behind it.
+    // handwritten letter IS the reply; the typed translation is
+    // optional (skip when the kid wrote in English, older kids often
+    // do). If Simon skipped the upload we block here rather than
+    // record a translation with no scan behind it.
     if (!uploadedImageUrl) {
       setError(
-        'Upload the scanned handwritten letter first, then add your English translation.'
+        'Upload the scanned handwritten letter first.'
+      );
+      return;
+    }
+    if (trimmed.length > 0 && trimmed.length < 3) {
+      setError(
+        "Translation is too short — add a few characters or leave it blank if the kid wrote in English."
       );
       return;
     }
@@ -768,7 +778,10 @@ function ReplySection({
             htmlFor={`reply-en-${message.id}`}
             className="block text-xs font-bold uppercase tracking-[0.15em] text-[#0d0d0d] mb-1"
           >
-            2 · Translated reply (English — this is what the sponsor reads)
+            2 · English translation{' '}
+            <span className="font-normal normal-case tracking-normal text-[#888]">
+              (leave blank if the kid already wrote in English)
+            </span>
           </label>
           <textarea
             id={`reply-en-${message.id}`}
@@ -812,7 +825,11 @@ function ReplySection({
                 saving ||
                 uploadingPhoto ||
                 !uploadedImageUrl ||
-                replyBody.trim().length < 3
+                // Translation is optional, but if there IS text it
+                // must be at least 3 chars (accidental "ok" submits
+                // are the failure mode here). Empty translation +
+                // photo alone is a valid submit.
+                (replyBody.trim().length > 0 && replyBody.trim().length < 3)
               }
               className="inline-block bg-[#D4A843] hover:bg-[#c49a3a] text-[#0d0d0d] disabled:opacity-50 disabled:cursor-not-allowed px-4 py-2 text-xs font-bold uppercase tracking-wider transition-colors"
             >

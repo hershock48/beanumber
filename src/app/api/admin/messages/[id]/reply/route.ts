@@ -105,6 +105,13 @@ export async function POST(
   const bodyEn = (body.bodyEn ?? '').trim();
   const rawImageUrl = (body.imageUrl ?? '').trim() || null;
 
+  // Translation is skippable when the kid wrote in English (older
+  // kids sometimes do). The photo IS the letter; the caption is only
+  // there for readability. Rule: bodyEn must be either empty OR at
+  // least MIN_REPLY chars — no in-between (2-char stubs like "ok"
+  // read as accidental submits). When bodyEn is empty we REQUIRE an
+  // imageUrl, otherwise there'd be nothing for the sponsor to see.
+
   // If an image URL is supplied it must be a well-formed http(s) URL.
   // We don't require it to be a specific host — Supabase URLs come
   // back from our own upload endpoint and the caller is admin-gated —
@@ -129,15 +136,26 @@ export async function POST(
       );
     }
   }
-  if (bodyEn.length < MIN_REPLY) {
+  if (bodyEn.length > 0 && bodyEn.length < MIN_REPLY) {
     return NextResponse.json(
-      { error: `Reply is too short. Say a little more (${MIN_REPLY}+ characters).` },
+      {
+        error: `Reply is too short. Say a little more (${MIN_REPLY}+ characters) — or leave it blank if the kid wrote in English.`,
+      },
       { status: 400 }
     );
   }
   if (bodyEn.length > MAX_REPLY) {
     return NextResponse.json(
       { error: `Reply is too long. Under ${MAX_REPLY} characters.` },
+      { status: 400 }
+    );
+  }
+  if (bodyEn.length === 0 && !imageUrl) {
+    return NextResponse.json(
+      {
+        error:
+          "A reply needs a scanned photo, a typed translation, or both — you can't record both blank.",
+      },
       { status: 400 }
     );
   }
@@ -287,7 +305,7 @@ export async function POST(
         subject: `A penpal letter from ${firstNamePlain}.`,
         html: wrap(`
           <p>${greeting}</p>
-          <p>Your penpal ${firstNameSafe} sat down at the campus this week and wrote you a reply. The team translated it and it&rsquo;s waiting for you on their page.</p>
+          <p>Your penpal ${firstNameSafe} sat down at the campus this week and wrote you a reply. It&rsquo;s waiting for you on their page.</p>
           <p style="text-align: center; margin: 28px 0;">
             <a href="${kidPageUrl}" style="display: inline-block; background: #D4A843; color: #0d0d0d; font-weight: bold; text-decoration: none; padding: 14px 32px; font-size: 15px; letter-spacing: 0.05em;">
               Read ${firstNameSafe}&rsquo;s penpal letter
@@ -312,11 +330,18 @@ export async function POST(
         parent.sponsorEmail
       );
       if (sponsorUserId) {
+        // notePreview drives the push body's teaser line. When Simon
+        // skipped translation because the kid wrote in English, fall
+        // back to a neutral "letter waiting" line — an empty preview
+        // reads as broken.
         await sendPush({
           kind: 'kidReplied',
           kidId: parent.childId,
           sponsorUserId,
-          notePreview: bodyEn,
+          notePreview:
+            bodyEn.length > 0
+              ? bodyEn
+              : `${parent.firstName ?? 'Your penpal'} wrote you a letter.`,
         });
       }
     } catch (err) {
@@ -375,7 +400,13 @@ export async function POST(
       kidDisplayName: parent.displayName || parent.firstName || 'the kid',
       shirtNumber: parent.shirtNumber ?? null,
       sponsorHoldsShirt,
-      replyBodyEn: bodyEn,
+      // Empty when Simon skipped translation (kid wrote in English).
+      // Fall back so Kevin's inbox alert doesn't render a blank quote
+      // block.
+      replyBodyEn:
+        bodyEn.length > 0
+          ? bodyEn
+          : `(Photo-only reply — the kid wrote in English. See the scan on the site.)`,
     });
   } catch (err) {
     console.warn(

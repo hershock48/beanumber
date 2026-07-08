@@ -90,8 +90,16 @@ export function KidCardNotesPreview({
 
   const total = preview.outboundCount + preview.replyCount;
   const showSeeAll = kidHref && total > 1;
-  const snippet = truncate(preview.latestBody, MAX_SNIPPET);
   const isReply = preview.latestKind === 'reply';
+  // When Simon uploaded a scan without a typed translation (the kid
+  // wrote in English), latestBody is empty. Fall back to a friendly
+  // line so the italic quote block never renders empty quotes.
+  const rawBody = preview.latestBody.trim();
+  const fallback =
+    isReply && preview.latestImageUrl
+      ? `${firstName} wrote you a letter. Open it to read.`
+      : '';
+  const snippet = truncate(rawBody.length > 0 ? rawBody : fallback, MAX_SNIPPET);
 
   return (
     <div className="mt-3 pt-3 border-t border-[#e8e0d4]">
@@ -139,12 +147,14 @@ export function KidCardNotesPreview({
           />
         </div>
       ) : null}
-      <p
-        className="text-sm text-[#555] leading-snug italic line-clamp-2"
-        style={{ fontFamily: 'Georgia, serif' }}
-      >
-        &ldquo;{snippet}&rdquo;
-      </p>
+      {snippet ? (
+        <p
+          className="text-sm text-[#555] leading-snug italic line-clamp-2"
+          style={{ fontFamily: 'Georgia, serif' }}
+        >
+          &ldquo;{snippet}&rdquo;
+        </p>
+      ) : null}
       {showSeeAll && (
         <p className="mt-2 text-[10px] font-bold uppercase tracking-[0.15em] text-[#888]">
           {total} penpal notes total &middot;{' '}
