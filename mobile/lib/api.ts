@@ -407,3 +407,17 @@ export interface MeResponse {
 export async function getMe(): Promise<MeResponse> {
   return authJson<MeResponse>('/api/mobile/v1/me');
 }
+
+/**
+ * POST /api/mobile/v1/account/delete
+ *
+ * Apple's mandatory in-app account-deletion path (Guideline 5.1.1(v)).
+ * Wipes the mobile_users row + cascades to push devices / prompts /
+ * deliveries. Does NOT cancel Stripe subscriptions — that's the
+ * sponsor's separate call, spelled out in the confirmation copy.
+ */
+export async function deleteAccount(): Promise<{ ok: boolean }> {
+  return authJson<{ ok: boolean }>('/api/mobile/v1/account/delete', {
+    method: 'POST',
+  });
+}

@@ -20,7 +20,7 @@ import { Text } from '../../components/design/Text';
 import { Card } from '../../components/design/Card';
 import { ListItem } from '../../components/design/ListItem';
 import { Skeleton } from '../../components/design/Skeleton';
-import { getMe, MeResponse } from '../../lib/api';
+import { deleteAccount, getMe, MeResponse } from '../../lib/api';
 import { useAuth } from '../../hooks/useAuth';
 
 export default function MeTab() {
@@ -57,6 +57,50 @@ export default function MeTab() {
         style: 'destructive',
         onPress: () => {
           signOut();
+        },
+      },
+    ]);
+  };
+
+  // Two-step delete confirm. First alert explains what deletion does
+  // and does NOT do (sponsorships keep running); second alert is the
+  // point-of-no-return. Apple wants both the deletion capability AND
+  // clear disclosure about what stays behind (Guideline 5.1.1(v)).
+  const confirmDeleteAccount = () => {
+    const hasSponsorships = (me?.sponsorships?.length ?? 0) > 0;
+    const message = hasSponsorships
+      ? "You're signed out and your app account is removed. Your sponsorships keep running on your card — to stop them, cancel from Billing above (or email kevin@beanumber.org). This step doesn't touch your giving."
+      : "You're signed out and your app account is removed. Sign back in anytime with the same email.";
+    Alert.alert('Delete your Be A Number account?', message, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Continue',
+        style: 'destructive',
+        onPress: () => {
+          Alert.alert(
+            'Delete for real?',
+            "This can't be undone from the app. If it's a mistake, tap Cancel.",
+            [
+              { text: 'Cancel', style: 'cancel' },
+              {
+                text: 'Delete my account',
+                style: 'destructive',
+                onPress: async () => {
+                  try {
+                    await deleteAccount();
+                  } catch (err) {
+                    Alert.alert(
+                      "Couldn't delete right now",
+                      'Try again in a moment. If it keeps failing, email kevin@beanumber.org — a person answers.'
+                    );
+                    return;
+                  }
+                  // Local sign-out clears SecureStore + routes to auth.
+                  signOut();
+                },
+              },
+            ]
+          );
         },
       },
     ]);
@@ -241,7 +285,7 @@ export default function MeTab() {
               </Card>
             </View>
 
-            {/* Sign out */}
+            {/* Sign out + account deletion */}
             <View
               style={{
                 marginTop: SPACING.section,
@@ -249,8 +293,21 @@ export default function MeTab() {
               }}
             >
               <Card style={{ paddingHorizontal: 0 }} padded={false}>
-                <ListItem title="Sign out" onPress={confirmSignOut} last />
+                <ListItem title="Sign out" onPress={confirmSignOut} />
+                <ListItem
+                  title="Delete my account"
+                  onPress={confirmDeleteAccount}
+                  last
+                />
               </Card>
+              <Text
+                variant="caption"
+                color="umber"
+                style={{ marginTop: SPACING.s }}
+              >
+                Deleting removes your app account. Sponsorships keep running on
+                your card — cancel those separately from Billing above.
+              </Text>
             </View>
 
             {/* Footer — trust surface */}
