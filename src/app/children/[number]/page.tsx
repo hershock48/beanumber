@@ -1404,6 +1404,72 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
           {backTarget.label}
         </Link>
 
+        {/* ── Viewer-state strip ──────────────────────────────────
+            Kevin's 2026-07-08 placement: this used to live below the
+            bio at the position of the old acknowledgment card. Moved
+            above the hero photo so the viewer knows their state
+            BEFORE meeting the kid, not after. Three variants share
+            the same slim horizontal treatment (border-y hairline,
+            single line, right-aligned action link).
+            Skipped for departed kids so the memorial page frame
+            stays clean. */}
+        {!child.departed_at && (
+          child.viewer_is_sponsor ? (
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 py-3 border-y border-[#e8e0d4] mb-8">
+              <div>
+                <span className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mr-3">
+                  {justSignedIn ? 'Welcome' : 'Signed in'}
+                </span>
+                <span className="text-[15px] text-[#555]">
+                  You&rsquo;re {firstName}&rsquo;s sponsor. Thank you.
+                </span>
+              </div>
+              <Link
+                href="/me"
+                className="text-sm font-bold text-[#D4A843] hover:underline whitespace-nowrap"
+              >
+                Your campus &rarr;
+              </Link>
+            </div>
+          ) : child.viewer_is_holder ? (
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 py-3 border-y border-[#e8e0d4] mb-8">
+              <div>
+                <span className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mr-3">
+                  {justSignedIn ? 'You own this number' : 'Signed in'}
+                </span>
+                <span className="text-[15px] text-[#555]">
+                  {justSignedIn
+                    ? `#${number} is yours. ${firstName} too.`
+                    : `Welcome back — ${firstName} is yours.`}
+                </span>
+              </div>
+              <Link
+                href="/me"
+                className="text-sm font-bold text-[#D4A843] hover:underline whitespace-nowrap"
+              >
+                Your campus &rarr;
+              </Link>
+            </div>
+          ) : (
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 py-3 border-y border-[#e8e0d4] mb-8">
+              <div>
+                <span className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mr-3">
+                  Not signed in
+                </span>
+                <span className="text-[15px] text-[#555]">
+                  Have a Be A Number shirt? Sign in to claim your number.
+                </span>
+              </div>
+              <Link
+                href={`/sponsor/login?next=${encodeURIComponent(`/children/${number}`)}`}
+                className="text-sm font-bold text-[#D4A843] hover:underline whitespace-nowrap"
+              >
+                Sign in &rarr;
+              </Link>
+            </div>
+          )
+        )}
+
         {/* Stockpile model claim card. Renders when the visitor has a
             ban_buyer_session cookie tied to a Shirt + Stay subscription
             AND no Sponsorship is bound to that buyer yet. Tapping
@@ -1875,86 +1941,23 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
                   </Link>
                 </div>
               )
-            ) : child.viewer_is_sponsor ? (
-              /* Active monthly sponsor: slim signed-in strip. The big
-                 acknowledgment card lived here before 2026-07-08 — Kevin's
-                 read was that it duplicated the state already communicated
-                 by the top-nav SIGN OUT button + everything the PenpalBox
-                 above gives them. Slim strip preserves the warmth without
-                 the visual weight of a full white bordered card.
-                 Sponsor variant: names the relationship + points at /me
-                 for subscription management + giving statements. */
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 py-4 border-y border-[#e8e0d4]">
-                <div>
-                  <span className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mr-3">
-                    {justSignedIn ? 'Welcome' : 'Signed in'}
-                  </span>
-                  <span className="text-[15px] text-[#555]">
-                    You&rsquo;re {firstName}&rsquo;s sponsor. Thank you.
-                  </span>
-                </div>
-                <Link
-                  href="/me"
-                  className="text-sm font-bold text-[#D4A843] hover:underline whitespace-nowrap"
-                >
-                  Your campus &rarr;
-                </Link>
-              </div>
-            ) : child.viewer_is_holder ? (
-              /* Holder: slim strip too. The card version (Kevin's
-                 2026-07-08 feedback) was doing double duty with the
-                 PenpalBox above — that box already has the $25/mo CTA
-                 and unlocks everything. The strip acknowledges state
-                 without repeating the sell. Copy switches between
-                 first-time ("you own #N now") and returning
-                 ("welcome back"). */
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 py-4 border-y border-[#e8e0d4]">
-                <div>
-                  <span className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mr-3">
-                    {justSignedIn ? 'You own this number' : 'Signed in'}
-                  </span>
-                  <span className="text-[15px] text-[#555]">
-                    {justSignedIn
-                      ? `#${number} is yours. ${firstName} too.`
-                      : `Welcome back — ${firstName} is yours.`}
-                  </span>
-                </div>
-                <Link
-                  href="/me"
-                  className="text-sm font-bold text-[#D4A843] hover:underline whitespace-nowrap"
-                >
-                  Your campus &rarr;
-                </Link>
-              </div>
+            ) : child.viewer_is_sponsor || child.viewer_is_holder ? (
+              /* Signed-in states get NOTHING at this position anymore —
+                 the slim viewer-state strip moved above the hero photo
+                 on 2026-07-08 per Kevin. Sponsor + holder acknowledgment
+                 lives up there so viewers know their state before
+                 meeting the kid, not after. */
+              null
             ) : (
-              /* Not authenticated for this kid — the cold-visitor path.
-                 Kevin's 2026-07-08 restructure: symmetric slim strip
-                 with the signed-in variants above, then a compact
-                 "want your own number?" beat that keeps the shirt
-                 mechanic honest (per CLAUDE.md non-negotiable #4:
-                 becoming a sponsor requires a shirt first). The
+              /* Not authenticated for this kid — cold-visitor path.
+                 Slim strip moved above the hero (matches sponsor +
+                 holder treatment); the shirt-buying pitch below is
+                 what's left. Per CLAUDE.md non-negotiable #4:
+                 becoming a sponsor requires a shirt first. Cold
+                 visitors without a shirt route through /shirts; the
                  SponsorButton path stays for buyers who already have
-                 a shirt in-hand and land on the page cold; cold
-                 visitors without a shirt route through /shirts. */
+                 a shirt in-hand and land on the page cold. */
               <>
-                {/* Parity strip — matches the signed-in variants. */}
-                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 py-4 border-y border-[#e8e0d4] mb-7">
-                  <div>
-                    <span className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mr-3">
-                      Not signed in
-                    </span>
-                    <span className="text-[15px] text-[#555]">
-                      Have a Be A Number shirt? Sign in to claim your number.
-                    </span>
-                  </div>
-                  <Link
-                    href={`/sponsor/login?next=${encodeURIComponent(`/children/${number}`)}`}
-                    className="text-sm font-bold text-[#D4A843] hover:underline whitespace-nowrap"
-                  >
-                    Sign in &rarr;
-                  </Link>
-                </div>
-
                 {/* Compact cold-visitor pitch — was a full sales column
                     before 2026-07-08. Slimmed to preserve the shirt
                     mechanic without repeating what the PenpalBox above
