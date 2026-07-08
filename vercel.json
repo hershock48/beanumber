@@ -31,7 +31,7 @@
     },
     {
       "path": "/api/cron/push-drain",
-      "schedule": "0 * * * *"
+      "schedule": "0 12 * * *"
     }
   ]
 }
