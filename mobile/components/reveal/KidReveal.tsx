@@ -54,15 +54,20 @@ interface KidRevealData {
 
 interface Props {
   kid: KidRevealData;
-  onSendNotePress: () => void;
-  onLookAroundPress: () => void;
+  /** Primary CTA copy — switches based on viewer role. */
+  primaryLabel: string;
+  onPrimaryPress: () => void;
+  secondaryLabel: string;
+  onSecondaryPress: () => void;
   reducedMotion?: boolean;
 }
 
 export function KidReveal({
   kid,
-  onSendNotePress,
-  onLookAroundPress,
+  primaryLabel,
+  onPrimaryPress,
+  secondaryLabel,
+  onSecondaryPress,
   reducedMotion = false,
 }: Props) {
   const { width: screenWidth } = useWindowDimensions();
@@ -281,16 +286,16 @@ export function KidReveal({
         <Animated.View
           style={[{ width: '100%' }, primaryStyle]}
         >
-          <Button variant="primary" onPress={onSendNotePress} fullWidth>
-            Send {kid.firstName} a note
+          <Button variant="primary" onPress={onPrimaryPress} fullWidth>
+            {primaryLabel}
           </Button>
         </Animated.View>
 
         <Animated.View
           style={[{ marginTop: SPACING.m }, ghostStyle]}
         >
-          <Button variant="ghost" onPress={onLookAroundPress}>
-            Look around {kid.firstName}'s page
+          <Button variant="ghost" onPress={onSecondaryPress}>
+            {secondaryLabel}
           </Button>
         </Animated.View>
 

@@ -79,12 +79,29 @@ export default function RootLayout() {
               }}
             />
             <Stack.Screen
+              name="keep-going/[number]"
+              options={{
+                headerShown: false,
+                animation: 'fade',
+                gestureEnabled: false,
+              }}
+            />
+            <Stack.Screen
               name="children/[number]"
               options={{
                 title: '',
                 headerBackTitle: 'Back',
                 headerTransparent: true,
                 animation: 'fade',
+              }}
+            />
+            <Stack.Screen
+              name="newsletter/[id]"
+              options={{
+                headerShown: true,
+                title: '',
+                headerTransparent: true,
+                animation: 'slide_from_bottom',
               }}
             />
           </Stack>

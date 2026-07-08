@@ -33,7 +33,11 @@ import { Text } from '../../components/design/Text';
 import { HoldButton } from '../../components/reveal/HoldButton';
 import { AmbientGlow } from '../../components/reveal/AmbientGlow';
 import { KidReveal } from '../../components/reveal/KidReveal';
-import { getKidByShirtNumber, Kid, ApiError } from '../../lib/api';
+import {
+  getMobileKid,
+  MobileKidDetail,
+  ApiError,
+} from '../../lib/api';
 import { revealCompletion } from '../../lib/haptics';
 
 type Phase = 'idle' | 'holding' | 'revealing' | 'failed';
@@ -44,10 +48,10 @@ export default function MeetScreen() {
   const router = useRouter();
 
   const [phase, setPhase] = useState<Phase>('idle');
-  const [kid, setKid] = useState<Kid | null>(null);
+  const [kid, setKid] = useState<MobileKidDetail | null>(null);
   const [fetchError, setFetchError] = useState<ApiError | null>(null);
   const [holdProgress, setHoldProgress] = useState(0);
-  const kidPromise = useRef<Promise<Kid> | null>(null);
+  const kidPromise = useRef<Promise<MobileKidDetail> | null>(null);
 
   // Fade layers for the pre-hold → reveal crossfade.
   const buttonLayerOpacity = useSharedValue(1);
@@ -60,7 +64,7 @@ export default function MeetScreen() {
       setPhase('failed');
       return;
     }
-    kidPromise.current = getKidByShirtNumber(number);
+    kidPromise.current = getMobileKid(number);
     kidPromise.current
       .then(k => {
         setKid(k);
@@ -228,20 +232,29 @@ export default function MeetScreen() {
         >
           <KidReveal
             kid={{
-              firstName:
-                kid.first_name || kid.display_name?.split(' ')[0] || 'Friend',
-              age: kid.age,
-              grade: kid.grade_class,
-              shirtNumber: kid.shirt_number ?? number,
-              photoUrl: kid.photo_url || kid.photo_urls?.[0],
-              intro: kid.loves || kid.child_quote,
-              location: 'Hope Bridge Primary · Omoro District, Uganda',
+              firstName: kid.firstName,
+              age: kid.ageYears ?? undefined,
+              grade: kid.gradeLabel ?? undefined,
+              shirtNumber: kid.shirtNumber,
+              photoUrl: kid.photoUrl ?? undefined,
+              intro: kid.intro ?? undefined,
+              location: kid.location || 'Hope Bridge Primary · Omoro District, Uganda',
             }}
-            onSendNotePress={() => {
-              router.push(`/children/${kid.shirt_number ?? number}?compose=1`);
+            primaryLabel={
+              kid.viewer.canWriteNotes
+                ? `Send ${kid.firstName} a note`
+                : `Yes, sponsor ${kid.firstName}`
+            }
+            onPrimaryPress={() => {
+              if (kid.viewer.canWriteNotes) {
+                router.push(`/children/${kid.shirtNumber}?compose=1`);
+              } else {
+                router.push(`/keep-going/${kid.shirtNumber}`);
+              }
             }}
-            onLookAroundPress={() => {
-              router.push(`/children/${kid.shirt_number ?? number}`);
+            secondaryLabel={`Look around ${kid.firstName}'s page`}
+            onSecondaryPress={() => {
+              router.push(`/children/${kid.shirtNumber}`);
             }}
           />
         </Animated.View>
