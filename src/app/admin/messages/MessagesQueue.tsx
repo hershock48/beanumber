@@ -32,6 +32,12 @@ interface MessageRow {
   translatedAt: string | null;
   deliveredAt: string | null;
   declinedAt: string | null;
+  /**
+   * Sponsor-attached photos (2026-07-08). Normalized to a plain
+   * string[] server-side (see page.tsx normalizeAttachments). Simon
+   * uses these to print + include with the delivered letter.
+   */
+  attachments: string[];
   kid: {
     recordId: string | null;
     firstName: string | null;
@@ -374,6 +380,41 @@ function MessageCard({
             >
               {message.bodyEn}
             </blockquote>
+            {/* Sponsor attachments (2026-07-08). When the sponsor
+                clipped photos onto their note, Simon needs to see +
+                print them so they land at the campus with the
+                delivered letter. Click a thumbnail to open full-size
+                in a new tab (ready for print / download). */}
+            {message.attachments && message.attachments.length > 0 && (
+              <div className="mt-3">
+                <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#0d0d0d] mb-2">
+                  Sponsor sent {message.attachments.length}{' '}
+                  {message.attachments.length === 1 ? 'photo' : 'photos'} to print
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {message.attachments.map((url, i) => (
+                    <a
+                      key={url + i}
+                      href={url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block"
+                      title="Open full size (print or download)"
+                    >
+                      <img
+                        src={url}
+                        alt={`Sponsor photo ${i + 1}`}
+                        loading="lazy"
+                        className="block h-28 w-auto max-w-full border border-[#e8e0d4] bg-white object-cover"
+                      />
+                    </a>
+                  ))}
+                </div>
+                <p className="text-xs text-[#888] italic mt-2">
+                  Click to open full size. Print and include with the delivered letter.
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Translation */}

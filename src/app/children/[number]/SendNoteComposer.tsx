@@ -29,6 +29,12 @@ const MAX_BODY = 1000;
 
 type Stage = 'idle' | 'composing' | 'sending' | 'queued' | 'error';
 
+// Sponsor-attached photos (2026-07-08). Hard cap of 2 per note. The
+// hard cap sits at the API layer too — this constant just gates the
+// UI so the sponsor sees Add-photo disable at the ceiling instead of
+// discovering it via a 400 on submit.
+const MAX_ATTACHMENTS = 2;
+
 export function SendNoteComposer({
   childRecordId,
   childIdLegacy,
@@ -43,6 +49,61 @@ export function SendNoteComposer({
   const [stage, setStage] = useState<Stage>('idle');
   const [body, setBody] = useState('');
   const [error, setError] = useState<string | null>(null);
+  // Public URLs of uploaded attachments, in the order the sponsor
+  // added them. Also stored 1:1 in a small preview list — see the
+  // JSX below. Reset on Cancel and on queued-success.
+  const [attachments, setAttachments] = useState<string[]>([]);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+
+  async function handlePhotoPick(file: File) {
+    if (attachments.length >= MAX_ATTACHMENTS) {
+      setError(
+        `You can attach up to ${MAX_ATTACHMENTS} photos per note. Send this one and add more in your next letter.`
+      );
+      return;
+    }
+    setError(null);
+    setUploadingPhoto(true);
+    try {
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result));
+        reader.onerror = () => reject(new Error('Could not read file'));
+        reader.readAsDataURL(file);
+      });
+      const commaIdx = dataUrl.indexOf(',');
+      const dataBase64 = commaIdx >= 0 ? dataUrl.slice(commaIdx + 1) : dataUrl;
+
+      const res = await fetch('/api/sponsor/notes/photo', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({
+          filename: file.name || 'photo.jpg',
+          contentType: file.type || 'image/jpeg',
+          dataBase64,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.publicUrl) {
+        setError(
+          data.error || 'Photo upload failed. Try a smaller file or another format.'
+        );
+        return;
+      }
+      setAttachments(prev => [...prev, String(data.publicUrl)]);
+    } catch (e) {
+      setError(
+        e instanceof Error ? e.message : 'Could not read that image.'
+      );
+    } finally {
+      setUploadingPhoto(false);
+    }
+  }
+
+  const removeAttachment = useCallback((index: number) => {
+    setAttachments(prev => prev.filter((_, i) => i !== index));
+  }, []);
 
   const submit = useCallback(async () => {
     const trimmed = body.trim();
@@ -68,6 +129,7 @@ export function SendNoteComposer({
           childIdLegacy,
           bodyEn: trimmed,
           sponsorName,
+          attachments,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -81,7 +143,7 @@ export function SendNoteComposer({
       setError('Network hiccup. Try again in a moment.');
       setStage('composing');
     }
-  }, [body, childRecordId, childIdLegacy, sponsorName]);
+  }, [body, childRecordId, childIdLegacy, sponsorName, attachments]);
 
   const charCount = body.trim().length;
   const overCap = charCount > MAX_BODY;
@@ -127,6 +189,7 @@ export function SendNoteComposer({
             onClick={() => {
               setStage('idle');
               setBody('');
+              setAttachments([]);
             }}
           >
             Close
@@ -165,6 +228,72 @@ export function SendNoteComposer({
             className="w-full px-3 py-2.5 bg-white border border-[#e8e0d4] focus:outline-none focus:border-[#D4A843] focus:ring-1 focus:ring-[#D4A843] text-base leading-relaxed resize-y"
             style={{ fontFamily: 'Georgia, serif' }}
           />
+
+          {/* Photo attachment strip. Sponsor can add up to 2 photos
+              per note (2026-07-08 rollout). Kid sees the photos with
+              their letter when Simon delivers, sponsor sees them in
+              the thread history on this page and on /me. */}
+          <div className="mt-3">
+            {attachments.length > 0 && (
+              <div className="flex flex-wrap gap-2 mb-2">
+                {attachments.map((url, i) => (
+                  <div key={url + i} className="relative w-20 h-20">
+                    <img
+                      src={url}
+                      alt={`Attachment ${i + 1}`}
+                      className="block w-20 h-20 object-cover border border-[#e8e0d4] bg-white"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeAttachment(i)}
+                      disabled={stage === 'sending'}
+                      aria-label="Remove photo"
+                      className="absolute -top-2 -right-2 w-6 h-6 flex items-center justify-center bg-[#0d0d0d] text-white text-xs rounded-full hover:bg-[#c0392b] transition-colors disabled:opacity-50"
+                      title="Remove"
+                    >
+                      &times;
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            {attachments.length < MAX_ATTACHMENTS && (
+              <label
+                className={`inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.15em] text-[#888] hover:text-[#0d0d0d] cursor-pointer transition-colors ${uploadingPhoto || stage === 'sending' ? 'opacity-50 pointer-events-none' : ''}`}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                  <circle cx="8.5" cy="8.5" r="1.5" />
+                  <polyline points="21 15 16 10 5 21" />
+                </svg>
+                {uploadingPhoto
+                  ? 'Uploading…'
+                  : attachments.length === 0
+                  ? 'Add a photo (optional)'
+                  : 'Add another photo'}
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="sr-only"
+                  disabled={uploadingPhoto || stage === 'sending'}
+                  onChange={e => {
+                    const f = e.currentTarget.files?.[0];
+                    if (f) void handlePhotoPick(f);
+                    // Reset so the same file can be re-picked after a
+                    // failed upload.
+                    e.currentTarget.value = '';
+                  }}
+                />
+              </label>
+            )}
+            {attachments.length > 0 && (
+              <p className="text-xs text-[#888] italic mt-1">
+                {attachments.length} of {MAX_ATTACHMENTS} photos attached.
+                Simon prints these and hands them to {firstName} with your letter.
+              </p>
+            )}
+          </div>
+
           <div className="flex items-center justify-between mt-3 flex-wrap gap-2">
             <p
               className={`text-xs ${
@@ -179,6 +308,7 @@ export function SendNoteComposer({
                 onClick={() => {
                   setStage('idle');
                   setBody('');
+                  setAttachments([]);
                   setError(null);
                 }}
                 disabled={stage === 'sending'}
@@ -189,7 +319,7 @@ export function SendNoteComposer({
               <button
                 type="button"
                 onClick={submit}
-                disabled={stage === 'sending' || overCap}
+                disabled={stage === 'sending' || uploadingPhoto || overCap}
                 className="inline-block bg-[#D4A843] hover:bg-[#c49a3a] disabled:opacity-50 disabled:cursor-not-allowed text-[#0d0d0d] px-6 py-2.5 text-xs font-bold uppercase tracking-wider transition-colors"
               >
                 {stage === 'sending' ? 'Sending…' : 'Send to Campus'}

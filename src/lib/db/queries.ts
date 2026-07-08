@@ -822,6 +822,14 @@ export interface NoteThreadEntry {
    * and bodyEn appears below as an italic translation caption.
    */
   replyImageUrl: string | null;
+  /**
+   * Sponsor-attached photos (2026-07-08). Only populated on
+   * sponsor_to_kid rows; null on kid_to_sponsor rows and on
+   * pre-migration sponsor notes. Array of public URLs, order-
+   * preserved as the sponsor added them. Rendered on the kid page
+   * thread as a small strip beneath the sponsor's italic text.
+   */
+  attachments: string[] | null;
 }
 
 /**
@@ -868,6 +876,14 @@ export interface KidCardNotePreview {
    *   - legacy typed-only replies
    */
   latestImageUrl: string | null;
+  /**
+   * When the latest event is the sponsor's OWN outgoing note WITH
+   * attached photos, this is the count (0-2). The /me KidCard uses it
+   * to render a small "+ N photos" indicator so the sponsor sees at a
+   * glance which of their notes carried photos. 0 for text-only
+   * outgoing notes and for reply rows (replies use replyImageUrl).
+   */
+  latestAttachmentCount: number;
 }
 
 export async function getNoteThreadPreviewsForSponsor(args: {
@@ -897,6 +913,7 @@ export async function getNoteThreadPreviewsForSponsor(args: {
         deliveredAt: kidMessages.deliveredAt,
         parentMessageId: kidMessages.parentMessageId,
         replyImageUrl: kidMessages.replyImageUrl,
+        attachments: kidMessages.attachments,
       })
       .from(kidMessages)
       .where(
@@ -964,6 +981,25 @@ export async function getNoteThreadPreviewsForSponsor(args: {
             break;
         }
       }
+      // Attachment count only for latest=sent rows (the sponsor's
+      // own outgoing note carrying photos). Replies use
+      // replyImageUrl instead. Normalize the jsonb into a length
+      // so the preview component doesn't need to parse the shape.
+      let latestAttachmentCount = 0;
+      if (!isReply) {
+        const raw = b.newest.attachments as unknown;
+        const arr =
+          typeof raw === 'string'
+            ? (() => {
+                try {
+                  return JSON.parse(raw);
+                } catch {
+                  return null;
+                }
+              })()
+            : raw;
+        if (Array.isArray(arr)) latestAttachmentCount = arr.length;
+      }
       out.set(childId, {
         latestKind: isReply ? 'reply' : 'sent',
         latestDate: dateSource
@@ -979,6 +1015,7 @@ export async function getNoteThreadPreviewsForSponsor(args: {
         // sponsor sees the kid's actual handwriting from the /me
         // grid without opening the kid page.
         latestImageUrl: isReply ? b.newest.replyImageUrl : null,
+        latestAttachmentCount,
       });
     }
     return out;
@@ -1012,6 +1049,7 @@ export async function getNoteThreadForSponsorAndChild(args: {
         deliveredAt: kidMessages.deliveredAt,
         parentMessageId: kidMessages.parentMessageId,
         replyImageUrl: kidMessages.replyImageUrl,
+        attachments: kidMessages.attachments,
       })
       .from(kidMessages)
       .where(
@@ -1052,6 +1090,36 @@ export async function getNoteThreadForSponsorAndChild(args: {
         // happen given the write path) still wouldn't paint a scan
         // over a sponsor's outgoing note.
         replyImageUrl: r.replyImageUrl,
+        // Sponsor attachments come back from Drizzle as either the
+        // typed jsonb object OR a JSON string depending on the driver
+        // — normalize to a plain string[] of URLs (or null) so the
+        // render layer doesn't have to care. Empty arrays become
+        // null so the render layer's `attachments ? ...` check works.
+        attachments: (() => {
+          const raw = r.attachments as unknown;
+          if (!raw) return null;
+          const arr =
+            typeof raw === 'string'
+              ? (() => {
+                  try {
+                    return JSON.parse(raw);
+                  } catch {
+                    return null;
+                  }
+                })()
+              : raw;
+          if (!Array.isArray(arr) || arr.length === 0) return null;
+          const urls = arr
+            .map(a =>
+              typeof a === 'string'
+                ? a
+                : a && typeof a === 'object' && typeof (a as { url?: unknown }).url === 'string'
+                ? (a as { url: string }).url
+                : null
+            )
+            .filter((u): u is string => !!u);
+          return urls.length > 0 ? urls : null;
+        })(),
       }));
   } catch {
     return [];

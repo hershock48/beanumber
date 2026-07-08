@@ -113,17 +113,48 @@ export function NotesThread({
                   )}
                 </figure>
               ) : (
-                <p
-                  className="text-[15px] md:text-base text-[#333] leading-relaxed italic"
-                  style={{ fontFamily: 'var(--font-lora), serif' }}
-                >
-                  {entry.bodyEn.split('\n').map((line, i, arr) => (
-                    <span key={i}>
-                      {line}
-                      {i < arr.length - 1 && <br />}
-                    </span>
-                  ))}
-                </p>
+                <>
+                  <p
+                    className="text-[15px] md:text-base text-[#333] leading-relaxed italic"
+                    style={{ fontFamily: 'var(--font-lora), serif' }}
+                  >
+                    {entry.bodyEn.split('\n').map((line, i, arr) => (
+                      <span key={i}>
+                        {line}
+                        {i < arr.length - 1 && <br />}
+                      </span>
+                    ))}
+                  </p>
+                  {/* Sponsor-attached photos (2026-07-08). Rendered
+                      below the sponsor's italic note as a small
+                      thumbnail strip so the sponsor sees "I sent
+                      Naume a photo of my dog on June 3" as part of
+                      the arc. Never rendered on kid_to_sponsor
+                      rows (queries.ts leaves this null there). */}
+                  {isSponsorNote &&
+                    entry.attachments &&
+                    entry.attachments.length > 0 && (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {entry.attachments.map((url, i) => (
+                          <a
+                            key={url + i}
+                            href={url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="block"
+                            title="Open full size"
+                          >
+                            <img
+                              src={url}
+                              alt={`Photo you sent with your note ${i + 1}`}
+                              loading="lazy"
+                              className="block h-24 w-auto max-w-full border border-[#e8e0d4] bg-white object-cover"
+                            />
+                          </a>
+                        ))}
+                      </div>
+                    )}
+                </>
               )}
               {!isSponsorNote && !entry.replyImageUrl && entry.bodyOriginal && (
                 <details className="mt-3">

@@ -56,6 +56,13 @@ export interface MobileThreadMessage {
    * below as an italic translation caption.
    */
   imageUrl: string | null;
+  /**
+   * Sponsor-attached photos (2026-07-08). Only populated on
+   * sponsorToKid rows. Array of public URLs, order-preserved. Mobile
+   * clients render these below the sponsor's own text so the user
+   * sees which photos they attached to that specific note.
+   */
+  attachments: string[];
 }
 
 export interface MobileThreadResponse {
@@ -220,6 +227,10 @@ async function getHandler(
     // came in through the new upload flow. Client renders the photo
     // large and `body` as translation caption below.
     imageUrl: r.replyImageUrl,
+    // Sponsor-attached photos on sponsor_to_kid rows. queries.ts
+    // normalizes the jsonb into string[] | null; unwrap null to []
+    // so mobile clients can always iterate without a nil check.
+    attachments: r.attachments ?? [],
   }));
 
   // "Kid is writing back" — the campus has a delivered outbound with
@@ -388,6 +399,10 @@ async function postHandler(
       }),
       // A newly-sent sponsor note never carries a reply photo.
       imageUrl: null,
+      // Mobile POST doesn't yet accept sponsor attachments (that
+      // ships with the mobile compose flow). New notes come back
+      // with an empty array so clients don't need to null-check.
+      attachments: [],
     };
 
     logger.apiResponse(method, path, 200);

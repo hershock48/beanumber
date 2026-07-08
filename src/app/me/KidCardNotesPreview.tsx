@@ -155,6 +155,16 @@ export function KidCardNotesPreview({
           &ldquo;{snippet}&rdquo;
         </p>
       ) : null}
+      {/* Small "+ N photos" tag when the latest event is the sponsor's
+          own outgoing note with attachments. Reply-with-photo state
+          already shows a thumbnail above, so this branch only lights
+          up on the sent side. */}
+      {!isReply && preview.latestAttachmentCount > 0 && (
+        <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.15em] text-[#D4A843]">
+          + {preview.latestAttachmentCount}{' '}
+          {preview.latestAttachmentCount === 1 ? 'photo' : 'photos'} attached
+        </p>
+      )}
       {showSeeAll && (
         <p className="mt-2 text-[10px] font-bold uppercase tracking-[0.15em] text-[#888]">
           {total} penpal notes total &middot;{' '}

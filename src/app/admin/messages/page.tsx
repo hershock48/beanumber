@@ -45,6 +45,7 @@ export default async function AdminMessagesPage() {
         translatedAt: kidMessages.translatedAt,
         deliveredAt: kidMessages.deliveredAt,
         declinedAt: kidMessages.declinedAt,
+        attachments: kidMessages.attachments,
         kidRecordId: children.id,
         kidFirstName: children.firstName,
         kidDisplayName: children.displayName,
@@ -112,6 +113,33 @@ export default async function AdminMessagesPage() {
     });
   }
 
+  // Normalize sponsor attachments from jsonb into a plain string[] of
+  // URLs so the client doesn't have to know about the object shape.
+  // Same shape/behavior as the NoteThreadEntry mapping in queries.ts.
+  function normalizeAttachments(raw: unknown): string[] {
+    if (!raw) return [];
+    const arr =
+      typeof raw === 'string'
+        ? (() => {
+            try {
+              return JSON.parse(raw);
+            } catch {
+              return null;
+            }
+          })()
+        : raw;
+    if (!Array.isArray(arr)) return [];
+    return arr
+      .map(a =>
+        typeof a === 'string'
+          ? a
+          : a && typeof a === 'object' && typeof (a as { url?: unknown }).url === 'string'
+          ? (a as { url: string }).url
+          : null
+      )
+      .filter((u): u is string => !!u);
+  }
+
   const messages = outboundRows.map(r => ({
     id: r.id,
     sponsorEmail: r.sponsorEmail,
@@ -125,6 +153,7 @@ export default async function AdminMessagesPage() {
     translatedAt: r.translatedAt ? new Date(r.translatedAt).toISOString() : null,
     deliveredAt: r.deliveredAt ? new Date(r.deliveredAt).toISOString() : null,
     declinedAt: r.declinedAt ? new Date(r.declinedAt).toISOString() : null,
+    attachments: normalizeAttachments(r.attachments),
     kid: {
       recordId: r.kidRecordId,
       firstName: r.kidFirstName,
