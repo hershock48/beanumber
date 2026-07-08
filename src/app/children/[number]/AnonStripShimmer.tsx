@@ -79,6 +79,20 @@ export function AnonStripShimmer({
     <div
       data-anon-strip-ready={ready ? 'true' : 'false'}
       className="anon-strip-shimmer-wrap"
+      style={{
+        // Hide the strip entirely until the reveal completes. On
+        // first-visit cold pages, the strip would otherwise show
+        // through the sides of the RevealOverlay's "Every number is
+        // a name" card and compete with the moment. Fades in ~250ms
+        // after the reveal finishes so it doesn't pop in abruptly.
+        // Return visitors (localStorage flag set) hit ready=true on
+        // mount so they see no transition at all.
+        opacity: ready ? 1 : 0,
+        transition: 'opacity 250ms ease-out',
+        // While hidden, don't intercept clicks either — a fully-
+        // transparent strip still absorbs pointer events by default.
+        pointerEvents: ready ? 'auto' : 'none',
+      }}
     >
       {children}
     </div>

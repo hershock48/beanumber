@@ -78,6 +78,12 @@ export interface PenpalBoxProps {
   sponsorPortal?: ReactNode;
 }
 
+// Per-state copy — the anon block leads with the school-funding
+// impact (Kevin's 2026-07-08 round-3 note: some visitors are drawn
+// by the sponsorship story, others by the penpal relationship;
+// blend both into one block instead of picking a lane). Holder and
+// signed_in_visitor keep the tighter penpal-first framing because
+// those audiences already know the value of the shirt/relationship.
 const VALUE_PROP =
   'You get a penpal, monthly photos, report cards, and campus updates.';
 
@@ -134,7 +140,10 @@ export function PenpalBox({
   } else if (viewerState === 'signed_in_visitor') {
     heading = `Add ${firstName} to your campus.`;
   } else {
-    heading = `You could be ${firstName}'s penpal.`;
+    // Anon: lead with the sponsorship story — the school-day framing
+    // is what makes a cold visitor care. The penpal is the surprise
+    // upside they discover in the body copy below.
+    heading = `Sponsor ${firstName}. Meet him for real.`;
   }
 
   // Anon-only href. Holder + signed_in_visitor use the client CTA
@@ -197,11 +206,32 @@ export function PenpalBox({
             >
               {heading}
             </p>
-            <p className="text-[15px] text-[#333] leading-relaxed mb-6">
-              {VALUE_PROP}{' '}
-              <span className="font-bold text-[#0d0d0d]">$25/month.</span>{' '}
-              Cancel anytime.
-            </p>
+            {viewerState === 'anon' ? (
+              /* Two-sided anon pitch — school-day funder on top so
+                 sponsorship-motivated visitors see the point of the
+                 $25 first; the penpal upside sits underneath as
+                 what-you-get-in-return. Kevin's 2026-07-08 round-3
+                 request: some visitors are pulled by "I sent him
+                 to school," others by "I have a penpal in Uganda,"
+                 and we shouldn't force them to pick a story. */
+              <div className="mb-6">
+                <p className="text-[16px] md:text-[17px] text-[#0d0d0d] leading-snug mb-3 font-semibold">
+                  <span className="font-bold text-[#0d0d0d]">$25/month</span>{' '}
+                  covers {firstName}&rsquo;s school day.
+                </p>
+                <p className="text-[14px] md:text-[15px] text-[#555] leading-relaxed">
+                  You get a real penpal on the other end &mdash; letters back
+                  and forth, monthly photos, report cards, and updates
+                  from the campus. Cancel anytime.
+                </p>
+              </div>
+            ) : (
+              <p className="text-[15px] text-[#333] leading-relaxed mb-6">
+                {VALUE_PROP}{' '}
+                <span className="font-bold text-[#0d0d0d]">$25/month.</span>{' '}
+                Cancel anytime.
+              </p>
+            )}
             {viewerState === 'anon' ? (
               /* Anon variant: TWO CTAs stacked. Anon covers both
                  populations:
