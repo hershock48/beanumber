@@ -48,7 +48,11 @@ import { AwardsTimeline } from './AwardsTimeline';
 import { SendNoteComposer } from './SendNoteComposer';
 import { NotesThread } from './NotesThread';
 import { PenpalBox } from './PenpalBox';
-import { ShareKidCard } from './ShareKidCard';
+// ShareKidCard import intentionally kept out — the component is
+// still on disk (src/app/children/[number]/ShareKidCard.tsx) and can
+// be re-imported when the "Take {firstName} with you" block is
+// re-enabled per Kevin's 2026-07-08 comment ("hide this part for
+// now... i dont love it").
 import { resolveShirtToKid } from '@/lib/cycle';
 import { CANONICAL_ROSTER_MAX } from '@/lib/roster-config';
 import { db } from '@/lib/db/client';

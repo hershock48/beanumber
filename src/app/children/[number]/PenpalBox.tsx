@@ -27,6 +27,7 @@
  * is server. Sponsor branch renders both directly.
  */
 
+import type { ReactNode } from 'react';
 import Link from 'next/link';
 import type { NoteThreadEntry } from '@/lib/db/queries';
 import { NotesThread } from './NotesThread';
@@ -54,7 +55,7 @@ export interface PenpalBoxProps {
    * from the update stream; sponsors get one unified inbox.
    * Silently omitted when the viewer isn't a sponsor.
    */
-  sponsorPortal?: React.ReactNode;
+  sponsorPortal?: ReactNode;
 }
 
 const VALUE_PROP =
