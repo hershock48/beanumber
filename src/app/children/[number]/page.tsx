@@ -1336,13 +1336,18 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
     ? { customerId: buyerContext.customerId, email: buyerContext.email }
     : null;
 
-  // Treat any cookie-identified buyer as "has a shirt." Under the May
-  // 2026 stockpile model we no longer write ShirtAssignedAt to the
-  // Child record, so child.shirt_assigned is always false for new
-  // buyers. Falling back to buyerContext keeps the warm "Will you
-  // stay?" framing and the locked-merch teaser firing for buyers who
-  // came in via /shirts/success but aren't yet sponsors.
-  const viewerLooksLikeBuyer = child.shirt_assigned || Boolean(buyerContext);
+  // Treat cookie-identified buyers as "has a shirt." child.shirt_assigned
+  // used to be a fallback here, but under the May 2026 stockpile model
+  // we no longer write ShirtAssignedAt to the Child record, so on new
+  // buyers it's always false — and on kids like Naume (#1) that pre-
+  // date the stockpile model it's stuck legacy-true, which meant EVERY
+  // anon visitor to Naume's page got treated as a buyer and hit with
+  // the ClaimGate ("You bought #1. Claim it.") over a blurred kid
+  // page. Kevin flagged this 2026-07-08. The anon strip at the top of
+  // the page ("Have a Be A Number shirt? Sign in to claim your
+  // number") already does the sign-in ask cleanly, so we drop the
+  // legacy fallback and rely on the buyer cookie only.
+  const viewerLooksLikeBuyer = Boolean(buyerContext);
 
   return (
     <div className="min-h-screen bg-[#FFF8F0]">
