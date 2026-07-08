@@ -4,6 +4,7 @@ import {
   canApplyPromoToCart,
   discountedAmountCents,
 } from '@/lib/promo-codes';
+import { isFreeShippingWindowActive } from '@/lib/free-shipping-window';
 
 async function getStripe() {
   const StripeModule = (await import('stripe')).default;
@@ -98,7 +99,13 @@ export async function POST(request: NextRequest) {
     const monthlyCount = items.filter(i => i.continueMonthly).length;
 
     // Shipping: $5 flat rate, free on 3+ shirts OR any monthly sponsorship.
-    const freeShipping = items.length >= 3 || hasMonthly;
+    // Free shipping applies if any of:
+    //   - buyer has 3+ shirts in the cart (bulk-buyer perk)
+    //   - buyer added monthly to at least one shirt (shirt+monthly always free)
+    //   - the FREE_SHIPPING_UNTIL env-var window is currently active
+    //     (site-wide temporary promo — see src/lib/free-shipping-window.ts)
+    const freeShipping =
+      items.length >= 3 || hasMonthly || isFreeShippingWindowActive();
     const shippingOptions = freeShipping
       ? [{ shipping_rate_data: { type: 'fixed_amount' as const, fixed_amount: { amount: 0, currency: 'usd' }, display_name: 'Free shipping' } }]
       : [{ shipping_rate_data: { type: 'fixed_amount' as const, fixed_amount: { amount: 500, currency: 'usd' }, display_name: 'Standard shipping (USPS)' } }];

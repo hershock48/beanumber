@@ -5,6 +5,7 @@ import {
   canApplyPromoToCart,
   discountedAmountCents,
 } from '@/lib/promo-codes';
+import { shippingOptionsWithWindow } from '@/lib/free-shipping-window';
 
 async function getStripe() {
   const StripeModule = (await import('stripe')).default;
@@ -130,7 +131,11 @@ export async function POST(request: NextRequest) {
             quantity: 1,
           },
         ],
-        shipping_options: [{ shipping_rate_data: { type: 'fixed_amount' as const, fixed_amount: { amount: 500, currency: 'usd' }, display_name: 'Standard shipping (USPS)' } }],
+        // Default $5 flat shipping; swapped for $0 if the
+        // FREE_SHIPPING_UNTIL env-var window is currently active.
+        shipping_options: shippingOptionsWithWindow([
+          { shipping_rate_data: { type: 'fixed_amount' as const, fixed_amount: { amount: 500, currency: 'usd' }, display_name: 'Standard shipping (USPS)' } },
+        ]),
         mode: 'payment',
         customer_creation: 'always',
         // Stripe-native promotion codes (e.g. legacy-sponsor free-shirt codes
