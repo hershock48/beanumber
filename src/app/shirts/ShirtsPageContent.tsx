@@ -268,7 +268,7 @@ type Shirt = {
 const SHARED_DESCRIPTION =
   "A heavyweight cotton tee, screen-printed by hand. Every shirt gets a unique number, pressed on after you order. Each is one of a kind. That number belongs to a specific child at our campus in Northern Uganda. Type it into beanumber.org and you'll meet them.";
 
-const SHARED_SPECS = 'S – 2XL · Unisex · Heavyweight cotton';
+const SHARED_SPECS = 'Youth S – Adult 2XL · Unisex · Heavyweight cotton';
 
 const SHIRTS_SOURCE: Shirt[] = [
   {
