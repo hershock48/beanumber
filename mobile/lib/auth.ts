@@ -306,3 +306,22 @@ export async function refreshToken(): Promise<boolean> {
     return false;
   }
 }
+
+// ─── Dev sign-in (Expo Go preview only) ───────────────────────────
+
+/**
+ * Bypass Apple/Google verification. Only responds when the server has
+ * MOBILE_DEV_AUTH='1' set. Only usable when the client has
+ * EXPO_PUBLIC_MOBILE_DEV_AUTH='1' set. Both are cleaned up before
+ * App Store submission.
+ *
+ * Purpose: Sign in with Apple requires the native
+ * expo-apple-authentication module, which does not run inside Expo Go.
+ * This lets Kevin preview the app on his phone via Expo Go without
+ * needing an EAS development build first.
+ */
+export async function signInAsDev(email: string): Promise<AuthUser> {
+  const result = await postAuth('/api/mobile/v1/auth/dev-sign-in', { email });
+  await persistSession(result.accessToken, result.user);
+  return result.user;
+}

@@ -31,6 +31,7 @@ import {
   refreshToken as libRefresh,
   signInWithApple as libSignInApple,
   signInWithGoogle as libSignInGoogle,
+  signInAsDev as libSignInAsDev,
   signOut as libSignOut,
   subscribe,
 } from '../lib/auth';
@@ -41,6 +42,7 @@ interface AuthContextValue {
   isLoading: boolean;
   signInWithApple: () => Promise<void>;
   signInWithGoogle: () => Promise<void>;
+  signInAsDev: (email: string) => Promise<void>;
   signOut: () => Promise<void>;
   refresh: () => Promise<boolean>;
 }
@@ -90,6 +92,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     () => wrap(() => libSignInGoogle()).then(() => undefined),
     [wrap]
   );
+  const signInAsDev = useCallback(
+    (email: string) =>
+      wrap(() => libSignInAsDev(email)).then(() => undefined),
+    [wrap]
+  );
   const signOut = useCallback(() => wrap(() => libSignOut()), [wrap]);
   const refresh = useCallback(() => wrap(() => libRefresh()), [wrap]);
 
@@ -100,10 +107,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       isLoading: hydrating || busy,
       signInWithApple,
       signInWithGoogle,
+      signInAsDev,
       signOut,
       refresh,
     }),
-    [state, hydrating, busy, signInWithApple, signInWithGoogle, signOut, refresh]
+    [
+      state,
+      hydrating,
+      busy,
+      signInWithApple,
+      signInWithGoogle,
+      signInAsDev,
+      signOut,
+      refresh,
+    ]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

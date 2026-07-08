@@ -43,13 +43,23 @@ import {
   getInitialMeetShirtNumber,
 } from '../../lib/deep-link';
 
+// Dev bypass — visible only when EXPO_PUBLIC_MOBILE_DEV_AUTH=1 in the
+// client env AND the server has MOBILE_DEV_AUTH=1 set. Both are cleaned
+// up before App Store submission. Purpose: preview the app inside
+// Expo Go (which can't run expo-apple-authentication).
+const DEV_AUTH_ENABLED =
+  process.env.EXPO_PUBLIC_MOBILE_DEV_AUTH === '1';
+const DEV_AUTH_EMAIL =
+  process.env.EXPO_PUBLIC_MOBILE_DEV_AUTH_EMAIL || 'kevin@beanumber.org';
+
 export default function SignInScreen() {
-  const { signInWithApple, signInWithGoogle, isSignedIn, isLoading } = useAuth();
+  const { signInWithApple, signInWithGoogle, signInAsDev, isSignedIn, isLoading } =
+    useAuth();
   const [meetNumber, setMeetNumber] = useState<number | null>(null);
   const [appleAvailable, setAppleAvailable] = useState(false);
-  const [busyProvider, setBusyProvider] = useState<'apple' | 'google' | null>(
-    null
-  );
+  const [busyProvider, setBusyProvider] = useState<
+    'apple' | 'google' | 'dev' | null
+  >(null);
 
   // Read the /meet/[N] shirt number from the initial URL (or any
   // subsequent link event while this screen is visible).
@@ -118,6 +128,18 @@ export default function SignInScreen() {
     }
   };
 
+  const handleDev = async () => {
+    setBusyProvider('dev');
+    try {
+      await signInAsDev(DEV_AUTH_EMAIL);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Dev sign-in failed.';
+      Alert.alert('Dev sign-in failed', msg);
+    } finally {
+      setBusyProvider(null);
+    }
+  };
+
   const headline = meetNumber
     ? `First — keep #${meetNumber} yours.`
     : 'First — keep your progress.';
@@ -176,6 +198,30 @@ export default function SignInScreen() {
               </Text>
             )}
           </Pressable>
+
+          {DEV_AUTH_ENABLED ? (
+            <Pressable
+              onPress={handleDev}
+              disabled={isLoading || busyProvider !== null}
+              style={({ pressed }) => [
+                styles.devButton,
+                pressed && { opacity: 0.6 },
+                (isLoading || busyProvider !== null) && { opacity: 0.4 },
+              ]}
+            >
+              {busyProvider === 'dev' ? (
+                <ActivityIndicator color={COLORS.umber} />
+              ) : (
+                <Text
+                  variant="caption"
+                  color="umber"
+                  style={{ fontFamily: 'Inter_500Medium' }}
+                >
+                  Dev sign-in ({DEV_AUTH_EMAIL})
+                </Text>
+              )}
+            </Pressable>
+          ) : null}
         </View>
 
         <Text
@@ -234,6 +280,12 @@ const styles = StyleSheet.create({
   },
   googleButtonPressed: {
     backgroundColor: COLORS.paper,
+  },
+  devButton: {
+    marginTop: SPACING.s,
+    paddingVertical: SPACING.s,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   footer: {
     // sits under the button stack
