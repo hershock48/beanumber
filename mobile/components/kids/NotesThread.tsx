@@ -54,22 +54,22 @@ export function NotesThread({
   return (
     <View style={{ paddingHorizontal: SPACING.l }}>
       <Text variant="h2" color="ink">
-        You and {kidFirstName}
+        You and {kidFirstName} — penpal
       </Text>
 
       {lockedForHolder ? (
         <Card variant="large" style={{ marginTop: SPACING.m }}>
           <Text variant="body" color="ink">
-            {kidFirstName} writes his sponsors back — real notes, in his own
-            handwriting first, then typed up by his teacher.
+            Your penpal writes back — real notes, in {kidFirstName}'s own
+            handwriting first, then typed up by the teacher.
           </Text>
           <Text
             variant="body"
             color="ink"
             style={{ marginTop: SPACING.m }}
           >
-            Notes unlock when you sponsor {kidFirstName} for $25/mo. Cancel
-            anytime.
+            You get a penpal, monthly photos, report cards, and campus
+            updates. $25/month. Cancel anytime.
           </Text>
           {onConvertPress ? (
             <Pressable
@@ -92,7 +92,7 @@ export function NotesThread({
       ) : messages.length === 0 ? (
         <Card variant="large" style={{ marginTop: SPACING.m }}>
           <Text variant="body" color="ink">
-            Say hi. {kidFirstName} loves hearing from you.
+            Say hi. Your penpal loves hearing from you.
           </Text>
           {onWriteFirstNote ? (
             <Pressable
@@ -107,7 +107,7 @@ export function NotesThread({
                   fontSize: TEXT_STYLES.textLink.fontSize,
                 }}
               >
-                Write your first note →
+                Write your first penpal note →
               </Text>
             </Pressable>
           ) : null}

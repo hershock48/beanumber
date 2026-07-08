@@ -140,9 +140,9 @@ export default async function AdminHomePage() {
             </Actions>
           </Card>
 
-          {/* ── Card: Sponsor notes queue ──────────────────────── */}
+          {/* ── Card: Penpal queue ─────────────────────────────── */}
           <Card
-            label="Sponsor notes queue"
+            label="Penpal queue"
             error={data.messagesQueue.error}
           >
             {data.messagesQueue.pendingCount === 0 &&
@@ -151,10 +151,10 @@ export default async function AdminHomePage() {
                 <Headline>The queue is empty.</Headline>
                 <p className="mt-2 text-sm text-[#666]">
                   {data.messagesQueue.deliveredLast7Days > 0
-                    ? `${data.messagesQueue.deliveredLast7Days} note${
+                    ? `${data.messagesQueue.deliveredLast7Days} penpal note${
                         data.messagesQueue.deliveredLast7Days === 1 ? '' : 's'
                       } delivered in the last week.`
-                    : 'When a sponsor writes to their kid, this fills up.'}
+                    : 'When a sponsor writes their penpal, this fills up.'}
                 </p>
               </>
             ) : (

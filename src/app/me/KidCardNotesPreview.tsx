@@ -118,7 +118,7 @@ export function KidCardNotesPreview({
             />
           </>
         ) : (
-          'Your correspondence'
+          'Your penpal'
         )}
       </p>
       <p className="text-xs text-[#0d0d0d] font-semibold leading-snug mb-1">
@@ -132,7 +132,7 @@ export function KidCardNotesPreview({
       </p>
       {showSeeAll && (
         <p className="mt-2 text-[10px] font-bold uppercase tracking-[0.15em] text-[#888]">
-          {total} notes total &middot;{' '}
+          {total} penpal notes total &middot;{' '}
           <span className="text-[#0d0d0d]">
             open {firstName}&rsquo;s page to see the thread
           </span>

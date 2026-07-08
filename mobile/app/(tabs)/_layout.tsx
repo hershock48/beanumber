@@ -186,7 +186,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="notes"
         options={{
-          title: 'Notes',
+          title: 'Penpal',
           tabBarIcon: props => <NotesIcon {...props} />,
         }}
       />

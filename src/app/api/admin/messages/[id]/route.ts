@@ -237,8 +237,8 @@ export async function PATCH(
       const firstNamePlain = message.firstName || 'your kid';
       const subject =
         action === 'deliver'
-          ? `Your note reached ${firstNamePlain}.`
-          : 'A note about your recent message';
+          ? `Your penpal note reached ${firstNamePlain}.`
+          : 'A note about your recent penpal note';
       const html =
         action === 'deliver'
           ? deliveredEmailHtml({
@@ -345,8 +345,8 @@ function deliveredEmailHtml({
 }): string {
   return wrap(`
     <p>${greeting}</p>
-    <p>Your note reached ${firstName} at the campus today. The team read it out loud, translated it where it needed to be, and handed the paper over.</p>
-    <p>You can write another whenever you want — the composer is on ${firstName}'s page.</p>
+    <p>Your penpal note reached ${firstName} at the campus today. The team read it out loud, translated it where it needed to be, and handed the paper over.</p>
+    <p>You can write another penpal note whenever you want — the composer is on ${firstName}'s page.</p>
     <p style="text-align: center; margin: 24px 0;">
       <a href="${kidPageUrl}" style="display: inline-block; background: #D4A843; color: #0d0d0d; font-weight: bold; text-decoration: none; padding: 12px 28px; font-size: 14px; letter-spacing: 0.05em;">
         Open ${firstName}'s page
@@ -365,8 +365,8 @@ function declinedEmailHtml({
 }): string {
   return wrap(`
     <p>${greeting}</p>
-    <p>Wanted to give you a heads up — the last note you wrote to ${firstName} didn't make it into this week's campus batch. If that's confusing, hit reply and I'll walk you through it.</p>
-    <p>Nothing broken. You can write another whenever you want.</p>
+    <p>Wanted to give you a heads up — the last penpal note you wrote to ${firstName} didn't make it into this week's campus batch. If that's confusing, hit reply and I'll walk you through it.</p>
+    <p>Nothing broken. You can write another penpal note whenever you want.</p>
     <p>Kevin</p>
   `);
 }

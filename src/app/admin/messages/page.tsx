@@ -1,5 +1,5 @@
 /**
- * Admin · Sponsor notes queue.
+ * Admin · Penpal queue.
  *
  * Simon and Kevin both see this. Every sponsor-written note in the
  * system, ordered pending → translated → delivered → declined. Each
@@ -140,20 +140,20 @@ export default async function AdminMessagesPage() {
       <div className="max-w-4xl mx-auto px-5 py-6 md:py-10">
         <div className="mb-8">
           <p className="text-xs uppercase tracking-[0.2em] text-[#aaa] mb-1">
-            Sponsor notes
+            Penpal
           </p>
           <h1
             className="text-3xl md:text-4xl text-[#0d0d0d] mb-3"
             style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
           >
             {role === 'simon'
-              ? "Notes waiting to translate + deliver."
-              : "Sponsor-to-kid notes."}
+              ? "Penpal notes waiting to translate + deliver."
+              : "Penpal correspondence."}
           </h1>
           <p className="text-[#666] leading-relaxed max-w-2xl">
             {role === 'simon'
-              ? "Sponsors write short notes to their kids from the site. Translate each one, then mark delivered once you've handed it over at the campus. Decline if a note isn't right — Kevin will handle the explanation."
-              : "Every sponsor-written note. Simon translates and delivers; you can eyeball any of them before or after."}
+              ? "Sponsors write short penpal notes to their kids from the site. Translate each one, then mark delivered once you've handed it over at the campus. Decline if a note isn't right — Kevin will handle the explanation."
+              : "Every penpal note between sponsors and kids. Simon translates and delivers; you can eyeball any of them before or after."}
           </p>
           {(pendingCount > 0 || translatedCount > 0) && (
             <div className="mt-4 flex gap-4 text-xs text-[#666]">

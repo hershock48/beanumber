@@ -242,16 +242,16 @@ export async function POST(
       await sendEmail({
         to: { email: parent.sponsorEmail },
         from: { email: FROM_EMAIL, name: 'Kevin at Be A Number' },
-        subject: `${firstNamePlain} wrote you back.`,
+        subject: `A penpal letter from ${firstNamePlain}.`,
         html: wrap(`
           <p>${greeting}</p>
-          <p>${firstNameSafe} sat down at the campus this week and wrote you a reply. The team translated it and it&rsquo;s waiting for you on their page.</p>
+          <p>Your penpal ${firstNameSafe} sat down at the campus this week and wrote you a reply. The team translated it and it&rsquo;s waiting for you on their page.</p>
           <p style="text-align: center; margin: 28px 0;">
             <a href="${kidPageUrl}" style="display: inline-block; background: #D4A843; color: #0d0d0d; font-weight: bold; text-decoration: none; padding: 14px 32px; font-size: 15px; letter-spacing: 0.05em;">
-              Read ${firstNameSafe}&rsquo;s reply
+              Read ${firstNameSafe}&rsquo;s penpal letter
             </a>
           </p>
-          <p>Write back whenever you want.</p>
+          <p>Write your penpal back whenever you want.</p>
           <p>Kevin</p>
         `),
       });

@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * Simon's + Kevin's client-side queue for sponsor notes.
+ * Simon's + Kevin's client-side queue for penpal notes.
  *
  * Each row has:
  *   - Kid photo + name + shirt number (context anchor)
@@ -363,7 +363,7 @@ function MessageCard({
           {/* Original body */}
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-2">
-              Sponsor wrote
+              Penpal note
             </p>
             <blockquote
               className="text-[15px] text-[#333] leading-relaxed italic bg-[#FFF8F0] border-l-2 border-[#D4A843] pl-4 py-2"

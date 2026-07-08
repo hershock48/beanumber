@@ -193,7 +193,7 @@ export function birthdayMilestone(
     return {
       kind: 'birthday-today',
       headline: `Today is ${kidFirstName}'s ${ordinal(age)} birthday.`,
-      body: `The campus knows. If you want to send a note, reply to any email from Kevin and it'll get to ${kidFirstName}.`,
+      body: `The campus knows. If you want to write your penpal, reply to any email from Kevin and it'll get to ${kidFirstName}.`,
       priority: 100,
     };
   }

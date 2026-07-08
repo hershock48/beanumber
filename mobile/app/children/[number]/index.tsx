@@ -1,10 +1,10 @@
 /**
  * /children/[number] — the kid page.
  *
- * The retention surface. Composes hero, latest update, notes thread,
+ * The retention surface. Composes hero, latest update, penpal thread,
  * timeline, bio, and co-sponsors into one scroll view with a sticky
- * nav on scroll past the hero and a floating "Write [Kid]" FAB for
- * monthly sponsors.
+ * nav on scroll past the hero and a floating "Write your penpal" FAB
+ * for monthly sponsors.
  *
  * Query params:
  *   compose=1 — auto-open the composer on mount (used after reveal
@@ -242,7 +242,7 @@ export default function KidPage() {
             onPress={() => setComposerOpen(true)}
             hitSlop={16}
             accessibilityRole="button"
-            accessibilityLabel={`Write ${kid.firstName}`}
+            accessibilityLabel={`Write your penpal (${kid.firstName})`}
           >
             <Text
               color="ink"
@@ -410,7 +410,7 @@ export default function KidPage() {
           <Pressable
             onPress={() => setComposerOpen(true)}
             accessibilityRole="button"
-            accessibilityLabel={`Write ${kid.firstName} a note`}
+            accessibilityLabel={`Write your penpal (${kid.firstName})`}
             style={{
               backgroundColor: COLORS.gold,
               paddingVertical: SPACING.m,
@@ -438,7 +438,7 @@ export default function KidPage() {
                 fontSize: 15,
               }}
             >
-              Write {kid.firstName}
+              Write your penpal
             </Text>
           </Pressable>
         </View>

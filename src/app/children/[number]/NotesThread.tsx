@@ -37,13 +37,13 @@ export function NotesThread({
     <section className="mb-10 md:mb-14 max-w-2xl mx-auto">
       <div className="text-center mb-6 md:mb-8">
         <p className="text-xs font-bold uppercase tracking-[0.3em] text-[#D4A843] mb-2">
-          Your thread
+          Penpal
         </p>
         <h2
           className="text-2xl md:text-3xl text-[#0d0d0d] leading-tight"
           style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
         >
-          Notes between you and {firstName}.
+          Penpal notes between you and {firstName}.
         </h2>
       </div>
       <ol className="space-y-4">

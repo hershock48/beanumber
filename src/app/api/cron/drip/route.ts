@@ -253,7 +253,7 @@ function shirtNurtureEmail(
         html: wrapEmail(`
           <p style="margin-top: 0;">Hey ${firstName},</p>
           <p>I&rsquo;ll stop showing up in your inbox after this one.</p>
-          <p>The shirt is how you found us. The number is how you met ${multi ? `your kids` : `your kid`}. Sponsorship, if you go that route, is how you stay in their life: school fees, meals, the clinic, plus letters and photos coming back to you. $25 a month, cancel anytime, and you&rsquo;d be welcome.</p>
+          <p>The shirt is how you found us. The number is how you met ${multi ? `your kids` : `your kid`}. Sponsorship, if you go that route, is how you stay in their life: you get a penpal, monthly photos, report cards, and campus updates. $25/month, cancel anytime, and you&rsquo;d be welcome.</p>
           <p style="text-align: center; margin: 24px 0;">
             <a href="${sponsorUrl}" style="display: inline-block; background: #D4A843; color: #0d0d0d; font-weight: bold; text-decoration: none; padding: 14px 32px; font-size: 15px; letter-spacing: 0.05em;">START A SPONSORSHIP</a>
           </p>
@@ -291,14 +291,14 @@ function sponsorOnboardEmail(
           <p style="margin-top: 0;">Hey ${firstName},</p>
           <p>Your sponsorship is active, and I wanted to make sure you have everything you need to get started.</p>
           ${displayChildName
-            ? `<p>Your $25 a month supports school fees, two meals a day, and medical care at the campus where ${displayChildName} goes to school. For a lot of the kids on campus, those meals are the only ones they get all day, so this matters starting right now.</p>`
-            : `<p>Your $25 a month supports school fees, two meals a day, and medical care at the campus where your kid goes to school. For a lot of the kids on campus, those meals are the only ones they get all day, so this matters starting right now.</p>`
+            ? `<p><strong>Here&rsquo;s what you unlocked:</strong> you get a penpal, monthly photos, report cards, and campus updates. $25/month. ${displayChildName} is your penpal.</p><p>Your $25 a month supports school fees, two meals a day, and medical care at the campus where ${displayChildName} goes to school. For a lot of the kids on campus, those meals are the only ones they get all day, so this matters starting right now.</p>`
+            : `<p><strong>Here&rsquo;s what you unlocked:</strong> you get a penpal, monthly photos, report cards, and campus updates. $25/month.</p><p>Your $25 a month supports school fees, two meals a day, and medical care at the campus where your kid goes to school. For a lot of the kids on campus, those meals are the only ones they get all day, so this matters starting right now.</p>`
           }
           ${firstNumber
-            ? `<p><strong>${displayChildName ? `${displayChildName}’s` : 'Your'} page is at <a href="${childUrl}" style="color: #D4A843; font-weight: bold;">${childUrlLabel}</a>.</strong> Bookmark it. That&rsquo;s where updates, photos, and letters from the campus show up. Your browser remembers you after your first visit, so there&rsquo;s no separate login to keep track of.</p>`
-            : `<p><strong>Updates, photos, and letters from the campus show up on your kid&rsquo;s page at <a href="${SITE_URL}" style="color: #D4A843; font-weight: bold;">beanumber.org</a>.</strong></p>`
+            ? `<p><strong>${displayChildName ? `${displayChildName}’s` : 'Your'} page is at <a href="${childUrl}" style="color: #D4A843; font-weight: bold;">${childUrlLabel}</a>.</strong> Bookmark it. That&rsquo;s where penpal letters, photos, and campus updates show up. Your browser remembers you after your first visit, so there&rsquo;s no separate login to keep track of.</p>`
+            : `<p><strong>Penpal letters, photos, and campus updates show up on your kid&rsquo;s page at <a href="${SITE_URL}" style="color: #D4A843; font-weight: bold;">beanumber.org</a>.</strong></p>`
           }
-          <p>If you ever want to write to ${displayChildName || 'your kid'}, reply to this email. The team on the ground handles delivery and translation. And if you ever can&rsquo;t get back to your page, write me at <a href="mailto:Kevin@beanumber.org" style="color: #D4A843; font-weight: bold;">Kevin@beanumber.org</a> and I&rsquo;ll sort it out.</p>
+          <p>If you ever want to write your penpal, reply to this email. The team on the ground handles delivery and translation. And if you ever can&rsquo;t get back to your page, write me at <a href="mailto:Kevin@beanumber.org" style="color: #D4A843; font-weight: bold;">Kevin@beanumber.org</a> and I&rsquo;ll sort it out.</p>
           <p>Kevin</p>
         `),
       };
@@ -309,8 +309,8 @@ function sponsorOnboardEmail(
         html: wrapEmail(`
           <p style="margin-top: 0;">Hey ${firstName},</p>
           <p>Just wanted to give you a heads up on what to expect over the next few weeks.</p>
-          <p>The team on the ground in Uganda sends regular updates from the campus. ${displayChildName ? `You&rsquo;ll hear about ${displayChildName} specifically` : 'You&rsquo;ll hear about your child specifically'}: what they&rsquo;re studying, how they&rsquo;re doing in class, sometimes a photo or a handwritten letter. Those updates show up on ${displayChildName ? `${displayChildName}&rsquo;s page` : 'your kid&rsquo;s page'} at <a href="${childUrl}" style="color: #D4A843; font-weight: bold;">${childUrlLabel}</a> and by email, and the first one usually comes within your first month.</p>
-          <p>If you want to write to ${displayChildName || 'your child'} yourself, go for it. Just reply to any email. The team reads every note, translates when needed, and makes sure it actually gets to them.</p>
+          <p>The team on the ground in Uganda sends regular updates from the campus. ${displayChildName ? `You&rsquo;ll hear about ${displayChildName} specifically` : 'You&rsquo;ll hear about your child specifically'}: what they&rsquo;re studying, how they&rsquo;re doing in class, sometimes a photo or a penpal letter. Those updates show up on ${displayChildName ? `${displayChildName}&rsquo;s page` : 'your kid&rsquo;s page'} at <a href="${childUrl}" style="color: #D4A843; font-weight: bold;">${childUrlLabel}</a> and by email, and the first one usually comes within your first month.</p>
+          <p>If you want to write your penpal (${displayChildName || 'your child'}), open ${displayChildName ? `${displayChildName}&rsquo;s page` : 'their page'} and use the Penpal composer. The team reads every note, translates when needed, and hands it over in person.</p>
           <p>Kevin</p>
         `),
       };
@@ -441,7 +441,7 @@ function shirtSponsorEmail(
           <p style="margin-top: 0;">Hey ${firstName},</p>
           <p>You&rsquo;ve been sponsoring for about two weeks now, and I wanted to give you a picture of what that looks like on the ground.</p>
           <p>Your $25 this month went toward school fees, breakfast and lunch every day, and a nurse on campus whenever the kids needed one. That&rsquo;s what sponsorship looks like in practice, and it happens every month you&rsquo;re here.</p>
-          <p>Your first update from the campus should be coming soon. The team sends photos, report cards, and sometimes handwritten letters from the kids, and they show up on your kid's page at <a href="${SITE_URL}" style="color: #D4A843; font-weight: bold;">beanumber.org</a> and by email.</p>
+          <p>Your first update from the campus should be coming soon. The team sends photos, report cards, and penpal letters from the kids, and they show up on your kid's page at <a href="${SITE_URL}" style="color: #D4A843; font-weight: bold;">beanumber.org</a> and by email.</p>
           <p>Kevin</p>
         `),
       };
@@ -490,7 +490,7 @@ function monthlyDonorEmail(
         html: wrapEmail(`
           <p style="margin-top: 0;">Hey ${firstName},</p>
           <p>I wanted to give you a better picture of how things work on the ground, since your monthly gift is part of what makes it all run.</p>
-          <p>Every child at the campus has a number, and that number goes on a shirt. When someone buys that shirt or sponsors that child, they get connected to a real kid by name. The sponsor gets letters, photos, and report cards, and the child knows their sponsor. It&rsquo;s not a big faceless program.</p>
+          <p>Every child at the campus has a number, and that number goes on a shirt. When someone buys that shirt or sponsors that child, they get connected to a real kid by name. The sponsor gets a penpal, monthly photos, report cards, and campus updates. The kid knows their sponsor. It&rsquo;s not a big faceless program.</p>
           <p>Your monthly gift is what keeps the whole campus going: the meals, the teachers, the clinic. Without monthly donors, none of the rest of it would work.</p>
           <p>If you want a shirt with a specific kid&rsquo;s number on it, you can <a href="${SITE_URL}/shirts" style="color: #D4A843; font-weight: bold;">get one here</a>. The number-to-name reveal happens when the shirt arrives.</p>
           <p>Kevin</p>

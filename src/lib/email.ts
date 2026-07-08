@@ -223,15 +223,15 @@ export async function sendSponsorWelcomeEmail(
 
     <p>Your sponsorship of ${childName} is active. That means ${childName} goes to school at the campus, eats two meals a day, and has the on-site clinic when they need it.</p>
 
+    <p><strong>Here&rsquo;s what you unlocked:</strong> you get a penpal, monthly photos, report cards, and campus updates. $25/month. ${childFirstName} is your penpal.</p>
+
     <p>One thing happens fast on the other side of this. The minute you clicked the button, a note went to the team at the campus. Tomorrow morning over there &mdash; they&rsquo;re hours ahead of us &mdash; the team is going to tell ${childFirstName} they have a sponsor. They don&rsquo;t know your name yet. They&rsquo;re going to ask.</p>
 
-    <p style="background: #FFF8F0; border-left: 3px solid #D4A843; padding: 16px 20px; margin: 24px 0;"><strong>Reply to this email and tell us what you want ${childFirstName} to know.</strong> One sentence. Two. Whatever feels right. We&rsquo;ll pass it on.</p>
+    <p style="background: #FFF8F0; border-left: 3px solid #D4A843; padding: 16px 20px; margin: 24px 0;"><strong>Reply to this email with your first penpal note for ${childFirstName}.</strong> One sentence. Two. Whatever feels right. We&rsquo;ll pass it on.</p>
 
     ${pageLine}
 
-    <p>You'll also get a monthly campus newsletter from our team in Northern Uganda, photos of ${childName} every few months, a handwritten letter from them once a year, and a year-end report card.</p>
-
-    <p>If you ever want to write back, change your monthly, or ask anything else, reply here. I read every one.</p>
+    <p>If you ever want to write another penpal note, change your monthly, or ask anything else, reply here. I read every one.</p>
 
     <p>Kevin</p>
   `);
@@ -1010,7 +1010,7 @@ export async function sendKevinNoteAlert(params: {
 
   return sendEmail({
     to: { email: 'kevin@beanumber.org', name: 'Kevin' },
-    subject: `New sponsor note: ${sponsorDisplay} → ${kidFirstName}`,
+    subject: `New penpal note: ${sponsorDisplay} → ${kidFirstName}`,
     html,
   });
 }

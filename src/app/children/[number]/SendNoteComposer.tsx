@@ -90,16 +90,16 @@ export function SendNoteComposer({
     <section className="mb-10 md:mb-14 max-w-2xl mx-auto">
       <div className="text-center mb-6 md:mb-8">
         <p className="text-xs font-bold uppercase tracking-[0.3em] text-[#D4A843] mb-2">
-          Send a note
+          Penpal
         </p>
         <h2
           className="text-2xl md:text-3xl text-[#0d0d0d] leading-tight"
           style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
         >
-          Write to {firstName}.
+          Write your penpal ({firstName}).
         </h2>
         <p className="text-[#666] mt-3 leading-relaxed max-w-lg mx-auto">
-          The team at the campus reads every note, translates it, and
+          The team at the campus reads every penpal note, translates it, and
           hands it to {firstName} in person. Deliveries happen in
           weekly batches, usually on a Sunday.
         </p>
@@ -114,13 +114,13 @@ export function SendNoteComposer({
             className="text-xl text-[#0d0d0d] leading-snug mb-3"
             style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
           >
-            Your note is on its way to {firstName}.
+            Your penpal note is on its way to {firstName}.
           </p>
           <p className="text-[#555] leading-relaxed max-w-md mx-auto">
             The campus batches deliveries each Sunday, so your note
             should reach {firstName} within about a week.{' '}
             <span className="text-[#0d0d0d] font-semibold">
-              We&rsquo;ll email you if {firstName} writes back.
+              We&rsquo;ll email you when your penpal writes back.
             </span>
           </p>
           <p className="text-[#888] leading-relaxed text-sm italic mt-4 max-w-md mx-auto">
@@ -145,19 +145,19 @@ export function SendNoteComposer({
             onClick={() => setStage('composing')}
             className="inline-block bg-[#D4A843] hover:bg-[#c49a3a] text-[#0d0d0d] px-6 py-3 text-xs font-bold uppercase tracking-wider transition-colors"
           >
-            Start a note
+            Write your penpal
           </button>
         </div>
       ) : (
         <div className="bg-white border border-[#e8e0d4] p-5 md:p-6">
           <label
-            htmlFor="sponsor-note"
+            htmlFor="penpal-note"
             className="sr-only"
           >
-            Note to {firstName}
+            Penpal note to {firstName}
           </label>
           <textarea
-            id="sponsor-note"
+            id="penpal-note"
             value={body}
             onChange={e => {
               setBody(e.target.value);

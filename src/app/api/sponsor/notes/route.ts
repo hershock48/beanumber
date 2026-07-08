@@ -62,7 +62,7 @@ export async function POST(request: NextRequest) {
   const email = await getViewerEmail();
   if (!email) {
     return NextResponse.json(
-      { error: 'Sign in to write to your kid.' },
+      { error: 'Sign in to write your penpal.' },
       { status: 401 }
     );
   }
@@ -83,7 +83,7 @@ export async function POST(request: NextRequest) {
   if (rawBody.length < MIN_BODY) {
     return NextResponse.json(
       {
-        error: `Your note is too short. Say a little more — the campus reads every one of these.`,
+        error: `Your penpal note is too short. Say a little more — the campus reads every one of these.`,
       },
       { status: 400 }
     );
@@ -190,7 +190,7 @@ export async function POST(request: NextRequest) {
   if (!monthlyRow) {
     return NextResponse.json(
       {
-        error: `You need to be sponsoring ${childRow.firstName ?? 'this kid'} monthly before you can write a note. If you're the holder, add a monthly sponsorship to unlock writing.`,
+        error: `You need to be sponsoring ${childRow.firstName ?? 'this kid'} monthly before you can write a penpal note. If you're the holder, add a monthly sponsorship to unlock writing.`,
       },
       { status: 403 }
     );
@@ -213,7 +213,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         error:
-          'You already have a note in the queue. Once it reaches the campus and gets delivered, you can write another.',
+          'You already have a penpal note in the queue. Once it reaches the campus and gets delivered, you can write another.',
       },
       { status: 409 }
     );

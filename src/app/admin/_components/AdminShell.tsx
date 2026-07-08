@@ -37,7 +37,7 @@ const ALL_TABS: Array<{ id: AdminTab; label: string; href: string; visibleTo: Ar
   { id: 'roster', label: 'Roster', href: '/admin/roster', visibleTo: ['admin', 'simon'] },
   { id: 'review', label: 'Review queue', href: '/admin/review', visibleTo: ['admin'] },
   { id: 'sotm', label: 'Student of the month', href: '/admin/sotm', visibleTo: ['admin', 'simon'] },
-  { id: 'messages', label: 'Sponsor notes', href: '/admin/messages', visibleTo: ['admin', 'simon'] },
+  { id: 'messages', label: 'Penpal', href: '/admin/messages', visibleTo: ['admin', 'simon'] },
   { id: 'campus-update', label: 'Monthly update', href: '/admin/campus-update', visibleTo: ['simon'] },
   { id: 'fulfillment', label: 'Fulfillment', href: '/admin/fulfillment', visibleTo: ['admin'] },
 ];
@@ -56,7 +56,7 @@ export function AdminShell({
   const tabs = ALL_TABS.filter(t => t.visibleTo.includes(role));
 
   // Pending sponsor notes count for the red-dot indicator on the
-  // "Sponsor notes" tab. Fetched on mount + on window focus so that
+  // "Penpal" tab. Fetched on mount + on window focus so that
   // when Kevin tabs back to the admin console from his inbox, the
   // count reflects reality. No aggressive polling — Kevin is one
   // user; this is the pragmatic amount of freshness.
@@ -114,7 +114,7 @@ export function AdminShell({
           <nav className="flex-1 overflow-x-auto">
             <ul className="flex items-center gap-1 md:gap-2 justify-end md:justify-center">
               {tabs.map(tab => {
-                // Red dot on the "Sponsor notes" tab when there are
+                // Red dot on the "Penpal" tab when there are
                 // pending or translated outbound notes waiting on
                 // admin action. Positioned as an inline sup pill so
                 // the tab layout doesn't jitter when the count flips.

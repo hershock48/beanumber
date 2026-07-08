@@ -712,8 +712,9 @@ export default async function MePage() {
                     <p className="text-sm text-[#d8cfc1] leading-relaxed max-w-xl">
                       A few more kids from the campus. If you want to
                       stay in another one&rsquo;s life, sponsor them &mdash;
-                      $25/mo, letters, updates, and photos, same as the
-                      kids you already have.
+                      you get a penpal, monthly photos, report cards, and
+                      campus updates. $25/month, same as the kids you
+                      already have.
                     </p>
                   </div>
                   {/* Horizontal scroll strip. Cards use overflow-x-auto

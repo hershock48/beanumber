@@ -1987,7 +1987,7 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
           <div className="max-w-2xl mx-auto mt-12 md:mt-16">
             <div className="text-center mb-6">
               <p className="text-xs font-bold uppercase tracking-[0.3em] text-[#D4A843] mb-2">
-                Letters, photos, report cards
+                Photos, report cards, campus updates
               </p>
               <h2
                 className="text-2xl md:text-3xl text-[#0d0d0d]"
@@ -2003,14 +2003,80 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
                 latestChildUpdate={portalData.latestChildUpdate}
               />
             ) : (
-              <div className="bg-[#FFF8F0] border border-[#e8e0d4] p-6 md:p-8 text-center">
-                <p className="text-[15px] md:text-base text-[#555] leading-relaxed">
-                  Once you&rsquo;re sponsoring {firstName}, you can write to
-                  them and they write back &mdash; the campus team translates
-                  in both directions. Personal photo updates from the campus
-                  land here too, a few times a year. Sponsors get the inside
-                  view; visitors get the public campus newsletter below.
-                </p>
+              /* Progressive-disclosure preview — matches the PenpalBox
+                 frosted aesthetic. A holder/anon viewer sees a blurred
+                 sample update block behind the same overlay treatment:
+                 backdrop-filter blur, gold-overlay CTA, canonical value-
+                 prop line, "Cancel anytime" footer. Kevin's rule from
+                 2026-07-08: penpal + updates should read as companion
+                 frosted boxes stacked together with matching "sponsor to
+                 unlock" pattern. */
+              <div className="relative border border-[#e8e0d4] bg-white">
+                <div
+                  className="relative overflow-hidden"
+                  style={{ filter: 'blur(3.5px) saturate(1.1)' }}
+                  aria-hidden="true"
+                >
+                  <div className="p-6 md:p-8 space-y-4">
+                    <div className="text-xs uppercase tracking-wider text-[#999] font-bold">
+                      Sample &middot; not a real update
+                    </div>
+                    <div className="bg-[#FFF8F0] border border-[#e8e0d4] p-5">
+                      <p className="text-xs uppercase tracking-wider text-[#D4A843] font-bold mb-2">
+                        New photos from {firstName} &middot; last month
+                      </p>
+                      <p
+                        className="text-[15px] text-[#333] leading-relaxed italic"
+                        style={{ fontFamily: 'var(--font-lora), serif' }}
+                      >
+                        &ldquo;{firstName} showed us her report card this
+                        month &mdash; top of her class in English. She said
+                        the book you asked about is her favorite. Photos
+                        from the school day are on her page.&rdquo;
+                      </p>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="aspect-square bg-[#f5f0e8] border border-[#e8e0d4]" />
+                      <div className="aspect-square bg-[#f5f0e8] border border-[#e8e0d4]" />
+                      <div className="aspect-square bg-[#f5f0e8] border border-[#e8e0d4]" />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/40 backdrop-blur-[1px]">
+                  <div className="max-w-md w-full mx-auto text-center px-6 py-8">
+                    <p
+                      className="text-2xl md:text-[26px] text-[#0d0d0d] mb-3 leading-tight"
+                      style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
+                    >
+                      Photos and updates unlock with sponsorship.
+                    </p>
+                    <p className="text-[15px] text-[#333] leading-relaxed mb-6">
+                      You get a penpal, monthly photos, report cards, and
+                      campus updates.{' '}
+                      <span className="font-bold text-[#0d0d0d]">
+                        $25/month.
+                      </span>{' '}
+                      Cancel anytime.
+                    </p>
+                    <Link
+                      href={`/children/${number}?intent=${
+                        child.viewer_is_holder || child.viewer_signed_in
+                          ? 'sponsor'
+                          : 'sign-in'
+                      }`}
+                      className="inline-block bg-[#D4A843] text-[#0d0d0d] font-bold uppercase tracking-wider py-4 px-8 hover:bg-[#c49a3a] transition-colors"
+                    >
+                      {child.viewer_is_holder || child.viewer_signed_in
+                        ? `Sponsor ${firstName} — $25/month`
+                        : `Sign in to sponsor ${firstName}`}
+                    </Link>
+                    <p className="text-xs text-[#888] mt-4 leading-relaxed">
+                      Personal updates from the campus land a few times a
+                      year.
+                    </p>
+                  </div>
+                </div>
               </div>
             )}
           </div>

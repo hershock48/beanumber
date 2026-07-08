@@ -567,15 +567,16 @@ function ShirtCard({ shirt, reversed }: { shirt: Shirt; reversed: boolean }) {
                   className="text-base text-[#0d0d0d]"
                   style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
                 >
-                  Stay in their life.
+                  Become their penpal.
                 </p>
                 <p className="text-xs font-bold uppercase tracking-wider text-[#D4A843] whitespace-nowrap">
                   +$25/mo
                 </p>
               </div>
               <p className="text-sm text-[#555] leading-snug">
-                The shirt is how you meet them. $25 a month is how you stay &mdash;
-                letters, photos, report cards, report from the ground.
+                The shirt is how you meet them. Monthly sponsorship is how you
+                stay: you get a penpal, monthly photos, report cards, and
+                campus updates. $25/month.
               </p>
             </div>
 
@@ -808,7 +809,7 @@ export default function ShirtsPageContent() {
             {[
               {
                 q: 'What actually happens when I buy a Shirt?',
-                a: 'You pick your color and size, and we ship you a hand-printed Shirt with a unique Number pressed on the back. That Number belongs to a real Child enrolled in our program in Northern Uganda. When the Shirt arrives, you flip it over, read your Number off the back, come back to the site, enter it, and meet them: their name, their face, their story. $25 supports school, meals, and medical care at the campus. $25/month keeps you in their story all year: a monthly campus newsletter, photos of your Kid, a handwritten letter from them, and a year-end report card.',
+                a: "You pick your color and size, and we ship you a hand-printed Shirt with a unique Number pressed on the back. That Number belongs to a real Child enrolled in our program in Northern Uganda. When the Shirt arrives, you flip it over, read your Number off the back, come back to the site, enter it, and meet them: their name, their face, their story. $25 supports school, meals, and medical care at the campus. $25/month makes it real: you get a penpal, monthly photos, report cards, and campus updates.",
               },
               {
                 q: 'Where does the $25 actually go?',

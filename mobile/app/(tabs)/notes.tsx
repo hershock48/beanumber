@@ -1,9 +1,10 @@
 /**
- * Notes tab.
+ * Penpal tab.
  *
  * Two states depending on the viewer's role for each of their kids:
- *   - For MONTHLY sponsors: an inbox of latest exchange per kid (like
- *     Messages.app). Tap a row → kid page scrolled to the thread.
+ *   - For MONTHLY sponsors: an inbox of the latest penpal exchange per
+ *     kid (like Messages.app). Tap a row → kid page scrolled to the
+ *     penpal thread.
  *   - For HOLDERS: the warm locked card per held kid — same copy as
  *     the kid page's locked state ("Ismail writes his sponsors back —
  *     real notes, in his own handwriting first, then typed up by his
@@ -67,7 +68,7 @@ export default function NotesTab() {
       >
         <View style={{ paddingHorizontal: SPACING.l, marginTop: SPACING.l }}>
           <Text variant="h1" color="ink">
-            Notes
+            Penpal
           </Text>
         </View>
 
@@ -81,7 +82,7 @@ export default function NotesTab() {
           <View style={{ paddingHorizontal: SPACING.l, marginTop: SPACING.l }}>
             <Text variant="body" color="umber">
               When someone claims one of the shirts on your card, you'll be
-              able to write to them here.
+              able to write your penpal here.
             </Text>
           </View>
         ) : (
@@ -180,7 +181,7 @@ function MonthlyRow({
           style={{ marginTop: 2 }}
           numberOfLines={1}
         >
-          {kid.lastUpdatePreview || 'Write to say hi.'}
+          {kid.lastUpdatePreview || 'Write your penpal to say hi.'}
         </Text>
       </View>
     </Pressable>
@@ -227,12 +228,12 @@ function HolderRow({
         </Text>
       </View>
       <Text variant="body" color="ink" style={{ marginTop: SPACING.m }}>
-        {kid.firstName} writes his sponsors back — real notes, in his own
-        handwriting first, then typed up by his teacher.
+        Your penpal writes back — real notes, in {kid.firstName}'s own
+        handwriting first, then typed up by the teacher.
       </Text>
       <Text variant="body" color="ink" style={{ marginTop: SPACING.m }}>
-        Notes unlock when you sponsor {kid.firstName} for $25/mo. Cancel
-        anytime.
+        You get a penpal, monthly photos, report cards, and campus updates.
+        $25/month. Cancel anytime.
       </Text>
       <View style={{ marginTop: SPACING.l }}>
         <Text

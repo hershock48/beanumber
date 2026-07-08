@@ -1,5 +1,5 @@
 /**
- * <Composer /> — the send-a-note sheet.
+ * <Composer /> — the write-your-penpal sheet.
  *
  * Opens from the FAB. 800-char soft limit; counter shows in the last
  * 100. Send disabled until ≥1 character. On success: sheet dismisses,
@@ -74,7 +74,7 @@ export function Composer({
     if (body.trim().length > 0 && !sendError) {
       Alert.alert(
         'Keep this draft?',
-        `Your note to ${kidFirstName} will be saved.`,
+        `Your penpal note to ${kidFirstName} will be saved.`,
         [
           {
             text: 'Discard',
@@ -118,7 +118,7 @@ export function Composer({
       setSendError(
         err instanceof Error
           ? err.message
-          : "Note didn't send. Try again?"
+          : "Penpal note didn't send. Try again?"
       );
     }
   };
@@ -136,7 +136,7 @@ export function Composer({
           }}
         >
           <Text variant="h3" color="ink">
-            Write {kidFirstName}
+            Write your penpal ({kidFirstName})
           </Text>
           <Pressable
             onPress={handleClose}
@@ -162,7 +162,7 @@ export function Composer({
           variant="writingSurface"
           value={body}
           onChangeText={setBody}
-          placeholder={`Tell ${kidFirstName} what you're up to. He'll write back.`}
+          placeholder={`Tell ${kidFirstName} what you're up to. Your penpal writes back.`}
           maxLength={SOFT_LIMIT * 2} // hard clamp, soft indicator only
         />
 
@@ -191,7 +191,7 @@ export function Composer({
             }}
           >
             <Text variant="bodySmall" color="ink">
-              Note didn't send. Try again?
+              Penpal note didn't send. Try again?
             </Text>
           </View>
         ) : null}
