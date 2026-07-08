@@ -33,12 +33,18 @@ export default function KeepGoingScreen() {
   const goKidPage = () => router.replace(`/children/${shirtNumber}`);
 
   const handleYes = async () => {
-    const url = `${API_BASE_URL}/sponsorship/start?shirtNumber=${shirtNumber}&source=app`;
+    // Hand off to the existing web sponsor-conversion flow. The
+    // /children/[N]?source=app query flags this as an app-originated
+    // conversion so the web can adjust the return-to-sender copy.
+    const url = `${API_BASE_URL}/children/${shirtNumber}?source=app&intent=sponsor`;
     try {
       await WebBrowser.openBrowserAsync(url, {
         presentationStyle: WebBrowser.WebBrowserPresentationStyle.PageSheet,
       });
     } finally {
+      // Return to the kid page regardless of outcome. If they converted,
+      // /children/[N] shows composer access; if not, kid-page gate copy
+      // carries any remaining conversion motivation.
       goKidPage();
     }
   };

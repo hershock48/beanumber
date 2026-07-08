@@ -25,15 +25,15 @@ import Animated, {
   Extrapolation,
   useAnimatedScrollHandler,
 } from 'react-native-reanimated';
-import { COLORS, SPACING, TEXT_STYLES, ELEVATION, RADIUS } from '../../lib/theme';
-import { Text } from '../../components/design/Text';
-import { Skeleton } from '../../components/design/Skeleton';
-import { HeroSection } from '../../components/kids/HeroSection';
-import { LatestUpdateSection } from '../../components/kids/LatestUpdateSection';
-import { NotesThread } from '../../components/kids/NotesThread';
-import { TimelineSection } from '../../components/kids/TimelineSection';
-import { BioSection } from '../../components/kids/BioSection';
-import { Composer } from '../../components/kids/Composer';
+import { COLORS, SPACING, TEXT_STYLES, ELEVATION, RADIUS } from '../../../lib/theme';
+import { Text } from '../../../components/design/Text';
+import { Skeleton } from '../../../components/design/Skeleton';
+import { HeroSection } from '../../../components/kids/HeroSection';
+import { LatestUpdateSection } from '../../../components/kids/LatestUpdateSection';
+import { NotesThread } from '../../../components/kids/NotesThread';
+import { TimelineSection } from '../../../components/kids/TimelineSection';
+import { BioSection } from '../../../components/kids/BioSection';
+import { Composer } from '../../../components/kids/Composer';
 import {
   getMobileKid,
   getKidUpdates,
@@ -44,7 +44,7 @@ import {
   KidUpdate,
   KidTimelineEntry,
   ThreadResponse,
-} from '../../lib/api';
+} from '../../../lib/api';
 
 const HERO_HEIGHT_APPROX = 520;
 
