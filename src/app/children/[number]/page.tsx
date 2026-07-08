@@ -1518,8 +1518,18 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
                     Sign in to your view.
                   </span>
                 </div>
+                {/* Magic-link flow — same route + params the killed
+                    ClaimGate used ("CLAIM #N →"). Enter email, get
+                    the one-tap link, callback drops the sponsor_session
+                    cookie and lands the visitor on the homepage with
+                    the number prefilled, which forwards them back to
+                    /children/N?just_signed_in=1 for the reveal. See
+                    /api/sponsor/recover/callback. The legacy
+                    /sponsor/login route (email + sponsor code) is
+                    intentionally avoided — sponsors rarely remember
+                    their code, so it's high friction. */}
                 <Link
-                  href={`/sponsor/login?next=${encodeURIComponent(`/children/${number}`)}`}
+                  href={`/signin?n=${number}`}
                   className="text-sm font-bold text-[#D4A843] hover:underline whitespace-nowrap"
                 >
                   Sign in &rarr;
