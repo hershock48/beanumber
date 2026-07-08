@@ -46,6 +46,15 @@ export interface PenpalBoxProps {
    * the anon-oriented sign-in preview.
    */
   viewerState: 'sponsor' | 'holder' | 'anon';
+  /**
+   * Renders BELOW the thread + composer for active monthly sponsors.
+   * Used to inline the "personal photo updates from the campus" block
+   * (letters, photos, report cards) as part of the same Penpal
+   * surface — Kevin's 2026-07-08 restructure: don't split penpal
+   * from the update stream; sponsors get one unified inbox.
+   * Silently omitted when the viewer isn't a sponsor.
+   */
+  sponsorPortal?: React.ReactNode;
 }
 
 const VALUE_PROP =
@@ -58,8 +67,9 @@ export function PenpalBox({
   childRecordId,
   childIdLegacy,
   viewerState,
+  sponsorPortal,
 }: PenpalBoxProps) {
-  // Sponsor: real experience. Thread (if any) + composer.
+  // Sponsor: real experience. Thread + composer + inline campus updates.
   if (viewerState === 'sponsor' && childRecordId) {
     return (
       <div className="mt-12 md:mt-16">
@@ -76,6 +86,10 @@ export function PenpalBox({
             firstName={firstName}
           />
         </div>
+        {/* Personal photo updates from the campus land here — kept
+            visually attached to the penpal thread so the sponsor's
+            single Naume "inbox" is one surface, not two. */}
+        {sponsorPortal ? <div className="mt-10">{sponsorPortal}</div> : null}
       </div>
     );
   }
@@ -159,8 +173,7 @@ export function PenpalBox({
               {ctaLabel}
             </Link>
             <p className="text-xs text-[#888] mt-4 leading-relaxed">
-              The campus team translates in both directions. Photos land
-              a few times a year.
+              The campus team translates in both directions.
             </p>
           </div>
         </div>

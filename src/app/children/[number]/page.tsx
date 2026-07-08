@@ -1772,6 +1772,48 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
             )}
           </div>
 
+          {/* ── Penpal box (INSIDE the ClaimGate reading column) ──
+              Kevin's 2026-07-08 restructure: Penpal is the primary
+              conversion surface and sits DIRECTLY under the child's
+              bio, before any acknowledgment / $25-mo restated ask.
+              Merged with the personal-photo-updates block via the
+              `sponsorPortal` prop, so sponsors see thread + composer
+              + campus updates as one continuous "your Naume inbox"
+              surface, and non-sponsors see the frosted preview + the
+              one CTA that covers the whole package.
+              Departed kids skip the box entirely. */}
+          {!child.departed_at && (
+            <PenpalBox
+              firstName={firstName}
+              shirtNumber={Number(number)}
+              thread={
+                child.viewer_is_sponsor && noteThread.length > 0
+                  ? noteThread
+                  : undefined
+              }
+              childRecordId={
+                child.viewer_is_sponsor ? child.record_id : undefined
+              }
+              childIdLegacy={child.child_id ?? null}
+              viewerState={
+                child.viewer_is_sponsor
+                  ? 'sponsor'
+                  : child.viewer_is_holder || child.viewer_signed_in
+                    ? 'holder'
+                    : 'anon'
+              }
+              sponsorPortal={
+                child.viewer_is_sponsor && portalData ? (
+                  <SponsorPortalSections
+                    firstName={firstName}
+                    stats={portalData.stats}
+                    latestChildUpdate={portalData.latestChildUpdate}
+                  />
+                ) : null
+              }
+            />
+          )}
+
           {/* RIGHT — CTA card. State-aware per viewer identity. The
               departed-kid branch (auto-reveal model, §0b): a
               sponsor/holder sees a quiet &ldquo;your new kid is on the
@@ -1878,15 +1920,8 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
                     : `Welcome back. ${firstName} is yours.`}
                 </p>
                 <p className="text-[#555] leading-relaxed mb-5">
-                  You own this number. Every update from the campus,
-                  every change in {firstName}&rsquo;s story, comes back
-                  to this page for you.
-                </p>
-                <p className="text-[#555] leading-relaxed mb-5">
-                  Whenever you&rsquo;re ready, $25/month keeps the
-                  campus running for {firstName} &mdash; school, meals,
-                  the clinic, teachers&rsquo; salaries. No pressure to
-                  decide today.
+                  Ready to unlock the penpal thread and campus updates
+                  above? $25/month.
                 </p>
                 <SponsorButton
                   childRecordId={child.record_id}
@@ -1977,13 +2012,20 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
         </div>
         </ClaimGate>
 
-        {/* ── Sponsor-only zone ──
-            For active sponsors: stats + the latest direct-from-the-kid
-            update (letters, photos, report cards). For non-sponsors:
-            a clear placeholder telling them what shows up in this
-            spot once they sponsor — making the value of the monthly
-            visible without requiring them to imagine it. */}
-        {!child.departed_at && (
+        {/* ── Sponsor-only zone (LEGACY — MERGED INTO PENPAL BOX) ──
+            The "Updates straight from {firstName}" block used to live
+            here as its own section between the bio-CTA and the awards
+            timeline. Per Kevin (2026-07-08): personal updates are
+            part of the penpal package, not a separate surface.
+            SponsorPortalSections is now passed into PenpalBox via
+            the `sponsorPortal` prop and renders inline under the
+            thread + composer. The frosted preview for non-sponsors is
+            also gone — the PenpalBox's own frosted overlay covers the
+            whole ask now.
+            Keeping this block for reference below, wrapped in a
+            {false && (...)} so it renders nothing. Delete cleanly
+            once the new flow is confirmed live. */}
+        {false && !child.departed_at && (
           <div className="max-w-2xl mx-auto mt-12 md:mt-16">
             <div className="text-center mb-6">
               <p className="text-xs font-bold uppercase tracking-[0.3em] text-[#D4A843] mb-2">
@@ -2097,58 +2139,18 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
             </div>
           )}
 
-        {/* ── Penpal box ──
-            The primary conversion surface. Placed directly under the
-            child's bio/info block. Three viewer states, all handled
-            by the PenpalBox component:
-              - Sponsor: real NotesThread + SendNoteComposer.
-              - Holder:  blurred sample thread + "Sponsor {firstName}"
-                         CTA ($25/mo). They already own the shirt so
-                         the ask is unlock the penpal thread.
-              - Anon:    blurred sample thread + "Sign in to write"
-                         CTA. Sign-in funnels them into the buyer
-                         claim / conversion flow.
-            The value prop line ("You get a penpal, monthly photos,
-            report cards, and campus updates. $25/month.") is used
-            verbatim across the site per Kevin (2026-07-08).
-            Departed kids skip the box entirely. */}
-        {!child.departed_at && (
-          <PenpalBox
-            firstName={firstName}
-            shirtNumber={Number(number)}
-            thread={
-              child.viewer_is_sponsor && noteThread.length > 0
-                ? noteThread
-                : undefined
-            }
-            childRecordId={
-              child.viewer_is_sponsor ? child.record_id : undefined
-            }
-            childIdLegacy={child.child_id ?? null}
-            viewerState={
-              child.viewer_is_sponsor
-                ? 'sponsor'
-                : child.viewer_is_holder || child.viewer_signed_in
-                  ? 'holder'
-                  : 'anon'
-            }
-          />
-        )}
+        {/* PenpalBox now lives inside the ClaimGate reading column
+            above (right under the bio, before the acknowledgment
+            box), matching Kevin's 2026-07-08 flow restructure. */}
 
-        {/* ── Share this kid ──
-            The viral loop. Every sponsor is a potential recruiter for
-            the NEXT sponsor — the person who scrolls Instagram, sees
-            their friend post a card that says "I'm sponsoring so-and-so's
-            education at the campus in Northern Uganda," and clicks through
-            to /children/[N]. The card is rendered in the browser (no
-            server route needed), sized 1080×1080 for Instagram, and
-            works with the native share sheet on mobile or a PNG
-            download everywhere else. Gated to actual sponsors + holders
-            so the first-person copy ("I'm sponsoring…") is always
-            honest — non-sponsors don't see the surface at all.
-            Departed kids skip this so the page keeps its memorial
-            frame. */}
-        {!child.departed_at &&
+        {/* ── Share this kid — HIDDEN 2026-07-08 ──
+            Kevin: "hide this part for now... i dont love it." The
+            ShareKidCard component still exists; the block is just
+            gated to false until the framing lands right.
+            When re-enabled, this needs a stronger reason-to-share
+            beat than "post the card on your feed." */}
+        {false &&
+          !child.departed_at &&
           (child.viewer_is_sponsor || child.viewer_is_holder) && (
             <div className="mt-12 md:mt-16 py-8 md:py-12 border-t border-[#e8e0d4]">
               <ShareKidCard
