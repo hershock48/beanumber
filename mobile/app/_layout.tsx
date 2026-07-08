@@ -29,6 +29,17 @@ import {
 } from '@expo-google-fonts/inter';
 import { COLORS, TEXT_STYLES } from '../lib/theme';
 import { AuthProvider } from '../hooks/useAuth';
+import { usePushDeepLinks } from '../hooks/usePushDeepLinks';
+
+/**
+ * Small inner component so useRouter (inside usePushDeepLinks) sits
+ * inside expo-router's context. Renders a fragment — its only job is
+ * to attach the notification-tap listeners on mount.
+ */
+function PushDeepLinkBridge() {
+  usePushDeepLinks();
+  return null;
+}
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
@@ -49,6 +60,7 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <AuthProvider>
+          <PushDeepLinkBridge />
           <StatusBar style="dark" />
           <Stack
             screenOptions={{

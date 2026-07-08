@@ -45,6 +45,7 @@ import {
   KidTimelineEntry,
   ThreadResponse,
 } from '../../../lib/api';
+import { requestPermissionIfAppropriate } from '../../../lib/push';
 
 const HERO_HEIGHT_APPROX = 520;
 
@@ -88,6 +89,21 @@ export default function KidPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [kid?.viewer.canWriteNotes]);
 
+  // Holder-first-return push permission ask. Two conditions:
+  //   1. viewer role is 'holder' (owns the shirt, no monthly)
+  //   2. there's a fresh update on the kid's page
+  // lib/push handles the 60-day cooldown so this can fire on every
+  // qualifying mount without becoming a nag.
+  const isHolder = kid?.viewer.roleForKid === 'holder';
+  const kidFirstName = kid?.firstName;
+  const hasUpdate = updates.length > 0;
+  useEffect(() => {
+    if (!isHolder || !hasUpdate || !kidFirstName) return;
+    void requestPermissionIfAppropriate('holder-first-return', {
+      kidFirstName,
+    });
+  }, [isHolder, hasUpdate, kidFirstName]);
+
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     await load();
@@ -115,8 +131,18 @@ export default function KidPage() {
           ? { ...prev, messages: [...prev.messages, message] }
           : { messages: [message], kidIsWritingBack: false }
       );
+      // Post-send push permission ask. Never during onboarding —
+      // this fires only after the sponsor's first note actually
+      // makes it into the queue, which by definition is post-
+      // onboarding. lib/push handles the 60-day cooldown + logs
+      // the outcome server-side.
+      if (kid?.firstName) {
+        void requestPermissionIfAppropriate('monthly-first-note', {
+          kidFirstName: kid.firstName,
+        });
+      }
     },
-    [shirtNumber]
+    [shirtNumber, kid?.firstName]
   );
 
   if (loading || !kid) {
