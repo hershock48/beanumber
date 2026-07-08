@@ -184,9 +184,40 @@ export default async function AdminMessagesPage() {
           </h1>
           <p className="text-[#666] leading-relaxed max-w-2xl">
             {role === 'simon'
-              ? "Sponsors write short penpal notes to their kids from the site. Translate each one, then mark delivered once you've handed it over at the campus. Decline if a note isn't right — Kevin will handle the explanation."
-              : "Every penpal note between sponsors and kids. Simon translates and delivers; you can eyeball any of them before or after."}
+              ? "Sponsors write short penpal notes to their kids from the site. Print each note, take it to the kid at the campus, and hit Reply to upload their handwritten response."
+              : "Every penpal note between sponsors and kids. Simon prints, delivers, and uploads the kid's scanned reply; you can eyeball any of them before or after."}
           </p>
+
+          {/* Blank reply-template download — the printable A4 sheet
+              with the BE A NUMBER wordmark, TO/FROM/DATE fill-in row,
+              wide-ruled writing lines, and drawing area for kids to
+              write their reply on before Simon scans + uploads. File
+              lives at public/penpal-reply-template.pdf and is served
+              at the top-level path. Kevin can freshen the PDF later
+              without touching this link. */}
+          <a
+            href="/penpal-reply-template.pdf"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 mt-4 text-sm font-bold text-[#D4A843] hover:underline"
+            title="Download the blank template PDF (A4, print + hand to the kid)"
+          >
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="7 10 12 15 17 10" />
+              <line x1="12" y1="15" x2="12" y2="3" />
+            </svg>
+            Download blank reply template (PDF)
+          </a>
           {(pendingCount > 0 || translatedCount > 0) && (
             <div className="mt-4 flex gap-4 text-xs text-[#666]">
               {pendingCount > 0 && (

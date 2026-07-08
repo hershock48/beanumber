@@ -203,11 +203,22 @@ export async function POST(
       { status: 409 }
     );
   }
-  if (parent.status !== 'delivered') {
+  // Reply is now allowed regardless of parent status (2026-07-08
+  // workflow v2). Simon's original flow required manually clicking
+  // Save Translation → Mark Delivered → Reply. Kevin simplified to
+  // a single Reply button that opens the scan upload immediately —
+  // recording the reply IS the signal that the parent was delivered.
+  // We auto-flip the parent to 'delivered' below on successful reply
+  // insert, so the queue view still shows the correct final state
+  // and the sponsor-side thread renders identically.
+  if (parent.status === 'declined') {
+    // The one exception: declined notes were never delivered by
+    // policy (Simon/Kevin flagged them as inappropriate), so a
+    // reply against a declined parent is a workflow error.
     return NextResponse.json(
       {
         error:
-          "The original note hasn't been marked delivered yet — deliver it first, then record the kid's reply.",
+          "This note was declined — no reply can be recorded against a declined note.",
       },
       { status: 409 }
     );
@@ -271,6 +282,40 @@ export async function POST(
         replyImageUploadedAt: imageUrl ? now : null,
       })
       .returning({ id: kidMessages.id });
+
+    // Workflow v2 (2026-07-08): recording the reply IS the delivery
+    // signal for the parent. Auto-flip the parent to 'delivered' if
+    // it wasn't already. Skip the update when already delivered so
+    // we don't overwrite the original deliveredAt timestamp. Silent
+    // — no separate email to the sponsor since the reply email
+    // itself covers "your note reached the campus, here's what came
+    // back."
+    if (parent.status !== 'delivered') {
+      try {
+        // If the parent skipped the 'translated' state entirely
+        // (Simon just hit Reply from a pending note), backfill
+        // translatedAt too so timeline queries have a sensible
+        // timestamp instead of NULL.
+        const patch: Partial<typeof kidMessages.$inferInsert> = {
+          status: 'delivered',
+          deliveredAt: now,
+        };
+        if (parent.status === 'pending') {
+          patch.translatedAt = now;
+        }
+        await db
+          .update(kidMessages)
+          .set(patch)
+          .where(eq(kidMessages.id, parent.id));
+      } catch (updErr) {
+        // Non-fatal — the reply row is already saved. Log so we can
+        // reconcile the parent status later if this ever fires.
+        console.warn(
+          '[messages/reply] parent auto-deliver flip failed (non-fatal):',
+          updErr instanceof Error ? updErr.message : String(updErr)
+        );
+      }
+    }
   } catch (err: unknown) {
     const pgCode =
       typeof err === 'object' && err !== null && 'code' in err

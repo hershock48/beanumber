@@ -356,15 +356,29 @@ function MessageCard({
             &middot; {created}
           </p>
         </div>
-        {collapsed && (
-          <button
-            type="button"
-            onClick={() => setCollapsed(false)}
-            className="text-xs font-bold uppercase tracking-[0.15em] text-[#888] hover:text-[#0d0d0d] transition-colors flex-shrink-0"
+        <div className="flex items-center gap-3 flex-shrink-0">
+          {/* Print button — new window with the print-friendly view;
+              PrintTrigger inside the /print route auto-fires the
+              browser print dialog on load. Available on every card. */}
+          <a
+            href={`/admin/messages/${message.id}/print`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs font-bold uppercase tracking-[0.15em] text-[#888] hover:text-[#D4A843] transition-colors"
+            title="Open a print-friendly view of this note"
           >
-            Open
-          </button>
-        )}
+            Print
+          </a>
+          {collapsed && (
+            <button
+              type="button"
+              onClick={() => setCollapsed(false)}
+              className="text-xs font-bold uppercase tracking-[0.15em] text-[#888] hover:text-[#0d0d0d] transition-colors"
+            >
+              Open
+            </button>
+          )}
+        </div>
       </div>
 
       {!collapsed && (
@@ -529,11 +543,12 @@ function MessageCard({
             </p>
           )}
 
-          {/* Reply section — only on delivered messages. Shows the
-              recorded reply if one exists, otherwise exposes a
-              composer for Simon to write what the kid said. Kid-to-
-              sponsor replies are auto-delivered + email the sponsor. */}
-          {message.status === 'delivered' && (
+          {/* Reply section — 2026-07-08 workflow v2. Now rendered on
+              ANY non-declined status so Simon can hit Reply straight
+              from pending without having to click Save Translation +
+              Mark Delivered first. When Simon saves a reply, the
+              parent auto-flips to 'delivered' server-side. */}
+          {message.status !== 'declined' && (
             <ReplySection
               message={message}
               onLocalUpdate={onLocalUpdate}
