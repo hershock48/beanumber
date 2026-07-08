@@ -1190,6 +1190,72 @@ export const kidMessages = pgTable(
 );
 
 // ─────────────────────────────────────────────────────────────────
+//  Mobile auth — Apple / Google sign-in for the native app
+// ─────────────────────────────────────────────────────────────────
+//
+// Mobile users are keyed by the identity-provider `sub` (Apple or
+// Google), not by email — emails change, subs don't. `email` is the
+// verified address at last sign-in; we lowercase-match it against
+// `sponsorships.sponsor_email` to link one sponsor row when it
+// exists. First-time users with no sponsor match still get a row —
+// they can meet a kid, they just won't see any "your kids" content
+// until a sponsorship shows up under the same address.
+//
+// Migration lives in drizzle/0006_mobile_auth.sql.
+
+export const mobileUsers = pgTable(
+  'mobile_users',
+  {
+    id: uuid('id')
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    email: text('email').notNull(),
+    appleSub: text('apple_sub'),
+    googleSub: text('google_sub'),
+    // Cached lower-cased email of the sponsorship this user is linked
+    // to, if any. Refreshed on every sign-in so a sponsor who changed
+    // their email in Stripe eventually re-links. NULL for users with
+    // no matching sponsor row.
+    linkedSponsorEmail: text('linked_sponsor_email'),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+    lastSeenAt: timestamp('last_seen_at', { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+  },
+  table => ({
+    // Uniqueness is enforced at the SQL level (0006_mobile_auth.sql
+    // marks apple_sub / google_sub as UNIQUE). These indexes match
+    // the query paths.
+    emailIdx: index('idx_mobile_users_email').on(sql`lower(${table.email})`),
+    linkedSponsorEmailIdx: index('idx_mobile_users_linked_sponsor_email').on(
+      sql`lower(${table.linkedSponsorEmail})`
+    ),
+  })
+);
+
+// Opaque JWT blacklist. Sign-out inserts a SHA-256 hash of the
+// access token here; requireMobileAuth() rejects any token whose
+// hash is present. expires_at = the JWT's own exp, so a periodic
+// sweep can drop entries once the token would have expired anyway.
+export const mobileTokenRevocations = pgTable(
+  'mobile_token_revocations',
+  {
+    tokenHash: text('token_hash').primaryKey(),
+    revokedAt: timestamp('revoked_at', { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  },
+  table => ({
+    expiresIdx: index('idx_mobile_token_revocations_expires').on(
+      table.expiresAt
+    ),
+  })
+);
+
+// ─────────────────────────────────────────────────────────────────
 //  Type exports — for use across the app
 // ─────────────────────────────────────────────────────────────────
 
@@ -1234,3 +1300,9 @@ export type NewSotmHistoryRow = typeof sotmHistory.$inferInsert;
 
 export type KidMessage = typeof kidMessages.$inferSelect;
 export type NewKidMessage = typeof kidMessages.$inferInsert;
+
+export type MobileUser = typeof mobileUsers.$inferSelect;
+export type NewMobileUser = typeof mobileUsers.$inferInsert;
+
+export type MobileTokenRevocation = typeof mobileTokenRevocations.$inferSelect;
+export type NewMobileTokenRevocation = typeof mobileTokenRevocations.$inferInsert;

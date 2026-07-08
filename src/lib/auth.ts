@@ -5,12 +5,16 @@
 
 import { NextRequest } from 'next/server';
 import { cookies } from 'next/headers';
+import { eq } from 'drizzle-orm';
 import { findSponsorshipByCode } from './airtable';
 import { logger } from './logger';
 import { AuthenticationError } from './errors';
 import { SESSION, ERROR_MESSAGES } from './constants';
 import type { AirtableSponsorshipRecord } from './types/airtable';
 import { ADMIN_SESSION_COOKIE, decodeSessionCookie } from './admin-session';
+import { db } from './db/client';
+import { mobileTokenRevocations } from './db/schema';
+import { hashToken, verifyMobileToken } from './mobile-auth';
 
 // ============================================================================
 // SESSION MANAGEMENT
@@ -171,3 +175,56 @@ export function requireAdminAuth(request: NextRequest): void {
     throw new AuthenticationError('Admin authentication required');
   }
 }
+
+// ============================================================================
+// MOBILE AUTHENTICATION (native app — Apple / Google sign-in)
+// ============================================================================
+
+/**
+ * Verify a mobile access token from `Authorization: Bearer <token>`.
+ *
+ * Returns the payload on success. Throws AuthenticationError if:
+ *   - no header
+ *   - malformed token
+ *   - bad signature
+ *   - expired
+ *   - present in the mobile_token_revocations blacklist (signed out)
+ *
+ * Called by every authenticated mobile v1 API route.
+ */
+export async function requireMobileAuth(
+  request: NextRequest
+): Promise<{ userId: string; email: string }> {
+  const header = request.headers.get('authorization') || request.headers.get('Authorization');
+  if (!header || !header.toLowerCase().startsWith('bearer ')) {
+    throw new AuthenticationError('Missing bearer token');
+  }
+  const token = header.slice('bearer '.length).trim();
+  if (!token) throw new AuthenticationError('Empty bearer token');
+
+  let verified;
+  try {
+    verified = verifyMobileToken(token);
+  } catch (err) {
+    // Surface expired-vs-invalid so the client can decide whether to
+    // silently refresh or force a re-sign-in.
+    const message = err instanceof Error ? err.message : 'Invalid token';
+    if (message === 'Access token expired') {
+      throw new AuthenticationError('tokenExpired');
+    }
+    throw new AuthenticationError('Invalid access token');
+  }
+
+  // Blacklist check — cheap primary-key lookup.
+  const revoked = await db
+    .select({ tokenHash: mobileTokenRevocations.tokenHash })
+    .from(mobileTokenRevocations)
+    .where(eq(mobileTokenRevocations.tokenHash, hashToken(token)))
+    .limit(1);
+  if (revoked.length > 0) {
+    throw new AuthenticationError('Token revoked');
+  }
+
+  return { userId: verified.payload.userId, email: verified.payload.email };
+}
+

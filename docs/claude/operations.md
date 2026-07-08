@@ -94,6 +94,12 @@ Env vars are configured in the Vercel dashboard per-project. The local `.env.loc
 
 Validated env loading lives in `src/lib/env.ts`. Any new var must be added there with a schema; otherwise it imports to `undefined` at runtime and things break silently in prod.
 
+**Mobile app env vars (added 2026-07-07 with the mobile auth build-out):**
+
+- `MOBILE_JWT_SECRET` — HMAC secret for signing BAN-issued access tokens for the native app. Must be 32+ chars. **Generate with `openssl rand -base64 48`.** No rotation strategy today — rotating invalidates every signed-in user, so save it for a security incident.
+- `APPLE_BUNDLE_IDS` — comma-separated list of Apple bundle identifiers the sign-in endpoint will accept as the `aud` on an Apple identity token. In practice: `org.beanumber.app` for prod, plus `org.beanumber.app.dev` for a dev build if we ship one. Without this set, `/api/mobile/v1/auth/apple` returns 500 by design (fail loudly rather than accept any aud).
+- `GOOGLE_CLIENT_IDS` — comma-separated list of OAuth client IDs (iOS, Android, web) authorized to hit the Google sign-in endpoint. Same fail-loudly behavior when missing.
+
 ## Stripe
 
 ### Test mode vs live mode
