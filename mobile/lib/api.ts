@@ -159,3 +159,251 @@ export async function getRecentNewsletters(): Promise<CampusNewsletter[]> {
     return [];
   }
 }
+
+// ─── /api/mobile/v1/* typed clients ───────────────────────────────────
+
+export interface MyKidRow {
+  id: string;
+  firstName: string;
+  shirtNumber: number;
+  photoUrl?: string | null;
+  ageYears?: number | null;
+  gradeLabel?: string | null;
+  roleForViewer: 'monthly' | 'holder';
+  unreadUpdatesCount: number;
+  lastUpdatePreview?: string | null;
+}
+
+export async function getMyKids(): Promise<MyKidRow[]> {
+  const data = await authJson<{ kids: MyKidRow[] }>('/api/mobile/v1/kids/mine');
+  return data.kids ?? [];
+}
+
+export interface MobileKidBio {
+  fullName?: string;
+  ageYears?: number | null;
+  gradeLabel?: string;
+  favoriteClass?: string;
+  wantsToBe?: string;
+  family?: string;
+  homeVillage?: string;
+  sponsoredSince?: string;
+}
+
+export interface MobileKidViewer {
+  roleForKid: 'monthly' | 'holder' | 'otherSponsor' | 'anonymous';
+  canReadNotes: boolean;
+  canWriteNotes: boolean;
+  canReadUpdates: boolean;
+}
+
+export interface MobileKidDetail {
+  id: string;
+  firstName: string;
+  shirtNumber: number;
+  photoUrl?: string | null;
+  ageYears?: number | null;
+  gradeLabel?: string | null;
+  intro?: string | null;
+  bio: MobileKidBio;
+  viewer: MobileKidViewer;
+  location?: string;
+  coSponsors?: string[]; // first names only
+}
+
+export async function getMobileKid(shirtNumber: number): Promise<MobileKidDetail> {
+  const data = await authJson<{ kid: MobileKidDetail }>(
+    `/api/mobile/v1/kids/${shirtNumber}`
+  );
+  return data.kid;
+}
+
+export interface KidUpdate {
+  id: string;
+  publishedAt: string;
+  caption: string;
+  photoUrl?: string;
+}
+
+export async function getKidUpdates(shirtNumber: number): Promise<KidUpdate[]> {
+  const data = await authJson<{ updates: KidUpdate[] }>(
+    `/api/mobile/v1/kids/${shirtNumber}/updates`
+  );
+  return data.updates ?? [];
+}
+
+export interface KidTimelineEntry {
+  id: string;
+  occurredOn: string;
+  type: 'sotm' | 'promotion' | 'milestone';
+  title: string;
+  subtitle?: string;
+}
+
+export async function getKidTimeline(
+  shirtNumber: number
+): Promise<KidTimelineEntry[]> {
+  const data = await authJson<{ entries: KidTimelineEntry[] }>(
+    `/api/mobile/v1/kids/${shirtNumber}/timeline`
+  );
+  return data.entries ?? [];
+}
+
+export interface ThreadResponse {
+  messages: Array<{
+    id: string;
+    direction: 'sponsorToKid' | 'kidToSponsor';
+    sentAt: string;
+    body: string;
+    statusText?: string;
+  }>;
+  kidIsWritingBack: boolean;
+  locked?: boolean;
+  unlockCopy?: string;
+}
+
+export async function getThread(shirtNumber: number): Promise<ThreadResponse> {
+  try {
+    const data = await authJson<ThreadResponse>(
+      `/api/mobile/v1/kids/${shirtNumber}/thread`
+    );
+    return data;
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 403) {
+      // Locked — the server returned the unlock copy in the body.
+      try {
+        const parsed = JSON.parse(err.message);
+        return {
+          messages: [],
+          kidIsWritingBack: false,
+          locked: true,
+          unlockCopy: parsed.unlockCopy,
+        };
+      } catch {
+        return { messages: [], kidIsWritingBack: false, locked: true };
+      }
+    }
+    throw err;
+  }
+}
+
+export interface SentMessage {
+  id: string;
+  direction: 'sponsorToKid' | 'kidToSponsor';
+  sentAt: string;
+  body: string;
+  statusText?: string;
+}
+
+export async function sendNote(
+  shirtNumber: number,
+  body: string
+): Promise<SentMessage> {
+  const data = await authJson<{ message: SentMessage }>(
+    `/api/mobile/v1/kids/${shirtNumber}/thread`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ body }),
+    }
+  );
+  return data.message;
+}
+
+export interface CampusFeedItem {
+  id: string;
+  publishedAt: string;
+  kind: 'update' | 'sotm' | 'milestone' | 'campusPost';
+  title: string;
+  body?: string;
+  photoUrl?: string;
+  kidRef?: {
+    firstName: string;
+    shirtNumber: number;
+  } | null;
+}
+
+export interface CampusFeedResponse {
+  items: CampusFeedItem[];
+  nextCursor?: string | null;
+}
+
+export async function getCampusFeed(
+  opts: { limit?: number; before?: string } = {}
+): Promise<CampusFeedResponse> {
+  const params = new URLSearchParams();
+  if (opts.limit) params.set('limit', String(opts.limit));
+  if (opts.before) params.set('before', opts.before);
+  const suffix = params.toString() ? `?${params}` : '';
+  return authJson<CampusFeedResponse>(`/api/mobile/v1/campus/feed${suffix}`);
+}
+
+export async function getExploreKids(
+  opts: { limit?: number; excludeMine?: boolean } = { excludeMine: true }
+): Promise<MyKidRow[]> {
+  const params = new URLSearchParams();
+  if (opts.limit) params.set('limit', String(opts.limit));
+  if (opts.excludeMine !== undefined)
+    params.set('excludeMine', String(opts.excludeMine));
+  const data = await authJson<{ kids: MyKidRow[] }>(
+    `/api/mobile/v1/campus/explore?${params}`
+  );
+  return data.kids ?? [];
+}
+
+export interface LatestNewsletter {
+  id: string;
+  title: string;
+  subject?: string;
+  teaser?: string;
+  heroPhotoUrl?: string;
+  bodyHtml?: string;
+  publishedAt: string;
+}
+
+export async function getLatestNewsletter(): Promise<LatestNewsletter | null> {
+  try {
+    const data = await authJson<{ newsletter: LatestNewsletter }>(
+      '/api/mobile/v1/newsletter/latest'
+    );
+    return data.newsletter ?? null;
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 404) return null;
+    throw err;
+  }
+}
+
+export interface MeMineSponsorship {
+  kidFirstName: string;
+  shirtNumber: number;
+  monthlyAmount: number;
+  sponsoredBy: 'you' | 'someoneElse';
+  sponsorOfRecord?: { firstName: string };
+}
+
+export interface MePurchase {
+  shirtDisplay: string;
+  sizeCode?: string;
+  colorLabel?: string;
+  purchasedOn: string;
+  amountUsd?: number | null;
+}
+
+export interface MeBilling {
+  cardLast4?: string | null;
+  receiptsEmail?: string;
+  hasCardOnFile: boolean;
+}
+
+export interface MeResponse {
+  userId: string;
+  email: string;
+  firstName?: string;
+  sponsorships: MeMineSponsorship[];
+  purchases: MePurchase[];
+  billing: MeBilling;
+}
+
+export async function getMe(): Promise<MeResponse> {
+  return authJson<MeResponse>('/api/mobile/v1/me');
+}
