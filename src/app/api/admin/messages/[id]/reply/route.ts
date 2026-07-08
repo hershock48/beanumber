@@ -125,6 +125,12 @@ export async function POST(
       if (u.protocol !== 'https:' && u.protocol !== 'http:') {
         throw new Error('bad protocol');
       }
+      // Reject URLs with embedded credentials — browsers strip
+      // creds on <img> fetches but the raw string persists in the
+      // DB and could leak on any future export.
+      if (u.username || u.password) {
+        throw new Error('credentials in URL');
+      }
       imageUrl = u.toString();
     } catch {
       return NextResponse.json(

@@ -34,6 +34,7 @@ import { YourKidsStrip } from '@/components/YourKidsStrip';
 // the breadcrumb (see the anon branch of the viewer-state strip). The
 // component file stays in the tree for now in case we want to bring
 // that shimmer treatment back somewhere else.
+import { AnonStripShimmer } from './AnonStripShimmer';
 import { RecentKidsTracker } from '@/components/RecentKidsTracker';
 import { MarkKidUpdatesSeen } from '@/components/MarkKidUpdatesSeen';
 import {
@@ -1475,6 +1476,12 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
                over from the killed AlreadySponsoringBanner so the
                moment still catches the eye of a returning sponsor
                who might otherwise scroll past. */
+            /* AnonStripShimmer client wrapper gates the animation
+               on the RevealOverlay curtain lifting. Without it,
+               cold visitors — the audience the shimmer is meant to
+               catch — miss the first sweep behind the reveal blur.
+               See AnonStripShimmer.tsx for the ready-detection logic. */
+            <AnonStripShimmer shirtNumber={Number(number)}>
             <div className="relative overflow-hidden ban-viewer-strip-shimmer-host py-3 border-y border-[#e8e0d4] mb-8">
               <style>{`
                 @keyframes banViewerStripShimmer {
@@ -1489,7 +1496,11 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
                     opacity: 0;
                   }
                 }
-                .ban-viewer-strip-shimmer-host::after {
+                /* Shimmer only runs when the wrapper's data attribute
+                   flips to 'true' — which AnonStripShimmer sets after
+                   the reveal completes (or a 4s safety timer). Before
+                   that, no ::after content is painted at all. */
+                .anon-strip-shimmer-wrap[data-anon-strip-ready="true"] .ban-viewer-strip-shimmer-host::after {
                   content: '';
                   position: absolute;
                   top: 0;
@@ -1540,6 +1551,7 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
                 </Link>
               </div>
             </div>
+            </AnonStripShimmer>
           )
         )}
 

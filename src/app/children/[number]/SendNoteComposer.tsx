@@ -311,7 +311,13 @@ export function SendNoteComposer({
                   setAttachments([]);
                   setError(null);
                 }}
-                disabled={stage === 'sending'}
+                /* uploadingPhoto guard fixes a race caught in audit:
+                   sponsor picks a photo, clicks Cancel before the
+                   upload resolves, then the in-flight fetch's
+                   setAttachments callback re-populates the array
+                   the user just cleared. Blocking the click while
+                   the upload is in flight is the simplest fix. */
+                disabled={stage === 'sending' || uploadingPhoto}
                 className="text-xs font-bold uppercase tracking-[0.15em] text-[#888] hover:text-[#0d0d0d] px-4 py-2 transition-colors disabled:opacity-50"
               >
                 Cancel

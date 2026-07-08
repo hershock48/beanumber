@@ -108,6 +108,13 @@ export async function POST(request: NextRequest) {
       if (u.protocol !== 'https:' && u.protocol !== 'http:') {
         throw new Error('bad protocol');
       }
+      // Reject URLs with embedded credentials
+      // (http://user:pass@host/…). Browsers strip creds on <img>
+      // fetches, but the raw string persists in jsonb and would
+      // leak on any future admin export.
+      if (u.username || u.password) {
+        throw new Error('credentials in URL');
+      }
       attachmentEntries.push({ url: u.toString(), uploadedAt: nowIso });
     } catch {
       return NextResponse.json(

@@ -251,6 +251,64 @@ async function createFulfillmentRecord(opts: {
     const message = err instanceof Error ? err.message : String(err);
     console.error('[WH] Fulfillment PG insert FAILED (queue will be missing this order):', message.slice(0, 300));
     // Don't return — Airtable dual-write below still gets a chance.
+
+    // Ping Kevin inline so a PG-write failure isn't silently hidden
+    // behind console noise. The admin queue reads Postgres now, so a
+    // failed insert means a shirt Kevin can't see. This alert gives
+    // him the order details to reconcile manually. Non-fatal: swallow
+    // any send error so a bad SendGrid state can't cascade into the
+    // whole webhook returning non-2xx (which would make Stripe retry
+    // every part of the flow including the sponsor's confirmation).
+    try {
+      const alertTo = process.env.KEVIN_ALERT_EMAIL || 'kevin@beanumber.org';
+      const escape = (s: string | null | undefined): string =>
+        String(s ?? '')
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;');
+      const numLabel =
+        typeof opts.shirtNumber === 'number'
+          ? `#${opts.shirtNumber}`
+          : '#TBD (stockpile)';
+      const shipLines = [
+        opts.address?.line1,
+        opts.address?.line2,
+        [opts.address?.city, opts.address?.state, opts.address?.postal_code]
+          .filter(Boolean)
+          .join(', '),
+      ]
+        .filter(Boolean)
+        .map(l => escape(l))
+        .join('<br>');
+      await sendEmail({
+        to: { email: alertTo, name: 'Kevin' },
+        subject: `[BAN] Fulfillment write FAILED — reconcile ${numLabel}`,
+        html: `
+          <p>Stripe webhook fired successfully, but the Postgres
+          fulfillment insert failed. The shirt buyer sees a normal
+          confirmation, but the admin shirts-to-ship queue is
+          missing this order. Reconcile manually.</p>
+          <p><strong>Number:</strong> ${escape(numLabel)}<br>
+          <strong>Design:</strong> ${escape(opts.design)}<br>
+          <strong>Color / Size:</strong> ${escape(opts.shirtColor)} / ${escape(opts.shirtSize)}<br>
+          <strong>Buyer:</strong> ${escape(opts.buyerName)} &lt;${escape(opts.buyerEmail)}&gt;<br>
+          ${opts.childName ? `<strong>Child:</strong> ${escape(opts.childName)}<br>` : ''}
+          <strong>Order date:</strong> ${escape(opts.orderDate)}<br>
+          ${opts.notes ? `<strong>Notes:</strong> ${escape(opts.notes)}<br>` : ''}
+          </p>
+          ${shipLines ? `<p><strong>Ship to:</strong><br>${shipLines}</p>` : ''}
+          <p><strong>DB error:</strong> <code>${escape(message.slice(0, 300))}</code></p>
+          <p style="font-size:12px;color:#888">Sent from stripe webhook, non-fatal path.</p>
+        `,
+      });
+    } catch (alertErr) {
+      console.warn(
+        '[WH] Fulfillment failure alert to Kevin also failed:',
+        alertErr instanceof Error
+          ? alertErr.message.slice(0, 200)
+          : String(alertErr).slice(0, 200)
+      );
+    }
   }
 
   // 2. Airtable — legacy dual-write. Skipped when env is unset (Kevin
