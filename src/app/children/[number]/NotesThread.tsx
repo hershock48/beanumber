@@ -70,18 +70,56 @@ export function NotesThread({
                   &middot; {dateLabel}
                 </span>
               </p>
-              <p
-                className="text-[15px] md:text-base text-[#333] leading-relaxed italic"
-                style={{ fontFamily: 'var(--font-lora), serif' }}
-              >
-                {entry.bodyEn.split('\n').map((line, i, arr) => (
-                  <span key={i}>
-                    {line}
-                    {i < arr.length - 1 && <br />}
-                  </span>
-                ))}
-              </p>
-              {!isSponsorNote && entry.bodyOriginal && (
+              {/* Scanned handwritten reply — kid_to_sponsor rows
+                  with a photo attached (2026-07-08 workflow). Photo
+                  is the payoff; the English text moves to a caption
+                  underneath, positioned as "here's what it says"
+                  rather than as the letter itself.
+
+                  The Image is a plain <img> — Next/Image isn't
+                  configured for arbitrary Supabase Storage hosts
+                  and the extra config drift isn't worth the small
+                  LCP win here (the whole thread is below the fold
+                  on load). Loading is lazy so a sponsor with a
+                  long thread doesn't pull every reply photo up
+                  front. */}
+              {!isSponsorNote && entry.replyImageUrl ? (
+                <figure className="mt-1 mb-3">
+                  <img
+                    src={entry.replyImageUrl}
+                    alt={`Handwritten letter from ${firstName}`}
+                    loading="lazy"
+                    className="block w-full h-auto max-w-full border border-[#e8e0d4] bg-white"
+                  />
+                  <figcaption
+                    className="text-[13px] md:text-sm text-[#555] leading-relaxed italic mt-3"
+                    style={{ fontFamily: 'var(--font-lora), serif' }}
+                  >
+                    <span className="not-italic text-[10px] font-bold uppercase tracking-[0.2em] text-[#888] block mb-2">
+                      Translated
+                    </span>
+                    {entry.bodyEn.split('\n').map((line, i, arr) => (
+                      <span key={i}>
+                        {line}
+                        {i < arr.length - 1 && <br />}
+                      </span>
+                    ))}
+                  </figcaption>
+                </figure>
+              ) : (
+                <p
+                  className="text-[15px] md:text-base text-[#333] leading-relaxed italic"
+                  style={{ fontFamily: 'var(--font-lora), serif' }}
+                >
+                  {entry.bodyEn.split('\n').map((line, i, arr) => (
+                    <span key={i}>
+                      {line}
+                      {i < arr.length - 1 && <br />}
+                    </span>
+                  ))}
+                </p>
+              )}
+              {!isSponsorNote && !entry.replyImageUrl && entry.bodyOriginal && (
                 <details className="mt-3">
                   <summary className="text-xs text-[#888] cursor-pointer hover:text-[#0d0d0d] not-italic">
                     Show the original in {firstName}&rsquo;s language

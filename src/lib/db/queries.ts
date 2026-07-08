@@ -811,6 +811,17 @@ export interface NoteThreadEntry {
   createdAt: string;
   deliveredAt: string | null;
   parentMessageId: string | null;
+  /**
+   * URL of the scanned handwritten reply photo, when this row is a
+   * kid_to_sponsor reply that Simon uploaded via the 2026-07-08
+   * scanned-reply workflow. Null on:
+   *   - sponsor_to_kid rows (always)
+   *   - legacy kid_to_sponsor replies recorded before the scan flow
+   *     shipped (typed-only)
+   * When present, the kid page renders this as the primary content
+   * and bodyEn appears below as an italic translation caption.
+   */
+  replyImageUrl: string | null;
 }
 
 /**
@@ -848,6 +859,15 @@ export interface KidCardNotePreview {
   latestReplyId: string | null; // for the "reply exists" callout
   outboundCount: number;
   replyCount: number;
+  /**
+   * When the latest event is a kid_to_sponsor reply with a scanned
+   * handwritten photo attached, this is that photo's public URL.
+   * Rendered on the /me KidCard as a small thumbnail so the sponsor
+   * sees the kid's actual handwriting at a glance. Null on:
+   *   - sent (sponsor's own outgoing note is latest)
+   *   - legacy typed-only replies
+   */
+  latestImageUrl: string | null;
 }
 
 export async function getNoteThreadPreviewsForSponsor(args: {
@@ -876,6 +896,7 @@ export async function getNoteThreadPreviewsForSponsor(args: {
         translatedAt: kidMessages.translatedAt,
         deliveredAt: kidMessages.deliveredAt,
         parentMessageId: kidMessages.parentMessageId,
+        replyImageUrl: kidMessages.replyImageUrl,
       })
       .from(kidMessages)
       .where(
@@ -953,6 +974,11 @@ export async function getNoteThreadPreviewsForSponsor(args: {
         latestReplyId: isReply ? b.newest.id : null,
         outboundCount: b.outboundCount,
         replyCount: b.replyCount,
+        // Only meaningful when the latest event is a reply. The
+        // KidCard preview shows a thumbnail when this is set so the
+        // sponsor sees the kid's actual handwriting from the /me
+        // grid without opening the kid page.
+        latestImageUrl: isReply ? b.newest.replyImageUrl : null,
       });
     }
     return out;
@@ -985,6 +1011,7 @@ export async function getNoteThreadForSponsorAndChild(args: {
         createdAt: kidMessages.createdAt,
         deliveredAt: kidMessages.deliveredAt,
         parentMessageId: kidMessages.parentMessageId,
+        replyImageUrl: kidMessages.replyImageUrl,
       })
       .from(kidMessages)
       .where(
@@ -1019,6 +1046,12 @@ export async function getNoteThreadForSponsorAndChild(args: {
           ? new Date(r.deliveredAt).toISOString()
           : null,
         parentMessageId: r.parentMessageId,
+        // Only meaningful on kid_to_sponsor rows; sponsor_to_kid rows
+        // never carry a photo. The render layer already branches on
+        // direction so a stale non-null value here (should never
+        // happen given the write path) still wouldn't paint a scan
+        // over a sponsor's outgoing note.
+        replyImageUrl: r.replyImageUrl,
       }));
   } catch {
     return [];

@@ -46,6 +46,16 @@ export interface MobileThreadMessage {
   sentAt: string;
   body: string;
   statusText: string;
+  /**
+   * Public URL of the kid's scanned handwritten reply photo when
+   * this message is a kidToSponsor row uploaded via the 2026-07-08
+   * scanned-reply workflow. Null on:
+   *   - sponsorToKid rows (always)
+   *   - legacy typed-only replies
+   * Mobile clients render this as the primary content and `body`
+   * below as an italic translation caption.
+   */
+  imageUrl: string | null;
 }
 
 export interface MobileThreadResponse {
@@ -206,6 +216,10 @@ async function getHandler(
       status: r.status,
       deliveredAt: r.deliveredAt,
     }),
+    // Scanned reply photo — null except on kid_to_sponsor rows that
+    // came in through the new upload flow. Client renders the photo
+    // large and `body` as translation caption below.
+    imageUrl: r.replyImageUrl,
   }));
 
   // "Kid is writing back" — the campus has a delivered outbound with
@@ -372,6 +386,8 @@ async function postHandler(
         status: inserted[0].status,
         deliveredAt: null,
       }),
+      // A newly-sent sponsor note never carries a reply photo.
+      imageUrl: null,
     };
 
     logger.apiResponse(method, path, 200);

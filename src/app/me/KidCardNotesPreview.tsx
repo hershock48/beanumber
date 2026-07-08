@@ -124,6 +124,21 @@ export function KidCardNotesPreview({
       <p className="text-xs text-[#0d0d0d] font-semibold leading-snug mb-1">
         {statusLine(preview, firstName)}
       </p>
+      {/* Scanned handwritten reply thumbnail — 2026-07-08 workflow.
+          Only rendered when the latest event is a reply that has
+          a photo attached. Small — the point is "there's a
+          handwritten letter waiting for you," not to read it here.
+          The italic English snippet still renders below as caption. */}
+      {isReply && preview.latestImageUrl ? (
+        <div className="mt-1 mb-2 flex justify-start">
+          <img
+            src={preview.latestImageUrl}
+            alt={`Letter from ${firstName}`}
+            loading="lazy"
+            className="block h-24 w-auto max-w-full border border-[#e8e0d4] bg-white"
+          />
+        </div>
+      ) : null}
       <p
         className="text-sm text-[#555] leading-snug italic line-clamp-2"
         style={{ fontFamily: 'Georgia, serif' }}

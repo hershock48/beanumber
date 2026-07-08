@@ -9,11 +9,22 @@
  *
  * Body:
  *   {
- *     bodyEn: string,             // English text of the reply (Simon
- *                                 // translates from the kid's original)
+ *     bodyEn: string,             // English translation of the reply
+ *                                 // (short — one to a few sentences,
+ *                                 // supplied by Simon or the social
+ *                                 // worker who reads what the kid wrote).
  *     bodyOriginal?: string,      // OPTIONAL — the kid's actual
  *                                 // language transcription. Stored in
  *                                 // body_translated for audit.
+ *     imageUrl?: string,          // OPTIONAL — public URL of the
+ *                                 // scanned handwritten reply photo,
+ *                                 // uploaded via
+ *                                 // POST /api/admin/messages/[id]/reply-photo
+ *                                 // right before this call. Required
+ *                                 // by the admin UI policy from 2026-07-08
+ *                                 // for new replies; kept optional at
+ *                                 // the API layer so legacy typed-only
+ *                                 // replies can still be recorded.
  *     notifySponsor?: boolean,    // default true
  *   }
  *
@@ -82,6 +93,7 @@ export async function POST(
   let body: {
     bodyEn?: string;
     bodyOriginal?: string;
+    imageUrl?: string;
     notifySponsor?: boolean;
   };
   try {
@@ -91,6 +103,32 @@ export async function POST(
   }
 
   const bodyEn = (body.bodyEn ?? '').trim();
+  const rawImageUrl = (body.imageUrl ?? '').trim() || null;
+
+  // If an image URL is supplied it must be a well-formed http(s) URL.
+  // We don't require it to be a specific host — Supabase URLs come
+  // back from our own upload endpoint and the caller is admin-gated —
+  // but a broken URL now is a permanent broken image in the sponsor's
+  // thread, so we reject obvious garbage. Cast to URL to validate;
+  // any parse failure falls through as null with an error surface.
+  let imageUrl: string | null = null;
+  if (rawImageUrl) {
+    try {
+      const u = new URL(rawImageUrl);
+      if (u.protocol !== 'https:' && u.protocol !== 'http:') {
+        throw new Error('bad protocol');
+      }
+      imageUrl = u.toString();
+    } catch {
+      return NextResponse.json(
+        {
+          error:
+            'The reply photo URL looks malformed. Re-upload the photo and try again.',
+        },
+        { status: 400 }
+      );
+    }
+  }
   if (bodyEn.length < MIN_REPLY) {
     return NextResponse.json(
       { error: `Reply is too short. Say a little more (${MIN_REPLY}+ characters).` },
@@ -203,6 +241,10 @@ export async function POST(
         bodyTranslated: bodyOriginal,
         status: 'delivered',
         deliveredAt: now,
+        // Scanned handwritten reply photo (2026-07-08 workflow).
+        // Null on typed-only replies.
+        replyImageUrl: imageUrl,
+        replyImageUploadedAt: imageUrl ? now : null,
       })
       .returning({ id: kidMessages.id });
   } catch (err: unknown) {

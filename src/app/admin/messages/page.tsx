@@ -74,6 +74,7 @@ export default async function AdminMessagesPage() {
         bodyTranslated: kidMessages.bodyTranslated,
         deliveredAt: kidMessages.deliveredAt,
         createdAt: kidMessages.createdAt,
+        replyImageUrl: kidMessages.replyImageUrl,
       })
       .from(kidMessages)
       .where(eq(kidMessages.direction, 'kid_to_sponsor'))
@@ -90,6 +91,7 @@ export default async function AdminMessagesPage() {
       id: string;
       bodyEn: string;
       bodyOriginal: string | null;
+      imageUrl: string | null;
       deliveredAt: string | null;
       createdAt: string | null;
     }
@@ -104,6 +106,7 @@ export default async function AdminMessagesPage() {
       // which is helpful audit context but not the primary reader-
       // facing text.
       bodyOriginal: r.bodyTranslated,
+      imageUrl: r.replyImageUrl,
       deliveredAt: r.deliveredAt ? new Date(r.deliveredAt).toISOString() : null,
       createdAt: r.createdAt ? new Date(r.createdAt).toISOString() : null,
     });

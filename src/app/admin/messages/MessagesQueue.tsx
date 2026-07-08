@@ -48,6 +48,9 @@ interface MessageRow {
     id: string;
     bodyEn: string;
     bodyOriginal: string | null;
+    /** Scanned handwritten reply photo URL (2026-07-08 workflow).
+     *  Null on legacy typed-only replies. */
+    imageUrl: string | null;
     deliveredAt: string | null;
     createdAt: string | null;
   } | null;
@@ -513,6 +516,60 @@ function ReplySection({
   const [replyOriginal, setReplyOriginal] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Scanned handwritten reply (2026-07-08 workflow). The photo is
+  // uploaded first (separate endpoint) so the admin sees preview +
+  // dimensions before typing the translation. Once uploaded we hold
+  // the public URL in state and submit it with the reply POST.
+  const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+
+  async function handlePhotoPick(file: File) {
+    // Accept anything image/* the browser identifies; server-side
+    // whitelist enforces the actual allowed types. Read as base64.
+    setError(null);
+    setUploadingPhoto(true);
+    try {
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result));
+        reader.onerror = () => reject(new Error('Could not read file'));
+        reader.readAsDataURL(file);
+      });
+      // Strip "data:image/xxx;base64," prefix — the server takes raw
+      // base64 in a JSON field.
+      const commaIdx = dataUrl.indexOf(',');
+      const dataBase64 = commaIdx >= 0 ? dataUrl.slice(commaIdx + 1) : dataUrl;
+
+      const res = await fetch(
+        `/api/admin/messages/${message.id}/reply-photo`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify({
+            filename: file.name || 'reply.jpg',
+            contentType: file.type || 'image/jpeg',
+            dataBase64,
+          }),
+        }
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.publicUrl) {
+        setError(
+          data.error || 'Photo upload failed. Try a smaller file or another format.'
+        );
+        setUploadingPhoto(false);
+        return;
+      }
+      setUploadedImageUrl(data.publicUrl);
+    } catch (e) {
+      setError(
+        e instanceof Error ? e.message : 'Could not read that image.'
+      );
+    } finally {
+      setUploadingPhoto(false);
+    }
+  }
 
   if (message.reply) {
     return (
@@ -520,6 +577,28 @@ function ReplySection({
         <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-2">
           {message.kid.firstName ?? 'The kid'} wrote back
         </p>
+        {/* Scanned handwritten reply (2026-07-08 workflow). Photo
+            is the anchor for the admin review — Simon can eyeball
+            his own upload + translation together. On the sponsor's
+            kid page this same photo renders full-width above the
+            translation caption; here the admin view is compact so
+            the photo is capped at a preview height. */}
+        {message.reply.imageUrl ? (
+          <a
+            href={message.reply.imageUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block mb-3"
+            title="Open the scan in a new tab"
+          >
+            <img
+              src={message.reply.imageUrl}
+              alt={`Scanned reply from ${message.kid.firstName ?? 'the kid'}`}
+              loading="lazy"
+              className="block max-h-80 w-auto max-w-full border border-[#e8e0d4] bg-white"
+            />
+          </a>
+        ) : null}
         <blockquote
           className="text-[15px] text-[#333] leading-relaxed italic bg-[#f5efe4] border-l-2 border-[#D4A843] pl-4 py-3"
           style={{ fontFamily: 'Georgia, serif' }}
@@ -559,6 +638,16 @@ function ReplySection({
       setError('Reply needs at least a few characters of translated text.');
       return;
     }
+    // Photo is required in the 2026-07-08 workflow. The kid's
+    // handwritten letter IS the reply; the typed translation is a
+    // caption. If Simon skipped the upload we block here rather
+    // than record a text-only reply that has no photo behind it.
+    if (!uploadedImageUrl) {
+      setError(
+        'Upload the scanned handwritten letter first, then add your English translation.'
+      );
+      return;
+    }
     setSaving(true);
     setError(null);
     try {
@@ -569,6 +658,7 @@ function ReplySection({
         body: JSON.stringify({
           bodyEn: trimmed,
           bodyOriginal: replyOriginal.trim() || undefined,
+          imageUrl: uploadedImageUrl,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -584,6 +674,7 @@ function ReplySection({
           id: data.id,
           bodyEn: trimmed,
           bodyOriginal: replyOriginal.trim() || null,
+          imageUrl: uploadedImageUrl,
           deliveredAt: new Date().toISOString(),
           createdAt: new Date().toISOString(),
         },
@@ -592,6 +683,7 @@ function ReplySection({
       setComposerOpen(false);
       setReplyBody('');
       setReplyOriginal('');
+      setUploadedImageUrl(null);
     } catch {
       setError('Network hiccup. Try again.');
       setSaving(false);
@@ -605,11 +697,78 @@ function ReplySection({
           <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-2">
             Record {message.kid.firstName ?? 'the kid'}&rsquo;s reply
           </p>
+
+          {/* Step 1 — photo upload. The 2026-07-08 workflow is:
+              the kid handwrites a reply on the printed template
+              and Simon uploads a scan / phone photo of the sheet.
+              This block is the anchor of the composer — Simon
+              can't submit without a photo. */}
+          <div className="mb-4 bg-[#FFF8F0] border border-[#e8e0d4] p-3">
+            <p className="text-xs font-bold uppercase tracking-[0.15em] text-[#0d0d0d] mb-2">
+              1 · Scanned handwritten letter
+            </p>
+            {uploadedImageUrl ? (
+              <div className="flex flex-col gap-2">
+                <img
+                  src={uploadedImageUrl}
+                  alt="Uploaded reply preview"
+                  className="block max-h-64 w-auto border border-[#e8e0d4] bg-white"
+                />
+                <div className="flex flex-wrap gap-3 text-xs">
+                  <a
+                    href={uploadedImageUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[#D4A843] font-bold hover:underline"
+                  >
+                    Open full size
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => setUploadedImageUrl(null)}
+                    disabled={saving || uploadingPhoto}
+                    className="text-[#888] hover:text-[#c0392b] font-bold uppercase tracking-[0.1em]"
+                  >
+                    Replace
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div>
+                <input
+                  id={`reply-photo-${message.id}`}
+                  type="file"
+                  accept="image/*"
+                  disabled={uploadingPhoto || saving}
+                  onChange={e => {
+                    const f = e.currentTarget.files?.[0];
+                    if (f) void handlePhotoPick(f);
+                    // Reset so the same file can be re-picked after a
+                    // failed upload (browsers won't refire onChange for
+                    // an identical value).
+                    e.currentTarget.value = '';
+                  }}
+                  className="block text-sm"
+                />
+                <p className="text-xs text-[#888] leading-relaxed mt-2">
+                  Phone camera works. JPEG or HEIC preferred, under ~7 MB.
+                  Take the picture in good light with the whole sheet in
+                  frame.
+                </p>
+                {uploadingPhoto && (
+                  <p className="text-xs text-[#0d0d0d] italic mt-2">
+                    Uploading…
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+
           <label
             htmlFor={`reply-en-${message.id}`}
-            className="block text-xs text-[#666] mb-1"
+            className="block text-xs font-bold uppercase tracking-[0.15em] text-[#0d0d0d] mb-1"
           >
-            Translated reply (in English — this is what the sponsor sees)
+            2 · Translated reply (English — this is what the sponsor reads)
           </label>
           <textarea
             id={`reply-en-${message.id}`}
@@ -626,9 +785,9 @@ function ReplySection({
           />
           <label
             htmlFor={`reply-orig-${message.id}`}
-            className="block text-xs text-[#666] mb-1 mt-3"
+            className="block text-xs font-bold uppercase tracking-[0.15em] text-[#0d0d0d] mb-1 mt-4"
           >
-            Original transcription (optional — Acholi, Luo, etc.)
+            3 · Original transcription <span className="font-normal normal-case tracking-normal text-[#888]">(optional — Acholi, Luo, etc.)</span>
           </label>
           <textarea
             id={`reply-orig-${message.id}`}
@@ -649,8 +808,13 @@ function ReplySection({
             <button
               type="button"
               onClick={submitReply}
-              disabled={saving || replyBody.trim().length < 3}
-              className="inline-block bg-[#D4A843] hover:bg-[#c49a3a] text-[#0d0d0d] disabled:opacity-50 px-4 py-2 text-xs font-bold uppercase tracking-wider transition-colors"
+              disabled={
+                saving ||
+                uploadingPhoto ||
+                !uploadedImageUrl ||
+                replyBody.trim().length < 3
+              }
+              className="inline-block bg-[#D4A843] hover:bg-[#c49a3a] text-[#0d0d0d] disabled:opacity-50 disabled:cursor-not-allowed px-4 py-2 text-xs font-bold uppercase tracking-wider transition-colors"
             >
               {saving ? 'Sending…' : 'Save & notify sponsor'}
             </button>
@@ -660,6 +824,7 @@ function ReplySection({
                 setComposerOpen(false);
                 setReplyBody('');
                 setReplyOriginal('');
+                setUploadedImageUrl(null);
                 setError(null);
               }}
               disabled={saving}

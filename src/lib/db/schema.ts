@@ -1148,6 +1148,20 @@ export const kidMessages = pgTable(
     translatedAt: timestamp('translated_at', { withTimezone: true }),
     deliveredAt: timestamp('delivered_at', { withTimezone: true }),
     declinedAt: timestamp('declined_at', { withTimezone: true }),
+    // ── Scanned handwritten reply (2026-07-08) ──────────────────────
+    // Only populated on direction='kid_to_sponsor' rows. Simon uploads
+    // a photo of the kid's handwritten letter (written on the printed
+    // template) and records the English translation in body_en. On
+    // the sponsor's kid-page thread we render the scan as the main
+    // content and body_en below as an italic caption.
+    //
+    // Nullable so pre-2026-07-08 typed-only replies keep working. New
+    // replies via the admin UI go through the reply-photo upload flow
+    // and always carry both fields.
+    replyImageUrl: text('reply_image_url'),
+    replyImageUploadedAt: timestamp('reply_image_uploaded_at', {
+      withTimezone: true,
+    }),
   },
   table => ({
     // Simon's queue is ordered by status then age. Composite index
