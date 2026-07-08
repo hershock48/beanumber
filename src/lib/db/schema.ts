@@ -1499,4 +1499,3 @@ export type NewPushDelivery = typeof pushDeliveries.$inferInsert;
 
 export type PendingDeferredLink = typeof pendingDeferredLinks.$inferSelect;
 export type NewPendingDeferredLink = typeof pendingDeferredLinks.$inferInsert;
-export type NewPushDelivery = typeof pushDeliveries.$inferInsert;

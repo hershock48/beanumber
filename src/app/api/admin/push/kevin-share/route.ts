@@ -82,7 +82,7 @@ export async function POST(request: NextRequest) {
       { status: 409 }
     );
   }
-  return NextResponse.json({ ok: true, ...result });
+  return NextResponse.json({ ...result, ok: true });
 }
 
 export const dynamic = 'force-dynamic';

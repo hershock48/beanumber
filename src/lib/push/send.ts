@@ -585,7 +585,7 @@ async function deliverToExpo(
         userId: row.userId,
         deviceId: dev.id,
         token: dev.token,
-        message: { ...row.message, to: dev.token },
+        message: { ...row.payload, to: dev.token },
       });
     }
   }
