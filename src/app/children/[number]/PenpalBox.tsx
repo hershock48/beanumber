@@ -103,8 +103,13 @@ export function PenpalBox({
   const ctaLabel = isHolder
     ? `Sponsor ${firstName} — $25/month`
     : `Sign in to write ${firstName}`;
+  // Holder heading must NOT duplicate the outer SectionHeader
+  // ("Write {firstName}. {firstName} writes back.") — for the holder
+  // that title is the promise, and the overlay heading is the reason
+  // to click. Anon gets a slightly different frame since they haven't
+  // even claimed the number yet.
   const heading = isHolder
-    ? `Write ${firstName}. ${firstName} writes back.`
+    ? `Sponsor to start writing ${firstName}.`
     : `You could be ${firstName}'s penpal.`;
 
   return (
