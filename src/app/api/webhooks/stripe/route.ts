@@ -12,6 +12,8 @@ import {
   mirrorCommunication,
   findDonationByPaymentIntent,
 } from '@/lib/db/webhook-bridge';
+import { db } from '@/lib/db/client';
+import { fulfillments } from '@/lib/db/schema';
 
 // Allow up to 60 seconds for the webhook handler. The default 10s on
 // Hobby plans is too tight — a shirt order does 8+ Airtable API calls,
@@ -209,13 +211,54 @@ async function createFulfillmentRecord(opts: {
   orderDate: string;     // ISO date string
   notes?: string;
 }): Promise<void> {
-  if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) {
-    console.warn('[WH] Fulfillment: missing Airtable creds, skipping (non-fatal)');
-    return;
-  }
-
   const vinylFront = vinylColorForShirt(opts.shirtColor);
   const vinylBack = vinylColorForShirt(opts.shirtColor);
+
+  // 1. Postgres — the source-of-truth write. Runs regardless of
+  //    Airtable state, since Airtable is legacy read-only in a few
+  //    admin surfaces (per project_state.md 2026-07-06) and the admin
+  //    dashboard reads exclusively from fulfillments.* here in Postgres.
+  //
+  //    Discovered 2026-07-08: webhook was still Airtable-only, so every
+  //    shirt order after 2026-06-22 (Postgres cutover date) silently
+  //    skipped the Postgres fulfillments table. Admin "shirts to ship"
+  //    card read empty even when real orders were sitting in donations.
+  try {
+    await db.insert(fulfillments).values({
+      orderNumber: typeof opts.shirtNumber === 'number' && !Number.isNaN(opts.shirtNumber) ? opts.shirtNumber : null,
+      design: opts.design,
+      shirtColor: opts.shirtColor,
+      size: opts.shirtSize,
+      vinylFront,
+      vinylBack,
+      buyerName: opts.buyerName,
+      buyerEmail: opts.buyerEmail,
+      shipName: opts.address ? opts.buyerName : null,
+      shipStreet1: opts.address?.line1 || null,
+      shipStreet2: opts.address?.line2 || null,
+      shipCity: opts.address?.city || null,
+      shipState: opts.address?.state || null,
+      shipZip: opts.address?.postal_code || null,
+      production: 'Pending',
+      shipping: 'Not Shipped',
+      childName: opts.childName || null,
+      orderDate: opts.orderDate,
+      notes: opts.notes || null,
+    });
+    const numLabel = typeof opts.shirtNumber === 'number' ? `#${opts.shirtNumber}` : '#TBD';
+    console.log(`[WH] Fulfillment PG insert: ${numLabel} ${opts.design} / ${opts.shirtColor} / ${opts.shirtSize} / ${opts.buyerEmail}`);
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error('[WH] Fulfillment PG insert FAILED (queue will be missing this order):', message.slice(0, 300));
+    // Don't return — Airtable dual-write below still gets a chance.
+  }
+
+  // 2. Airtable — legacy dual-write. Skipped when env is unset (Kevin
+  //    has been removing AIRTABLE_API_KEY as part of the sunset).
+  if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) {
+    console.log('[WH] Fulfillment: Airtable disabled by env, PG insert only');
+    return;
+  }
 
   const fields: Record<string, unknown> = {
     'fldsWHbE3yq7Xoyn4': opts.design,            // Design
