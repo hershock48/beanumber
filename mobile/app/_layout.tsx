@@ -28,6 +28,7 @@ import {
   Inter_600SemiBold,
 } from '@expo-google-fonts/inter';
 import { COLORS, TEXT_STYLES } from '../lib/theme';
+import { AuthProvider } from '../hooks/useAuth';
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
@@ -47,41 +48,47 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        <StatusBar style="dark" />
-        <Stack
-          screenOptions={{
-            headerStyle: { backgroundColor: COLORS.cream },
-            headerTitleStyle: {
-              color: COLORS.ink,
-              fontFamily: TEXT_STYLES.h3.fontFamily,
-              fontSize: 15,
-            },
-            headerTintColor: COLORS.ink,
-            headerShadowVisible: false,
-            contentStyle: { backgroundColor: COLORS.cream },
-            headerBackTitle: 'Back',
-            animation: 'slide_from_right',
-          }}
-        >
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen
-            name="meet/[number]"
-            options={{
-              headerShown: false,
-              animation: 'fade',
-              gestureEnabled: false,
-            }}
-          />
-          <Stack.Screen
-            name="children/[number]"
-            options={{
-              title: '',
+        <AuthProvider>
+          <StatusBar style="dark" />
+          <Stack
+            screenOptions={{
+              headerStyle: { backgroundColor: COLORS.cream },
+              headerTitleStyle: {
+                color: COLORS.ink,
+                fontFamily: TEXT_STYLES.h3.fontFamily,
+                fontSize: 15,
+              },
+              headerTintColor: COLORS.ink,
+              headerShadowVisible: false,
+              contentStyle: { backgroundColor: COLORS.cream },
               headerBackTitle: 'Back',
-              headerTransparent: true,
-              animation: 'fade',
+              animation: 'slide_from_right',
             }}
-          />
-        </Stack>
+          >
+            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            <Stack.Screen
+              name="(auth)"
+              options={{ headerShown: false, animation: 'fade' }}
+            />
+            <Stack.Screen
+              name="meet/[number]"
+              options={{
+                headerShown: false,
+                animation: 'fade',
+                gestureEnabled: false,
+              }}
+            />
+            <Stack.Screen
+              name="children/[number]"
+              options={{
+                title: '',
+                headerBackTitle: 'Back',
+                headerTransparent: true,
+                animation: 'fade',
+              }}
+            />
+          </Stack>
+        </AuthProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

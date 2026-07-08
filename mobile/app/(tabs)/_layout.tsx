@@ -7,12 +7,28 @@
  *
  * No icons yet — labels only — until we settle on icon style.
  * Replace with proper SF Symbols / Material icons in Phase 1.3.
+ *
+ * Auth guard: signed-out users get pushed to /(auth)/sign-in. The
+ * check waits for the initial hydration pass to finish so we don't
+ * flash-redirect a user whose token is still being loaded from
+ * SecureStore.
  */
-import { Tabs } from 'expo-router';
+import { useEffect } from 'react';
+import { Tabs, router } from 'expo-router';
 import { COLORS } from '../../lib/theme';
 import { tap } from '../../lib/haptics';
+import { useAuth } from '../../hooks/useAuth';
 
 export default function TabsLayout() {
+  const { isSignedIn, isLoading } = useAuth();
+
+  useEffect(() => {
+    if (isLoading) return;
+    if (!isSignedIn) {
+      router.replace('/(auth)/sign-in');
+    }
+  }, [isSignedIn, isLoading]);
+
   return (
     <Tabs
       screenOptions={{
