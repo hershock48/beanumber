@@ -30,6 +30,8 @@ import {
 import { COLORS, TEXT_STYLES } from '../lib/theme';
 import { AuthProvider } from '../hooks/useAuth';
 import { usePushDeepLinks } from '../hooks/usePushDeepLinks';
+import { useWebDeepLinks } from '../hooks/useWebDeepLinks';
+import { useDeferredLink } from '../hooks/useDeferredLink';
 
 /**
  * Small inner component so useRouter (inside usePushDeepLinks) sits
@@ -38,6 +40,28 @@ import { usePushDeepLinks } from '../hooks/usePushDeepLinks';
  */
 function PushDeepLinkBridge() {
   usePushDeepLinks();
+  return null;
+}
+
+/**
+ * Web-URL bridge — mirrors PushDeepLinkBridge but for
+ * https://beanumber.org/... universal links and beanumber://...
+ * custom-scheme URLs. Coexists with push handling because the two
+ * hook different event sources (see hooks/useWebDeepLinks.ts).
+ */
+function WebDeepLinkBridge() {
+  useWebDeepLinks();
+  return null;
+}
+
+/**
+ * First-open deferred-link resolver. Runs at most once per install,
+ * hits /api/mobile/v1/deferred-link/resolve, and routes the app to
+ * the shirt-number the user scanned before installing. See
+ * hooks/useDeferredLink.ts for the mechanism.
+ */
+function DeferredLinkBridge() {
+  useDeferredLink();
   return null;
 }
 
@@ -61,6 +85,8 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <AuthProvider>
           <PushDeepLinkBridge />
+          <WebDeepLinkBridge />
+          <DeferredLinkBridge />
           <StatusBar style="dark" />
           <Stack
             screenOptions={{

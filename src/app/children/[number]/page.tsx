@@ -6,6 +6,9 @@ import Image from 'next/image';
 import { BANNavigation } from '@/components/BANNavigation';
 import { BANFooter } from '@/components/BANFooter';
 import { RevealBeacon } from './RevealBeacon';
+import { MobileAppBanner } from './MobileAppBanner';
+import { detectPlatform } from '@/lib/deferred-link';
+import { headers } from 'next/headers';
 import { RevealOverlay } from './RevealOverlay';
 import { ReassignReveal } from './ReassignReveal';
 import { SponsorButton } from './SponsorButton';
@@ -1247,6 +1250,12 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
   const firstName = child.first_name || displayName.split(' ')[0] || 'them';
   const photoUrl = child.photo_url || '/images/child-placeholder.jpg';
 
+  // Detect iOS/Android UA server-side so the mobile smart-open banner
+  // renders with no hydration flash. Returns null on desktop and the
+  // banner isn't included in the tree at all. See MobileAppBanner.tsx.
+  const uaHeader = (await headers()).get('user-agent');
+  const mobilePlatform = detectPlatform(uaHeader);
+
   // True if ANY of the structured intake fields are populated. When none
   // are, we fall back to the legacy Notes prose so older records still
   // render something human rather than an empty scaffold.
@@ -1332,6 +1341,21 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
 
   return (
     <div className="min-h-screen bg-[#FFF8F0]">
+      {/* Mobile smart-open banner — additive. On iOS/Android UAs we
+          render a slim banner at the top offering to open the app
+          (universal link fires if installed, App Store hop with a
+          deferred-link stamp if not). No-op on desktop, no-op if the
+          user dismissed it within 24h. Never intercepts the reveal
+          flow — the web experience continues to work if the banner
+          is ignored. See docs/claude/architecture.md §"Deep linking". */}
+      {mobilePlatform ? (
+        <MobileAppBanner
+          shirtNumber={Number(number)}
+          kidFirstName={firstName}
+          platform={mobilePlatform}
+        />
+      ) : null}
+
       {/* Silently flip the sponsor's ChildRevealedAt if they're logged in
           and this number matches their assignment. Renders nothing. */}
       <RevealBeacon number={Number(number)} />

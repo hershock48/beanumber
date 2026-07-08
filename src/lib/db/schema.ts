@@ -1322,6 +1322,69 @@ export const pushPromptHistory = pgTable(
   })
 );
 
+// ─────────────────────────────────────────────────────────────────
+//  Deferred deep links — the "install-first, meet-your-kid-second" glue
+// ─────────────────────────────────────────────────────────────────
+//
+// When a shirt QR scan hits beanumber.org/meet/[N] on a mobile
+// device that DOESN'T have the app installed yet, the web page
+// stamps a row here before redirecting to the App Store. The
+// mobile app, on first open, calls
+// POST /api/mobile/v1/deferred-link/resolve with the same
+// (IP + user_agent) fingerprint and the row is claimed within a
+// 10-minute window. That's how the reveal screen knows to land on
+// /meet/48 even though the user never typed a number — Apple killed
+// classic Branch-style deferred deep-linking, so this is our
+// fingerprint-fallback path. See docs/claude/architecture.md
+// §"Deep linking" for the full flow.
+//
+// Rows are single-use (consumed_at set on first claim) and time-
+// bounded (expires_at + a periodic sweep). Fingerprint is a hash of
+// IP + normalized UA so nothing personally identifying lives here
+// past the 10-minute window.
+
+export const pendingDeferredLinks = pgTable(
+  'pending_deferred_links',
+  {
+    id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+    // sha256(ip + '|' + normalizedUserAgent) — see
+    // src/lib/deferred-link.ts. Never contains raw IP or UA text.
+    fingerprint: text('fingerprint').notNull(),
+    // The deep link the app should navigate to on first open.
+    // Stored as an app path ("/meet/48"), not a full URL.
+    targetPath: text('target_path').notNull(),
+    // Optional shirt number for observability / analytics — most
+    // deferred links are shirt-QR scans, and we want to be able to
+    // eyeball this table and see the flow working.
+    shirtNumber: integer('shirt_number'),
+    // src=qr | src=email | src=push | null — carried from the URL
+    // query param on the original web hit so we can attribute the
+    // install source in the future.
+    source: text('source'),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+    // Rows past expires_at are ignored by /resolve. 10 minutes is
+    // enough for install + first-open, tight enough that stale rows
+    // don't cross-contaminate.
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    // Single-use: /resolve sets this so the same fingerprint doesn't
+    // resolve twice.
+    consumedAt: timestamp('consumed_at', { withTimezone: true }),
+  },
+  table => ({
+    // Hot path: /resolve looks up by fingerprint + not-yet-consumed
+    // + not-yet-expired.
+    fingerprintIdx: index('pending_deferred_links_fingerprint_idx').on(
+      table.fingerprint
+    ),
+    // Periodic sweep of expired rows.
+    expiresIdx: index('pending_deferred_links_expires_idx').on(
+      table.expiresAt
+    ),
+  })
+);
+
 export const pushDeliveries = pgTable(
   'push_deliveries',
   {
@@ -1432,4 +1495,8 @@ export type PushPromptHistoryRow = typeof pushPromptHistory.$inferSelect;
 export type NewPushPromptHistoryRow = typeof pushPromptHistory.$inferInsert;
 
 export type PushDelivery = typeof pushDeliveries.$inferSelect;
+export type NewPushDelivery = typeof pushDeliveries.$inferInsert;
+
+export type PendingDeferredLink = typeof pendingDeferredLinks.$inferSelect;
+export type NewPendingDeferredLink = typeof pendingDeferredLinks.$inferInsert;
 export type NewPushDelivery = typeof pushDeliveries.$inferInsert;

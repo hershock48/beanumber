@@ -179,6 +179,80 @@ The `/children/[number]` page checks `hasStructured` (any of HomeVillage, Family
 
 Custom colors and spacing are in `tailwind.config.ts`. The palette in `voice.md` is authoritative: cream `#FFF8F0` background, sand `#e8e0d4` borders, gold `#D4A843` accent, near-black `#0d0d0d` body, mid-gray `#777` secondary. Lora serif for headings (600 weight), system sans for body. When adding new components, reach for these before inventing new values.
 
+## Deep linking
+
+Unified across four surfaces so a shirt QR, an email link, a push notification, and a bare URL all land on the same in-app screen.
+
+### Route table (contract — appears in QRs, emails, push payloads)
+
+| Web URL                                    | App route             |
+|--------------------------------------------|-----------------------|
+| `beanumber.org/meet/[N]`                   | `/meet/[N]`           |
+| `beanumber.org/children/[N]`               | `/children/[N]`       |
+| `beanumber.org/children/[N]/updates`       | `/children/[N]/updates` |
+| `beanumber.org/newsletter/[id]`            | `/newsletter/[id]`    |
+| `beanumber.org/campus`                     | `/(tabs)/explore`     |
+| `beanumber.org/me`                         | `/(tabs)/me`          |
+| `beanumber://<same paths>`                 | same                  |
+
+The custom-scheme fallback is for push payloads and dev/testing.
+
+### Delivery surfaces
+
+- **iOS Universal Links** — driven by the AASA at `/.well-known/apple-app-site-association` (served by `src/app/.well-known/apple-app-site-association/route.ts`). App bundle ID + Apple team ID are `APPLE_BUNDLE_ID` + `APPLE_TEAM_ID` in Vercel env. Both are required; the route returns 500 if either is missing so a broken deploy fails loudly instead of silently serving a bad file. `mobile/app.json` sets `ios.associatedDomains: ["applinks:beanumber.org", "applinks:www.beanumber.org"]` and `ios.bundleIdentifier: "org.beanumber.app"`.
+- **Android App Links** — driven by the Digital Asset Links file at `/.well-known/assetlinks.json` (served by `src/app/.well-known/assetlinks.json/route.ts`). Env: `ANDROID_PACKAGE_NAME` + `ANDROID_APP_SHA256`. The SHA-256 fingerprint comes from `eas credentials` for the RELEASE build — debug builds have a different fingerprint. `mobile/app.json` sets `android.package: "org.beanumber.app"` and `android.intentFilters` covering every path in the table above.
+- **Custom scheme** — `mobile/app.json` sets `scheme: "beanumber"`. Push notifications emit `beanumber://<path>` in the `data.deepLink` field; the push handler in `mobile/hooks/usePushDeepLinks.ts` routes them.
+
+### Client-side plumbing
+
+Three hooks run in the root layout, each attached to a different event source:
+
+- `usePushDeepLinks` (unchanged) — notification-response listener.
+- `useWebDeepLinks` — expo-linking initial-URL + `addEventListener('url')`. Handles universal-link and custom-scheme taps.
+- `useDeferredLink` — first-open only. Hits `/api/mobile/v1/deferred-link/resolve` with (IP + UA) fingerprint; routes if a match is found.
+
+All three route through the same normalizer in `mobile/lib/deepLink.ts` (`parseIncomingUrl` + `routeFor`). The route allow-list is enforced there — anything outside the table above returns null, so `/admin/*` and `/api/*` can't sneak into the app.
+
+### Deferred-link fallback
+
+When a shirt QR scan hits `beanumber.org/meet/[N]` on a mobile device that DOESN'T have the app installed, the smart-open banner on `/children/[N]` (rendered when the server-side UA sniff detects iOS/Android) offers "Open in Be A Number." Tapping it:
+
+1. `POST /api/mobile/v1/deferred-link/stamp` with `{ targetPath: "/meet/N", shirtNumber: N, source: "children_banner" }`. Server hashes `(client IP + normalized UA)` and inserts a row into `pending_deferred_links` with `expires_at = now + 10min`.
+2. Client tries `beanumber://meet/N` (fires the app if installed).
+3. If that's still visible after 1.2s, redirects to the App Store / Play Store — the store URL carries `?ct=meet_N` as a campaign token for the belt-and-suspenders SKAdNetwork path (documented, not built).
+4. On first-open, the app calls `POST /api/mobile/v1/deferred-link/resolve` with the same fingerprint (computed server-side from the request headers). If a live row matches (unconsumed + not expired), the endpoint marks it consumed and returns `targetPath`. The app routes there.
+
+The hold-to-meet ritual is preserved regardless of how the number arrives. `/meet/[N]` in the app always runs the HoldButton. Nothing bypasses the hold. (See `mobile/app/meet/[number].tsx`.)
+
+### Files
+
+Web:
+- `src/app/.well-known/apple-app-site-association/route.ts` — AASA JSON
+- `src/app/.well-known/assetlinks.json/route.ts` — Android Digital Asset Links
+- `src/app/api/mobile/v1/deferred-link/stamp/route.ts` — write pending row
+- `src/app/api/mobile/v1/deferred-link/resolve/route.ts` — claim pending row
+- `src/lib/deferred-link.ts` — fingerprint + UA helpers
+- `src/lib/db/schema.ts` — `pendingDeferredLinks` table
+- `drizzle/0008_pending_deferred_links.sql` — migration
+- `src/app/children/[number]/MobileAppBanner.tsx` — client banner
+- `src/app/children/[number]/page.tsx` — server-side UA detect + banner render
+
+Mobile:
+- `mobile/app.json` — scheme, associatedDomains, intentFilters, bundle IDs
+- `mobile/lib/deepLink.ts` — `parseIncomingUrl`, `routeFor`, `resolveIncomingUrl`
+- `mobile/hooks/useWebDeepLinks.ts` — expo-linking listener
+- `mobile/hooks/useDeferredLink.ts` — first-open resolver
+- `mobile/app/_layout.tsx` — bridge wiring
+
+### Test
+
+```bash
+curl -H "Accept: application/json" \
+  https://beanumber.org/.well-known/apple-app-site-association | jq .
+curl -H "Accept: application/json" \
+  https://beanumber.org/.well-known/assetlinks.json | jq .
+```
+
 ## When you don't know where something lives
 
 - Run `git log --oneline -20` for recent context.

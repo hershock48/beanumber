@@ -6,17 +6,48 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
+    "scheme": "beanumber",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "org.beanumber.app",
+      "associatedDomains": [
+        "applinks:beanumber.org",
+        "applinks:www.beanumber.org"
+      ]
     },
     "android": {
+      "package": "org.beanumber.app",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            { "scheme": "https", "host": "beanumber.org", "pathPrefix": "/meet" },
+            { "scheme": "https", "host": "beanumber.org", "pathPrefix": "/children" },
+            { "scheme": "https", "host": "beanumber.org", "pathPrefix": "/newsletter" },
+            { "scheme": "https", "host": "beanumber.org", "pathPrefix": "/campus" },
+            { "scheme": "https", "host": "beanumber.org", "pathPrefix": "/me" },
+            { "scheme": "https", "host": "www.beanumber.org", "pathPrefix": "/meet" },
+            { "scheme": "https", "host": "www.beanumber.org", "pathPrefix": "/children" },
+            { "scheme": "https", "host": "www.beanumber.org", "pathPrefix": "/newsletter" },
+            { "scheme": "https", "host": "www.beanumber.org", "pathPrefix": "/campus" },
+            { "scheme": "https", "host": "www.beanumber.org", "pathPrefix": "/me" }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        },
+        {
+          "action": "VIEW",
+          "data": [{ "scheme": "beanumber" }],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
