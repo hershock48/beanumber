@@ -1352,8 +1352,15 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
           deferred-link stamp if not). No-op on desktop, no-op if the
           user dismissed it within 24h. Never intercepts the reveal
           flow — the web experience continues to work if the banner
-          is ignored. See docs/claude/architecture.md §"Deep linking". */}
-      {mobilePlatform ? (
+          is ignored. See docs/claude/architecture.md §"Deep linking".
+
+          KILLSWITCH: gated on MOBILE_APP_LIVE=1 until the app is
+          actually published. The web-side banner was promising an
+          install experience users couldn't complete, which is worse
+          than not offering it at all. Set MOBILE_APP_LIVE=1 in the
+          Vercel env after App Store + Play approval and the banner
+          returns without a code change. Kevin 2026-07-08. */}
+      {mobilePlatform && process.env.MOBILE_APP_LIVE === '1' ? (
         <MobileAppBanner
           shirtNumber={Number(number)}
           kidFirstName={firstName}
