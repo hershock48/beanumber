@@ -1,26 +1,33 @@
 {
   "expo": {
-    "name": "mobile",
-    "slug": "mobile",
+    "name": "Be A Number",
+    "slug": "be-a-number",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
+    "primaryColor": "#D4A843",
     "scheme": "beanumber",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "org.beanumber.app",
+      "buildNumber": "1",
       "associatedDomains": [
         "applinks:beanumber.org",
         "applinks:www.beanumber.org"
-      ]
+      ],
+      "infoPlist": {
+        "NSCameraUsageDescription": "Optional — used to scan shirt QR codes so the app can jump straight to the reveal moment. Nothing else.",
+        "NSPhotoLibraryUsageDescription": "Save your reveal moments and letters to your camera roll.",
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "org.beanumber.app",
+      "versionCode": 1,
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#fafafa",
         "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
@@ -54,10 +61,23 @@
     },
     "plugins": [
       [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#fafafa",
+          "dark": {
+            "image": "./assets/splash-icon.png",
+            "backgroundColor": "#0d0d0d"
+          }
+        }
+      ],
+      [
         "expo-notifications",
         {
-          "icon": "./assets/icon.png",
-          "color": "#fafafa"
+          "icon": "./assets/notification-icon.png",
+          "color": "#D4A843"
         }
       ]
     ]

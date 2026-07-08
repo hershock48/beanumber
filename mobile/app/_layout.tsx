@@ -11,10 +11,20 @@
  * references one of these families — do not embed font names in
  * component files.
  */
+import { useEffect } from 'react';
 import { Stack } from 'expo-router';
+import * as SplashScreen from 'expo-splash-screen';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+
+// Keep the native splash on-screen while fonts load. Hidden once the
+// Lora + Inter families are ready — see the useEffect below. Prevents
+// the "flash of system font" that would otherwise show for ~200ms on
+// cold start.
+SplashScreen.preventAutoHideAsync().catch(() => {
+  // Already prevented or platform doesn't support it. Non-fatal.
+});
 import {
   useFonts,
   Lora_400Regular,
@@ -76,8 +86,16 @@ export default function RootLayout() {
     Inter_600SemiBold,
   });
 
-  // No splash shimmer here — the app icon + system splash covers this.
-  // Rendering nothing until fonts land avoids a system-font flash.
+  // Hide the native splash the moment fonts finish loading. If it fires
+  // before fonts are ready, users would see system-font text — the
+  // preventAutoHide above blocks that; this effect releases it.
+  useEffect(() => {
+    if (fontsLoaded) {
+      SplashScreen.hideAsync().catch(() => {});
+    }
+  }, [fontsLoaded]);
+
+  // Return null while fonts load — the native splash stays up.
   if (!fontsLoaded) return null;
 
   return (
