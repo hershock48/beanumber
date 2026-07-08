@@ -29,7 +29,10 @@ interface RateLimitConfig {
  */
 class InMemoryRateLimiter {
   private store: Map<string, RateLimitEntry> = new Map();
-  private cleanupInterval: NodeJS.Timeout;
+  // ReturnType<typeof setInterval> covers both browser (number) and
+  // Node (Timeout) return types cleanly. Was NodeJS.Timeout which
+  // TS was rejecting under stricter Vercel build settings.
+  private cleanupInterval: ReturnType<typeof setInterval>;
 
   constructor() {
     // Cleanup expired entries every 5 minutes

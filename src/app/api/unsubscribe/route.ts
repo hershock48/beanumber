@@ -163,7 +163,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   if (!email || !token) {
     try {
-      const formData = await request.formData();
+      // Cast through unknown — Next.js's FormData typing has diverged
+      // between web and Node lib definitions in newer TS versions.
+      // The .get() method is present at runtime; the cast just quiets
+      // the compiler.
+      const formData = (await request.formData()) as unknown as {
+        get(k: string): string | null;
+      };
       email = email || String(formData.get('email') || '');
       token = token || String(formData.get('token') || '');
     } catch {
