@@ -1256,6 +1256,124 @@ export const mobileTokenRevocations = pgTable(
 );
 
 // ─────────────────────────────────────────────────────────────────
+//  Push notifications — Expo push token registry + delivery log
+// ─────────────────────────────────────────────────────────────────
+//
+// Powers the five-event notification vocabulary defined in
+// docs/app-design-brief.md §3.7. See drizzle/0007_push.sql for the
+// migration and src/lib/push/send.ts for the runtime that applies
+// window / cap / threading / kevinShare-fence rules on top of these
+// rows.
+
+export const pushDevices = pgTable(
+  'push_devices',
+  {
+    id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => mobileUsers.id, { onDelete: 'cascade' }),
+    expoPushToken: text('expo_push_token').notNull(),
+    // 'ios' | 'android' — informational only; Expo push handles the
+    // delivery-channel split for us.
+    platform: text('platform'),
+    // IANA time zone captured at registration ("America/New_York").
+    // send.ts uses it to hold rows outside the recipient's local
+    // 09:00–20:00 window until the next morning.
+    tz: text('tz'),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+    lastSeenAt: timestamp('last_seen_at', { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+    // Soft-delete. Set by /unregister or by the send loop when Expo
+    // returns DeviceNotRegistered for the token.
+    revokedAt: timestamp('revoked_at', { withTimezone: true }),
+  },
+  table => ({
+    tokenIdx: uniqueIndex('push_devices_token_idx').on(table.expoPushToken),
+    // Partial index on the live rows only — matches the
+    // "give me every device for this sponsor" hot path.
+    userIdx: index('push_devices_user_idx').on(table.userId),
+  })
+);
+
+export const pushPromptHistory = pgTable(
+  'push_prompt_history',
+  {
+    id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => mobileUsers.id, { onDelete: 'cascade' }),
+    // 'monthly-first-note' | 'holder-first-return'
+    kind: text('kind').notNull(),
+    lastPromptedAt: timestamp('last_prompted_at', { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+    // 'granted' | 'declined' | null (asked but not answered yet)
+    outcome: text('outcome'),
+  },
+  table => ({
+    userKindIdx: index('push_prompt_history_user_kind_idx').on(
+      table.userId,
+      table.kind,
+      table.lastPromptedAt
+    ),
+  })
+);
+
+export const pushDeliveries = pgTable(
+  'push_deliveries',
+  {
+    id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => mobileUsers.id, { onDelete: 'cascade' }),
+    // One of the five allowed event kinds — enforced at the send
+    // layer, not with a DB check constraint (easier to evolve).
+    eventType: text('event_type').notNull(),
+    // The kid the notification is about, when the event kind is
+    // kid-scoped. NULL for newsletterPublished / kevinShare.
+    kidId: uuid('kid_id').references(() => children.id, {
+      onDelete: 'set null',
+    }),
+    // Expo threading key. `kid_id` for kid-scoped events so an
+    // "Ismail (3)" summary lands on iOS instead of three separate
+    // cards. Newsletter and kevin-share thread separately.
+    threadId: text('thread_id').notNull(),
+    scheduledFor: timestamp('scheduled_for', { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+    // Set once Expo accepted the ticket. Null while queued.
+    sentAt: timestamp('sent_at', { withTimezone: true }),
+    // Only populated on failure (Expo receipt error, missing device,
+    // caps hit at drain time, etc.). Presence + sent_at NULL means
+    // the row will not be retried; presence + sent_at NOT NULL means
+    // the send happened but the receipt came back invalid.
+    error: text('error'),
+    payload: jsonb('payload').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+  },
+  table => ({
+    // Cron: "what's due to send now that hasn't sent yet?"
+    pendingIdx: index('push_deliveries_pending_idx').on(table.scheduledFor),
+    // Frequency cap: "how many notes has X received today?"
+    userScheduledIdx: index('push_deliveries_user_scheduled_idx').on(
+      table.userId,
+      table.scheduledFor
+    ),
+    // Per-kid cap: "already sent about kid K to X today?"
+    userKidIdx: index('push_deliveries_user_kid_idx').on(
+      table.userId,
+      table.kidId,
+      table.scheduledFor
+    ),
+  })
+);
+
+// ─────────────────────────────────────────────────────────────────
 //  Type exports — for use across the app
 // ─────────────────────────────────────────────────────────────────
 
@@ -1306,3 +1424,12 @@ export type NewMobileUser = typeof mobileUsers.$inferInsert;
 
 export type MobileTokenRevocation = typeof mobileTokenRevocations.$inferSelect;
 export type NewMobileTokenRevocation = typeof mobileTokenRevocations.$inferInsert;
+
+export type PushDevice = typeof pushDevices.$inferSelect;
+export type NewPushDevice = typeof pushDevices.$inferInsert;
+
+export type PushPromptHistoryRow = typeof pushPromptHistory.$inferSelect;
+export type NewPushPromptHistoryRow = typeof pushPromptHistory.$inferInsert;
+
+export type PushDelivery = typeof pushDeliveries.$inferSelect;
+export type NewPushDelivery = typeof pushDeliveries.$inferInsert;
