@@ -329,7 +329,20 @@ function shuffle<T>(src: T[]): T[] {
 
 /* ── Per-shirt card ─────────────────────────────────────────── */
 
-const SIZES = ['S', 'M', 'L', 'XL', '2XL'];
+// Adult run (Bella+Canvas 3001 base). Standard S–2XL.
+const ADULT_SIZES = ['S', 'M', 'L', 'XL', '2XL'] as const;
+
+// Youth run, added July 2026 for kid-sized shirts. Stored as literal
+// "Youth S" / "Youth M" / "Youth L" strings end-to-end (Zod validators
+// on every checkout route accept the same values) so email
+// confirmations, packing slips, and admin surfaces just render them
+// without any translation layer. Button labels use short "YS/YM/YL"
+// for space; the *value* passed on submit is the full string.
+const YOUTH_SIZES: ReadonlyArray<{ value: string; label: string }> = [
+  { value: 'Youth S', label: 'YS' },
+  { value: 'Youth M', label: 'YM' },
+  { value: 'Youth L', label: 'YL' },
+];
 
 /**
  * Single preview slot — design on a tee silhouette, no hover-zoom toggle.
@@ -486,22 +499,52 @@ function ShirtCard({ shirt, reversed }: { shirt: Shirt; reversed: boolean }) {
               <p className="text-xs text-[#666]">{shirt.color}</p>
             </div>
 
-            {/* Size selector */}
+            {/* Size selector — Adult row + Youth row.
+                Rendered as two separate labeled groups so a parent
+                buying for a kid can see the youth options clearly and
+                a bigger buyer isn't accidentally scanning past them. */}
             <p className="text-xs text-[#999] uppercase tracking-wider font-bold mb-2">Size</p>
-            <div className="flex gap-2 mb-4">
-              {SIZES.map((size) => (
-                <button
-                  key={size}
-                  onClick={() => { setSelectedSize(size); setError(null); }}
-                  className={`w-12 h-10 text-sm font-semibold border transition-all cursor-pointer ${
-                    selectedSize === size
-                      ? 'bg-[#0d0d0d] text-white border-[#0d0d0d]'
-                      : 'bg-white text-[#555] border-[#e8e0d4] hover:border-[#999]'
-                  }`}
-                >
-                  {size}
-                </button>
-              ))}
+
+            {/* Adult sizes */}
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-[10px] text-[#aaa] uppercase tracking-[0.12em] font-semibold w-10 shrink-0">Adult</span>
+              <div className="flex gap-2 flex-wrap">
+                {ADULT_SIZES.map((size) => (
+                  <button
+                    key={size}
+                    onClick={() => { setSelectedSize(size); setError(null); }}
+                    className={`w-12 h-10 text-sm font-semibold border transition-all cursor-pointer ${
+                      selectedSize === size
+                        ? 'bg-[#0d0d0d] text-white border-[#0d0d0d]'
+                        : 'bg-white text-[#555] border-[#e8e0d4] hover:border-[#999]'
+                    }`}
+                  >
+                    {size}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Youth sizes */}
+            <div className="flex items-center gap-2 mb-4">
+              <span className="text-[10px] text-[#aaa] uppercase tracking-[0.12em] font-semibold w-10 shrink-0">Youth</span>
+              <div className="flex gap-2 flex-wrap">
+                {YOUTH_SIZES.map(({ value, label }) => (
+                  <button
+                    key={value}
+                    onClick={() => { setSelectedSize(value); setError(null); }}
+                    className={`w-12 h-10 text-sm font-semibold border transition-all cursor-pointer ${
+                      selectedSize === value
+                        ? 'bg-[#0d0d0d] text-white border-[#0d0d0d]'
+                        : 'bg-white text-[#555] border-[#e8e0d4] hover:border-[#999]'
+                    }`}
+                    aria-label={value}
+                    title={value}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
             </div>
 
             {error && (

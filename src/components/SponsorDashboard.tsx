@@ -53,7 +53,14 @@ const PORTAL_DESIGNS: { id: string; name: string; color: string; price: number }
   { id: 'blossom', name: 'Blossom', color: 'Blossom', price: 25 },
   { id: 'sky', name: 'Sky', color: 'Sky', price: 25 },
 ];
-const PORTAL_SIZES = ['S', 'M', 'L', 'XL', '2XL'] as const;
+const PORTAL_ADULT_SIZES = ['S', 'M', 'L', 'XL', '2XL'] as const;
+// Youth run added July 2026. Value = full "Youth S" string (matches
+// downstream storage); label = short "YS" for the compact picker.
+const PORTAL_YOUTH_SIZES: ReadonlyArray<{ value: string; label: string }> = [
+  { value: 'Youth S', label: 'YS' },
+  { value: 'Youth M', label: 'YM' },
+  { value: 'Youth L', label: 'YL' },
+];
 
 // A single timeline entry — the component merges updates and computed
 // milestones into this shape and sorts chronologically. Sponsor-to-child
@@ -334,21 +341,45 @@ function ShopYourNumberSection({
                 <div className="px-4 py-4 border-t border-[#D4A843]/40 space-y-3">
                   <div>
                     <p className="text-[10px] font-bold uppercase tracking-wider text-[#999] mb-1.5">Size</p>
-                    <div className="flex gap-1.5">
-                      {PORTAL_SIZES.map((s) => (
-                        <button
-                          key={s}
-                          type="button"
-                          onClick={() => { setSize(s); setError(null); }}
-                          className={`w-10 h-9 text-xs font-semibold border transition-colors cursor-pointer ${
-                            size === s
-                              ? 'bg-[#0d0d0d] text-white border-[#0d0d0d]'
-                              : 'bg-white text-[#555] border-[#e8e0d4] hover:border-[#999]'
-                          }`}
-                        >
-                          {s}
-                        </button>
-                      ))}
+                    <div className="flex items-center gap-1.5 mb-1.5">
+                      <span className="text-[9px] text-[#aaa] uppercase tracking-wider font-semibold w-9 shrink-0">Adult</span>
+                      <div className="flex gap-1.5 flex-wrap">
+                        {PORTAL_ADULT_SIZES.map((s) => (
+                          <button
+                            key={s}
+                            type="button"
+                            onClick={() => { setSize(s); setError(null); }}
+                            className={`w-10 h-9 text-xs font-semibold border transition-colors cursor-pointer ${
+                              size === s
+                                ? 'bg-[#0d0d0d] text-white border-[#0d0d0d]'
+                                : 'bg-white text-[#555] border-[#e8e0d4] hover:border-[#999]'
+                            }`}
+                          >
+                            {s}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[9px] text-[#aaa] uppercase tracking-wider font-semibold w-9 shrink-0">Youth</span>
+                      <div className="flex gap-1.5 flex-wrap">
+                        {PORTAL_YOUTH_SIZES.map(({ value, label }) => (
+                          <button
+                            key={value}
+                            type="button"
+                            onClick={() => { setSize(value); setError(null); }}
+                            className={`w-10 h-9 text-xs font-semibold border transition-colors cursor-pointer ${
+                              size === value
+                                ? 'bg-[#0d0d0d] text-white border-[#0d0d0d]'
+                                : 'bg-white text-[#555] border-[#e8e0d4] hover:border-[#999]'
+                            }`}
+                            aria-label={value}
+                            title={value}
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   </div>
                   {error && <p className="text-xs text-red-600">{error}</p>}

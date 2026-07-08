@@ -10,12 +10,21 @@ const SHIRTS = [
 ] as const;
 type ShirtId = typeof SHIRTS[number]['id'];
 
-const SIZES = ['S', 'M', 'L', 'XL', '2XL'] as const;
+const ADULT_SIZES = ['S', 'M', 'L', 'XL', '2XL'] as const;
+// Youth run added July 2026. Value = full "Youth S" string (matches
+// storage end-to-end); label = short "YS" for the market booth
+// checkout which is space-constrained on iPad.
+const YOUTH_SIZES: ReadonlyArray<{ value: string; label: string }> = [
+  { value: 'Youth S', label: 'YS' },
+  { value: 'Youth M', label: 'YM' },
+  { value: 'Youth L', label: 'YL' },
+];
+type SizeValue = typeof ADULT_SIZES[number] | 'Youth S' | 'Youth M' | 'Youth L';
 
 type CartItem = {
   id: string;            // local UI id for keying
   shirtId: ShirtId;
-  size: typeof SIZES[number];
+  size: SizeValue;
   continueMonthly: boolean;
 };
 
@@ -212,10 +221,12 @@ function ShirtRow({
         </p>
       </div>
 
-      {/* Size row */}
+      {/* Size row — Adult on top, Youth below. Larger buttons for
+          the booth-iPad touch target; two rows keep the visual weight
+          balanced. */}
       <div className="mb-3">
-        <div className="grid grid-cols-5 gap-1.5">
-          {SIZES.map(s => (
+        <div className="grid grid-cols-5 gap-1.5 mb-1.5">
+          {ADULT_SIZES.map(s => (
             <button
               key={s}
               type="button"
@@ -230,6 +241,28 @@ function ShirtRow({
               {s}
             </button>
           ))}
+        </div>
+        <div className="grid grid-cols-5 gap-1.5">
+          {YOUTH_SIZES.map(({ value, label }) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => onPatch({ size: value as SizeValue })}
+              className={`py-3 text-sm font-bold border-2 transition-all ${
+                item.size === value
+                  ? 'border-[#D4A843] bg-[#FFF8F0] text-[#0d0d0d]'
+                  : 'border-[#e8e0d4] bg-white text-[#777] hover:border-[#aaa]'
+              }`}
+              aria-pressed={item.size === value}
+              aria-label={value}
+              title={value}
+            >
+              {label}
+            </button>
+          ))}
+          {/* Fill the row so grid alignment matches Adult row */}
+          <div />
+          <div />
         </div>
       </div>
 

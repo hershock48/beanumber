@@ -41,7 +41,8 @@ const SHIRT_PRICE = 25;
 const purchaseSchema = z.object({
   sponsorCode: z.string().min(1).max(64),
   shirtId: z.enum(['onyx', 'meadow', 'blossom', 'sky']),
-  size: z.enum(['S', 'M', 'L', 'XL', '2XL']),
+  // Adult run S–2XL plus the July 2026 youth run.
+  size: z.enum(['S', 'M', 'L', 'XL', '2XL', 'Youth S', 'Youth M', 'Youth L']),
   color: z.enum(['Onyx', 'Meadow', 'Blossom', 'Sky']),
 });
 

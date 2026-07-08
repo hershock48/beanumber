@@ -37,7 +37,8 @@ const SHIRTS: Record<string, { name: string }> = {
   sky: { name: 'Sky' },
 };
 
-const VALID_SIZES = ['S', 'M', 'L', 'XL', '2XL'] as const;
+// Adult run S–2XL plus the July 2026 youth run.
+const VALID_SIZES = ['S', 'M', 'L', 'XL', '2XL', 'Youth S', 'Youth M', 'Youth L'] as const;
 const VALID_COLORS = ['Onyx', 'Meadow', 'Blossom', 'Sky'] as const;
 const SHIRT_PRICE = 25;
 
