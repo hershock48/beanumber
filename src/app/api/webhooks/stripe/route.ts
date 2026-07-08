@@ -2092,7 +2092,20 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
       // own child assignment. Items with continueMonthly get a deferred
       // Stripe subscription created using the saved payment method.
       const itemsJson = session.metadata?.items_json || '[]';
-      let cartItems: Array<{ i: number; s: string; n: string; c: string; z: string; m: number }> = [];
+      // Legacy sessions (pre-July 2026) carried n and c as separate
+      // fields. New sessions omit both — they're derivable from s
+      // (shirtId) via the SHIRT_NAMES map below. The type keeps both
+      // as optional for the transition window; any in-flight legacy
+      // session still parses cleanly and we fall back to item.n/item.c
+      // if present.
+      let cartItems: Array<{
+        i: number;
+        s: string;
+        n?: string;
+        c?: string;
+        z: string;
+        m: number;
+      }> = [];
       try {
         cartItems = JSON.parse(itemsJson);
       } catch (e) {
@@ -2103,6 +2116,17 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
 
       const donorId = await donorPromise;
       console.log('[WH] S3: donor resolved for cart, id=' + donorId);
+
+      // All 4 shirt designs are named after their color, so shirtName
+      // and shirtColor collapse to the same titlecase string. Kept as
+      // separate downstream fields because email templates + admin
+      // surfaces still render them as separate columns.
+      const SHIRT_NAMES: Record<string, string> = {
+        onyx: 'Onyx',
+        meadow: 'Meadow',
+        blossom: 'Blossom',
+        sky: 'Sky',
+      };
 
       // Stockpile model (May 2026 forward): no per-item child assignment.
       // Kevin pulls pre-printed shirts that match color+size from inventory
@@ -2115,8 +2139,8 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
         continueMonthly: boolean;
       }> = cartItems.map(item => ({
         itemIndex: item.i,
-        shirtName: item.n,
-        shirtColor: item.c,
+        shirtName: item.n ?? SHIRT_NAMES[item.s] ?? item.s,
+        shirtColor: item.c ?? SHIRT_NAMES[item.s] ?? item.s,
         shirtSize: item.z,
         continueMonthly: item.m === 1,
       }));

@@ -18,8 +18,12 @@ import { db } from '@/lib/db/client';
 import { fulfillments } from '@/lib/db/schema';
 import { and, eq } from 'drizzle-orm';
 
+// Size sort order — Youth first (smallest bodies), then Adult small→big.
+// Keys MUST match what's actually stored in fulfillments.size: full
+// strings like "Youth S", not short codes. Short codes here were a
+// dev-time typo that would silently sort youth rows to the bottom.
 const SIZE_ORDER: Record<string, number> = {
-  YS: 0, YM: 1, YL: 2,
+  'Youth S': 0, 'Youth M': 1, 'Youth L': 2,
   S: 3, M: 4, L: 5, XL: 6, '2XL': 7, '3XL': 8, '4XL': 9,
 };
 

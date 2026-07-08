@@ -73,7 +73,13 @@ import { useSearchParams } from 'next/navigation';
 // read — they understand &ldquo;Pink,&rdquo; they may not parse
 // &ldquo;Blossom.&rdquo; The brand color names stay on the website where
 // context makes them feel intentional.
-export const SIZE_OPTIONS = ['S', 'M', 'L', 'XL', 'XXL'] as const;
+// Adult run S–2XL + Youth run added July 2026. XXL removed — the
+// storefront never sold XXL; it was a dev-time typo from before the
+// site used '2XL' consistently.
+export const SIZE_OPTIONS = [
+  'Youth S', 'Youth M', 'Youth L',
+  'S', 'M', 'L', 'XL', '2XL',
+] as const;
 export const COLOR_OPTIONS = ['Pink', 'Green', 'Black', 'Blue'] as const;
 
 const LORA = 'var(--font-lora), Georgia, "Times New Roman", serif';

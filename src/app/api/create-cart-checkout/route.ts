@@ -89,11 +89,17 @@ export async function POST(request: NextRequest) {
 
     // Per-item metadata for the webhook (so it can build Fulfillment
     // and (when monthly) Sponsorship rows).
+    //
+    // Compact shape — Stripe caps each metadata VALUE at 500 chars,
+    // and this whole array serializes into one string. Dropped `n`
+    // (name) and `c` (color) — both are derivable from `s` (shirtId)
+    // via the SHIRTS map on the webhook side. For a 10-shirt cart with
+    // youth-size values, this keeps items_json around 420 chars vs.
+    // ~700 with the full shape, leaving comfortable margin under the
+    // 500-char cap even for future field additions.
     const itemsMeta = items.map((item, i) => ({
       i: i,
       s: item.shirtId,
-      n: SHIRTS[item.shirtId]!.name,
-      c: item.color,
       z: item.size,
       m: item.continueMonthly ? 1 : 0,
     }));
