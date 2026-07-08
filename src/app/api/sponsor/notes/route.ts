@@ -72,12 +72,54 @@ export async function POST(request: NextRequest) {
     childIdLegacy?: string;
     bodyEn?: string;
     sponsorName?: string;
+    /**
+     * Sponsor-attached photos (2026-07-08). Array of public URLs
+     * previously returned from POST /api/sponsor/notes/photo. Hard
+     * cap of 2 per note — sponsors can send more by writing another
+     * note in the next cycle. Each URL must be http(s); malformed
+     * entries reject the whole POST rather than silently drop, so
+     * the sponsor isn't left wondering where their photo went.
+     */
+    attachments?: string[];
   };
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
+
+  // Attachment sanitization — cap at 2, validate URLs, drop empties.
+  const MAX_ATTACHMENTS = 2;
+  const rawAttachments = Array.isArray(body.attachments) ? body.attachments : [];
+  if (rawAttachments.length > MAX_ATTACHMENTS) {
+    return NextResponse.json(
+      { error: `You can attach up to ${MAX_ATTACHMENTS} photos per note.` },
+      { status: 400 }
+    );
+  }
+  const attachmentEntries: Array<{ url: string; uploadedAt: string }> = [];
+  const nowIso = new Date().toISOString();
+  for (const raw of rawAttachments) {
+    if (typeof raw !== 'string') continue;
+    const trimmed = raw.trim();
+    if (!trimmed) continue;
+    try {
+      const u = new URL(trimmed);
+      if (u.protocol !== 'https:' && u.protocol !== 'http:') {
+        throw new Error('bad protocol');
+      }
+      attachmentEntries.push({ url: u.toString(), uploadedAt: nowIso });
+    } catch {
+      return NextResponse.json(
+        {
+          error:
+            'One of the attached photos has a malformed URL. Re-upload and try again.',
+        },
+        { status: 400 }
+      );
+    }
+  }
+  const attachments = attachmentEntries.length > 0 ? attachmentEntries : null;
 
   const rawBody = (body.bodyEn ?? '').trim();
   if (rawBody.length < MIN_BODY) {
@@ -231,6 +273,9 @@ export async function POST(request: NextRequest) {
         direction: 'sponsor_to_kid',
         bodyEn: rawBody,
         status: 'pending',
+        // Sponsor-attached photos (2026-07-08). Null when the sponsor
+        // sent a text-only note, which is still the common case.
+        attachments,
       })
       .returning({ id: kidMessages.id, status: kidMessages.status });
 

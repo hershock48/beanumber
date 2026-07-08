@@ -40,12 +40,26 @@ interface ClaimGateProps {
 }
 
 export function ClaimGate({
-  shirtNumber,
-  firstName,
-  viewerLooksLikeBuyer,
-  viewerIsRecognized,
+  shirtNumber: _shirtNumber,
+  firstName: _firstName,
+  viewerLooksLikeBuyer: _viewerLooksLikeBuyer,
+  viewerIsRecognized: _viewerIsRecognized,
   children,
 }: ClaimGateProps) {
+  // ── Neutralized 2026-07-08 ────────────────────────────────────────
+  // Kevin: the sign-in strip at the top of the page ("Sponsoring
+  // monthly or hold a Be A Number shirt? Sign in →") already covers
+  // the ask, so the blurred bio + dark "You bought #N. Claim it."
+  // card is redundant and interrupts the reveal. Passthrough the
+  // children unchanged; the whole gate render path is skipped.
+  //
+  // File kept in the tree (not deleted) so the wrapper contract stays
+  // intact and we can reintroduce the treatment behind a flag later
+  // if we want. All the state / effect wiring below is dead code
+  // under this branch — leaving it in place minimizes the diff for
+  // now and makes reactivation a two-line change (delete this branch
+  // and re-enable the render).
+  return <>{children}</>;
   // Three independent flags that ALL must be true for the gate to
   // actually render its CSS-affecting wrapper:
   //   decided      — we've checked viewer state + localStorage

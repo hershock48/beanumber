@@ -25,7 +25,11 @@ import { ClaimThisNumberCard } from './ClaimThisNumberCard';
 import { ClaimGate } from './ClaimGate';
 import { LocationBlock } from './LocationBlock';
 import { YourKidsStrip } from '@/components/YourKidsStrip';
-import { AlreadySponsoringBanner } from './AlreadySponsoringBanner';
+// AlreadySponsoringBanner deprecated 2026-07-08 — Kevin consolidated
+// the top black banner into the slim strip that already lived below
+// the breadcrumb (see the anon branch of the viewer-state strip). The
+// component file stays in the tree for now in case we want to bring
+// that shimmer treatment back somewhere else.
 import { RecentKidsTracker } from '@/components/RecentKidsTracker';
 import { MarkKidUpdatesSeen } from '@/components/MarkKidUpdatesSeen';
 import {
@@ -1385,18 +1389,12 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
           don't have to bounce through /me to switch between kids. */}
       <YourKidsStrip excludeShirtNumber={Number(number)} />
 
-      {/* Already-sponsoring banner — slim, dismissible, only shown to
-          unsigned visitors (sponsors and holders already see their
-          acknowledgment further down; this is the off-ramp for the
-          existing-sponsor-on-new-device case who would otherwise
-          panic at the public view). Also suppressed for viewers
-          who have a session cookie for a DIFFERENT kid — they're
-          already signed in, asking them to sign in again is wrong. */}
-      {!child.viewer_is_sponsor &&
-        !child.viewer_is_holder &&
-        !child.viewer_signed_in && (
-          <AlreadySponsoringBanner shirtNumber={Number(number)} />
-        )}
+      {/* Old top-of-page banner deleted 2026-07-08. Kevin: too many
+          sign-in surfaces stacked. The consolidated ask lives in the
+          slim strip below the breadcrumb (viewer-state strip, anon
+          branch), which now covers both monthly-sponsors-on-new-
+          device AND shirt-holders in one line and picks up the same
+          gold shimmer treatment. */}
 
       {/* Departure now uses auto-reveal (June 2026, core_model.md
           §0b). The old 3-card chooser short-circuit lived here; it
@@ -1463,21 +1461,70 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
               </Link>
             </div>
           ) : (
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 py-3 border-y border-[#e8e0d4] mb-8">
-              <div>
-                <span className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mr-3">
-                  Not signed in
-                </span>
-                <span className="text-[15px] text-[#555]">
-                  Have a Be A Number shirt? Sign in to claim your number.
-                </span>
+            /* Anon strip — post-2026-07-08 consolidation. Covers both
+               populations that used to get their own surface:
+                 - Monthly sponsors landing on a new device (was:
+                   AlreadySponsoringBanner at page top).
+                 - Shirt-holders who haven't signed in yet (was: the
+                   old "NOT SIGNED IN — Have a Be A Number shirt?" line).
+               One line, one CTA. The gold-shimmer treatment moved
+               over from the killed AlreadySponsoringBanner so the
+               moment still catches the eye of a returning sponsor
+               who might otherwise scroll past. */
+            <div className="relative overflow-hidden ban-viewer-strip-shimmer-host py-3 border-y border-[#e8e0d4] mb-8">
+              <style>{`
+                @keyframes banViewerStripShimmer {
+                  0% {
+                    transform: translateX(-120%) skewX(-18deg);
+                    opacity: 0;
+                  }
+                  15% { opacity: 1; }
+                  85% { opacity: 1; }
+                  100% {
+                    transform: translateX(120%) skewX(-18deg);
+                    opacity: 0;
+                  }
+                }
+                .ban-viewer-strip-shimmer-host::after {
+                  content: '';
+                  position: absolute;
+                  top: 0;
+                  bottom: 0;
+                  left: 0;
+                  width: 35%;
+                  background: linear-gradient(
+                    90deg,
+                    transparent 0%,
+                    rgba(212, 168, 67, 0.0) 20%,
+                    rgba(212, 168, 67, 0.35) 50%,
+                    rgba(212, 168, 67, 0.0) 80%,
+                    transparent 100%
+                  );
+                  pointer-events: none;
+                  animation:
+                    banViewerStripShimmer 1.8s ease-out 0.4s,
+                    banViewerStripShimmer 1.8s ease-out 5.4s;
+                  animation-fill-mode: both;
+                  mix-blend-mode: multiply;
+                }
+              `}</style>
+              <div className="relative z-10 flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+                <div>
+                  <span className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mr-3">
+                    Not signed in
+                  </span>
+                  <span className="text-[15px] text-[#555]">
+                    Sponsoring monthly or hold a Be A Number shirt?
+                    Sign in to your view.
+                  </span>
+                </div>
+                <Link
+                  href={`/sponsor/login?next=${encodeURIComponent(`/children/${number}`)}`}
+                  className="text-sm font-bold text-[#D4A843] hover:underline whitespace-nowrap"
+                >
+                  Sign in &rarr;
+                </Link>
               </div>
-              <Link
-                href={`/sponsor/login?next=${encodeURIComponent(`/children/${number}`)}`}
-                className="text-sm font-bold text-[#D4A843] hover:underline whitespace-nowrap"
-              >
-                Sign in &rarr;
-              </Link>
             </div>
           )
         )}

@@ -1162,6 +1162,17 @@ export const kidMessages = pgTable(
     replyImageUploadedAt: timestamp('reply_image_uploaded_at', {
       withTimezone: true,
     }),
+    // ── Sponsor-attached photos (2026-07-08) ────────────────────────
+    // Only populated on direction='sponsor_to_kid' rows. jsonb array
+    // of {url, uploadedAt} objects, hard-capped at 2 entries by the
+    // write path (see /api/sponsor/notes). Simon prints these in-
+    // country and hands them to the kid with the delivered letter.
+    // The sponsor also sees them in their own thread history so the
+    // note stays part of the arc. Nullable — pre-migration and
+    // no-attachment notes render exactly as before.
+    attachments: jsonb('attachments').$type<
+      Array<{ url: string; uploadedAt: string }>
+    >(),
   },
   table => ({
     // Simon's queue is ordered by status then age. Composite index

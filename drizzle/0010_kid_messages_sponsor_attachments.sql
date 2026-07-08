@@ -1,0 +1,33 @@
+-- Sponsor-side photo attachments on penpal notes.
+--
+-- A sponsor writing to their kid can attach up to 2 photos alongside
+-- the note (photo of their own kid, their dog, their neighborhood,
+-- etc.). Simon prints the photos in-country and hands them to the
+-- kid with the delivered letter. Sponsor also sees the photos in
+-- their own thread history on /children/[N] and on /me — the note
+-- doesn't just disappear once sent, it becomes part of the arc.
+--
+-- Shape: jsonb array of {url, uploadedAt} objects, cap-enforced at
+-- the write path (max 2 per note). JSON was chosen over a side
+-- table because attachments are always fetched with their parent
+-- row, never queried in isolation, and never edited after creation.
+-- A side table would add a join for every thread read with no
+-- corresponding query flexibility gain.
+--
+-- Nullable so pre-migration rows keep rendering — an old
+-- sponsor_to_kid note without attachments continues to display
+-- normally, and an old kid_to_sponsor reply row is unaffected too
+-- (this column is only populated on sponsor_to_kid rows going
+-- forward).
+--
+-- See:
+--   * src/app/api/sponsor/notes/route.ts — POST accepts attachments
+--   * src/app/api/sponsor/notes/photo/route.ts — upload endpoint
+--   * src/app/children/[number]/SendNoteComposer.tsx — picker UI
+--   * src/app/children/[number]/NotesThread.tsx — render on kid page
+--   * src/app/admin/messages/MessagesQueue.tsx — Simon sees + prints
+--
+-- Kevin approved defaults 2026-07-08.
+
+ALTER TABLE kid_messages
+  ADD COLUMN IF NOT EXISTS attachments jsonb;
