@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>BAN — Shirt bag labels (thermal print)</title>
+<style>
+  /* ────────────────────────────────────────────────────────────────
+     Page size: 4" × 2" — a common premium-label size for poly mailers.
+     If your FlashPro stock is different (DYMO 2.25"×1.25", Rollo 4"×6",
+     etc.), change ALL FOUR of these values to match:
+        @page { size: WIDTH HEIGHT }
+        .label { width: WIDTH; height: HEIGHT }
+     Everything else (typography, spacing) scales naturally.
+     ──────────────────────────────────────────────────────────────── */
+
+  @page {
+    size: 4in 2in;
+    margin: 0;
+  }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: #fafafa;
+    color: black;
+    font-family: Georgia, 'Times New Roman', serif;
+  }
+
+  /* On-screen controls (hidden when printing) */
+  .controls {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 28px 28px 12px;
+    background: #fff;
+    border-bottom: 1px solid #e8e0d4;
+  }
+  .controls h1 {
+    font-size: 20px;
+    margin: 0 0 6px 0;
+    color: #0d0d0d;
+  }
+  .controls p {
+    font-size: 14px;
+    line-height: 1.55;
+    color: #555;
+    margin: 6px 0;
+  }
+  .controls code {
+    background: #f5f0e8;
+    padding: 1px 5px;
+    font-size: 13px;
+  }
+  .controls .row {
+    margin-top: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .controls input {
+    font-family: ui-monospace, Menlo, monospace;
+    font-size: 16px;
+    padding: 9px 12px;
+    flex: 1;
+    min-width: 260px;
+    border: 1px solid #999;
+    border-radius: 0;
+  }
+  .controls button {
+    font-size: 14px;
+    padding: 9px 18px;
+    cursor: pointer;
+    border: 1px solid #0d0d0d;
+    background: #0d0d0d;
+    color: #fff;
+    letter-spacing: 0.04em;
+  }
+  .controls button:hover { background: #333; }
+  .controls .count {
+    font-size: 13px;
+    color: #888;
+    margin-top: 8px;
+  }
+
+  /* ────────────────────────────────────────────────────────────────
+     The label itself. On screen it shows a dashed border; on print
+     the border disappears and each label gets its own page.
+     ──────────────────────────────────────────────────────────────── */
+  .label {
+    width: 4in;
+    height: 2in;
+    box-sizing: border-box;
+    padding: 0.22in 0.32in;
+    margin: 20px auto;
+    background: white;
+    color: black;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    text-align: center;
+    border: 1px dashed #ccc;
+    page-break-after: always;
+    page-break-inside: avoid;
+  }
+
+  .label .wordmark {
+    font-size: 9pt;
+    font-weight: 700;
+    letter-spacing: 0.32em;
+    text-transform: uppercase;
+    margin: 0;
+    /* Tiny black cross-bar above wordmark, optional brand mark */
+  }
+  .label .wordmark::before {
+    content: '';
+    display: block;
+    width: 0.45in;
+    height: 2.5pt;
+    background: black;
+    margin: 0 auto 8pt;
+  }
+
+  .label .action {
+    font-size: 26pt;
+    font-weight: 700;
+    line-height: 1.05;
+    letter-spacing: 0;
+    margin: 0;
+    font-style: italic;
+  }
+
+  .label .size {
+    font-size: 10pt;
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+    font-weight: 600;
+    margin: 0;
+  }
+  .label .size .value {
+    font-size: 18pt;
+    margin-left: 0.4em;
+    font-weight: 800;
+    letter-spacing: 0;
+  }
+
+  @media print {
+    html, body { background: white; }
+    .controls { display: none !important; }
+    .label {
+      border: none;
+      margin: 0;
+      page-break-after: always;
+    }
+    .label:last-child { page-break-after: auto; }
+  }
+</style>
+</head>
+<body>
+
+<div class="controls">
+  <h1>Be A Number — bag labels</h1>
+  <p>Type the sizes you want, comma-separated. One label per size. Repeat a size to print multiple.</p>
+  <p>
+    Examples: &nbsp;
+    <code>M</code> &nbsp;·&nbsp;
+    <code>S, M, M, L, L, XL</code> &nbsp;·&nbsp;
+    <code>M, M, M, M, M, M</code>
+  </p>
+  <div class="row">
+    <input id="sizes" type="text" value="M" placeholder="S, M, M, L, L, XL" autofocus>
+    <button onclick="generate()">Generate</button>
+    <button onclick="window.print()">Print</button>
+  </div>
+  <p class="count" id="count"></p>
+  <p style="margin-top: 14px; color: #888;">
+    Print settings: paper size <strong>4 × 2 in</strong> (or whatever your label stock is — match the @page CSS at the top of this file), margins <strong>None</strong>, background graphics <strong>On</strong>.
+  </p>
+</div>
+
+<div id="labels"></div>
+
+<script>
+  function generate() {
+    const raw = document.getElementById('sizes').value || '';
+    const sizes = raw.split(/[,\s]+/).map(s => s.trim().toUpperCase()).filter(Boolean);
+    const container = document.getElementById('labels');
+    container.innerHTML = '';
+    for (const size of sizes) {
+      const div = document.createElement('div');
+      div.className = 'label';
+      div.innerHTML = `
+        <p class="wordmark">Be A Number</p>
+        <p class="action">Open to meet them.</p>
+        <p class="size">Size <span class="value">${escapeHtml(size)}</span></p>
+      `;
+      container.appendChild(div);
+    }
+    document.getElementById('count').textContent =
+      sizes.length === 0
+        ? 'No labels yet.'
+        : sizes.length + ' label' + (sizes.length === 1 ? '' : 's') + ' below — ready to print.';
+  }
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+  document.getElementById('sizes').addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); generate(); }
+  });
+  generate();
+</script>
+
+</body>
+</html>

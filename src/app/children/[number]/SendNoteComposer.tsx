@@ -88,22 +88,16 @@ export function SendNoteComposer({
 
   return (
     <section className="mb-10 md:mb-14 max-w-2xl mx-auto">
-      <div className="text-center mb-6 md:mb-8">
-        <p className="text-xs font-bold uppercase tracking-[0.3em] text-[#D4A843] mb-2">
-          Penpal
-        </p>
-        <h2
-          className="text-2xl md:text-3xl text-[#0d0d0d] leading-tight"
-          style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
-        >
-          Write your penpal ({firstName}).
-        </h2>
-        <p className="text-[#666] mt-3 leading-relaxed max-w-lg mx-auto">
-          The team at the campus reads every penpal note, translates it, and
-          hands it to {firstName} in person. Deliveries happen in
-          weekly batches, usually on a Sunday.
-        </p>
-      </div>
+      {/* No inner header/label here — the outer PenpalBox already
+          renders the "PENPAL / Write {firstName}. {firstName} writes
+          back." section header. Duplicating it here made the sponsor
+          surface show two PENPAL headings back-to-back. Just the
+          descriptor + composer states below. */}
+      <p className="text-center text-[#666] mb-6 md:mb-8 leading-relaxed max-w-lg mx-auto">
+        The team at the campus reads every penpal note, translates it, and
+        hands it to {firstName} in person. Deliveries happen in
+        weekly batches, usually on a Sunday.
+      </p>
 
       {stage === 'queued' ? (
         <div className="bg-[#f5efe4] border border-[#e8e0d4] p-6 md:p-7 text-center">

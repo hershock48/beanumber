@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>BAN Shirt Insert — Print Ready</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Lora:wght@400;600;700&display=swap');
+
+  @page {
+    size: 3.75in 8.8in;
+    margin: 0;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body {
+    background: #ffffff;
+    color: #2a1f14;
+    font-family: 'Lora', Georgia, serif;
+  }
+
+  .page {
+    width: 3.75in;
+    height: 8.8in;
+    page-break-after: always;
+    page-break-inside: avoid;
+    position: relative;
+    overflow: hidden;
+  }
+  .page:last-child { page-break-after: auto; }
+
+  /* ─── Outside (single sheet, folds in half) ─── */
+  .outside {
+    display: flex;
+    flex-direction: column;
+  }
+  .outside .half {
+    width: 3.75in;
+    height: 4.4in;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 0.45in 0.4in;
+  }
+  /* Front cover lives on the BOTTOM half of the printed sheet
+     so that when the sheet is folded with the fold at the TOP,
+     the front cover ends up facing out (right-side-up). */
+  .outside .back {
+    /* top half on the printed sheet → back of folded card.
+       Rotated 180° so it reads upright after the sheet is folded
+       in half and the card is flipped over to view the back. */
+    transform: rotate(180deg);
+  }
+  .outside .front {
+    /* bottom half → front cover when folded */
+  }
+
+  .cross-logo {
+    width: 0.7in;
+    height: 0.7in;
+    margin-bottom: 0.4in;
+  }
+  .cross-logo-small {
+    width: 0.45in;
+    height: 0.45in;
+    opacity: 1;
+    margin-bottom: 0.28in;
+  }
+
+  .headline {
+    font-family: 'Lora', serif;
+    font-weight: 600;
+    font-size: 26px;
+    line-height: 1.32;
+    color: #2a1f14;
+  }
+
+  .sub {
+    font-size: 11px;
+    color: #000000;
+    margin-top: 0.5in;
+    letter-spacing: 0.06em;
+  }
+
+  .back-text {
+    font-size: 11.5px;
+    line-height: 1.85;
+    color: #000000;
+  }
+
+  .back-url {
+    font-family: 'Lora', serif;
+    font-weight: 600;
+    font-size: 12.5px;
+    color: #000000;
+    margin-top: 0.28in;
+    letter-spacing: 0.04em;
+  }
+
+  /* ─── Inside (single sheet, full 8.8" spread, split into two
+         4.4" panels so each side of the open card is balanced) ─── */
+  .inside {
+    display: flex;
+    flex-direction: column;
+  }
+  .inside-half {
+    width: 3.75in;
+    height: 4.4in;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 0.4in 0.4in;
+  }
+  .inside-half-top {
+    /* fold line guide removed per request */
+  }
+  .inside-top {
+    text-align: center;
+    width: 100%;
+  }
+  .inside-top .body-text {
+    font-size: 12.5px;
+    line-height: 1.8;
+    color: #000000;
+    margin-bottom: 0.28in;
+  }
+  .divider {
+    width: 38px;
+    height: 1px;
+    background: #000000;
+    margin: 0.25in auto;
+  }
+  .reveal-text {
+    font-family: 'Lora', serif;
+    font-weight: 600;
+    font-size: 15px;
+    line-height: 1.55;
+    color: #000000;
+  }
+  .reveal-text + .reveal-text { margin-top: 0.15in; }
+
+  .inside-bottom {
+    text-align: center;
+    width: 100%;
+  }
+  .qr-code {
+    width: 1.25in;
+    height: 1.25in;
+    margin: 0 auto 0.18in;
+  }
+  .qr-code img {
+    width: 100%;
+    height: 100%;
+    image-rendering: pixelated;
+  }
+  .url {
+    font-family: 'Lora', serif;
+    font-weight: 600;
+    font-size: 14px;
+    color: #000000;
+    letter-spacing: 0.04em;
+    margin-bottom: 0.08in;
+  }
+  .instruction {
+    font-size: 12px;
+    color: #000000;
+    letter-spacing: 0.06em;
+  }
+  .note {
+    font-size: 10px;
+    color: #000000;
+    margin-top: 0.32in;
+    line-height: 1.55;
+  }
+</style>
+</head>
+<body>
+
+<!-- PAGE 1: OUTSIDE OF FOLDED CARD
+     Top half = back panel (upside-down logic on a single sheet:
+     when the sheet is folded with the bottom up to meet the top,
+     the back panel ends up as the back of the folded card).
+     Bottom half = front cover. -->
+<div class="page outside">
+  <div class="half back">
+    <svg class="cross-logo-small" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 92 92" fill="none">
+      <rect x="19" y="0" width="16" height="16" rx="1" fill="#D4A843"/>
+      <rect x="57" y="0" width="16" height="16" rx="1" fill="#D4A843"/>
+      <rect x="0" y="19" width="16" height="16" rx="1" fill="#D4A843"/>
+      <rect x="76" y="19" width="16" height="16" rx="1" fill="#D4A843"/>
+      <path d="M 19 38 L 35 38 L 35 57 L 57 57 L 57 38 L 73 38 L 73 57 L 92 57 L 92 73 L 73 73 L 73 92 L 57 92 L 57 73 L 35 73 L 35 92 L 19 92 L 19 73 L 0 73 L 0 57 L 19 57 Z" fill="#D4A843"/>
+    </svg>
+    <p class="back-text">
+      Be A Number, International is a 501(c)(3) nonprofit
+      (EIN 93-1948872). We assign every shirt to a kid at
+      the YDO campus in Omoro District, Northern Uganda —
+      and we keep them in school, fed, and cared for
+      as long as their sponsor stays.
+    </p>
+    <p class="back-url">beanumber.org</p>
+  </div>
+
+  <div class="half front">
+    <svg class="cross-logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 92 92" fill="none">
+      <rect x="19" y="0" width="16" height="16" rx="1" fill="#D4A843"/>
+      <rect x="57" y="0" width="16" height="16" rx="1" fill="#D4A843"/>
+      <rect x="0" y="19" width="16" height="16" rx="1" fill="#D4A843"/>
+      <rect x="76" y="19" width="16" height="16" rx="1" fill="#D4A843"/>
+      <path d="M 19 38 L 35 38 L 35 57 L 57 57 L 57 38 L 73 38 L 73 57 L 92 57 L 92 73 L 73 73 L 73 92 L 57 92 L 57 73 L 35 73 L 35 92 L 19 92 L 19 73 L 0 73 L 0 57 L 19 57 Z" fill="#D4A843"/>
+    </svg>
+    <h1 class="headline">This Number<br>has a Name.</h1>
+    <p class="sub">OPEN TO MEET THEM.</p>
+  </div>
+</div>
+
+<!-- PAGE 2: INSIDE OF FOLDED CARD (full 3.75" × 8.8" spread,
+     split into two 4.4" halves so content is centered on each
+     panel of the open card). -->
+<div class="page inside">
+  <div class="inside-half inside-half-top">
+    <p class="body-text">
+      The number on the back of your shirt belongs to
+      a real kid at the YDO campus in Northern Uganda.
+      Scan the code. Type your number. Meet them.
+    </p>
+    <div class="divider"></div>
+    <p class="reveal-text">
+      The shirt is how you meet them.
+    </p>
+    <p class="reveal-text" style="margin-top: 0.15in;">
+      $25 a month is how you stay.
+    </p>
+  </div>
+
+  <div class="inside-half inside-half-bottom">
+    <div class="qr-code">
+      <img src="data:image/png;base64,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" alt="QR code to beanumber.org">
+    </div>
+    <p class="url">beanumber.org</p>
+    <p class="instruction">ENTER YOUR NUMBER.</p>
+    <p class="note">
+      School fees, meals, medical care, and mentorship<br>
+      at the YDO campus in Omoro District, Northern Uganda.
+    </p>
+  </div>
+</div>
+
+</body>
+</html>
