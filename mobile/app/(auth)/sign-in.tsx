@@ -141,8 +141,8 @@ export default function SignInScreen() {
   };
 
   const headline = meetNumber
-    ? `First — keep #${meetNumber} yours.`
-    : 'First — keep your progress.';
+    ? `#${meetNumber} is a kid. Sign in to meet them.`
+    : 'Sign in to meet your kid.';
 
   return (
     <SafeAreaView style={styles.screen}>
@@ -157,8 +157,8 @@ export default function SignInScreen() {
             align="center"
             style={styles.subhead}
           >
-            Sign in so the number on your shirt — and every kid you meet
-            after — stays with you across every device.
+            Every Be A Number shirt has a kid on the other end. Sign in
+            and the number reveals who.
           </Text>
         </View>
 

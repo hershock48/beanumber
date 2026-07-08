@@ -20,9 +20,43 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ADMIN_SESSION_COOKIE, isValidSessionCookieEdge } from '@/lib/admin-session-edge';
 
+/**
+ * CORS: the mobile v1 API is called by native app runtimes (which
+ * don't enforce CORS) AND by Kevin's browser-based development
+ * previews via `expo start --web` (which do). Open CORS wide for
+ * anything under /api/mobile/v1/*. This surface is bearer-token
+ * auth'd, so opening CORS doesn't leak anything — a browser without
+ * a token can't do anything past the auth endpoints, and the auth
+ * endpoints themselves need a valid Apple/Google identity token
+ * (or the env-gated dev-sign-in flag).
+ */
+function withMobileCors(response: NextResponse): NextResponse {
+  response.headers.set('Access-Control-Allow-Origin', '*');
+  response.headers.set(
+    'Access-Control-Allow-Methods',
+    'GET, POST, DELETE, PATCH, OPTIONS'
+  );
+  response.headers.set(
+    'Access-Control-Allow-Headers',
+    'Content-Type, Authorization'
+  );
+  response.headers.set('Access-Control-Max-Age', '86400');
+  return response;
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  // Mobile v1 API: attach CORS on every response and short-circuit
+  // OPTIONS preflight with 204.
+  if (pathname.startsWith('/api/mobile/v1/')) {
+    if (request.method === 'OPTIONS') {
+      return withMobileCors(new NextResponse(null, { status: 204 }));
+    }
+    return withMobileCors(NextResponse.next());
+  }
+
+  // Admin session gate (unchanged).
   if (!pathname.startsWith('/admin')) return NextResponse.next();
   if (pathname === '/admin/login') return NextResponse.next();
 
@@ -39,5 +73,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/admin/:path*'],
+  matcher: ['/admin/:path*', '/api/mobile/v1/:path*'],
 };
