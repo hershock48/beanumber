@@ -19,7 +19,16 @@
  */
 
 export function isFreeShippingWindowActive(now: Date = new Date()): boolean {
-  const raw = process.env.FREE_SHIPPING_UNTIL;
+  // Prefer the NEXT_PUBLIC_* version so the same flag also reaches
+  // client components (CartContext computes shipping preview in the
+  // browser and needs to know the window is active). Fall back to the
+  // server-only var for compatibility.
+  //
+  // NEXT_PUBLIC_* is baked into the client bundle at build time, so
+  // changing the value requires a redeploy — not a hot config swap.
+  const raw =
+    process.env.NEXT_PUBLIC_FREE_SHIPPING_UNTIL ||
+    process.env.FREE_SHIPPING_UNTIL;
   if (!raw) return false;
 
   const until = Date.parse(raw);

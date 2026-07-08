@@ -13,6 +13,7 @@ import {
   discountedAmountCents,
   type PromoCode,
 } from '@/lib/promo-codes';
+import { isFreeShippingWindowActive } from '@/lib/free-shipping-window';
 
 export type CartItem = {
   id: string;           // unique key (generated on add)
@@ -136,7 +137,20 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const totalMonthly = items.filter(i => i.continueMonthly).reduce((sum, i) => sum + i.price, 0);
   const itemCount = items.length;
   const hasMonthly = items.some(i => i.continueMonthly);
-  const shippingCost = itemCount === 0 ? 0 : (itemCount >= 3 || hasMonthly) ? 0 : 5;
+  // Free shipping if any of:
+  //   - cart is empty (no shipping to charge)
+  //   - buyer has 3+ shirts (bulk perk)
+  //   - buyer added monthly to at least one shirt (shirt+monthly is
+  //     always free ship by policy)
+  //   - the FREE_SHIPPING_UNTIL window is currently active (site-wide
+  //     temporary promo; must be exposed via NEXT_PUBLIC_* to reach
+  //     this client-side check)
+  const shippingCost =
+    itemCount === 0
+      ? 0
+      : itemCount >= 3 || hasMonthly || isFreeShippingWindowActive()
+      ? 0
+      : 5;
   const totalWithShipping = totalOneTime + shippingCost;
 
   // Compute promo applicability against the current cart shape. Re-
