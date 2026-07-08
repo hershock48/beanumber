@@ -2012,117 +2012,10 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
         </div>
         </ClaimGate>
 
-        {/* ── Sponsor-only zone (LEGACY — MERGED INTO PENPAL BOX) ──
-            The "Updates straight from {firstName}" block used to live
-            here as its own section between the bio-CTA and the awards
-            timeline. Per Kevin (2026-07-08): personal updates are
-            part of the penpal package, not a separate surface.
-            SponsorPortalSections is now passed into PenpalBox via
-            the `sponsorPortal` prop and renders inline under the
-            thread + composer. The frosted preview for non-sponsors is
-            also gone — the PenpalBox's own frosted overlay covers the
-            whole ask now.
-            Keeping this block for reference below, wrapped in a
-            {false && (...)} so it renders nothing. Delete cleanly
-            once the new flow is confirmed live. */}
-        {false && !child.departed_at && (
-          <div className="max-w-2xl mx-auto mt-12 md:mt-16">
-            <div className="text-center mb-6">
-              <p className="text-xs font-bold uppercase tracking-[0.3em] text-[#D4A843] mb-2">
-                Photos, report cards, campus updates
-              </p>
-              <h2
-                className="text-2xl md:text-3xl text-[#0d0d0d]"
-                style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
-              >
-                Updates straight from {firstName}.
-              </h2>
-            </div>
-            {child.viewer_is_sponsor && portalData ? (
-              <SponsorPortalSections
-                firstName={firstName}
-                stats={portalData.stats}
-                latestChildUpdate={portalData.latestChildUpdate}
-              />
-            ) : (
-              /* Progressive-disclosure preview — matches the PenpalBox
-                 frosted aesthetic. A holder/anon viewer sees a blurred
-                 sample update block behind the same overlay treatment:
-                 backdrop-filter blur, gold-overlay CTA, canonical value-
-                 prop line, "Cancel anytime" footer. Kevin's rule from
-                 2026-07-08: penpal + updates should read as companion
-                 frosted boxes stacked together with matching "sponsor to
-                 unlock" pattern. */
-              <div className="relative border border-[#e8e0d4] bg-white">
-                <div
-                  className="relative overflow-hidden"
-                  style={{ filter: 'blur(3.5px) saturate(1.1)' }}
-                  aria-hidden="true"
-                >
-                  <div className="p-6 md:p-8 space-y-4">
-                    <div className="text-xs uppercase tracking-wider text-[#999] font-bold">
-                      Sample &middot; not a real update
-                    </div>
-                    <div className="bg-[#FFF8F0] border border-[#e8e0d4] p-5">
-                      <p className="text-xs uppercase tracking-wider text-[#D4A843] font-bold mb-2">
-                        New photos from {firstName} &middot; last month
-                      </p>
-                      <p
-                        className="text-[15px] text-[#333] leading-relaxed italic"
-                        style={{ fontFamily: 'var(--font-lora), serif' }}
-                      >
-                        &ldquo;{firstName} showed us her report card this
-                        month &mdash; top of her class in English. She said
-                        the book you asked about is her favorite. Photos
-                        from the school day are on her page.&rdquo;
-                      </p>
-                    </div>
-                    <div className="grid grid-cols-3 gap-2">
-                      <div className="aspect-square bg-[#f5f0e8] border border-[#e8e0d4]" />
-                      <div className="aspect-square bg-[#f5f0e8] border border-[#e8e0d4]" />
-                      <div className="aspect-square bg-[#f5f0e8] border border-[#e8e0d4]" />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/40 backdrop-blur-[1px]">
-                  <div className="max-w-md w-full mx-auto text-center px-6 py-8">
-                    <p
-                      className="text-2xl md:text-[26px] text-[#0d0d0d] mb-3 leading-tight"
-                      style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
-                    >
-                      Photos and updates unlock with sponsorship.
-                    </p>
-                    <p className="text-[15px] text-[#333] leading-relaxed mb-6">
-                      You get a penpal, monthly photos, report cards, and
-                      campus updates.{' '}
-                      <span className="font-bold text-[#0d0d0d]">
-                        $25/month.
-                      </span>{' '}
-                      Cancel anytime.
-                    </p>
-                    <Link
-                      href={`/children/${number}?intent=${
-                        child.viewer_is_holder || child.viewer_signed_in
-                          ? 'sponsor'
-                          : 'sign-in'
-                      }`}
-                      className="inline-block bg-[#D4A843] text-[#0d0d0d] font-bold uppercase tracking-wider py-4 px-8 hover:bg-[#c49a3a] transition-colors"
-                    >
-                      {child.viewer_is_holder || child.viewer_signed_in
-                        ? `Sponsor ${firstName} — $25/month`
-                        : `Sign in to sponsor ${firstName}`}
-                    </Link>
-                    <p className="text-xs text-[#888] mt-4 leading-relaxed">
-                      Personal updates from the campus land a few times a
-                      year.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
+        {/* NOTE: the "Updates straight from {firstName}" section used
+            to render here as its own block. Merged into PenpalBox via
+            the `sponsorPortal` prop on 2026-07-08 — personal updates
+            are part of the penpal package, not a separate surface. */}
 
         {/* ── Awards timeline ──
             Every Student of the Month award the kid has earned,
@@ -2143,24 +2036,18 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
             above (right under the bio, before the acknowledgment
             box), matching Kevin's 2026-07-08 flow restructure. */}
 
-        {/* ── Share this kid — HIDDEN 2026-07-08 ──
-            Kevin: "hide this part for now... i dont love it." The
-            ShareKidCard component still exists; the block is just
-            gated to false until the framing lands right.
-            When re-enabled, this needs a stronger reason-to-share
-            beat than "post the card on your feed." */}
-        {false &&
-          !child.departed_at &&
-          (child.viewer_is_sponsor || child.viewer_is_holder) && (
-            <div className="mt-12 md:mt-16 py-8 md:py-12 border-t border-[#e8e0d4]">
-              <ShareKidCard
-                firstName={firstName}
-                displayName={displayName}
-                photoUrl={child.photo_url ?? null}
-                shirtNumber={Number(number)}
-              />
-            </div>
-          )}
+        {/* NOTE: the "Take {firstName} with you" / ShareKidCard block
+            used to render here, gated to sponsors + holders. Removed
+            2026-07-08 per Kevin ("hide this part for now... i dont
+            love it"). ShareKidCard component still exists — to
+            re-enable, restore the block below with a stronger
+            reason-to-share beat than "post the card on your feed."
+              {!child.departed_at &&
+                (child.viewer_is_sponsor || child.viewer_is_holder) && (
+                  <div className="mt-12 md:mt-16 ...">
+                    <ShareKidCard firstName={firstName} ... />
+                  </div>
+                )} */}
 
         {/* ── Public campus newsfeed ───────────────────────────────
             Visible to anyone — sponsor or not. The ask block above
