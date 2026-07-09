@@ -16,6 +16,7 @@
  */
 
 import { and, desc, eq, inArray, isNotNull, isNull, or, sql } from 'drizzle-orm';
+import { unstable_cache } from 'next/cache';
 import { db } from '@/lib/db/client';
 import {
   children,
@@ -925,7 +926,10 @@ export interface AdminHomeData {
   thisMonth: ThisMonthCard;
 }
 
-export async function getAdminHomeData(): Promise<AdminHomeData> {
+// Uncached inner — always runs the 7 parallel queries. Kept
+// separate so we can bypass the cache when we want fresh data
+// (e.g. an explicit reload from a mutation).
+async function _fetchAdminHomeData(): Promise<AdminHomeData> {
   const [
     pendingUpdates,
     shirtsToShip,
@@ -953,3 +957,18 @@ export async function getAdminHomeData(): Promise<AdminHomeData> {
     thisMonth,
   };
 }
+
+/**
+ * 30-second in-memory cache around the admin home data fetch.
+ * Rationale: Kevin re-visits /admin dozens of times during a triage
+ * session; without this every visit re-runs 7 queries + pays cold
+ * start. 30s is short enough that a new sponsor / new shirt order
+ * appears within one refresh, long enough to make repeat loads feel
+ * instant. Cache tag lets any mutation call revalidateTag('admin-home')
+ * to bust immediately when we know something changed.
+ */
+export const getAdminHomeData = unstable_cache(
+  _fetchAdminHomeData,
+  ['admin-home-data-v1'],
+  { revalidate: 30, tags: ['admin-home'] }
+);

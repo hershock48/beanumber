@@ -41,7 +41,15 @@ function getDb() {
 
   _client = postgres(DATABASE_URL, {
     prepare: false, // Supabase transaction-mode pooler can't prepare.
-    max: 1, // Keep pool small per serverless instance.
+    // Pool size per serverless instance. Was 1, which meant every
+    // Promise.all-style parallel query (e.g. the 7 admin home cards)
+    // actually serialized on a single connection, adding hundreds of
+    // ms of latency per admin load. 5 lets the parallel queries run
+    // parallel while staying well within Supabase pooler limits
+    // (default 60 client conns; even with 10 warm Lambdas that's 50).
+    max: 5,
+    idle_timeout: 20, // seconds — close idle conns so pooler doesn't hold them
+    connect_timeout: 10, // fail fast on cold-start rather than hang past Vercel's 10s cap
   });
   _db = drizzle(_client, { schema });
   return _db;
