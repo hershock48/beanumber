@@ -375,8 +375,14 @@ export async function POST(
     try {
       const firstNamePlain = parent.firstName || 'your kid';
       const firstNameSafe = escapeHtml(firstNamePlain);
+      // Deep-link the email button to the reply card itself via the
+      // #note-<id> anchor rendered on every NotesThread entry. The
+      // browser scrolls straight to the letter (with scroll-margin-top
+      // headroom) so the sponsor lands on the payoff instead of the
+      // top of the kid page. Fallback to /me for legacy sponsorships
+      // without a shirt number stays intact.
       const kidPageUrl = parent.shirtNumber
-        ? `${SITE_URL}/children/${parent.shirtNumber}`
+        ? `${SITE_URL}/children/${parent.shirtNumber}#note-${inserted[0].id}`
         : `${SITE_URL}/me`;
       const firstWordOfName = parent.sponsorName?.trim().split(/\s+/)[0];
       const greeting = firstWordOfName

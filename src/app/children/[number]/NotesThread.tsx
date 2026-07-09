@@ -52,18 +52,36 @@ export function NotesThread({
           return (
             <li
               key={entry.id}
+              // Anchor id so a future "read the letter" email link can
+              // deep-link straight to the reply (e.g. /children/17#note-abc).
+              // scroll-margin-top gives the target headroom so if any
+              // header ever ends up sticky, the anchored card still lands
+              // fully visible, not tucked under it.
+              id={`note-${entry.id}`}
+              style={{ scrollMarginTop: '96px' }}
               className={
                 isSponsorNote
                   ? 'bg-white border border-[#e8e0d4] p-5 md:p-6'
-                  : 'bg-[#faf4e8] border border-[#e8e0d4] p-5 md:p-6'
+                  : 'bg-[#fbf5e8] border border-[#e8e0d4] p-6 md:p-8 shadow-[0_2px_12px_rgba(184,150,66,0.08)]'
               }
             >
-              <p className="text-xs font-bold uppercase tracking-[0.25em] text-[#D4A843] mb-3">
-                {isSponsorNote ? 'You wrote' : `${firstName} wrote back`}
-                <span className="text-[#888] font-normal normal-case tracking-normal ml-2">
-                  &middot; {dateLabel}
-                </span>
-              </p>
+              {isSponsorNote ? (
+                <p className="text-xs font-bold uppercase tracking-[0.25em] text-[#D4A843] mb-3">
+                  You wrote
+                  <span className="text-[#888] font-normal normal-case tracking-normal ml-2">
+                    &middot; {dateLabel}
+                  </span>
+                </p>
+              ) : (
+                <div className="mb-5 md:mb-6">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-[#c0392b]">
+                    A letter from {firstName}
+                  </p>
+                  <p className="text-xs text-[#888] mt-1">
+                    Arrived {dateLabel}
+                  </p>
+                </div>
+              )}
               {/* Scanned handwritten reply — kid_to_sponsor rows
                   with a photo attached (2026-07-08 workflow). Photo
                   is the payoff; the English text moves to a caption
@@ -84,12 +102,21 @@ export function NotesThread({
                   return (
                     <figure className="mt-1 mb-3">
                       {kind === 'image' ? (
-                        <img
-                          src={entry.replyImageUrl}
-                          alt={`Handwritten letter from ${firstName}`}
-                          loading="lazy"
-                          className="block w-full h-auto max-w-full border border-[#e8e0d4] bg-white"
-                        />
+                        /* Photo matting — the scan sits inside a
+                           white card with generous padding and a
+                           soft warm-tinted shadow so it reads as a
+                           physical letter someone laid on the desk,
+                           not just an inline image. Padding is
+                           deliberately larger on desktop so the
+                           handwriting has room to breathe. */
+                        <div className="bg-white border border-[#e8e0d4] p-3 md:p-5 shadow-[0_6px_24px_rgba(184,150,66,0.15)]">
+                          <img
+                            src={entry.replyImageUrl}
+                            alt={`Handwritten letter from ${firstName}`}
+                            loading="lazy"
+                            className="block w-full h-auto max-w-full"
+                          />
+                        </div>
                       ) : (
                         /* PDF or Word doc — can't render inline as an
                            <img>. Show a warm document card that opens
@@ -135,21 +162,30 @@ export function NotesThread({
                       {/* Translation caption is skipped entirely when
                           Simon marked the letter as already in English
                           (the scan IS the readable content). Otherwise
-                          the translation renders below as a caption. */}
+                          the translation renders below the photo as a
+                          soft accompanying note — small caps kicker
+                          separated by a hairline rule, then Lora italic
+                          in the same warm tone as the sponsor's own
+                          note above so the arc reads as a conversation. */}
                       {entry.bodyEn.trim().length > 0 && (
-                        <figcaption
-                          className="text-[13px] md:text-sm text-[#555] leading-relaxed italic mt-3"
-                          style={{ fontFamily: 'var(--font-lora), serif' }}
-                        >
-                          <span className="not-italic text-[10px] font-bold uppercase tracking-[0.2em] text-[#888] block mb-2">
-                            Translated
-                          </span>
-                          {entry.bodyEn.split('\n').map((line, i, arr) => (
-                            <span key={i}>
-                              {line}
-                              {i < arr.length - 1 && <br />}
+                        <figcaption className="mt-5 md:mt-6">
+                          <div className="flex items-center gap-3 mb-3">
+                            <span className="text-[10px] font-bold uppercase tracking-[0.25em] text-[#888]">
+                              In English
                             </span>
-                          ))}
+                            <span className="flex-1 h-px bg-[#e8e0d4]"></span>
+                          </div>
+                          <p
+                            className="text-[14px] md:text-[15px] text-[#333] leading-relaxed italic"
+                            style={{ fontFamily: 'var(--font-lora), serif' }}
+                          >
+                            {entry.bodyEn.split('\n').map((line, i, arr) => (
+                              <span key={i}>
+                                {line}
+                                {i < arr.length - 1 && <br />}
+                              </span>
+                            ))}
+                          </p>
                         </figcaption>
                       )}
                     </figure>
