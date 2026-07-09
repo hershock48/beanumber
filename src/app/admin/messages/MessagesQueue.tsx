@@ -71,6 +71,18 @@ export function MessagesQueue({
   role: 'admin' | 'simon';
 }) {
   const [messages, setMessages] = useState(initialMessages);
+  // Hide delivered + declined items from the working view by default.
+  // Kevin's queue is a "what needs attention" board; anything already
+  // done just adds clutter. Small "Show N done" affordance below the
+  // action list lets him peek at history without leaving the page.
+  const [hideDone, setHideDone] = useState(true);
+
+  const doneCount = messages.filter(
+    m => m.status === 'delivered' || m.status === 'declined'
+  ).length;
+  const visibleMessages = hideDone
+    ? messages.filter(m => m.status !== 'delivered' && m.status !== 'declined')
+    : messages;
 
   const patch = useCallback(
     async (
@@ -105,16 +117,46 @@ export function MessagesQueue({
   );
 
   return (
-    <div className="space-y-6">
-      {messages.map(m => (
-        <MessageCard
-          key={m.id}
-          message={m}
-          role={role}
-          onPatch={patch}
-          onLocalUpdate={mutateLocal}
-        />
-      ))}
+    <div>
+      {doneCount > 0 && (
+        <div className="mb-5 flex items-center justify-between gap-3 flex-wrap">
+          <p className="text-xs text-[#888]">
+            {visibleMessages.length}{' '}
+            {visibleMessages.length === 1 ? 'note' : 'notes'} waiting on you
+            {hideDone && doneCount > 0 && (
+              <span className="ml-2 text-[#aaa]">
+                &middot; {doneCount} done, hidden
+              </span>
+            )}
+          </p>
+          <button
+            type="button"
+            onClick={() => setHideDone(v => !v)}
+            className="text-xs font-bold uppercase tracking-[0.15em] text-[#D4A843] hover:text-[#c49a3a] transition-colors"
+          >
+            {hideDone ? `Show ${doneCount} done` : 'Hide done'}
+          </button>
+        </div>
+      )}
+      <div className="space-y-6">
+        {visibleMessages.length === 0 ? (
+          <div className="bg-[#FFF8F0] border border-[#e8e0d4] p-8 md:p-12 text-center">
+            <p className="text-[#666] leading-relaxed">
+              Nothing pending. All caught up.
+            </p>
+          </div>
+        ) : (
+          visibleMessages.map(m => (
+            <MessageCard
+              key={m.id}
+              message={m}
+              role={role}
+              onPatch={patch}
+              onLocalUpdate={mutateLocal}
+            />
+          ))
+        )}
+      </div>
     </div>
   );
 }

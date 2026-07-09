@@ -25,6 +25,27 @@ export const revalidate = 0;
 export default async function AdminMessagesPage() {
   const role = (await getAdminRole()) || 'admin';
 
+  // Reconciler: any sponsor_to_kid parent that has a kid_to_sponsor
+  // reply on it should be status='delivered'. The reply POST endpoint
+  // auto-flips this at write time, but on 2026-07-09 James's parent
+  // was found stuck at 'pending' despite the reply existing (silent
+  // failure, no Kevin alert). Running this on every queue load is a
+  // cheap belt-and-suspenders — it's a WHERE clause narrowed to only
+  // the mismatched rows so it costs almost nothing in the healthy
+  // case. Uses the reply's delivered_at as source of truth for when
+  // the round-trip actually completed.
+  await db.execute(sql`
+    UPDATE kid_messages parent
+    SET status = 'delivered',
+        delivered_at = COALESCE(parent.delivered_at, reply.delivered_at, NOW()),
+        translated_at = COALESCE(parent.translated_at, reply.delivered_at, NOW())
+    FROM kid_messages reply
+    WHERE reply.parent_message_id = parent.id
+      AND reply.direction = 'kid_to_sponsor'
+      AND parent.direction = 'sponsor_to_kid'
+      AND parent.status IN ('pending', 'translated')
+  `);
+
   // Fetch every sponsor->kid row (the queue) plus every kid->sponsor
   // row (replies). Attach replies to their parents in-memory so the
   // client renders each thread as a single card. Two queries beats
@@ -147,7 +168,14 @@ export default async function AdminMessagesPage() {
     direction: r.direction,
     bodyEn: r.bodyEn,
     bodyTranslated: r.bodyTranslated,
-    status: r.status,
+    // Effective status: if a reply exists we treat the parent as
+    // delivered regardless of the raw status column. Belt-and-
+    // suspenders in case the reconciler above ever fails or the
+    // write-side auto-flip silent-fails again. This is the value the
+    // client sees.
+    status: replyByParent.has(r.id) && r.status !== 'declined'
+      ? 'delivered'
+      : r.status,
     simonNotes: r.simonNotes,
     createdAt: r.createdAt ? new Date(r.createdAt).toISOString() : null,
     translatedAt: r.translatedAt ? new Date(r.translatedAt).toISOString() : null,
