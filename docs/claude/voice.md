@@ -41,6 +41,36 @@ Source of truth is `BAN_Brand_Guide.docx` in the repo root. If this file and the
 - Short sentences.
 - Saying something hard without softening it ("The shirt is how you meet them. $25 a month is how you stay.")
 
+### Penpal — how to talk about correspondence
+
+Added 2026-07-08 after Kevin's strategic evaluation of penpal weight in the funnel. Research summary in the same-day agent report (see the strategic-evaluation task in the todo list). This section is load-bearing for any donor-facing copy touching the correspondence feature.
+
+**Penpal is the retention product, not the acquisition pitch.** It earns the second, third, tenth year of a subscription — it does not earn the first click. Global site hierarchy is shirt → reveal → sponsorship → correspondence. Penpal never leads a homepage headline or a shirt-page hero. It shows up as an upgrade benefit and as a proof-of-model asset.
+
+**Show it, don't demand it.** Compassion, World Vision, and ChildFund all publish counter-messaging about letter-writing guilt ("stop feeling like a bad sponsor for not writing") because letter obligation drives cancellations. BAN inherits that failure mode if we frame the sell as "become a penpal" or "write your first letter." Never do that. Show that correspondence exists and works — use a real handwritten letter photo as evidence once we have one — but don't push the sponsor into feeling they have to write.
+
+**Never promise cadence.** Not monthly. Not annual. Not "regularly." The sponsor writes when they want; the kid writes when Simon can walk it through. Any specific frequency in copy becomes an obligation the sponsor feels bad about missing.
+
+**The medium is asymmetric.** The sponsor writes from the site (types into the composer). Simon prints the note, delivers it in person, and reads it to the kid. The kid handwrites a reply on the printed BE A NUMBER template. Simon uploads a scan. The sponsor sees the actual handwriting. So the truthful shape is: sponsor types → kid handwrites → sponsor sees the handwriting. Copy must not imply the sponsor is licking envelopes ("real handwritten letters both ways" is wrong; "write to your Kid and see their handwritten replies" is right).
+
+**Do not use the word "penpal" in public marketing copy** (homepage, shirt page, cold-visitor pitches). It sounds smaller than the actual relationship, which is a sponsored kid you also correspond with. Inside the product — kid page PenpalBox, /me, admin queue, email alerts — "penpal" is the feature name and stays. That's a brand-consistency line: on marketing surfaces we're selling the sponsorship; inside the product the sponsor has already bought, and "penpal" is the label for their thread.
+
+**Preferred phrases:**
+- "Write to your Kid and see their handwritten replies"
+- "Write to your Kid; they write back by hand"
+- "Real letters — you write from the site, theirs come back in their own handwriting"
+
+**Phrases to avoid:**
+- "Become a penpal" (obligation-implying, undersells the sponsorship)
+- "Your monthly correspondence" (cadence promise)
+- "Real handwritten letters both ways" (implies the sponsor handwrites, which they don't)
+- "A handwritten letter from them once a year" (understates the model and misleads on frequency)
+- "Write your penpal" (grammatically off + undersells; use "write to your Kid")
+
+**Where penpal DOES deserve full weight**: on /me for existing sponsors. That's the retention surface, and correspondence is a first-class object there. The kid page PenpalBox for signed-in sponsors is the correspondence surface itself. Cold visitors see correspondence as proof-of-model; sponsors see it as their inbox.
+
+**Once we have a real letter**: screenshot Simon's first uploaded reply and use it as a proof-of-model asset. Small "PROOF" section between the impact stats and the final CTA on the homepage. Single image + one line of caption. That single asset is worth more than any headline copy — 55% of donors believe child sponsorship is "mostly a gimmick," and visible bidirectional correspondence is the strongest not-gimmick proof point we can show.
+
 ### Typography and color (quick reference)
 
 - Headings: Lora serif, weight 600.

@@ -78,7 +78,7 @@ Read **`docs/claude/app_model.md`** if Kevin is asking about the app direction, 
 
 1. This file (you're here).
 2. `docs/claude/charter.md` — identity.
-3. `docs/claude/voice.md` — tone.
+3. `docs/claude/voice.md` — tone. **Before writing any donor-facing copy about the penpal / correspondence feature, re-read the "Penpal — how to talk about correspondence" section of voice.md. Load-bearing.**
 4. `docs/claude/project_state.md` — where we are.
 5. Then whichever of the other four matches what Kevin is asking about.
 

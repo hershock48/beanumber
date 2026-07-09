@@ -298,8 +298,9 @@ function HomePageInner() {
           </h2>
           <p className="text-[#777] max-w-lg mx-auto leading-relaxed text-lg">
             Every Number on every Shirt belongs to a Child like the ones below. Your Shirt starts their year
-            at the campus. Stay with them for $25/month to finish it &mdash; a monthly newsletter from the campus,
-            photos of your Kid through the year, and a handwritten letter from them once a year.
+            at the campus. Stay with them for $25/month to finish it &mdash; write to your Kid and see their
+            handwritten replies, photos of your Kid through the year, a year-end report card, and the monthly
+            campus newsletter.
           </p>
         </div>
 
@@ -458,7 +459,7 @@ function HomePageInner() {
               </div>
               <h3 className="text-lg font-semibold text-[#0d0d0d] mb-3">Stay With Them</h3>
               <p className="text-[#777] text-sm leading-relaxed">
-                For $25/month you stay connected. A monthly campus newsletter, photos of your child through the year, a handwritten letter from them, and a year-end report card.
+                For $25/month you stay connected. Write to your Kid and see their handwritten replies, photos of your child through the year, a year-end report card, and the monthly campus newsletter.
               </p>
             </div>
           </div>
