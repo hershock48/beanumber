@@ -18,16 +18,25 @@
  *
  * Body: JSON
  *   {
- *     filename: string,       // e.g. "reply-naume.jpg"
- *     contentType: string,    // "image/jpeg" | "image/png" | "image/heic" | "image/webp"
+ *     filename: string,       // e.g. "reply-naume.jpg" or "reply-naume.pdf"
+ *     contentType: string,    // image/jpeg | image/png | image/heic | image/webp |
+ *                             //   application/pdf | application/msword |
+ *                             //   application/vnd.openxmlformats-officedocument.wordprocessingml.document
  *     dataBase64: string,     // raw base64, no "data:" prefix
  *   }
  *
  * Auth: admin cookie required (Simon or Kevin).
  *
- * Size cap: ~10 MB base64 (~7.5 MB raw). A phone photo of an A4 sheet
- * is comfortably under this. Larger and we reject to protect the
+ * Size cap: ~20 MB base64 (~15 MB raw). A single phone photo of an A4
+ * sheet is well under 10; a multi-page PDF scan of a longer letter
+ * comfortably fits under 20. Larger and we reject to protect the
  * function's memory + the Supabase quota.
+ *
+ * 2026-07-09 update: name kept as reply-photo for URL stability, but
+ * the endpoint now accepts PDF and Word docs in addition to images.
+ * Simon requested this so multi-page scans (his scanner outputs PDF)
+ * and typed letters (rare, but happens when a kid dictates to a
+ * teacher) can also come through the same pipeline.
  *
  * Response:
  *   200 { ok: true, publicUrl, path }
@@ -48,19 +57,25 @@ const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const ALLOWED_TYPES = new Set([
+  // Images (phone photo of the letter).
   'image/jpeg',
   'image/jpg',
   'image/png',
   'image/webp',
   'image/heic',
   'image/heif',
+  // PDF (scanner output, multi-page scans).
+  'application/pdf',
+  // Word docs (legacy .doc + modern .docx). Rare but Simon asked
+  // for it 2026-07-09 — occasional typed letter needs a home.
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
 ]);
 
-// ~10 MB base64 → ~7.5 MB decoded. Enough for a phone photo of the
-// template at typical mid-range camera resolution; enough headroom
-// for a decently-lit scan without letting a stray 20 MB DSLR shot
-// slip through.
-const MAX_BASE64_BYTES = 10 * 1024 * 1024;
+// ~20 MB base64 → ~15 MB decoded. A single phone photo is well under
+// 10 MB; a multi-page PDF scan of a longer letter fits comfortably
+// under 20. Larger and we reject rather than eat the function memory.
+const MAX_BASE64_BYTES = 20 * 1024 * 1024;
 
 export async function POST(
   request: NextRequest,
@@ -122,7 +137,7 @@ export async function POST(
     return NextResponse.json(
       {
         error:
-          'Only JPEG, PNG, WEBP, or HEIC images are supported. Convert and try again.',
+          'Supported: JPEG / PNG / WEBP / HEIC photos, PDF, or Word (.doc / .docx). Convert and try again.',
       },
       { status: 400 }
     );
@@ -137,7 +152,7 @@ export async function POST(
     return NextResponse.json(
       {
         error:
-          'Photo is too large. Under ~7 MB after decoding, please — shrink it and re-upload.',
+          'File is too large. Under ~15 MB after decoding, please — shrink or split it and re-upload.',
       },
       { status: 413 }
     );

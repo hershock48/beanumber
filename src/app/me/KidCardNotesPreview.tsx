@@ -23,6 +23,7 @@
 
 import type { KidCardNotePreview } from '@/lib/db/queries';
 import { KidCardNoteReplyBadge } from './KidCardNoteReplyBadge';
+import { attachmentKind } from '@/lib/attachments';
 
 const MAX_SNIPPET = 90;
 
@@ -132,20 +133,45 @@ export function KidCardNotesPreview({
       <p className="text-xs text-[#0d0d0d] font-semibold leading-snug mb-1">
         {statusLine(preview, firstName)}
       </p>
-      {/* Scanned handwritten reply thumbnail — 2026-07-08 workflow.
-          Only rendered when the latest event is a reply that has
-          a photo attached. Small — the point is "there's a
-          handwritten letter waiting for you," not to read it here.
-          The italic English snippet still renders below as caption. */}
+      {/* Scanned reply thumbnail — 2026-07-08 workflow, extended
+          2026-07-09 to handle PDF + Word doc. When the file is an
+          image we show it as a small thumbnail (point: "there's a
+          letter waiting"). When it's a PDF or DOCX we show a
+          document icon card since <img src="foo.pdf"> would be a
+          broken image. The italic English snippet still renders
+          below as caption in either case. */}
       {isReply && preview.latestImageUrl ? (
-        <div className="mt-1 mb-2 flex justify-start">
-          <img
-            src={preview.latestImageUrl}
-            alt={`Letter from ${firstName}`}
-            loading="lazy"
-            className="block h-24 w-auto max-w-full border border-[#e8e0d4] bg-white"
-          />
-        </div>
+        attachmentKind(preview.latestImageUrl) === 'image' ? (
+          <div className="mt-1 mb-2 flex justify-start">
+            <img
+              src={preview.latestImageUrl}
+              alt={`Letter from ${firstName}`}
+              loading="lazy"
+              className="block h-24 w-auto max-w-full border border-[#e8e0d4] bg-white"
+            />
+          </div>
+        ) : (
+          <div className="mt-1 mb-2 flex items-center gap-2 border border-[#e8e0d4] bg-white px-3 py-2 max-w-max">
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="text-[#D4A843] flex-shrink-0"
+              aria-hidden="true"
+            >
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+              <polyline points="14 2 14 8 20 8" />
+            </svg>
+            <span className="text-xs font-semibold text-[#0d0d0d]">
+              Letter attached
+            </span>
+          </div>
+        )
       ) : null}
       {snippet ? (
         <p

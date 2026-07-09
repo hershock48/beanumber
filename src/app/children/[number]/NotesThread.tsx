@@ -18,6 +18,7 @@
  */
 
 import type { NoteThreadEntry } from '@/lib/db/queries';
+import { attachmentKind, attachmentTypeLabel } from '@/lib/attachments';
 
 export function NotesThread({
   firstName,
@@ -77,34 +78,83 @@ export function NotesThread({
                   long thread doesn't pull every reply photo up
                   front. */}
               {!isSponsorNote && entry.replyImageUrl ? (
-                <figure className="mt-1 mb-3">
-                  <img
-                    src={entry.replyImageUrl}
-                    alt={`Handwritten letter from ${firstName}`}
-                    loading="lazy"
-                    className="block w-full h-auto max-w-full border border-[#e8e0d4] bg-white"
-                  />
-                  {/* Translation caption is skipped entirely when
-                      Simon marked the letter as already in English
-                      (the scan IS the readable content). Otherwise
-                      the translation renders below as a caption. */}
-                  {entry.bodyEn.trim().length > 0 && (
-                    <figcaption
-                      className="text-[13px] md:text-sm text-[#555] leading-relaxed italic mt-3"
-                      style={{ fontFamily: 'var(--font-lora), serif' }}
-                    >
-                      <span className="not-italic text-[10px] font-bold uppercase tracking-[0.2em] text-[#888] block mb-2">
-                        Translated
-                      </span>
-                      {entry.bodyEn.split('\n').map((line, i, arr) => (
-                        <span key={i}>
-                          {line}
-                          {i < arr.length - 1 && <br />}
-                        </span>
-                      ))}
-                    </figcaption>
-                  )}
-                </figure>
+                (() => {
+                  const kind = attachmentKind(entry.replyImageUrl);
+                  const label = attachmentTypeLabel(kind);
+                  return (
+                    <figure className="mt-1 mb-3">
+                      {kind === 'image' ? (
+                        <img
+                          src={entry.replyImageUrl}
+                          alt={`Handwritten letter from ${firstName}`}
+                          loading="lazy"
+                          className="block w-full h-auto max-w-full border border-[#e8e0d4] bg-white"
+                        />
+                      ) : (
+                        /* PDF or Word doc — can't render inline as an
+                           <img>. Show a warm document card that opens
+                           the file in a new tab. Keeps the emotional
+                           beat ("[Kid] wrote you a letter") without a
+                           broken image icon. */
+                        <a
+                          href={entry.replyImageUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-4 border border-[#e8e0d4] bg-white p-5 hover:bg-[#FFF8F0] transition-colors"
+                        >
+                          <div className="w-12 h-14 bg-[#f5f0e8] flex items-center justify-center flex-shrink-0">
+                            <svg
+                              width="24"
+                              height="24"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              className="text-[#D4A843]"
+                              aria-hidden="true"
+                            >
+                              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                              <polyline points="14 2 14 8 20 8" />
+                            </svg>
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p
+                              className="text-base text-[#0d0d0d] font-semibold"
+                              style={{ fontFamily: 'var(--font-lora), serif' }}
+                            >
+                              Open {firstName}&rsquo;s letter
+                            </p>
+                            <p className="text-xs text-[#666] mt-0.5">
+                              {label} &middot; opens in a new tab
+                            </p>
+                          </div>
+                        </a>
+                      )}
+                      {/* Translation caption is skipped entirely when
+                          Simon marked the letter as already in English
+                          (the scan IS the readable content). Otherwise
+                          the translation renders below as a caption. */}
+                      {entry.bodyEn.trim().length > 0 && (
+                        <figcaption
+                          className="text-[13px] md:text-sm text-[#555] leading-relaxed italic mt-3"
+                          style={{ fontFamily: 'var(--font-lora), serif' }}
+                        >
+                          <span className="not-italic text-[10px] font-bold uppercase tracking-[0.2em] text-[#888] block mb-2">
+                            Translated
+                          </span>
+                          {entry.bodyEn.split('\n').map((line, i, arr) => (
+                            <span key={i}>
+                              {line}
+                              {i < arr.length - 1 && <br />}
+                            </span>
+                          ))}
+                        </figcaption>
+                      )}
+                    </figure>
+                  );
+                })()
               ) : (
                 <>
                   <p

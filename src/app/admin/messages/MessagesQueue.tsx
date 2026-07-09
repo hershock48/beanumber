@@ -18,6 +18,7 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react';
 import Image from 'next/image';
+import { attachmentKind, attachmentTypeLabel } from '@/lib/attachments';
 
 interface MessageRow {
   id: string;
@@ -587,16 +588,29 @@ function ReplySection({
   const [replyOriginal, setReplyOriginal] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // Scanned handwritten reply (2026-07-08 workflow). The photo is
+  // Scanned handwritten reply (2026-07-08 workflow, extended 2026-07-09
+  // to accept PDF + Word doc in addition to images). The file is
   // uploaded first (separate endpoint) so the admin sees preview +
   // dimensions before typing the translation. Once uploaded we hold
   // the public URL in state and submit it with the reply POST.
   const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  // "Kid wrote in English — no translation needed." When true, the
+  // translation textarea is hidden and the Save button re-labels to
+  // "Approve English letter." Preserves the underlying skippable-
+  // translation path (empty bodyEn + photo is legal on the server)
+  // but makes it discoverable — the "leave blank" hint under the
+  // textarea was too subtle for anyone who wasn't hunting for it.
+  const [englishLetter, setEnglishLetter] = useState(false);
+  // Uploaded file kind — drives the preview branch and the button
+  // label (photo/PDF/document phrasing). Resets when the upload is
+  // cleared or a new one arrives.
+  const uploadedKind = attachmentKind(uploadedImageUrl);
 
   async function handlePhotoPick(file: File) {
-    // Accept anything image/* the browser identifies; server-side
-    // whitelist enforces the actual allowed types. Read as base64.
+    // Accept images / PDFs / Word docs. Server-side whitelist enforces
+    // the actual allowed types; the browser input just widens the
+    // picker. Read as base64.
     setError(null);
     setUploadingPhoto(true);
     try {
@@ -648,27 +662,62 @@ function ReplySection({
         <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-2">
           {message.kid.firstName ?? 'The kid'} wrote back
         </p>
-        {/* Scanned handwritten reply (2026-07-08 workflow). Photo
-            is the anchor for the admin review — Simon can eyeball
-            his own upload + translation together. On the sponsor's
-            kid page this same photo renders full-width above the
-            translation caption; here the admin view is compact so
-            the photo is capped at a preview height. */}
+        {/* Scanned reply (2026-07-08 workflow, extended 2026-07-09 to
+            accept PDF + Word doc). Image is the anchor for admin
+            review — Simon can eyeball his own upload + translation
+            together. Non-image attachments render as a document
+            card since a raw <img src="foo.pdf"> would be broken. */}
         {message.reply.imageUrl ? (
-          <a
-            href={message.reply.imageUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="block mb-3"
-            title="Open the scan in a new tab"
-          >
-            <img
-              src={message.reply.imageUrl}
-              alt={`Scanned reply from ${message.kid.firstName ?? 'the kid'}`}
-              loading="lazy"
-              className="block max-h-80 w-auto max-w-full border border-[#e8e0d4] bg-white"
-            />
-          </a>
+          attachmentKind(message.reply.imageUrl) === 'image' ? (
+            <a
+              href={message.reply.imageUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block mb-3"
+              title="Open the scan in a new tab"
+            >
+              <img
+                src={message.reply.imageUrl}
+                alt={`Scanned reply from ${message.kid.firstName ?? 'the kid'}`}
+                loading="lazy"
+                className="block max-h-80 w-auto max-w-full border border-[#e8e0d4] bg-white"
+              />
+            </a>
+          ) : (
+            <a
+              href={message.reply.imageUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mb-3 flex items-center gap-3 border border-[#e8e0d4] bg-white p-3 hover:bg-[#FFF8F0] transition-colors"
+              title="Open the file in a new tab"
+            >
+              <div className="w-10 h-12 bg-[#f5f0e8] flex items-center justify-center flex-shrink-0">
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="text-[#D4A843]"
+                  aria-hidden="true"
+                >
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                  <polyline points="14 2 14 8 20 8" />
+                </svg>
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-[#0d0d0d]">
+                  {attachmentTypeLabel(attachmentKind(message.reply.imageUrl))} — open to view
+                </p>
+                <p className="text-xs text-[#666] truncate">
+                  {message.reply.imageUrl.split('/').pop() || 'file'}
+                </p>
+              </div>
+            </a>
+          )
         ) : null}
         {message.reply.bodyEn.trim().length > 0 ? (
           <blockquote
@@ -779,22 +828,57 @@ function ReplySection({
             Record {message.kid.firstName ?? 'the kid'}&rsquo;s reply
           </p>
 
-          {/* Step 1 — photo upload. The 2026-07-08 workflow is:
+          {/* Step 1 — file upload. The 2026-07-08 workflow is:
               the kid handwrites a reply on the printed template
               and Simon uploads a scan / phone photo of the sheet.
-              This block is the anchor of the composer — Simon
-              can't submit without a photo. */}
+              As of 2026-07-09 Simon can also upload a PDF (multi-
+              page scan from a scanning app) or a Word doc (rare —
+              typed on behalf of a kid). This block is the anchor
+              of the composer — Simon can't submit without a file. */}
           <div className="mb-4 bg-[#FFF8F0] border border-[#e8e0d4] p-3">
             <p className="text-xs font-bold uppercase tracking-[0.15em] text-[#0d0d0d] mb-2">
-              1 · Scanned handwritten letter
+              1 · Scanned letter{' '}
+              <span className="font-normal normal-case tracking-normal text-[#888]">
+                (photo, PDF, or Word doc)
+              </span>
             </p>
             {uploadedImageUrl ? (
               <div className="flex flex-col gap-2">
-                <img
-                  src={uploadedImageUrl}
-                  alt="Uploaded reply preview"
-                  className="block max-h-64 w-auto border border-[#e8e0d4] bg-white"
-                />
+                {uploadedKind === 'image' ? (
+                  <img
+                    src={uploadedImageUrl}
+                    alt="Uploaded reply preview"
+                    className="block max-h-64 w-auto border border-[#e8e0d4] bg-white"
+                  />
+                ) : (
+                  <div className="flex items-center gap-3 border border-[#e8e0d4] bg-white p-3">
+                    <div className="w-10 h-12 bg-[#f5f0e8] flex items-center justify-center flex-shrink-0">
+                      <svg
+                        width="20"
+                        height="20"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className="text-[#D4A843]"
+                        aria-hidden="true"
+                      >
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                        <polyline points="14 2 14 8 20 8" />
+                      </svg>
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold text-[#0d0d0d] truncate">
+                        {attachmentTypeLabel(uploadedKind)} uploaded
+                      </p>
+                      <p className="text-xs text-[#666] truncate">
+                        {uploadedImageUrl.split('/').pop() || 'file'}
+                      </p>
+                    </div>
+                  </div>
+                )}
                 <div className="flex flex-wrap gap-3 text-xs">
                   <a
                     href={uploadedImageUrl}
@@ -802,7 +886,7 @@ function ReplySection({
                     rel="noopener noreferrer"
                     className="text-[#D4A843] font-bold hover:underline"
                   >
-                    Open full size
+                    {uploadedKind === 'image' ? 'Open full size' : 'Open file'}
                   </a>
                   <button
                     type="button"
@@ -819,7 +903,7 @@ function ReplySection({
                 <input
                   id={`reply-photo-${message.id}`}
                   type="file"
-                  accept="image/*"
+                  accept="image/*,application/pdf,.doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                   disabled={uploadingPhoto || saving}
                   onChange={e => {
                     const f = e.currentTarget.files?.[0];
@@ -832,9 +916,9 @@ function ReplySection({
                   className="block text-sm"
                 />
                 <p className="text-xs text-[#888] leading-relaxed mt-2">
-                  Phone camera works. JPEG or HEIC preferred, under ~7 MB.
-                  Take the picture in good light with the whole sheet in
-                  frame.
+                  Phone camera works. JPEG / HEIC / PDF / DOCX under
+                  ~15 MB. Take the picture in good light with the whole
+                  sheet in frame.
                 </p>
                 {uploadingPhoto && (
                   <p className="text-xs text-[#0d0d0d] italic mt-2">
@@ -845,44 +929,73 @@ function ReplySection({
             )}
           </div>
 
-          <label
-            htmlFor={`reply-en-${message.id}`}
-            className="block text-xs font-bold uppercase tracking-[0.15em] text-[#0d0d0d] mb-1"
-          >
-            2 · English translation{' '}
-            <span className="font-normal normal-case tracking-normal text-[#888]">
-              (leave blank if the kid already wrote in English)
+          {/* English-letter shortcut. When the kid already wrote in
+              English, there's no translation to do — Simon just needs
+              to approve the scan and notify the sponsor. Toggling this
+              hides the translation textarea + relabels the Save button.
+              The path always worked (blank bodyEn + photo is a valid
+              server submit); this control makes it discoverable. */}
+          <label className="flex items-start gap-2 mb-3 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={englishLetter}
+              onChange={e => {
+                setEnglishLetter(e.target.checked);
+                if (e.target.checked) {
+                  // Clear any half-typed translation so a stray
+                  // character doesn't ride along on the submit.
+                  setReplyBody('');
+                  if (error) setError(null);
+                }
+              }}
+              disabled={saving}
+              className="mt-0.5 accent-[#D4A843]"
+            />
+            <span className="text-sm text-[#0d0d0d] leading-snug">
+              <strong>{message.kid.firstName ?? 'The kid'} wrote in English</strong>{' '}
+              <span className="text-[#666]">— no translation needed, just approve the scan.</span>
             </span>
           </label>
-          <textarea
-            id={`reply-en-${message.id}`}
-            value={replyBody}
-            onChange={e => {
-              setReplyBody(e.target.value);
-              if (error) setError(null);
-            }}
-            rows={4}
-            disabled={saving}
-            className="w-full px-3 py-2 bg-white border border-[#e8e0d4] focus:outline-none focus:border-[#D4A843] focus:ring-1 focus:ring-[#D4A843] text-base"
-            placeholder="What did the kid say back?"
-            style={{ fontFamily: 'Georgia, serif' }}
-          />
-          <label
-            htmlFor={`reply-orig-${message.id}`}
-            className="block text-xs font-bold uppercase tracking-[0.15em] text-[#0d0d0d] mb-1 mt-4"
-          >
-            3 · Original transcription <span className="font-normal normal-case tracking-normal text-[#888]">(optional — Acholi, Luo, etc.)</span>
-          </label>
-          <textarea
-            id={`reply-orig-${message.id}`}
-            value={replyOriginal}
-            onChange={e => setReplyOriginal(e.target.value)}
-            rows={2}
-            disabled={saving}
-            className="w-full px-3 py-2 bg-white border border-[#e8e0d4] focus:outline-none focus:border-[#D4A843] focus:ring-1 focus:ring-[#D4A843] text-sm"
-            placeholder="Kept for audit — sponsor sees this on request."
-            style={{ fontFamily: 'Georgia, serif' }}
-          />
+
+          {!englishLetter && (
+            <>
+              <label
+                htmlFor={`reply-en-${message.id}`}
+                className="block text-xs font-bold uppercase tracking-[0.15em] text-[#0d0d0d] mb-1"
+              >
+                2 · English translation
+              </label>
+              <textarea
+                id={`reply-en-${message.id}`}
+                value={replyBody}
+                onChange={e => {
+                  setReplyBody(e.target.value);
+                  if (error) setError(null);
+                }}
+                rows={4}
+                disabled={saving}
+                className="w-full px-3 py-2 bg-white border border-[#e8e0d4] focus:outline-none focus:border-[#D4A843] focus:ring-1 focus:ring-[#D4A843] text-base"
+                placeholder="What did the kid say back?"
+                style={{ fontFamily: 'Georgia, serif' }}
+              />
+              <label
+                htmlFor={`reply-orig-${message.id}`}
+                className="block text-xs font-bold uppercase tracking-[0.15em] text-[#0d0d0d] mb-1 mt-4"
+              >
+                3 · Original transcription <span className="font-normal normal-case tracking-normal text-[#888]">(optional — Acholi, Luo, etc.)</span>
+              </label>
+              <textarea
+                id={`reply-orig-${message.id}`}
+                value={replyOriginal}
+                onChange={e => setReplyOriginal(e.target.value)}
+                rows={2}
+                disabled={saving}
+                className="w-full px-3 py-2 bg-white border border-[#e8e0d4] focus:outline-none focus:border-[#D4A843] focus:ring-1 focus:ring-[#D4A843] text-sm"
+                placeholder="Kept for audit — sponsor sees this on request."
+                style={{ fontFamily: 'Georgia, serif' }}
+              />
+            </>
+          )}
           {error && (
             <p className="text-sm text-[#c0392b] mt-2 leading-relaxed">
               {error}
@@ -899,12 +1012,18 @@ function ReplySection({
                 // Translation is optional, but if there IS text it
                 // must be at least 3 chars (accidental "ok" submits
                 // are the failure mode here). Empty translation +
-                // photo alone is a valid submit.
+                // photo alone is a valid submit. When englishLetter
+                // is on we already forced replyBody to '' so this
+                // check is a no-op — kept for defensive symmetry.
                 (replyBody.trim().length > 0 && replyBody.trim().length < 3)
               }
               className="inline-block bg-[#D4A843] hover:bg-[#c49a3a] text-[#0d0d0d] disabled:opacity-50 disabled:cursor-not-allowed px-4 py-2 text-xs font-bold uppercase tracking-wider transition-colors"
             >
-              {saving ? 'Sending…' : 'Save & notify sponsor'}
+              {saving
+                ? 'Sending…'
+                : englishLetter
+                  ? 'Approve English letter & notify sponsor'
+                  : 'Save & notify sponsor'}
             </button>
             <button
               type="button"
@@ -913,6 +1032,7 @@ function ReplySection({
                 setReplyBody('');
                 setReplyOriginal('');
                 setUploadedImageUrl(null);
+                setEnglishLetter(false);
                 setError(null);
               }}
               disabled={saving}
