@@ -14,8 +14,16 @@ export function PrintTrigger() {
 
   useEffect(() => {
     if (fired.current) return;
-    fired.current = true;
+    // Don't flip `fired` until the callback actually runs. React 19
+    // strict-mode double-invokes effects in dev: previously we set
+    // fired.current=true on the first mount + cleared the timer in
+    // cleanup, then the second mount's early-return skipped
+    // scheduling entirely, so window.print() never fired in `next
+    // dev`. Now the ref only guards a re-schedule AFTER a real
+    // print attempt, which strict-mode double-mount handles
+    // correctly.
     const t = window.setTimeout(() => {
+      fired.current = true;
       try {
         window.print();
       } catch {

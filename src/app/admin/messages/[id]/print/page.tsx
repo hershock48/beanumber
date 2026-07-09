@@ -11,7 +11,7 @@
  */
 
 import { redirect, notFound } from 'next/navigation';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { getAdminRole } from '@/lib/admin-session';
 import { db } from '@/lib/db/client';
 import { kidMessages, children } from '@/lib/db/schema';
@@ -51,7 +51,17 @@ export default async function PrintNotePage({
     })
     .from(kidMessages)
     .leftJoin(children, eq(children.id, kidMessages.childId))
-    .where(eq(kidMessages.id, id))
+    /* Only print sponsor→kid rows. A kid→sponsor reply UUID feeding
+       this endpoint would render "For {kidName} · From {sponsorFirst}"
+       with the wrong body (the reply text) and reversed roles.
+       Nothing in the UI exposes reply IDs at this route, but the DB
+       row is real, so guard here in case one leaks via a bookmark. */
+    .where(
+      and(
+        eq(kidMessages.id, id),
+        eq(kidMessages.direction, 'sponsor_to_kid')
+      )
+    )
     .limit(1);
   const note = rows[0];
   if (!note) notFound();

@@ -364,9 +364,24 @@ function MessageCard({
             href={`/admin/messages/${message.id}/print`}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-xs font-bold uppercase tracking-[0.15em] text-[#888] hover:text-[#D4A843] transition-colors"
+            className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.15em] text-[#D4A843] hover:text-[#c49a3a] transition-colors border border-[#D4A843] px-3 py-1.5"
             title="Open a print-friendly view of this note"
           >
+            <svg
+              width="12"
+              height="12"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <polyline points="6 9 6 2 18 2 18 9" />
+              <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+              <rect x="6" y="14" width="12" height="8" />
+            </svg>
             Print
           </a>
           {collapsed && (

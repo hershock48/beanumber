@@ -292,28 +292,65 @@ export async function POST(
     // back."
     if (parent.status !== 'delivered') {
       try {
-        // If the parent skipped the 'translated' state entirely
-        // (Simon just hit Reply from a pending note), backfill
-        // translatedAt too so timeline queries have a sensible
-        // timestamp instead of NULL.
-        const patch: Partial<typeof kidMessages.$inferInsert> = {
-          status: 'delivered',
-          deliveredAt: now,
-        };
-        if (parent.status === 'pending') {
-          patch.translatedAt = now;
-        }
+        // Race-safe patch: use SQL coalesce on deliveredAt +
+        // translatedAt so a concurrent PATCH from the queue (Kevin
+        // clicking Save Translation → Mark Delivered while Simon
+        // uploads a reply) doesn't get its fresher timestamp
+        // stomped by the reply's `now`. If parent was already
+        // delivered by the concurrent PATCH, the row's status stays
+        // 'delivered' — this UPDATE just becomes a no-op setting
+        // the same value.
         await db
           .update(kidMessages)
-          .set(patch)
+          .set({
+            status: 'delivered',
+            deliveredAt: sql`COALESCE(${kidMessages.deliveredAt}, ${now})`,
+            translatedAt: sql`COALESCE(${kidMessages.translatedAt}, ${now})`,
+          })
           .where(eq(kidMessages.id, parent.id));
       } catch (updErr) {
-        // Non-fatal — the reply row is already saved. Log so we can
-        // reconcile the parent status later if this ever fires.
+        // Non-fatal for the reply itself — the row is already saved
+        // and the sponsor will still get the reply email — but leaves
+        // the parent in a stuck state that we need to hand-reconcile.
+        // Ping Kevin so it's visible instead of silent-console noise.
         console.warn(
           '[messages/reply] parent auto-deliver flip failed (non-fatal):',
           updErr instanceof Error ? updErr.message : String(updErr)
         );
+        try {
+          const alertTo =
+            process.env.KEVIN_ALERT_EMAIL || 'kevin@beanumber.org';
+          await sendEmail({
+            to: { email: alertTo, name: 'Kevin' },
+            from: { email: FROM_EMAIL, name: 'Be A Number Admin' },
+            subject: `[BAN] Reply saved but parent stuck — reconcile message ${parent.id.slice(0, 8)}`,
+            html: `
+              <p>Simon (or an admin) uploaded a kid reply successfully,
+              but the parent note's status auto-flip to
+              <code>delivered</code> failed. The reply is saved and
+              the sponsor was emailed. The parent needs a manual
+              status bump so the queue view stays accurate.</p>
+              <p><strong>Parent id:</strong> ${escapeHtml(parent.id)}<br>
+              <strong>Kid:</strong> ${escapeHtml(parent.firstName || '?')} (#${parent.shirtNumber ?? '?'})<br>
+              <strong>Sponsor:</strong> ${escapeHtml(parent.sponsorEmail)}<br>
+              <strong>Reply id:</strong> ${escapeHtml(inserted[0].id)}<br>
+              <strong>Update error:</strong> <code>${escapeHtml(
+                (updErr instanceof Error ? updErr.message : String(updErr)).slice(
+                  0,
+                  300
+                )
+              )}</code></p>
+              <p><a href="${SITE_URL}/admin/messages">Open admin queue</a></p>
+            `,
+          });
+        } catch (alertErr) {
+          console.warn(
+            '[messages/reply] Kevin alert for stuck-parent also failed:',
+            alertErr instanceof Error
+              ? alertErr.message.slice(0, 200)
+              : String(alertErr).slice(0, 200)
+          );
+        }
       }
     }
   } catch (err: unknown) {
