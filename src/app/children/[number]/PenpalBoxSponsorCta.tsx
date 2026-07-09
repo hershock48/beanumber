@@ -51,11 +51,14 @@ export function PenpalBoxSponsorCta({
     return () => window.removeEventListener('pageshow', reset);
   }, []);
 
+  // Both signed-in variants now use the same CTA copy. Kevin dropped
+  // the "too" qualifier 2026-07-09 — sponsors on the signed_in_visitor
+  // path don't need to be told they're adding on; the "Add [Kid] to
+  // your campus" header already frames it, and "Sponsor Joan — $25/month"
+  // reads cleaner than "Sponsor Joan too — $25/month" in the button.
   const label = loading
     ? 'Redirecting…'
-    : variant === 'signed_in_visitor'
-      ? `Sponsor ${firstName} too — $25/month`
-      : `Sponsor ${firstName} — $25/month`;
+    : `Sponsor ${firstName} — $25/month`;
 
   async function handleClick() {
     setLoading(true);

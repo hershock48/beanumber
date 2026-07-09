@@ -173,6 +173,16 @@ export async function POST(
       id: kidMessages.id,
       direction: kidMessages.direction,
       status: kidMessages.status,
+      // Existing timestamps needed for the JS-side coalesce in the
+      // auto-flip below. Previously we used sql`COALESCE(...)` but
+      // postgres.js chokes on Date objects inside raw sql``` templates
+      // (2026-07-09: every reply since workflow v2 shipped has
+      // silently failed the auto-flip with 'string argument must be
+      // Buffer or ArrayBuffer, received Date'). Fetching the current
+      // values and coalescing in JS sidesteps the driver's serializer
+      // and keeps the update path simple.
+      deliveredAt: kidMessages.deliveredAt,
+      translatedAt: kidMessages.translatedAt,
       sponsorEmail: kidMessages.sponsorEmail,
       sponsorName: kidMessages.sponsorName,
       childId: kidMessages.childId,
@@ -292,20 +302,26 @@ export async function POST(
     // back."
     if (parent.status !== 'delivered') {
       try {
-        // Race-safe patch: use SQL coalesce on deliveredAt +
-        // translatedAt so a concurrent PATCH from the queue (Kevin
-        // clicking Save Translation → Mark Delivered while Simon
-        // uploads a reply) doesn't get its fresher timestamp
-        // stomped by the reply's `now`. If parent was already
-        // delivered by the concurrent PATCH, the row's status stays
-        // 'delivered' — this UPDATE just becomes a no-op setting
-        // the same value.
+        // JS-side coalesce (2026-07-09). The previous version used
+        // sql`COALESCE(delivered_at, ${now})` which postgres.js
+        // silently rejected with 'string argument must be Buffer or
+        // ArrayBuffer, received Date' — every reply since v2 shipped
+        // was silent-failing the flip and getting caught by the
+        // read-side reconciler in admin/messages/page.tsx. Kevin
+        // finally got a Reply-saved-but-parent-stuck alert email
+        // proving it, exposing the exact error string.
+        //
+        // JS-side coalesce sidesteps the driver's serializer entirely:
+        // we already selected parent.deliveredAt above so we can
+        // preserve whatever was there. Small race window relative to
+        // a concurrent Mark-Delivered PATCH is fine — the worst case
+        // is the deliveredAt shifts by a few ms to `now`.
         await db
           .update(kidMessages)
           .set({
             status: 'delivered',
-            deliveredAt: sql`COALESCE(${kidMessages.deliveredAt}, ${now})`,
-            translatedAt: sql`COALESCE(${kidMessages.translatedAt}, ${now})`,
+            deliveredAt: parent.deliveredAt ?? now,
+            translatedAt: parent.translatedAt ?? now,
           })
           .where(eq(kidMessages.id, parent.id));
       } catch (updErr) {
