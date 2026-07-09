@@ -77,7 +77,7 @@ import { useSearchParams } from 'next/navigation';
 // storefront never sold XXL; it was a dev-time typo from before the
 // site used '2XL' consistently.
 export const SIZE_OPTIONS = [
-  'Youth S', 'Youth M', 'Youth L',
+  'Youth S', 'Youth M', 'Youth L', 'Youth XL',
   'S', 'M', 'L', 'XL', '2XL',
 ] as const;
 export const COLOR_OPTIONS = ['Pink', 'Green', 'Black', 'Blue'] as const;

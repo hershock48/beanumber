@@ -97,6 +97,7 @@ export default async function AdminMessagesPage() {
         deliveredAt: kidMessages.deliveredAt,
         createdAt: kidMessages.createdAt,
         replyImageUrl: kidMessages.replyImageUrl,
+        sponsorNotifiedAt: kidMessages.sponsorNotifiedAt,
       })
       .from(kidMessages)
       .where(eq(kidMessages.direction, 'kid_to_sponsor'))
@@ -116,6 +117,7 @@ export default async function AdminMessagesPage() {
       imageUrl: string | null;
       deliveredAt: string | null;
       createdAt: string | null;
+      sponsorNotifiedAt: string | null;
     }
   >();
   for (const r of replyRows) {
@@ -131,6 +133,9 @@ export default async function AdminMessagesPage() {
       imageUrl: r.replyImageUrl,
       deliveredAt: r.deliveredAt ? new Date(r.deliveredAt).toISOString() : null,
       createdAt: r.createdAt ? new Date(r.createdAt).toISOString() : null,
+      sponsorNotifiedAt: r.sponsorNotifiedAt
+        ? new Date(r.sponsorNotifiedAt).toISOString()
+        : null,
     });
   }
 

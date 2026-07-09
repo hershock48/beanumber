@@ -342,6 +342,7 @@ const YOUTH_SIZES: ReadonlyArray<{ value: string; label: string }> = [
   { value: 'Youth S', label: 'YS' },
   { value: 'Youth M', label: 'YM' },
   { value: 'Youth L', label: 'YL' },
+  { value: 'Youth XL', label: 'YXL' },
 ];
 
 /**

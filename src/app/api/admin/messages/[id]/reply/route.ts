@@ -409,6 +409,21 @@ export async function POST(
           <p>Kevin</p>
         `),
       });
+      // Stamp the reply row so the admin queue knows the notification
+      // actually went out. Non-fatal on failure — we already sent the
+      // email, we just couldn't record the timestamp. Queue will show
+      // "Email pending — resend?" until this gets set.
+      try {
+        await db
+          .update(kidMessages)
+          .set({ sponsorNotifiedAt: new Date() })
+          .where(eq(kidMessages.id, inserted[0].id));
+      } catch (stampErr) {
+        console.warn(
+          '[messages/reply] sponsor_notified_at stamp failed (non-fatal):',
+          stampErr instanceof Error ? stampErr.message : String(stampErr)
+        );
+      }
     } catch (err) {
       console.warn(
         '[messages/reply] sponsor notification failed (non-fatal):',

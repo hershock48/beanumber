@@ -21,8 +21,8 @@ import { eq, inArray, sql } from 'drizzle-orm';
 // Keys MUST match what's actually stored in fulfillments.size: full
 // strings like "Youth S", not short codes.
 const SIZE_ORDER: Record<string, number> = {
-  'Youth S': 0, 'Youth M': 1, 'Youth L': 2,
-  S: 3, M: 4, L: 5, XL: 6, '2XL': 7, '3XL': 8, '4XL': 9,
+  'Youth S': 0, 'Youth M': 1, 'Youth L': 2, 'Youth XL': 3,
+  S: 4, M: 5, L: 6, XL: 7, '2XL': 8, '3XL': 9, '4XL': 10,
 };
 
 export async function GET(request: NextRequest) {

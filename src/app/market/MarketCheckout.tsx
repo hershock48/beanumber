@@ -18,8 +18,9 @@ const YOUTH_SIZES: ReadonlyArray<{ value: string; label: string }> = [
   { value: 'Youth S', label: 'YS' },
   { value: 'Youth M', label: 'YM' },
   { value: 'Youth L', label: 'YL' },
+  { value: 'Youth XL', label: 'YXL' },
 ];
-type SizeValue = typeof ADULT_SIZES[number] | 'Youth S' | 'Youth M' | 'Youth L';
+type SizeValue = typeof ADULT_SIZES[number] | 'Youth S' | 'Youth M' | 'Youth L' | 'Youth XL';
 
 type CartItem = {
   id: string;            // local UI id for keying

@@ -42,7 +42,7 @@ const SHIRT_PRICE = 25;
 const cartItemSchema = z.object({
   shirtId: z.enum(['onyx', 'meadow', 'blossom', 'sky']),
   // Adult run S–2XL plus the July 2026 youth run.
-  size: z.enum(['S', 'M', 'L', 'XL', '2XL', 'Youth S', 'Youth M', 'Youth L']),
+  size: z.enum(['S', 'M', 'L', 'XL', '2XL', 'Youth S', 'Youth M', 'Youth L', 'Youth XL']),
   color: z.enum(['Onyx', 'Meadow', 'Blossom', 'Sky']),
   continueMonthly: z.boolean().optional().default(false),
 });

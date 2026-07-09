@@ -1162,6 +1162,19 @@ export const kidMessages = pgTable(
     replyImageUploadedAt: timestamp('reply_image_uploaded_at', {
       withTimezone: true,
     }),
+    // Timestamp of when the sponsor-reply notification email actually
+    // dispatched successfully (SendGrid accepted the send). Null when
+    // either (a) the row is a sponsor->kid parent (only replies notify
+    // the sponsor), or (b) the reply was recorded but the sendEmail
+    // call threw inside the try/catch — a silent failure Kevin can
+    // now see in the admin queue as "Email pending — resend?".
+    //
+    // Populated on direction='kid_to_sponsor' rows only. Backfill in
+    // migration 0011 stamped existing replies with delivered_at so
+    // the queue doesn't light up red on rows we know landed.
+    sponsorNotifiedAt: timestamp('sponsor_notified_at', {
+      withTimezone: true,
+    }),
     // ── Sponsor-attached photos (2026-07-08) ────────────────────────
     // Only populated on direction='sponsor_to_kid' rows. jsonb array
     // of {url, uploadedAt} objects, hard-capped at 2 entries by the

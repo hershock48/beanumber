@@ -23,8 +23,8 @@ import { and, eq } from 'drizzle-orm';
 // strings like "Youth S", not short codes. Short codes here were a
 // dev-time typo that would silently sort youth rows to the bottom.
 const SIZE_ORDER: Record<string, number> = {
-  'Youth S': 0, 'Youth M': 1, 'Youth L': 2,
-  S: 3, M: 4, L: 5, XL: 6, '2XL': 7, '3XL': 8, '4XL': 9,
+  'Youth S': 0, 'Youth M': 1, 'Youth L': 2, 'Youth XL': 3,
+  S: 4, M: 5, L: 6, XL: 7, '2XL': 8, '3XL': 9, '4XL': 10,
 };
 
 function esc(s: string): string {

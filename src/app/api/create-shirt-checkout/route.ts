@@ -32,7 +32,7 @@ const SHIRTS: Record<string, { name: string }> = {
 // Adult run S–2XL plus the July 2026 youth run (stored as literal
 // "Youth S" / "Youth M" / "Youth L" strings so display everywhere
 // reads clean without a translation layer).
-const VALID_SIZES = ['S', 'M', 'L', 'XL', '2XL', 'Youth S', 'Youth M', 'Youth L'];
+const VALID_SIZES = ['S', 'M', 'L', 'XL', '2XL', 'Youth S', 'Youth M', 'Youth L', 'Youth XL'];
 const VALID_COLORS = ['Black', 'White', 'Grey', 'Pink', 'Yellow'];
 const SHIRT_PRICE = 25; // $25 per shirt (and per month when opted in)
 
@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
 
     const shirtSchema = z.object({
       shirtId: z.enum(['onyx', 'meadow', 'blossom', 'sky']),
-      size: z.enum(['S', 'M', 'L', 'XL', '2XL', 'Youth S', 'Youth M', 'Youth L']),
+      size: z.enum(['S', 'M', 'L', 'XL', '2XL', 'Youth S', 'Youth M', 'Youth L', 'Youth XL']),
       color: z.enum(['Onyx', 'Meadow', 'Blossom', 'Sky']),
       email: z.string().email().optional().or(z.literal('')),
       name: z.string().max(255).optional().default(''),

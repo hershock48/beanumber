@@ -60,6 +60,11 @@ interface MessageRow {
     imageUrl: string | null;
     deliveredAt: string | null;
     createdAt: string | null;
+    /** Non-null = the sponsor-notification email actually dispatched
+     *  at this time. Null = notification never fired or the send
+     *  failed silently. Drives the queue's "Emailed" vs "Email
+     *  pending — resend?" state on the reply block. */
+    sponsorNotifiedAt: string | null;
   } | null;
 }
 
@@ -794,9 +799,22 @@ function ReplySection({
               month: 'short',
               day: 'numeric',
             })}
-            . Sponsor was emailed.
+            .
           </p>
         )}
+        {/* Notification state — shows whether the sponsor's "your
+            penpal wrote back" email actually dispatched. When
+            sponsorNotifiedAt is stamped we're certain the send
+            landed at SendGrid. When null (silent failure inside
+            the reply POST's sendEmail catch) Kevin sees a Resend
+            button to retry. */}
+        <ResendNotificationBlock
+          replyId={message.reply.id}
+          initialNotifiedAt={message.reply.sponsorNotifiedAt}
+          onLocalUpdate={onLocalUpdate}
+          parentMessageId={message.id}
+          currentReply={message.reply}
+        />
       </div>
     );
   }
@@ -849,6 +867,12 @@ function ReplySection({
           imageUrl: uploadedImageUrl,
           deliveredAt: new Date().toISOString(),
           createdAt: new Date().toISOString(),
+          // Server stamps sponsorNotifiedAt inside the reply POST on
+          // successful sendEmail. We don't know client-side whether
+          // it succeeded — safest to leave null and let the row re-
+          // fetch on next page load resolve it. If Kevin never gets
+          // a stamp, the queue will show the resend button.
+          sponsorNotifiedAt: null,
         },
       });
       setSaving(false);
@@ -1097,6 +1121,128 @@ function ReplySection({
             Record their reply
           </button>
         </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Small state block that shows "Sponsor was emailed [date]" when the
+ * reply POST's sendEmail succeeded, or "Email pending — resend" +
+ * button when it didn't. The resend button hits the resend endpoint,
+ * which fires a fresh email and stamps sponsorNotifiedAt. On success
+ * we mutate local state so the block flips to the emailed variant
+ * without a full page reload.
+ */
+function ResendNotificationBlock({
+  replyId,
+  initialNotifiedAt,
+  onLocalUpdate,
+  parentMessageId,
+  currentReply,
+}: {
+  replyId: string;
+  initialNotifiedAt: string | null;
+  onLocalUpdate: (id: string, updates: Partial<MessageRow>) => void;
+  parentMessageId: string;
+  currentReply: NonNullable<MessageRow['reply']>;
+}) {
+  const [notifiedAt, setNotifiedAt] = useState(initialNotifiedAt);
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function resend() {
+    setSending(true);
+    setError(null);
+    try {
+      const res = await fetch(
+        `/api/admin/messages/${replyId}/resend-notification`,
+        {
+          method: 'POST',
+          credentials: 'same-origin',
+        }
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.error || 'Resend failed. Try again in a moment.');
+        setSending(false);
+        return;
+      }
+      const nextIso = data.notifiedAt || new Date().toISOString();
+      setNotifiedAt(nextIso);
+      onLocalUpdate(parentMessageId, {
+        reply: { ...currentReply, sponsorNotifiedAt: nextIso },
+      });
+      if (data.warning) setError(data.warning);
+    } catch (e) {
+      setError(
+        e instanceof Error ? e.message : 'Network hiccup. Try again.'
+      );
+    } finally {
+      setSending(false);
+    }
+  }
+
+  if (notifiedAt) {
+    return (
+      <p className="text-xs text-[#666] mt-1 flex items-center gap-2">
+        <svg
+          width="12"
+          height="12"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="text-[#4a8b3a] flex-shrink-0"
+          aria-hidden="true"
+        >
+          <polyline points="20 6 9 17 4 12" />
+        </svg>
+        Sponsor was emailed{' '}
+        {new Date(notifiedAt).toLocaleString('en-US', {
+          month: 'short',
+          day: 'numeric',
+          hour: 'numeric',
+          minute: '2-digit',
+        })}
+        .
+      </p>
+    );
+  }
+
+  return (
+    <div className="mt-2 flex items-center gap-3 flex-wrap">
+      <p className="text-xs text-[#c0392b] italic flex items-center gap-2">
+        <svg
+          width="12"
+          height="12"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="flex-shrink-0"
+          aria-hidden="true"
+        >
+          <circle cx="12" cy="12" r="10" />
+          <line x1="12" y1="8" x2="12" y2="12" />
+          <line x1="12" y1="16" x2="12.01" y2="16" />
+        </svg>
+        Email not confirmed — no timestamp on file.
+      </p>
+      <button
+        type="button"
+        onClick={resend}
+        disabled={sending}
+        className="text-xs font-bold uppercase tracking-[0.15em] text-[#D4A843] hover:text-[#c49a3a] disabled:opacity-50 border border-[#D4A843] px-3 py-1.5 transition-colors"
+      >
+        {sending ? 'Sending…' : 'Resend notification'}
+      </button>
+      {error && (
+        <p className="text-xs text-[#c0392b] w-full mt-1">{error}</p>
       )}
     </div>
   );
