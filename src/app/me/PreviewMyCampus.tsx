@@ -71,9 +71,10 @@ export function PreviewMyCampus({
         <p className="text-base md:text-lg text-[#555] leading-relaxed max-w-2xl">
           This is where sponsors come back. Every shirt has a number.
           Every number is a kid at the campus in Northern Uganda. When
-          you buy a shirt, this page becomes yours &mdash; updates,
-          letters, the monthly newsletter, and the specific kid your
-          number belongs to, all in one place.
+          you buy a shirt, this page becomes yours &mdash; the specific
+          kid your number belongs to, their handwritten letters back to
+          you, photos and report cards from the campus, and the monthly
+          newsletter.
         </p>
       </header>
 
@@ -210,14 +211,14 @@ export function PreviewMyCampus({
             name.
           </FeatureRow>
           <FeatureRow>
-            <strong className="text-[#0d0d0d]">Personal updates from the campus.</strong>{' '}
-            Photos, handwritten letters, report cards &mdash; landing
-            on your kid&rsquo;s page whenever the team sends them.
+            <strong className="text-[#0d0d0d]">Letters between you.</strong>{' '}
+            Write to your kid from here. Their handwritten replies
+            land on your kid&rsquo;s page, ready when you are.
           </FeatureRow>
           <FeatureRow>
-            <strong className="text-[#0d0d0d]">The monthly newsletter.</strong>{' '}
-            One letter a month from Kevin and the team &mdash; what
-            actually moved on the ground.
+            <strong className="text-[#0d0d0d]">Personal updates from the campus.</strong>{' '}
+            Photos, report cards, milestones &mdash; landing on your
+            kid&rsquo;s page whenever the team sends them.
           </FeatureRow>
           <FeatureRow>
             <strong className="text-[#0d0d0d]">Everything in one place.</strong>{' '}
