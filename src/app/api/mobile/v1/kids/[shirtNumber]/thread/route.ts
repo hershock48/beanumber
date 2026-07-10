@@ -29,7 +29,7 @@ import {
   getNoteThreadForSponsorAndChild,
 } from '@/lib/db/queries';
 import { canonicalShirtNumber } from '@/lib/mobile/shirt-cycle';
-import { sendKevinNoteAlert, sendSimonNoteAlert } from '@/lib/email';
+import { sendKevinNoteAlert } from '@/lib/email';
 import type { Child } from '@/lib/db/schema';
 
 export const dynamic = 'force-dynamic';
