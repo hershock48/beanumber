@@ -29,6 +29,7 @@ import { db } from '@/lib/db/client';
 import { kidMessages, children, sponsorships } from '@/lib/db/schema';
 import { getAdminRole } from '@/lib/admin-session';
 import { sendEmail, sendKevinDeclineAlert } from '@/lib/email';
+import { stampHolderFirstLetterCycle } from '@/lib/penpal-cycle';
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.beanumber.org';
 const FROM_EMAIL = process.env.SENDGRID_FROM_EMAIL || 'Kevin@beanumber.org';
@@ -219,6 +220,19 @@ export async function PATCH(
   }
 
   await db.update(kidMessages).set(patch).where(eq(kidMessages.id, id));
+
+  // Included-letter cycle stamp (2026-07-10). When Simon marks a
+  // holder's letter delivered, we stamp their sponsorship row so
+  // subsequent write attempts hit the "sponsor to keep writing"
+  // paywall. No-op for monthly sponsors (they're past the gate)
+  // and for declines (declined letters don't burn the cycle).
+  if (action === 'deliver' && message.childId) {
+    await stampHolderFirstLetterCycle({
+      sponsorEmail: message.sponsorEmail,
+      childRecordId: message.childId,
+      now,
+    });
+  }
 
   // Sponsor notification for deliver / decline. Best-effort — don't
   // fail the API if SendGrid is having a moment.

@@ -57,6 +57,10 @@ import { AwardsTimeline } from './AwardsTimeline';
 import { SendNoteComposer } from './SendNoteComposer';
 import { NotesThread } from './NotesThread';
 import { PenpalBox } from './PenpalBox';
+import {
+  getViewerWriteStatus,
+  type ViewerWriteStatus,
+} from '@/lib/penpal-cycle';
 // ShareKidCard import intentionally kept out — the component is
 // still on disk (src/app/children/[number]/ShareKidCard.tsx) and can
 // be re-imported when the "Take {firstName} with you" block is
@@ -1310,8 +1314,14 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
   // notes fetch can be included as a fourth peer.
   const viewerEmailForThread = await getViewerEmail();
 
-  const [buyerBundle, portalData, recentNewsletters, sotmAwards, noteThread] =
-    await Promise.all([
+  const [
+    buyerBundle,
+    portalData,
+    recentNewsletters,
+    sotmAwards,
+    noteThread,
+    viewerWriteStatus,
+  ] = await Promise.all([
       resolveBuyerBundle(child.viewer_is_sponsor, child.record_id),
       resolvePortalData(child),
       child.departed_at
@@ -1339,7 +1349,27 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
             childRecordId: child.record_id,
           })
         : Promise.resolve<NoteThreadEntry[]>([]),
+      // One-letter-included cycle status for shirt-holders. The kid
+      // page's PenpalBox uses this to decide whether to render the
+      // composer for a holder (viewerState = 'holder' + cycle
+      // available) or route them to the upgrade card (cycle used).
+      // Only meaningful when the viewer is a holder AND we know their
+      // email — for everyone else the result is unused. Cheap enough
+      // (a single indexed row lookup by sponsor email + child) that
+      // we always issue it when we have both inputs; the read is
+      // dropped downstream if the viewer isn't a holder.
+      !child.departed_at &&
+      child.viewer_is_holder &&
+      child.record_id &&
+      viewerEmailForThread
+        ? getViewerWriteStatus({
+            sponsorEmail: viewerEmailForThread,
+            childRecordId: child.record_id,
+            childIdLegacy: child.child_id ?? null,
+          })
+        : Promise.resolve<ViewerWriteStatus>('none'),
     ]);
+  const holderCycleAvailable = viewerWriteStatus === 'holder_available';
   const { buyerContext, showClaimCard } = buyerBundle;
   const buyerHint = buyerContext
     ? { customerId: buyerContext.customerId, email: buyerContext.email }
@@ -1942,7 +1972,8 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
               firstName={firstName}
               shirtNumber={Number(number)}
               thread={
-                child.viewer_is_sponsor && noteThread.length > 0
+                (child.viewer_is_sponsor || child.viewer_is_holder) &&
+                noteThread.length > 0
                   ? noteThread
                   : undefined
               }
@@ -1959,6 +1990,7 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
                       ? 'signed_in_visitor'
                       : 'anon'
               }
+              holderCycleAvailable={holderCycleAvailable}
               sponsorPortal={
                 child.viewer_is_sponsor && portalData ? (
                   <SponsorPortalSections

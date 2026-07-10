@@ -234,13 +234,16 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Writing notes requires an ACTIVE MONTHLY sponsorship of the target
-  // kid. Rule change 2026-07-06: holders (shirt-only, no monthly) can
-  // no longer write. The correspondence engine is a sponsor benefit,
-  // and letting holders write while the composer promises "the campus
-  // team will translate and deliver" reads wrong when the holder has
-  // no monthly relationship to fund that work. Holders can still meet
-  // the kid, hold the number, and convert to monthly to unlock notes.
+  // Writing notes: monthly sponsors write freely; shirt-holders get
+  // ONE free letter ("included with the shirt" per the physical letter
+  // template we ship). After that first note reaches 'delivered',
+  // the cycle stamps included_letter_sent_at on their sponsorship row
+  // and subsequent writes 403 until they subscribe monthly.
+  //
+  // The 2026-07-06 "monthly required" rule is superseded by this
+  // 2026-07-10 revision (see docs/claude/voice.md penpal section and
+  // src/lib/penpal-cycle.ts). Non-holder non-monthly viewers still
+  // get 403 — they haven't paid for anything yet.
   const relatedSponsorships = await db
     .select({
       id: sponsorships.id,
@@ -253,6 +256,8 @@ export async function POST(request: NextRequest) {
       // color the Kevin alert email so add-on notes aren't described
       // as coming from the shirt-holder.
       childRevealedAt: sponsorships.childRevealedAt,
+      // 2026-07-10 cycle gate — see src/lib/penpal-cycle.ts.
+      includedLetterSentAt: sponsorships.includedLetterSentAt,
     })
     .from(sponsorships)
     .where(
@@ -271,20 +276,32 @@ export async function POST(request: NextRequest) {
         ),
         eq(sponsorships.status, 'Active')
       )
-    )
-    .limit(1);
-  // Also require monthlyAmount > 0 — an 'Active' status with $0/mo is
-  // still a holder in the spirit of the rule.
+    );
+
   const monthlyRow = relatedSponsorships.find(
     r => Number(r.monthlyAmount ?? 0) > 0
   );
+  const holderRow = relatedSponsorships.find(r => !!r.childRevealedAt);
+
   if (!monthlyRow) {
-    return NextResponse.json(
-      {
-        error: `You need to be sponsoring ${childRow.firstName ?? 'this kid'} monthly before you can write a penpal note. If you're the holder, add a monthly sponsorship to unlock writing.`,
-      },
-      { status: 403 }
-    );
+    // No monthly. Check for holder-with-available-cycle.
+    if (!holderRow) {
+      return NextResponse.json(
+        {
+          error: `You need to hold this shirt to write to ${childRow.firstName ?? 'this kid'}. If you already do, sign in with the email you used to buy it.`,
+        },
+        { status: 403 }
+      );
+    }
+    if (holderRow.includedLetterSentAt) {
+      return NextResponse.json(
+        {
+          error: `You've already sent the letter that came with your shirt. Sponsor ${childRow.firstName ?? 'this kid'} at $25/month to keep writing to them.`,
+        },
+        { status: 403 }
+      );
+    }
+    // Fall through — holder with unused cycle, allow the write.
   }
 
   // Rate limit — one pending-or-translated note per (sponsor, kid).
@@ -347,13 +364,15 @@ export async function POST(request: NextRequest) {
         kidDisplayName:
           childRow.displayName || childRow.firstName || 'the kid',
         shirtNumber: childRow.shirtNumber ?? null,
-        // True only when the sponsor claimed THIS kid's number via
-        // Hold-to-Meet (owns the shirt). False for add-on sponsorships
-        // — same sponsor writing to a kid they don't hold the shirt
-        // for. The alert renders a small tag so Kevin knows which
-        // channel he's looking at (matters for retention analysis
-        // and for how he might frame a personal follow-up).
-        sponsorHoldsShirt: !!monthlyRow.childRevealedAt,
+        // True when this sponsor holds the shirt (childRevealedAt set
+        // on any of their rows for this kid). Reads either the monthly
+        // row's flag OR the holder row's flag — under the 2026-07-10
+        // included-letter rule a holder-first-letter writer has no
+        // monthly row yet but is still the shirt-holder, and the tag
+        // should still say "Holds #N" for Kevin's inbox context.
+        sponsorHoldsShirt: !!(
+          monthlyRow?.childRevealedAt || holderRow?.childRevealedAt
+        ),
         // When the sponsor uploaded a handwritten scan and skipped
         // typing, the body is empty. Substitute a marker so the
         // Kevin alert email doesn't render a blank quote block —

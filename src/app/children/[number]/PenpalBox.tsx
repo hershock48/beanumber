@@ -68,6 +68,15 @@ export interface PenpalBoxProps {
    */
   viewerState: 'sponsor' | 'holder' | 'signed_in_visitor' | 'anon';
   /**
+   * 2026-07-10 "one letter included with the shirt" mechanic.
+   * When true AND viewerState === 'holder', we render the real
+   * composer (not the frosted upgrade preview) so the shirt-holder
+   * can send their included letter without subscribing first. The
+   * server enforces the same gate via sponsorships.included_letter_sent_at.
+   * Ignored when viewerState !== 'holder'.
+   */
+  holderCycleAvailable?: boolean;
+  /**
    * Renders BELOW the thread + composer for active monthly sponsors.
    * Used to inline the "personal photo updates from the campus" block
    * (letters, photos, report cards) as part of the same Penpal
@@ -96,10 +105,24 @@ export function PenpalBox({
   childId,
   childDisplayName,
   viewerState,
+  holderCycleAvailable,
   sponsorPortal,
 }: PenpalBoxProps) {
   // Sponsor: real experience. Thread + composer + inline campus updates.
-  if (viewerState === 'sponsor' && childRecordId) {
+  //
+  // Also: shirt-holders with their included letter still available
+  // (2026-07-10 mechanic — see src/lib/penpal-cycle.ts) get the real
+  // composer path. The composer itself renders a "First letter's on
+  // us" banner when passed `firstLetterIncluded` so the sponsor knows
+  // they're using their included cycle. Once they use it, the next
+  // page load flips them to viewerState 'holder' cycle_used and
+  // routes to the frosted upgrade preview below.
+  const isHolderFirstLetter =
+    viewerState === 'holder' && !!holderCycleAvailable;
+  const showComposerPath =
+    (viewerState === 'sponsor' || isHolderFirstLetter) && childRecordId;
+
+  if (showComposerPath) {
     return (
       <div className="mt-12 md:mt-16">
         <SectionHeader firstName={firstName} />
@@ -113,12 +136,17 @@ export function PenpalBox({
             childRecordId={childRecordId}
             childIdLegacy={childIdLegacy ?? null}
             firstName={firstName}
+            firstLetterIncluded={isHolderFirstLetter}
           />
         </div>
         {/* Personal photo updates from the campus land here — kept
             visually attached to the penpal thread so the sponsor's
-            single Naume "inbox" is one surface, not two. */}
-        {sponsorPortal ? <div className="mt-10">{sponsorPortal}</div> : null}
+            single Naume "inbox" is one surface, not two.
+            Holder-first-letter users don't get sponsorPortal — that
+            requires monthly. */}
+        {sponsorPortal && viewerState === 'sponsor' ? (
+          <div className="mt-10">{sponsorPortal}</div>
+        ) : null}
       </div>
     );
   }
@@ -136,7 +164,11 @@ export function PenpalBox({
   // promise; the overlay heading is the CTA-adjacent reason to click.
   let heading: string;
   if (viewerState === 'holder') {
-    heading = `Sponsor to start writing ${firstName}.`;
+    // Holders reaching this branch have USED their included letter
+    // cycle — the "not yet" path renders the composer above. Copy
+    // matches the state: they've done one round-trip, now the ask
+    // is to keep going.
+    heading = `Keep writing to ${firstName}.`;
   } else if (viewerState === 'signed_in_visitor') {
     heading = `Add ${firstName} to your campus.`;
   } else {
@@ -151,8 +183,24 @@ export function PenpalBox({
   const anonCtaHref = `/signin?n=${shirtNumber}`;
   const anonCtaLabel = `Sign in to write ${firstName}`;
 
+  // Holder who has already used their included letter cycle AND has
+  // a real thread (their sent letter + kid's reply): show the real
+  // exchange ABOVE the frosted upgrade card, so they don't lose the
+  // artifact of what they wrote and what came back. Their next-step
+  // ask is to keep going at $25/mo.
+  const showRealHolderThread =
+    viewerState === 'holder' && !!thread && thread.length > 0;
+
   return (
     <div className="mt-12 md:mt-16">
+      {showRealHolderThread ? (
+        <>
+          <SectionHeader firstName={firstName} />
+          <div className="mt-6 mb-8">
+            <NotesThread firstName={firstName} thread={thread} />
+          </div>
+        </>
+      ) : null}
       {/* SectionHeader intentionally omitted for holder / anon /
           signed_in_visitor variants (2026-07-08 fix).
           The frosted overlay heading below already IS the primary

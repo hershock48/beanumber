@@ -342,6 +342,18 @@ export const sponsorships = pgTable(
     // animation fires.
     childRevealedAt: timestamp('child_revealed_at', { withTimezone: true }),
 
+    // "One letter included with the shirt" (2026-07-10). Shirt-holders
+    // (child_revealed_at set, no monthly amount yet) can write one
+    // free note to their kid; when that note reaches 'delivered' at
+    // the campus, this column is stamped and subsequent writes 403
+    // until the holder subscribes at $25/mo. Nullable — a null value
+    // for a holder means "free letter still available." Idempotent
+    // COALESCE writes preserve the first stamp. See migration 0013
+    // and src/lib/penpal-cycle.ts for the enforcement.
+    includedLetterSentAt: timestamp('included_letter_sent_at', {
+      withTimezone: true,
+    }),
+
     // Request/publish lifecycle (sponsor-initiated kid update
     // requests).
     requestedBySponsor: boolean('requested_by_sponsor').default(false),

@@ -54,6 +54,7 @@ import { kidMessages, children, sponsorships } from '@/lib/db/schema';
 import { getAdminRole } from '@/lib/admin-session';
 import { sendEmail, sendKevinReplyAlert } from '@/lib/email';
 import { sendPush, resolveMobileUserIdForEmail } from '@/lib/push/send';
+import { stampHolderFirstLetterCycle } from '@/lib/penpal-cycle';
 
 const SITE_URL =
   process.env.NEXT_PUBLIC_SITE_URL || 'https://www.beanumber.org';
@@ -324,6 +325,19 @@ export async function POST(
             translatedAt: parent.translatedAt ?? now,
           })
           .where(eq(kidMessages.id, parent.id));
+
+        // Included-letter cycle stamp (2026-07-10). Auto-flip is one of
+        // the two paths that transitions the parent to 'delivered' —
+        // the other is the /admin/messages PATCH deliver action which
+        // stamps there. Idempotent (helper uses COALESCE) so hitting
+        // both paths on one message is safe.
+        if (parent.childId) {
+          await stampHolderFirstLetterCycle({
+            sponsorEmail: parent.sponsorEmail,
+            childRecordId: parent.childId,
+            now,
+          });
+        }
       } catch (updErr) {
         // Non-fatal for the reply itself — the row is already saved
         // and the sponsor will still get the reply email — but leaves

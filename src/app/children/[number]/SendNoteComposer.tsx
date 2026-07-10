@@ -41,11 +41,20 @@ export function SendNoteComposer({
   childIdLegacy,
   firstName,
   sponsorName,
+  firstLetterIncluded,
 }: {
   childRecordId: string;
   childIdLegacy: string | null;
   firstName: string;
   sponsorName?: string | null;
+  /**
+   * 2026-07-10 "one letter included with the shirt" mechanic.
+   * True when this viewer is a shirt-holder using their included
+   * letter (see src/lib/penpal-cycle.ts). Renders a warm banner
+   * above the composer explaining the deal. Silently ignored for
+   * monthly sponsors — they don't need the reminder.
+   */
+  firstLetterIncluded?: boolean;
 }) {
   const [stage, setStage] = useState<Stage>('idle');
   const [body, setBody] = useState('');
@@ -293,6 +302,29 @@ export function SendNoteComposer({
         </div>
       ) : (
         <div className="bg-white border border-[#e8e0d4] p-5 md:p-6">
+
+          {/* First-letter-included banner (2026-07-10). Shown to
+              shirt-holders using their included cycle. Frames the
+              interaction as a gift, not a limit — voice.md rule 4
+              "describe the trade" applied to the physical letter
+              template's promise. */}
+          {firstLetterIncluded && (
+            <div className="mb-4 bg-[#FFF8F0] border border-[#D4A843] p-4">
+              <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-[#D4A843] mb-1">
+                Included with your shirt
+              </p>
+              <p
+                className="text-[15px] text-[#0d0d0d] leading-snug"
+                style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
+              >
+                Your first letter to {firstName} is on us.
+              </p>
+              <p className="text-xs text-[#666] mt-1 leading-relaxed">
+                {firstName} writes back. If you want to keep the
+                letters going after that, sponsor at $25/month.
+              </p>
+            </div>
+          )}
 
           {/* Mode toggle — Type / Handwrite & upload. Pill selector at
               the top of the composer. Handwrite unlocks the physical-
