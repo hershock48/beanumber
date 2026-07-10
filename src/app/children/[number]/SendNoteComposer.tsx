@@ -240,9 +240,9 @@ export function SendNoteComposer({
           surface show two PENPAL headings back-to-back. Just the
           descriptor + composer states below. */}
       <p className="text-center text-[#666] mb-6 md:mb-8 leading-relaxed max-w-lg mx-auto">
-        The team at the campus reads every penpal note, translates it, and
-        hands it to {firstName} in person. Deliveries happen in
-        weekly batches, usually on a Sunday.
+        The team at the campus reads every penpal note and hands it to{' '}
+        {firstName} in person. Deliveries happen in weekly batches,
+        usually on a Sunday.
       </p>
 
       {stage === 'queued' ? (
@@ -506,7 +506,8 @@ export function SendNoteComposer({
             {attachments.length > 0 && (
               <p className="text-xs text-[#888] italic mt-1">
                 {attachments.length} of {MAX_ATTACHMENTS} photos attached.
-                Simon prints these and hands them to {firstName} with your letter.
+                The campus team prints these and hands them to {firstName}{' '}
+                with your letter.
               </p>
             )}
           </div>
