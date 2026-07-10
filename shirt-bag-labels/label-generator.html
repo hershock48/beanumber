@@ -143,6 +143,17 @@
     font-weight: 800;
     letter-spacing: 0;
   }
+  /* Youth pill — small gold kicker above the SIZE line so a
+     scanning packer can tell at a glance this is a youth shirt.
+     Matches the brand gold used elsewhere on print pieces. */
+  .label .youth-flag {
+    font-size: 9pt;
+    letter-spacing: 0.32em;
+    text-transform: uppercase;
+    font-weight: 800;
+    color: #b8894a;
+    margin: 0 0 3pt 0;
+  }
 
   @media print {
     html, body { background: white; }
@@ -160,15 +171,16 @@
 
 <div class="controls">
   <h1>Be A Number — bag labels</h1>
-  <p>Type the sizes you want, comma-separated. One label per size. Repeat a size to print multiple.</p>
+  <p>Type the sizes you want, comma-separated. One label per size. Repeat a size to print multiple. Prefix a size with <code>Youth</code> for a youth label &mdash; a gold <strong>YOUTH</strong> flag prints above the size.</p>
   <p>
     Examples: &nbsp;
     <code>M</code> &nbsp;·&nbsp;
     <code>S, M, M, L, L, XL</code> &nbsp;·&nbsp;
-    <code>M, M, M, M, M, M</code>
+    <code>Youth S, Youth M, Youth L, Youth XL</code> &nbsp;·&nbsp;
+    <code>M, M, Youth M, Youth L</code>
   </p>
   <div class="row">
-    <input id="sizes" type="text" value="M" placeholder="S, M, M, L, L, XL" autofocus>
+    <input id="sizes" type="text" value="M" placeholder="S, M, L, XL, 2XL, Youth S, Youth M, Youth L, Youth XL" autofocus>
     <button onclick="generate()">Generate</button>
     <button onclick="window.print()">Print</button>
   </div>
@@ -181,25 +193,53 @@
 <div id="labels"></div>
 
 <script>
+  // Parse the input into a list of {isYouth, size} tokens.
+  // Split on commas only (not whitespace) so a token like "Youth S" or
+  // "Youth XL" stays together. Then, per token, detect a leading
+  // "youth" / "y" / "yth" prefix (case-insensitive) and peel it off.
+  // Whatever remains is the visible size letter ("S", "M", "L", "XL",
+  // "2XL"). Empty tokens are dropped.
+  function parseSizes(raw) {
+    const out = [];
+    for (const rawTok of raw.split(',')) {
+      const tok = rawTok.trim();
+      if (!tok) continue;
+      // Case-insensitive match: "youth s", "Youth XL", "YOUTH  M", "Y-S", "yth L"
+      const m = tok.match(/^(?:youth|yth|y)[\s\-_]+(.+)$/i);
+      if (m) {
+        out.push({ isYouth: true, size: m[1].trim().toUpperCase() });
+      } else {
+        out.push({ isYouth: false, size: tok.toUpperCase() });
+      }
+    }
+    return out;
+  }
+
   function generate() {
     const raw = document.getElementById('sizes').value || '';
-    const sizes = raw.split(/[,\s]+/).map(s => s.trim().toUpperCase()).filter(Boolean);
+    const tokens = parseSizes(raw);
     const container = document.getElementById('labels');
     container.innerHTML = '';
-    for (const size of sizes) {
+    for (const t of tokens) {
       const div = document.createElement('div');
       div.className = 'label';
+      const youthFlag = t.isYouth
+        ? `<p class="youth-flag">Youth</p>`
+        : '';
       div.innerHTML = `
         <p class="wordmark">Be A Number</p>
         <p class="action">Open to meet them.</p>
-        <p class="size">Size <span class="value">${escapeHtml(size)}</span></p>
+        <div>
+          ${youthFlag}
+          <p class="size">Size <span class="value">${escapeHtml(t.size)}</span></p>
+        </div>
       `;
       container.appendChild(div);
     }
     document.getElementById('count').textContent =
-      sizes.length === 0
+      tokens.length === 0
         ? 'No labels yet.'
-        : sizes.length + ' label' + (sizes.length === 1 ? '' : 's') + ' below — ready to print.';
+        : tokens.length + ' label' + (tokens.length === 1 ? '' : 's') + ' below — ready to print.';
   }
   function escapeHtml(str) {
     const div = document.createElement('div');
