@@ -414,15 +414,26 @@ function MessageCard({
           </p>
         </div>
         <div className="flex items-center gap-3 flex-shrink-0">
-          {/* Print button — new window with the print-friendly view;
-              PrintTrigger inside the /print route auto-fires the
-              browser print dialog on load. Available on every card. */}
+          {/* Print button — for typed notes, opens the print-friendly
+              /print route where PrintTrigger auto-fires the browser
+              print dialog on load. For handwritten letters, opens
+              the scan URL directly since /print would render an empty
+              body — the browser's built-in image/PDF viewer prints
+              the scan just fine. */}
           <a
-            href={`/admin/messages/${message.id}/print`}
+            href={
+              message.letterImageUrl
+                ? message.letterImageUrl
+                : `/admin/messages/${message.id}/print`
+            }
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.15em] text-[#D4A843] hover:text-[#c49a3a] transition-colors border border-[#D4A843] px-3 py-1.5"
-            title="Open a print-friendly view of this note"
+            title={
+              message.letterImageUrl
+                ? 'Open the handwritten scan (ready to print)'
+                : 'Open a print-friendly view of this note'
+            }
           >
             <svg
               width="12"
@@ -611,14 +622,20 @@ function MessageCard({
           {/* Actions */}
           {message.status !== 'delivered' && message.status !== 'declined' && (
             <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={saveTranslation}
-                disabled={saving !== null}
-                className="inline-block bg-white border border-[#0d0d0d] hover:bg-[#0d0d0d] hover:text-white text-[#0d0d0d] disabled:opacity-50 px-4 py-2 text-xs font-bold uppercase tracking-wider transition-colors"
-              >
-                {saving === 'translate' ? 'Saving…' : 'Save translation'}
-              </button>
+              {/* Save Translation hidden entirely for handwritten
+                  letters — there's no translation textarea to save
+                  from, and clicking would return a server 400. Simon
+                  goes straight to Mark Delivered on those. */}
+              {!message.letterImageUrl && (
+                <button
+                  type="button"
+                  onClick={saveTranslation}
+                  disabled={saving !== null}
+                  className="inline-block bg-white border border-[#0d0d0d] hover:bg-[#0d0d0d] hover:text-white text-[#0d0d0d] disabled:opacity-50 px-4 py-2 text-xs font-bold uppercase tracking-wider transition-colors"
+                >
+                  {saving === 'translate' ? 'Saving…' : 'Save translation'}
+                </button>
+              )}
               <button
                 type="button"
                 onClick={markDelivered}
