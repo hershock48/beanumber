@@ -191,6 +191,57 @@ export function NotesThread({
                     </figure>
                   );
                 })()
+              ) : isSponsorNote && entry.letterImageUrl ? (
+                /* Sponsor's handwritten letter — 2026-07-10. When the
+                   buyer wrote on the physical letter template and
+                   uploaded a scan via the composer's handwrite mode,
+                   we render THEIR handwriting as the primary body of
+                   this entry. Same photo-matting treatment as the
+                   kid's reply so the arc reads symmetric: handwriting
+                   out, handwriting back. */
+                (() => {
+                  const kind = attachmentKind(entry.letterImageUrl);
+                  const label = attachmentTypeLabel(kind);
+                  return (
+                    <figure className="mt-1 mb-3">
+                      {kind === 'image' ? (
+                        <div className="bg-white border border-[#e8e0d4] p-3 md:p-5 shadow-[0_6px_24px_rgba(184,150,66,0.15)]">
+                          <img
+                            src={entry.letterImageUrl}
+                            alt="Your handwritten letter"
+                            loading="lazy"
+                            className="block w-full h-auto max-w-full"
+                          />
+                        </div>
+                      ) : (
+                        <a
+                          href={entry.letterImageUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-4 border border-[#e8e0d4] bg-white p-5 hover:bg-[#FFF8F0] transition-colors"
+                        >
+                          <div className="w-12 h-14 bg-[#f5f0e8] flex items-center justify-center flex-shrink-0">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#D4A843]" aria-hidden="true">
+                              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                              <polyline points="14 2 14 8 20 8" />
+                            </svg>
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p
+                              className="text-base text-[#0d0d0d] font-semibold"
+                              style={{ fontFamily: 'var(--font-lora), serif' }}
+                            >
+                              Your handwritten letter
+                            </p>
+                            <p className="text-xs text-[#666] mt-0.5">
+                              {label} &middot; opens in a new tab
+                            </p>
+                          </div>
+                        </a>
+                      )}
+                    </figure>
+                  );
+                })()
               ) : (
                 <>
                   <p

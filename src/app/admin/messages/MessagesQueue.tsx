@@ -39,6 +39,15 @@ interface MessageRow {
    * uses these to print + include with the delivered letter.
    */
   attachments: string[];
+  /**
+   * Sponsor's handwritten letter photo (2026-07-10). When set, Simon
+   * prints the scan and delivers the sponsor's own handwriting
+   * directly — no translation step needed. Rendered as the primary
+   * body of the card in place of the text pull-quote, and the
+   * translation textarea is disabled since there's nothing to
+   * translate.
+   */
+  letterImageUrl: string | null;
   kid: {
     recordId: string | null;
     firstName: string | null;
@@ -449,14 +458,64 @@ function MessageCard({
           {/* Original body */}
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-2">
-              Penpal note
+              {message.letterImageUrl
+                ? 'Handwritten letter — print and deliver'
+                : 'Penpal note'}
             </p>
-            <blockquote
-              className="text-[15px] text-[#333] leading-relaxed italic bg-[#FFF8F0] border-l-2 border-[#D4A843] pl-4 py-2"
-              style={{ fontFamily: 'Georgia, serif' }}
-            >
-              {message.bodyEn}
-            </blockquote>
+            {message.letterImageUrl ? (
+              /* Sponsor uploaded a handwritten letter photo
+                 (2026-07-10). The scan IS the letter — print it and
+                 walk it to the kid. No translation step needed.
+                 Same document-card treatment we built for PDF/DOC
+                 kid replies: inline <img> for image types, document
+                 card with filename + open link for PDF/DOC. */
+              attachmentKind(message.letterImageUrl) === 'image' ? (
+                <a
+                  href={message.letterImageUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block"
+                  title="Open the scan in a new tab (ready to print)"
+                >
+                  <img
+                    src={message.letterImageUrl}
+                    alt={`Handwritten letter from ${message.sponsorName || message.sponsorEmail}`}
+                    loading="lazy"
+                    className="block max-h-96 w-auto max-w-full border border-[#e8e0d4] bg-white"
+                  />
+                </a>
+              ) : (
+                <a
+                  href={message.letterImageUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-3 border border-[#e8e0d4] bg-white p-3 hover:bg-[#FFF8F0] transition-colors"
+                  title="Open the letter in a new tab (ready to print)"
+                >
+                  <div className="w-10 h-12 bg-[#f5f0e8] flex items-center justify-center flex-shrink-0">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#D4A843]" aria-hidden="true">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                      <polyline points="14 2 14 8 20 8" />
+                    </svg>
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold text-[#0d0d0d]">
+                      {attachmentTypeLabel(attachmentKind(message.letterImageUrl))} — open to print
+                    </p>
+                    <p className="text-xs text-[#666] truncate">
+                      {message.letterImageUrl.split('/').pop() || 'file'}
+                    </p>
+                  </div>
+                </a>
+              )
+            ) : (
+              <blockquote
+                className="text-[15px] text-[#333] leading-relaxed italic bg-[#FFF8F0] border-l-2 border-[#D4A843] pl-4 py-2"
+                style={{ fontFamily: 'Georgia, serif' }}
+              >
+                {message.bodyEn}
+              </blockquote>
+            )}
             {/* Sponsor attachments (2026-07-08). When the sponsor
                 clipped photos onto their note, Simon needs to see +
                 print them so they land at the campus with the
@@ -494,25 +553,37 @@ function MessageCard({
             )}
           </div>
 
-          {/* Translation */}
-          <div>
-            <label
-              htmlFor={`translation-${message.id}`}
-              className="block text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-2"
-            >
-              Translation (for the kid)
-            </label>
-            <textarea
-              id={`translation-${message.id}`}
-              value={translation}
-              onChange={e => setTranslation(e.target.value)}
-              disabled={message.status === 'delivered' || message.status === 'declined'}
-              rows={4}
-              className="w-full px-3 py-2 bg-white border border-[#e8e0d4] focus:outline-none focus:border-[#D4A843] focus:ring-1 focus:ring-[#D4A843] text-base disabled:bg-[#f5f0e8] disabled:opacity-70"
-              placeholder="Type your translation here…"
-              style={{ fontFamily: 'Georgia, serif' }}
-            />
-          </div>
+          {/* Translation — hidden entirely on handwritten letters
+              since Simon just prints the scan and delivers it. No
+              translation step, no textarea. Save Translation button
+              below auto-relaxes because the deliver-gate accepts an
+              empty translation when letterImageUrl is present. */}
+          {message.letterImageUrl ? (
+            <div className="text-xs text-[#666] italic bg-[#FFF8F0] border border-[#e8e0d4] p-3 leading-relaxed">
+              No translation needed — this is a handwritten letter.
+              Print the scan above and hand it to{' '}
+              {message.kid.firstName ?? 'the kid'} as-is.
+            </div>
+          ) : (
+            <div>
+              <label
+                htmlFor={`translation-${message.id}`}
+                className="block text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-2"
+              >
+                Translation (for the kid)
+              </label>
+              <textarea
+                id={`translation-${message.id}`}
+                value={translation}
+                onChange={e => setTranslation(e.target.value)}
+                disabled={message.status === 'delivered' || message.status === 'declined'}
+                rows={4}
+                className="w-full px-3 py-2 bg-white border border-[#e8e0d4] focus:outline-none focus:border-[#D4A843] focus:ring-1 focus:ring-[#D4A843] text-base disabled:bg-[#f5f0e8] disabled:opacity-70"
+                placeholder="Type your translation here…"
+                style={{ fontFamily: 'Georgia, serif' }}
+              />
+            </div>
+          )}
 
           {/* Simon's notes */}
           <div>
@@ -559,11 +630,13 @@ function MessageCard({
                 disabled={
                   saving !== null ||
                   (
+                    !message.letterImageUrl &&
                     (translation.trim().length === 0) &&
                     !(message.bodyTranslated && message.bodyTranslated.trim().length > 0)
                   )
                 }
                 title={
+                  !message.letterImageUrl &&
                   translation.trim().length === 0 &&
                   !(message.bodyTranslated && message.bodyTranslated.trim().length > 0)
                     ? 'Add a translation before delivering'

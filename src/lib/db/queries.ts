@@ -830,6 +830,15 @@ export interface NoteThreadEntry {
    * thread as a small strip beneath the sponsor's italic text.
    */
   attachments: string[] | null;
+  /**
+   * Sponsor's handwritten letter photo (2026-07-10). Only populated
+   * on sponsor_to_kid rows where the sponsor uploaded a physical
+   * letter scan via the composer's handwrite mode. When present,
+   * the kid page renders this as the primary content (photo-matted
+   * like the kid's own reply) — sponsor's actual handwriting was
+   * printed and walked to the kid at the campus.
+   */
+  letterImageUrl: string | null;
 }
 
 /**
@@ -1050,6 +1059,7 @@ export async function getNoteThreadForSponsorAndChild(args: {
         parentMessageId: kidMessages.parentMessageId,
         replyImageUrl: kidMessages.replyImageUrl,
         attachments: kidMessages.attachments,
+        letterImageUrl: kidMessages.letterImageUrl,
       })
       .from(kidMessages)
       .where(
@@ -1120,6 +1130,11 @@ export async function getNoteThreadForSponsorAndChild(args: {
             .filter((u): u is string => !!u);
           return urls.length > 0 ? urls : null;
         })(),
+        // Only meaningful on sponsor_to_kid rows — kid replies never
+        // carry a letter photo (they use replyImageUrl instead). Pass
+        // it through untouched; the render layer branches on direction
+        // before painting it, so a stale value here is harmless.
+        letterImageUrl: r.letterImageUrl,
       }));
   } catch {
     return [];

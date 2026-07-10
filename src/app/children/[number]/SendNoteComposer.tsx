@@ -28,6 +28,7 @@ const MIN_BODY = 10;
 const MAX_BODY = 1000;
 
 type Stage = 'idle' | 'composing' | 'sending' | 'queued' | 'error';
+type Mode = 'type' | 'handwrite';
 
 // Sponsor-attached photos (2026-07-08). Hard cap of 2 per note. The
 // hard cap sits at the API layer too — this constant just gates the
@@ -54,6 +55,16 @@ export function SendNoteComposer({
   // JSX below. Reset on Cancel and on queued-success.
   const [attachments, setAttachments] = useState<string[]>([]);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  // Composition mode — 2026-07-10. 'type' is the original path
+  // (textarea → Simon translates → delivers). 'handwrite' is the new
+  // path unlocked by the physical letter template we ship in the
+  // shirt bag: the sponsor writes on the paper, photographs it, and
+  // uploads the scan as the PRIMARY body. Simon prints the scan and
+  // delivers it directly — no translation step, sponsor's own
+  // handwriting reaches the kid.
+  const [mode, setMode] = useState<Mode>('type');
+  const [letterImageUrl, setLetterImageUrl] = useState<string | null>(null);
+  const [uploadingLetter, setUploadingLetter] = useState(false);
 
   async function handlePhotoPick(file: File) {
     if (attachments.length >= MAX_ATTACHMENTS) {
@@ -105,18 +116,77 @@ export function SendNoteComposer({
     setAttachments(prev => prev.filter((_, i) => i !== index));
   }, []);
 
+  // Handwritten letter photo picker — mirror of handlePhotoPick but
+  // targets letterImageUrl instead of the attachments array. Same
+  // upload endpoint (/api/sponsor/notes/photo) because the storage
+  // + auth logic is identical; the semantic distinction between
+  // "primary letter" and "supplementary photo" lives in state, not
+  // in the upload path. Server-side, the sponsor notes POST decides
+  // which column to write based on which field carries the URL.
+  async function handleLetterPick(file: File) {
+    setError(null);
+    setUploadingLetter(true);
+    try {
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result));
+        reader.onerror = () => reject(new Error('Could not read file'));
+        reader.readAsDataURL(file);
+      });
+      const commaIdx = dataUrl.indexOf(',');
+      const dataBase64 = commaIdx >= 0 ? dataUrl.slice(commaIdx + 1) : dataUrl;
+
+      const res = await fetch('/api/sponsor/notes/photo', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({
+          filename: file.name || 'letter.jpg',
+          contentType: file.type || 'image/jpeg',
+          dataBase64,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.publicUrl) {
+        setError(
+          data.error || 'Upload failed. Try a smaller file or another format.'
+        );
+        return;
+      }
+      setLetterImageUrl(String(data.publicUrl));
+    } catch (e) {
+      setError(
+        e instanceof Error ? e.message : 'Could not read that file.'
+      );
+    } finally {
+      setUploadingLetter(false);
+    }
+  }
+
   const submit = useCallback(async () => {
     const trimmed = body.trim();
-    if (trimmed.length < MIN_BODY) {
-      setError(
-        `Say a little more — the campus reads every one of these. (${MIN_BODY}+ characters.)`
-      );
-      return;
+
+    // Mode-specific validation. Type mode requires the same 10-1000
+    // character body as before. Handwrite mode requires a letter
+    // photo but no typed text — the scan IS the letter.
+    if (mode === 'type') {
+      if (trimmed.length < MIN_BODY) {
+        setError(
+          `Say a little more. The campus reads every one of these. (${MIN_BODY}+ characters.)`
+        );
+        return;
+      }
+      if (trimmed.length > MAX_BODY) {
+        setError(`Under ${MAX_BODY} characters, please.`);
+        return;
+      }
+    } else {
+      if (!letterImageUrl) {
+        setError('Upload your handwritten letter first.');
+        return;
+      }
     }
-    if (trimmed.length > MAX_BODY) {
-      setError(`Under ${MAX_BODY} characters, please.`);
-      return;
-    }
+
     setStage('sending');
     setError(null);
     try {
@@ -127,9 +197,15 @@ export function SendNoteComposer({
         body: JSON.stringify({
           childRecordId,
           childIdLegacy,
-          bodyEn: trimmed,
+          // In handwrite mode we send an empty body — the server
+          // makes body_en optional when letterImageUrl is present.
+          bodyEn: mode === 'type' ? trimmed : '',
           sponsorName,
           attachments,
+          // Only send letterImageUrl on the handwrite path so we
+          // never accidentally attach a stale photo to a typed note
+          // if the sponsor toggled modes back and forth.
+          letterImageUrl: mode === 'handwrite' ? letterImageUrl : null,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -143,7 +219,15 @@ export function SendNoteComposer({
       setError('Network hiccup. Try again in a moment.');
       setStage('composing');
     }
-  }, [body, childRecordId, childIdLegacy, sponsorName, attachments]);
+  }, [
+    body,
+    mode,
+    letterImageUrl,
+    childRecordId,
+    childIdLegacy,
+    sponsorName,
+    attachments,
+  ]);
 
   const charCount = body.trim().length;
   const overCap = charCount > MAX_BODY;
@@ -190,6 +274,8 @@ export function SendNoteComposer({
               setStage('idle');
               setBody('');
               setAttachments([]);
+              setLetterImageUrl(null);
+              setMode('type');
             }}
           >
             Close
@@ -207,27 +293,158 @@ export function SendNoteComposer({
         </div>
       ) : (
         <div className="bg-white border border-[#e8e0d4] p-5 md:p-6">
-          <label
-            htmlFor="penpal-note"
-            className="sr-only"
-          >
-            Penpal note to {firstName}
-          </label>
-          <textarea
-            id="penpal-note"
-            value={body}
-            onChange={e => {
-              setBody(e.target.value);
-              if (error) setError(null);
-            }}
-            rows={7}
-            maxLength={MAX_BODY + 200 /* soft over-cap so the character
-              counter can turn red before the field hard-truncates */}
-            placeholder={`Hi ${firstName}, I want you to know…`}
-            disabled={stage === 'sending'}
-            className="w-full px-3 py-2.5 bg-white border border-[#e8e0d4] focus:outline-none focus:border-[#D4A843] focus:ring-1 focus:ring-[#D4A843] text-base leading-relaxed resize-y"
-            style={{ fontFamily: 'Georgia, serif' }}
-          />
+
+          {/* Mode toggle — Type / Handwrite & upload. Pill selector at
+              the top of the composer. Handwrite unlocks the physical-
+              letter workflow: the sponsor writes on the printed template
+              we ship in the shirt bag, photographs it, uploads. Simon
+              prints the scan and delivers it directly. */}
+          <div className="mb-4 flex justify-center">
+            <div className="inline-flex bg-[#f5f0e8] border border-[#e8e0d4] p-1 rounded-full">
+              <button
+                type="button"
+                onClick={() => {
+                  setMode('type');
+                  if (error) setError(null);
+                }}
+                disabled={stage === 'sending' || uploadingLetter}
+                className={`px-4 py-1.5 text-xs font-bold uppercase tracking-[0.12em] rounded-full transition-colors ${
+                  mode === 'type'
+                    ? 'bg-[#0d0d0d] text-white'
+                    : 'text-[#666] hover:text-[#0d0d0d]'
+                }`}
+              >
+                Type
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setMode('handwrite');
+                  if (error) setError(null);
+                }}
+                disabled={stage === 'sending' || uploadingPhoto}
+                className={`px-4 py-1.5 text-xs font-bold uppercase tracking-[0.12em] rounded-full transition-colors ${
+                  mode === 'handwrite'
+                    ? 'bg-[#0d0d0d] text-white'
+                    : 'text-[#666] hover:text-[#0d0d0d]'
+                }`}
+              >
+                Handwrite &amp; upload
+              </button>
+            </div>
+          </div>
+
+          {mode === 'type' ? (
+            <>
+              <label
+                htmlFor="penpal-note"
+                className="sr-only"
+              >
+                Penpal note to {firstName}
+              </label>
+              <textarea
+                id="penpal-note"
+                value={body}
+                onChange={e => {
+                  setBody(e.target.value);
+                  if (error) setError(null);
+                }}
+                rows={7}
+                maxLength={MAX_BODY + 200 /* soft over-cap so the character
+                  counter can turn red before the field hard-truncates */}
+                placeholder={`Hi ${firstName}, I want you to know…`}
+                disabled={stage === 'sending'}
+                className="w-full px-3 py-2.5 bg-white border border-[#e8e0d4] focus:outline-none focus:border-[#D4A843] focus:ring-1 focus:ring-[#D4A843] text-base leading-relaxed resize-y"
+                style={{ fontFamily: 'Georgia, serif' }}
+              />
+            </>
+          ) : (
+            /* Handwrite mode — primary letter photo picker. Reuses the
+               same attachment-kind helper via URL extension for preview
+               (image inline, PDF/DOC as document card). */
+            <div className="mb-2">
+              <p className="text-xs text-[#666] mb-3 leading-relaxed">
+                Write on the printed letter template we sent with your
+                shirt (or any paper), photograph the sheet, and upload
+                it here. The team prints your handwriting and delivers
+                it to {firstName} in person.
+              </p>
+              {letterImageUrl ? (
+                <div className="border border-[#e8e0d4] bg-[#FFF8F0] p-3">
+                  {/\.(jpe?g|png|gif|webp|heic|heif|bmp|tiff?)(\?|#|$)/i.test(letterImageUrl) ? (
+                    <img
+                      src={letterImageUrl}
+                      alt="Your handwritten letter"
+                      className="block max-h-64 w-auto max-w-full mx-auto border border-[#e8e0d4] bg-white"
+                    />
+                  ) : (
+                    <div className="flex items-center gap-3 border border-[#e8e0d4] bg-white p-3">
+                      <div className="w-10 h-12 bg-[#f5f0e8] flex items-center justify-center flex-shrink-0">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#D4A843]" aria-hidden="true">
+                          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                          <polyline points="14 2 14 8 20 8" />
+                        </svg>
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-semibold text-[#0d0d0d]">Letter uploaded</p>
+                        <p className="text-xs text-[#666] truncate">
+                          {letterImageUrl.split('/').pop() || 'file'}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                  <div className="flex flex-wrap gap-3 text-xs mt-3">
+                    <a
+                      href={letterImageUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[#D4A843] font-bold hover:underline"
+                    >
+                      Open
+                    </a>
+                    <button
+                      type="button"
+                      onClick={() => setLetterImageUrl(null)}
+                      disabled={stage === 'sending' || uploadingLetter}
+                      className="text-[#888] hover:text-[#c0392b] font-bold uppercase tracking-[0.1em]"
+                    >
+                      Replace
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <label
+                  className={`block border-2 border-dashed border-[#e8e0d4] hover:border-[#D4A843] bg-[#FFF8F0] p-6 text-center cursor-pointer transition-colors ${
+                    uploadingLetter || stage === 'sending' ? 'opacity-50 pointer-events-none' : ''
+                  }`}
+                >
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-[#D4A843] mx-auto mb-2" aria-hidden="true">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                    <polyline points="14 2 14 8 20 8" />
+                    <line x1="12" y1="18" x2="12" y2="12" />
+                    <polyline points="9 15 12 12 15 15" />
+                  </svg>
+                  <p className="text-sm font-semibold text-[#0d0d0d]">
+                    {uploadingLetter ? 'Uploading…' : 'Upload your handwritten letter'}
+                  </p>
+                  <p className="text-xs text-[#666] mt-1">
+                    Photo, PDF, or Word doc. Phone camera works.
+                  </p>
+                  <input
+                    type="file"
+                    accept="image/*,application/pdf,.doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                    className="sr-only"
+                    disabled={uploadingLetter || stage === 'sending'}
+                    onChange={e => {
+                      const f = e.currentTarget.files?.[0];
+                      if (f) void handleLetterPick(f);
+                      e.currentTarget.value = '';
+                    }}
+                  />
+                </label>
+              )}
+            </div>
+          )}
 
           {/* Photo attachment strip. Sponsor can add up to 2 photos
               per note (2026-07-08 rollout). Kid sees the photos with
@@ -295,13 +512,19 @@ export function SendNoteComposer({
           </div>
 
           <div className="flex items-center justify-between mt-3 flex-wrap gap-2">
-            <p
-              className={`text-xs ${
-                overCap ? 'text-[#c0392b] font-semibold' : 'text-[#888]'
-              }`}
-            >
-              {charCount} / {MAX_BODY}
-            </p>
+            {/* Character counter only shows in type mode. Handwrite
+                mode doesn't have a body length to track. */}
+            {mode === 'type' ? (
+              <p
+                className={`text-xs ${
+                  overCap ? 'text-[#c0392b] font-semibold' : 'text-[#888]'
+                }`}
+              >
+                {charCount} / {MAX_BODY}
+              </p>
+            ) : (
+              <span />
+            )}
             <div className="flex items-center gap-2">
               <button
                 type="button"
@@ -309,15 +532,19 @@ export function SendNoteComposer({
                   setStage('idle');
                   setBody('');
                   setAttachments([]);
+                  setLetterImageUrl(null);
+                  setMode('type');
                   setError(null);
                 }}
-                /* uploadingPhoto guard fixes a race caught in audit:
-                   sponsor picks a photo, clicks Cancel before the
-                   upload resolves, then the in-flight fetch's
-                   setAttachments callback re-populates the array
-                   the user just cleared. Blocking the click while
-                   the upload is in flight is the simplest fix. */
-                disabled={stage === 'sending' || uploadingPhoto}
+                /* uploadingPhoto/uploadingLetter guards fix a race
+                   caught in audit: sponsor picks a photo, clicks Cancel
+                   before the upload resolves, then the in-flight fetch's
+                   set-state callback re-populates the field the user
+                   just cleared. Blocking the click while any upload is
+                   in flight is the simplest fix. */
+                disabled={
+                  stage === 'sending' || uploadingPhoto || uploadingLetter
+                }
                 className="text-xs font-bold uppercase tracking-[0.15em] text-[#888] hover:text-[#0d0d0d] px-4 py-2 transition-colors disabled:opacity-50"
               >
                 Cancel
@@ -325,7 +552,16 @@ export function SendNoteComposer({
               <button
                 type="button"
                 onClick={submit}
-                disabled={stage === 'sending' || uploadingPhoto || overCap}
+                /* Send disabled while any upload is in flight, when
+                   type mode is over the body cap, or (handwrite mode)
+                   when no letter photo has been uploaded yet. */
+                disabled={
+                  stage === 'sending' ||
+                  uploadingPhoto ||
+                  uploadingLetter ||
+                  (mode === 'type' && overCap) ||
+                  (mode === 'handwrite' && !letterImageUrl)
+                }
                 className="inline-block bg-[#D4A843] hover:bg-[#c49a3a] disabled:opacity-50 disabled:cursor-not-allowed text-[#0d0d0d] px-6 py-2.5 text-xs font-bold uppercase tracking-wider transition-colors"
               >
                 {stage === 'sending' ? 'Sending…' : 'Send to Campus'}

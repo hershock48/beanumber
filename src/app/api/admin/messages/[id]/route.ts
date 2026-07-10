@@ -97,8 +97,11 @@ export async function PATCH(
       bodyEn: kidMessages.bodyEn,
       // Needed by the 'deliver' gate — deliver is refused when
       // there's no translation on file (either already stored here or
-      // being submitted in this same PATCH).
+      // being submitted in this same PATCH). Exception: handwritten
+      // letters (letterImageUrl set) skip the translation gate since
+      // Simon prints the scan and delivers it directly.
       bodyTranslated: kidMessages.bodyTranslated,
+      letterImageUrl: kidMessages.letterImageUrl,
       // Needed by the Kevin decline alert — falls back to the existing
       // simon_notes when this PATCH doesn't include a fresh one.
       simonNotes: kidMessages.simonNotes,
@@ -166,7 +169,11 @@ export async function PATCH(
       const incomingTranslation = (body.bodyTranslated ?? '').trim();
       const storedTranslation = (message.bodyTranslated ?? '').trim();
       const nextTranslation = incomingTranslation || storedTranslation;
-      if (!nextTranslation) {
+      // Handwritten letters (letterImageUrl set) skip the translation
+      // gate — the sponsor wrote by hand, Simon prints the scan and
+      // delivers it directly, nothing to translate. Everything else
+      // still requires a translation on file before delivery.
+      if (!nextTranslation && !message.letterImageUrl) {
         return NextResponse.json(
           {
             error:

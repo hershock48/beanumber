@@ -67,6 +67,11 @@ export default async function AdminMessagesPage() {
         deliveredAt: kidMessages.deliveredAt,
         declinedAt: kidMessages.declinedAt,
         attachments: kidMessages.attachments,
+        // Sponsor's handwritten letter photo (2026-07-10). When set,
+        // Simon prints the scan and delivers the sponsor's own
+        // handwriting directly — no translation step. Renders as
+        // the primary body of the card in place of a text pull-quote.
+        letterImageUrl: kidMessages.letterImageUrl,
         kidRecordId: children.id,
         kidFirstName: children.firstName,
         kidDisplayName: children.displayName,
@@ -187,6 +192,7 @@ export default async function AdminMessagesPage() {
     deliveredAt: r.deliveredAt ? new Date(r.deliveredAt).toISOString() : null,
     declinedAt: r.declinedAt ? new Date(r.declinedAt).toISOString() : null,
     attachments: normalizeAttachments(r.attachments),
+    letterImageUrl: r.letterImageUrl ?? null,
     kid: {
       recordId: r.kidRecordId,
       firstName: r.kidFirstName,
