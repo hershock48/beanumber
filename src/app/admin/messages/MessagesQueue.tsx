@@ -278,6 +278,12 @@ function MessageCard({
     setCollapsed(true);
   }
 
+  // NOTE 2026-07-10: the Decline button that called this was removed
+  // from the actions row (see ~line 665). Kevin's call: campus team
+  // doesn't decline penpal notes, every letter ships. The function
+  // is kept in place because if the "Escalate to Kevin" middle-path
+  // ever lands, the wiring is already here — just re-add a button
+  // that calls this. For now: unreachable from the UI.
   async function decline() {
     // The decline endpoint auto-sends a static template email to
     // the sponsor — it does NOT include this reason. Anything typed

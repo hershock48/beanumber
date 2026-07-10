@@ -304,11 +304,22 @@ export async function POST(request: NextRequest) {
       );
     }
     // Holder — check the message log for a spent cycle. Any non-declined
-    // sponsor_to_kid message from this email for this kid counts. The
-    // partial unique index kid_messages_active_per_sponsor_kid_idx +
-    // this pre-check together mean a race can't produce two free
-    // letters: the concurrent-POST path is caught by the 23505 branch
-    // in the insert catch below, and the sequential path is caught here.
+    // sponsor_to_kid message from this email for this kid counts.
+    //
+    // Race coverage:
+    //   - Concurrent first-letter POSTs (no prior row exists): partial
+    //     unique index kid_messages_active_per_sponsor_kid_idx enforces
+    //     uniqueness across status IN ('pending','translated'), so the
+    //     second concurrent INSERT hits 23505 → the catch below returns
+    //     409. Neither commits.
+    //   - Sequential post-first-delivery: this pre-check reads the
+    //     committed 'delivered' row and 403s. The partial index doesn't
+    //     apply to 'delivered' rows but doesn't need to — the delivered
+    //     status is already visible to every subsequent SELECT.
+    //   - Concurrent DURING first delivery (Simon's PATCH racing this
+    //     POST): the pre-check reads the row as either pending (before
+    //     the PATCH commits) or delivered (after). Either way non-
+    //     declined → 403.
     const prior = await db
       .select({ id: kidMessages.id })
       .from(kidMessages)
