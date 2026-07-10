@@ -44,6 +44,14 @@ const purchaseSchema = z.object({
   // Adult run S–2XL plus the July 2026 youth run.
   size: z.enum(['S', 'M', 'L', 'XL', '2XL', 'Youth S', 'Youth M', 'Youth L', 'Youth XL']),
   color: z.enum(['Onyx', 'Meadow', 'Blossom', 'Sky']),
+  /**
+   * Optional path (relative, must start with '/') to route the buyer
+   * back to on success. Used by the kid-page reorder CTA so a holder
+   * lands back on /children/[N] instead of /sponsor (which doesn't
+   * make sense for an unconverted holder). Ignored if malformed or
+   * off-origin.
+   */
+  returnTo: z.string().min(1).max(128).optional(),
 });
 
 async function verifySession(sponsorCode: string): Promise<boolean> {
@@ -78,7 +86,7 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-    const { sponsorCode, shirtId, size, color } = parsed.data;
+    const { sponsorCode, shirtId, size, color, returnTo } = parsed.data;
 
     if (!(await verifySession(sponsorCode))) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -90,12 +98,16 @@ export async function POST(request: NextRequest) {
     if (!sponsorship) {
       return NextResponse.json({ error: 'Sponsorship not found' }, { status: 404 });
     }
-    if (sponsorship.status !== 'Active') {
-      // Memo §5 + §7: lapsed sponsors lose the order surface, but their
-      // number and matched child are preserved. The relationship outlasts
-      // the billing relationship.
+    // Active + Holder both qualify — an unconverted shirt-holder can
+    // reorder another shirt with their Number too (Kevin's 2026-07-10
+    // ask: "reorder another shirt w that same number on it"). The
+    // reorder path is intentionally not a conversion trigger — the
+    // buyer doesn't get pushed into monthly sponsorship on the way
+    // through; they just get another shirt. Lapsed sponsors still
+    // lose the surface (memo §5 + §7).
+    if (sponsorship.status !== 'Active' && sponsorship.status !== 'Holder') {
       return NextResponse.json(
-        { error: 'Shop Your Number is available for active sponsors only.' },
+        { error: 'Reorder is available for active sponsors and shirt-holders.' },
         { status: 403 }
       );
     }
@@ -174,8 +186,8 @@ export async function POST(request: NextRequest) {
           price_data: {
             currency: 'usd',
             product_data: {
-              name: `${shirt.name} tee · ${size} — Sponsor reorder #${shirtNumber}`,
-              description: `Repeat order for ${sponsorName || 'an active sponsor'}. Ships with #${shirtNumber} pressed on the back of the shirt — the same number as the original.`,
+              name: `REORDER · #${shirtNumber} · ${shirt.name} ${size}`,
+              description: `Reorder for ${sponsorName || 'an existing shirt-holder'}. Press #${shirtNumber} on the back — SAME number as their original shirt. Do NOT assign a new number, do NOT create a new sponsorship, do NOT change the kid pairing.`,
             },
             unit_amount: SHIRT_PRICE * 100,
           },
@@ -192,8 +204,18 @@ export async function POST(request: NextRequest) {
         },
       ],
       mode: 'payment',
-      success_url: `${origin}/sponsor?repeat_order=1&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${origin}/sponsor`,
+      // returnTo is safe-guarded: must start with '/' (relative to
+      // origin) so a spoofed absolute URL can't hijack the redirect.
+      // Falls back to /sponsor which is the historical target used
+      // by the SponsorDashboard "Shop Your Number" surface.
+      success_url:
+        returnTo && returnTo.startsWith('/') && !returnTo.startsWith('//')
+          ? `${origin}${returnTo}?repeat_order=1&session_id={CHECKOUT_SESSION_ID}`
+          : `${origin}/sponsor?repeat_order=1&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url:
+        returnTo && returnTo.startsWith('/') && !returnTo.startsWith('//')
+          ? `${origin}${returnTo}`
+          : `${origin}/sponsor`,
       shipping_address_collection: { allowed_countries: ['US'] },
       metadata,
       // Always save the payment method so future portal purchases stay

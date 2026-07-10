@@ -57,6 +57,7 @@ import { AwardsTimeline } from './AwardsTimeline';
 import { SendNoteComposer } from './SendNoteComposer';
 import { NotesThread } from './NotesThread';
 import { PenpalBox } from './PenpalBox';
+import { ReorderShirtCard } from './ReorderShirtCard';
 import {
   getViewerWriteStatus,
   type ViewerWriteStatus,
@@ -1005,7 +1006,14 @@ const getChildByShirtNumber = cache(async function getChildByShirtNumber(shirtNu
       // monthly? Sign in" prompt for viewers who are signed in for
       // a different kid — they shouldn't be asked to sign in again.
       viewer_signed_in: Boolean(viewerEmail),
-      sponsor_code: viewerIsSponsor ? sponsorship!.SponsorCode : undefined,
+      // Exposed for viewers who can reorder a shirt with this Number
+      // (both monthly sponsors and unconverted shirt-holders). The
+      // ReorderShirtCard POSTs to /api/sponsor/portal-purchase which
+      // requires the sponsor code to match the session cookie.
+      sponsor_code:
+        (viewerIsSponsor || viewerIsHolder)
+          ? (sponsorship?.SponsorCode as string | undefined)
+          : undefined,
       // Surfaced for the impact stats strip in the unified sponsor view.
       // Only populated when this viewer is the verified sponsor, since
       // it's their relationship start date specifically.
@@ -2125,6 +2133,26 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
                     <ShareKidCard firstName={firstName} ... />
                   </div>
                 )} */}
+
+        {/* ── Reorder another shirt with #N ───────────────────────
+            2026-07-10 mechanic (Kevin): a sponsor OR unconverted
+            shirt-holder can order another shirt with the SAME
+            Number pressed on it. Different color, an extra, a spare
+            — same kid, same Number, NOT a new sponsorship and NOT a
+            new child pairing. Component enforces its own copy on
+            both sides (buyer + Kevin at the press) so nobody gets
+            confused. Departed kids skip: the relationship has a
+            different frame there. */}
+        {!child.departed_at &&
+          (child.viewer_is_sponsor || child.viewer_is_holder) &&
+          child.sponsor_code && (
+            <ReorderShirtCard
+              firstName={firstName}
+              shirtNumber={Number(number)}
+              sponsorCode={child.sponsor_code}
+              returnTo={`/children/${number}`}
+            />
+          )}
 
         {/* ── Public campus newsfeed ───────────────────────────────
             Visible to anyone — sponsor or not. The ask block above

@@ -663,14 +663,14 @@ function MessageCard({
               >
                 {saving === 'deliver' ? 'Sending…' : 'Mark delivered'}
               </button>
-              <button
-                type="button"
-                onClick={decline}
-                disabled={saving !== null}
-                className="inline-block bg-white border border-[#c0392b] text-[#c0392b] hover:bg-[#c0392b] hover:text-white disabled:opacity-50 px-4 py-2 text-xs font-bold uppercase tracking-wider transition-colors ml-auto"
-              >
-                {saving === 'decline' ? 'Working…' : 'Decline'}
-              </button>
+              {/* Decline button removed 2026-07-10 per Kevin: campus team
+                  doesn't decline penpal notes. Every letter gets delivered.
+                  If a real content issue comes up, Kevin handles it out of
+                  band (email / Slack). The `decline` action handler +
+                  server endpoint + enum value are kept intact so legacy
+                  declined rows still render correctly and the cycle gate
+                  (`!= 'declined'`) still excludes them, but the button
+                  is no longer reachable from the UI. */}
             </div>
           )}
 
