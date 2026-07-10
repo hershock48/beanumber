@@ -38,7 +38,7 @@ import { cookies } from 'next/headers';
 import { and, eq, inArray, ne, or, sql } from 'drizzle-orm';
 import { db } from '@/lib/db/client';
 import { kidMessages, sponsorships, children } from '@/lib/db/schema';
-import { sendKevinNoteAlert, sendSimonNoteAlert } from '@/lib/email';
+import { sendKevinNoteAlert } from '@/lib/email';
 import { SESSION } from '@/lib/constants';
 
 const MIN_BODY = 10;
@@ -352,7 +352,12 @@ export async function POST(request: NextRequest) {
       and(
         sql`lower(${kidMessages.sponsorEmail}) = ${email}`,
         eq(kidMessages.childId, childRow.id),
-        inArray(kidMessages.status, ['pending', 'translated'])
+        // Includes 'awaiting_kevin' (2026-07-10) so the sponsor can't
+        // queue a second note while the first is still waiting for
+        // Kevin's approve/decline. The message-based cycle gate above
+        // already rejects a second free letter for holders, but this
+        // rate limit applies to monthly sponsors too.
+        inArray(kidMessages.status, ['awaiting_kevin', 'pending', 'translated'])
       )
     )
     .limit(1);
@@ -377,7 +382,13 @@ export async function POST(request: NextRequest) {
         childId: childRow.id,
         direction: 'sponsor_to_kid',
         bodyEn: rawBody,
-        status: 'pending',
+        // Kevin approval layer (2026-07-10). Every new sponsor→kid
+        // note comes in as 'awaiting_kevin' — the campus team does
+        // NOT see it until Kevin approves. Kevin's admin actions
+        // flip it to 'pending' (approved) or 'declined' (rejected).
+        // Historical rows may still be seeded 'pending' by legacy
+        // paths; the queue filter reads both.
+        status: 'awaiting_kevin',
         // Sponsor-attached photos (2026-07-08). Null when the sponsor
         // sent a text-only note, which is still the common case.
         attachments,
@@ -428,32 +439,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Simon (campus-side reviewer) also gets the ping so a note that
-    // came in mid-Kampala-morning doesn't wait for him to happen to
-    // open the queue. Same non-fatal posture as the Kevin alert.
-    try {
-      await sendSimonNoteAlert({
-        noteId: inserted[0].id,
-        sponsorEmail: email,
-        sponsorName,
-        kidFirstName: childRow.firstName || 'the kid',
-        kidDisplayName:
-          childRow.displayName || childRow.firstName || 'the kid',
-        shirtNumber: childRow.shirtNumber ?? null,
-        // Same fallback as the Kevin alert — when only a scan came
-        // in, tell Simon so he opens the queue to see the letter
-        // rather than translating an empty body.
-        bodyEn:
-          rawBody.length > 0
-            ? rawBody
-            : '(Handwritten letter uploaded. Print + deliver as-is.)',
-      });
-    } catch (err) {
-      console.warn(
-        '[sponsor/notes] Simon alert send failed (non-fatal):',
-        err instanceof Error ? err.message : String(err)
-      );
-    }
+    // Note: Simon alert was previously fired here on every POST.
+    // Under the 2026-07-10 Kevin-approval layer, the campus team
+    // should NOT be pinged until Kevin has approved — otherwise
+    // Simon might translate a note Kevin later declines.
+    // The alert is now sent from the admin PATCH action='kevin_approve'
+    // handler (src/app/api/admin/messages/[id]/route.ts) so Simon
+    // only hears about greenlit notes.
 
     return NextResponse.json({
       ok: true,

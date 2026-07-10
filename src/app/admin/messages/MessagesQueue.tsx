@@ -48,6 +48,12 @@ interface MessageRow {
    * translate.
    */
   letterImageUrl: string | null;
+  /**
+   * Kevin's personalized decline note (2026-07-10). Populated only
+   * when action='kevin_decline' fired on this row. Shown inline on
+   * declined cards so Kevin can remember what he told the sponsor.
+   */
+  kevinDeclineNote: string | null;
   kid: {
     recordId: string | null;
     firstName: string | null;
@@ -102,7 +108,13 @@ export function MessagesQueue({
     async (
       id: string,
       body: {
-        action: 'translate' | 'deliver' | 'decline' | 'edit-notes';
+        action:
+          | 'translate'
+          | 'deliver'
+          | 'decline'
+          | 'edit-notes'
+          | 'kevin_approve'
+          | 'kevin_decline';
         bodyTranslated?: string;
         simonNotes?: string;
         notifySponsor?: boolean;
@@ -186,10 +198,17 @@ function MessageCard({
   onPatch: (
     id: string,
     body: {
-      action: 'translate' | 'deliver' | 'decline' | 'edit-notes';
+      action:
+        | 'translate'
+        | 'deliver'
+        | 'decline'
+        | 'edit-notes'
+        | 'kevin_approve'
+        | 'kevin_decline';
       bodyTranslated?: string;
       simonNotes?: string;
       notifySponsor?: boolean;
+      kevinDeclineNote?: string;
     }
   ) => Promise<
     { ok: true; status: string } | { ok: false; error: string }
@@ -199,7 +218,13 @@ function MessageCard({
   const [translation, setTranslation] = useState(message.bodyTranslated || '');
   const [notes, setNotes] = useState(message.simonNotes || '');
   const [saving, setSaving] = useState<
-    'translate' | 'deliver' | 'decline' | 'notes' | null
+    | 'translate'
+    | 'deliver'
+    | 'decline'
+    | 'notes'
+    | 'kevin_approve'
+    | 'kevin_decline'
+    | null
   >(null);
   const [error, setError] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState(
@@ -274,6 +299,59 @@ function MessageCard({
           }
         : {}),
       deliveredAt: new Date().toISOString(),
+    });
+    setCollapsed(true);
+  }
+
+  // Kevin's approve — flips awaiting_kevin → pending. Simon then
+  // sees the note in his queue. Non-interactive (no prompt) because
+  // approval is meant to be one click.
+  async function kevinApprove() {
+    setSaving('kevin_approve');
+    setError(null);
+    const res = await onPatch(message.id, { action: 'kevin_approve' });
+    setSaving(null);
+    if (!res.ok) {
+      setError(res.error);
+      return;
+    }
+    onLocalUpdate(message.id, { status: 'pending' });
+  }
+
+  // Kevin's decline — flips awaiting_kevin → declined and captures
+  // Kevin's personalized note, which lands in the sponsor's decline
+  // email verbatim. Prompt copy makes it clear the sponsor will see
+  // exactly what Kevin types (not a static template).
+  async function kevinDecline() {
+    const note = prompt(
+      "Type a note for the sponsor. They'll see exactly what you write here in the decline email. Keep it short and warm — 1-3 sentences works. Cancel to abort."
+    );
+    if (note === null) return;
+    const trimmed = note.trim();
+    if (trimmed.length === 0) {
+      if (
+        !confirm(
+          "Send the decline without a personal note? The sponsor gets the generic template instead."
+        )
+      ) {
+        return;
+      }
+    }
+    setSaving('kevin_decline');
+    setError(null);
+    const res = await onPatch(message.id, {
+      action: 'kevin_decline',
+      kevinDeclineNote: trimmed.length > 0 ? trimmed : undefined,
+    });
+    setSaving(null);
+    if (!res.ok) {
+      setError(res.error);
+      return;
+    }
+    onLocalUpdate(message.id, {
+      status: 'declined',
+      declinedAt: new Date().toISOString(),
+      kevinDeclineNote: trimmed.length > 0 ? trimmed : null,
     });
     setCollapsed(true);
   }
@@ -625,8 +703,36 @@ function MessageCard({
             <p className="text-sm text-[#c0392b] leading-relaxed">{error}</p>
           )}
 
-          {/* Actions */}
-          {message.status !== 'delivered' && message.status !== 'declined' && (
+          {/* Actions — Kevin approval layer split (2026-07-10):
+              - awaiting_kevin: Kevin sees Approve / Decline. Simon's
+                translate + deliver buttons don't render — the note
+                isn't his to touch yet.
+              - pending / translated: Simon's normal workflow. */}
+          {message.status === 'awaiting_kevin' && (
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={kevinApprove}
+                disabled={saving !== null}
+                className="inline-block bg-[#D4A843] hover:bg-[#c49a3a] text-[#0d0d0d] disabled:opacity-50 disabled:cursor-not-allowed px-4 py-2 text-xs font-bold uppercase tracking-wider transition-colors"
+              >
+                {saving === 'kevin_approve'
+                  ? 'Approving…'
+                  : 'Approve — send to campus'}
+              </button>
+              <button
+                type="button"
+                onClick={kevinDecline}
+                disabled={saving !== null}
+                className="inline-block bg-white border border-[#c0392b] text-[#c0392b] hover:bg-[#c0392b] hover:text-white disabled:opacity-50 px-4 py-2 text-xs font-bold uppercase tracking-wider transition-colors ml-auto"
+              >
+                {saving === 'kevin_decline' ? 'Working…' : 'Decline with note'}
+              </button>
+            </div>
+          )}
+          {message.status !== 'delivered' &&
+            message.status !== 'declined' &&
+            message.status !== 'awaiting_kevin' && (
             <div className="flex flex-wrap gap-2">
               {/* Save Translation hidden entirely for handwritten
                   letters — there's no translation textarea to save
@@ -1346,6 +1452,10 @@ function ResendNotificationBlock({
 
 function statusPillFor(status: string) {
   const map: Record<string, { label: string; cls: string }> = {
+    awaiting_kevin: {
+      label: 'Awaiting Kevin',
+      cls: 'bg-[#0d0d0d] text-[#D4A843]',
+    },
     pending: {
       label: 'Pending',
       cls: 'bg-[#c0392b] text-white',

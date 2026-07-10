@@ -1144,11 +1144,32 @@ export const kidMessages = pgTable(
     bodyEn: text('body_en').notNull(),
     // Simon's translation for delivery. Nullable while pending.
     bodyTranslated: text('body_translated'),
-    // pending | translated | delivered | declined
+    // awaiting_kevin | pending | translated | delivered | declined
+    //
+    // awaiting_kevin: sponsor just submitted; Kevin has NOT approved yet.
+    //   The campus team should not act on it. When Kevin approves →
+    //   'pending'. When Kevin declines → 'declined' + kevin_decline_note
+    //   populated + sponsor decline email fires.
+    // pending: Kevin approved. Campus team can translate.
+    // translated: campus team has a translation ready to deliver.
+    // delivered: kid received the letter.
+    // declined: Kevin (or, historically, Simon) rejected the note. Row
+    //   still exists but does not count against the holder cycle or
+    //   render in the sponsor's thread.
+    //
+    // Default stays 'pending' on this column for backward compat with
+    // pre-2026-07-10 code paths; the sponsor notes POST explicitly
+    // writes 'awaiting_kevin' for new incoming rows.
     status: text('status').notNull().default('pending'),
     // Simon's internal notes to himself/Kevin. Not shown to the
     // sponsor. Optional decline explanation lives here too.
     simonNotes: text('simon_notes'),
+    // Kevin's personalized decline note. Shown to the sponsor in the
+    // decline email. Distinct from simon_notes (admin-internal). Only
+    // populated on 'declined' rows and only when Kevin's the decliner;
+    // legacy Simon-declined rows have this null and fall back to the
+    // static decline template. Added migration 0014.
+    kevinDeclineNote: text('kevin_decline_note'),
     // Timestamps for each state transition. delivered_at + declined_at
     // are mutually exclusive; whichever fires drives the sponsor email.
     createdAt: timestamp('created_at', { withTimezone: true })

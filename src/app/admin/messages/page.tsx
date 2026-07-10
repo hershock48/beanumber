@@ -72,6 +72,10 @@ export default async function AdminMessagesPage() {
         // handwriting directly — no translation step. Renders as
         // the primary body of the card in place of a text pull-quote.
         letterImageUrl: kidMessages.letterImageUrl,
+        // Kevin's personalized decline note (2026-07-10). Rendered
+        // on declined cards so Kevin can see what he told the
+        // sponsor. Null on legacy Simon-declined rows.
+        kevinDeclineNote: kidMessages.kevinDeclineNote,
         kidRecordId: children.id,
         kidFirstName: children.firstName,
         kidDisplayName: children.displayName,
@@ -84,11 +88,12 @@ export default async function AdminMessagesPage() {
       .orderBy(
         sql`
           case ${kidMessages.status}
-            when 'pending'    then 0
-            when 'translated' then 1
-            when 'delivered'  then 2
-            when 'declined'   then 3
-            else 4
+            when 'awaiting_kevin' then 0
+            when 'pending'    then 1
+            when 'translated' then 2
+            when 'delivered'  then 3
+            when 'declined'   then 4
+            else 5
           end
         `,
         asc(kidMessages.createdAt)
@@ -193,6 +198,7 @@ export default async function AdminMessagesPage() {
     declinedAt: r.declinedAt ? new Date(r.declinedAt).toISOString() : null,
     attachments: normalizeAttachments(r.attachments),
     letterImageUrl: r.letterImageUrl ?? null,
+    kevinDeclineNote: r.kevinDeclineNote ?? null,
     kid: {
       recordId: r.kidRecordId,
       firstName: r.kidFirstName,

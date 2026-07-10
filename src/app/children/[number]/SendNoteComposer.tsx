@@ -285,8 +285,9 @@ export function SendNoteComposer({
             Your penpal note is on its way to {firstName}.
           </p>
           <p className="text-[#555] leading-relaxed max-w-md mx-auto">
-            The campus batches deliveries each Sunday, so your note
-            should reach {firstName} within about a week.{' '}
+            Kevin reads every note before it heads to the campus, then
+            the team batches deliveries each Sunday. Your note should
+            reach {firstName} within about a week.{' '}
             <span className="text-[#0d0d0d] font-semibold">
               We&rsquo;ll email you when your penpal writes back.
             </span>

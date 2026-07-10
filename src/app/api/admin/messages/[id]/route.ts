@@ -28,7 +28,11 @@ import { and, desc, eq, or, sql } from 'drizzle-orm';
 import { db } from '@/lib/db/client';
 import { kidMessages, children, sponsorships } from '@/lib/db/schema';
 import { getAdminRole } from '@/lib/admin-session';
-import { sendEmail, sendKevinDeclineAlert } from '@/lib/email';
+import {
+  sendEmail,
+  sendKevinDeclineAlert,
+  sendSimonNoteAlert,
+} from '@/lib/email';
 import { stampHolderFirstLetterCycle } from '@/lib/penpal-cycle';
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.beanumber.org';
@@ -58,6 +62,13 @@ interface PatchBody {
   bodyTranslated?: string;
   simonNotes?: string;
   notifySponsor?: boolean;
+  /**
+   * Kevin's personalized decline note (2026-07-10 approval layer).
+   * Only meaningful for action='kevin_decline'. Stored on the row
+   * (kevin_decline_note column) and folded into the sponsor's decline
+   * email so they see Kevin's actual words, not a static template.
+   */
+  kevinDeclineNote?: string;
 }
 
 const UUID_RE =
@@ -138,6 +149,15 @@ export async function PATCH(
 
   switch (action) {
     case 'translate': {
+      if (message.status === 'awaiting_kevin') {
+        return NextResponse.json(
+          {
+            error:
+              'Kevin needs to approve this note before it can be translated.',
+          },
+          { status: 409 }
+        );
+      }
       const translation = (body.bodyTranslated ?? '').trim();
       if (translation.length < 3) {
         return NextResponse.json(
@@ -157,6 +177,15 @@ export async function PATCH(
       if (message.status === 'declined') {
         return NextResponse.json(
           { error: 'This message was declined and can\'t be delivered.' },
+          { status: 409 }
+        );
+      }
+      if (message.status === 'awaiting_kevin') {
+        return NextResponse.json(
+          {
+            error:
+              'Kevin needs to approve this note before it can be delivered.',
+          },
           { status: 409 }
         );
       }
@@ -206,6 +235,42 @@ export async function PATCH(
       patch.status = 'declined';
       break;
     }
+    case 'kevin_approve': {
+      // Kevin approval layer (2026-07-10). Only meaningful when the
+      // row is currently 'awaiting_kevin' — approving a row that's
+      // already past this gate is a no-op that we surface as 409 to
+      // catch a double-click. Anything else, the sponsor may see two
+      // 'note reached kid' emails downstream.
+      if (message.status !== 'awaiting_kevin') {
+        return NextResponse.json(
+          { error: 'This note is already past the approval step.' },
+          { status: 409 }
+        );
+      }
+      patch.status = 'pending';
+      break;
+    }
+    case 'kevin_decline': {
+      // Kevin's decline of a note before it ever reached the campus
+      // team. Distinct from a Simon-decline (which the current codebase
+      // no longer has a UI path for) — Kevin's note is personalized and
+      // gets folded into the sponsor's decline email. Guarded so once
+      // the note has been approved (status='pending' or beyond) Kevin
+      // has to use a different action, not this one.
+      if (message.status !== 'awaiting_kevin') {
+        return NextResponse.json(
+          { error: 'This note is already past the approval step.' },
+          { status: 409 }
+        );
+      }
+      patch.declinedAt = now;
+      patch.status = 'declined';
+      const kevinNote = (body.kevinDeclineNote ?? '').trim();
+      if (kevinNote.length > 0) {
+        patch.kevinDeclineNote = kevinNote;
+      }
+      break;
+    }
     case 'edit-notes': {
       // simon_notes-only update; no status change. Handled by the
       // simonNotes assignment above. Nothing else to do.
@@ -234,10 +299,11 @@ export async function PATCH(
     });
   }
 
-  // Sponsor notification for deliver / decline. Best-effort — don't
-  // fail the API if SendGrid is having a moment.
+  // Sponsor notification for deliver / decline / kevin_decline.
+  // Best-effort — don't fail the API if SendGrid is having a moment.
   const shouldNotify = body.notifySponsor !== false;
-  if (shouldNotify && (action === 'deliver' || action === 'decline')) {
+  const isDeclineAction = action === 'decline' || action === 'kevin_decline';
+  if (shouldNotify && (action === 'deliver' || isDeclineAction)) {
     try {
       const firstNameSafe = escapeHtml(message.firstName || 'your kid');
       const shirtNumber = message.shirtNumber;
@@ -260,6 +326,15 @@ export async function PATCH(
         action === 'deliver'
           ? `Your penpal note reached ${firstNamePlain}.`
           : 'A note about your recent penpal note';
+      // Kevin's personalized decline note (2026-07-10). Read the
+      // freshly-submitted value from patch first (kevin_decline path)
+      // and escape before injecting into HTML. Legacy 'decline' with
+      // no Kevin note falls back to the static template.
+      const kevinNoteRaw =
+        typeof patch.kevinDeclineNote === 'string' && patch.kevinDeclineNote
+          ? patch.kevinDeclineNote
+          : null;
+      const kevinNoteSafe = kevinNoteRaw ? escapeHtml(kevinNoteRaw) : null;
       const html =
         action === 'deliver'
           ? deliveredEmailHtml({
@@ -267,7 +342,11 @@ export async function PATCH(
               firstName: firstNameSafe,
               kidPageUrl,
             })
-          : declinedEmailHtml({ greeting, firstName: firstNameSafe });
+          : declinedEmailHtml({
+              greeting,
+              firstName: firstNameSafe,
+              kevinNote: kevinNoteSafe,
+            });
       await sendEmail({
         to: { email: message.sponsorEmail },
         from: { email: FROM_EMAIL, name: 'Kevin at Be A Number' },
@@ -277,6 +356,32 @@ export async function PATCH(
     } catch (err) {
       console.warn(
         '[messages] sponsor notification failed (non-fatal):',
+        err instanceof Error ? err.message : String(err)
+      );
+    }
+  }
+
+  // Simon alert on Kevin approval (2026-07-10). Under the new approval
+  // layer, the campus team only hears about notes Kevin has greenlit —
+  // the initial POST no longer fans out to Simon. Non-fatal on error.
+  if (action === 'kevin_approve') {
+    try {
+      await sendSimonNoteAlert({
+        noteId: id,
+        sponsorEmail: message.sponsorEmail,
+        sponsorName: message.sponsorName,
+        kidFirstName: message.firstName || 'the kid',
+        kidDisplayName:
+          message.displayName || message.firstName || 'the kid',
+        shirtNumber: message.shirtNumber ?? null,
+        bodyEn:
+          (message.bodyEn ?? '').length > 0
+            ? message.bodyEn
+            : '(Handwritten letter uploaded. Print + deliver as-is.)',
+      });
+    } catch (err) {
+      console.warn(
+        '[messages] Simon approval alert failed (non-fatal):',
         err instanceof Error ? err.message : String(err)
       );
     }
@@ -380,10 +485,35 @@ function deliveredEmailHtml({
 function declinedEmailHtml({
   greeting,
   firstName,
+  kevinNote,
 }: {
   greeting: string;
   firstName: string;
+  /**
+   * Kevin's personalized decline note, already HTML-escaped. When
+   * present (kevin_decline action), it replaces the static
+   * template's body with Kevin's own words in a block quote so the
+   * sponsor sees a real human explanation rather than a form letter.
+   * Falls back to the legacy static template when null (a Simon-
+   * decline or a Kevin-decline that came in without a note).
+   */
+  kevinNote: string | null;
 }): string {
+  if (kevinNote) {
+    // Preserve line breaks in Kevin's note by converting them to <br>.
+    // kevinNote is already HTML-escaped upstream, so this substitution
+    // is safe against injection.
+    const noteHtml = kevinNote.replace(/\r?\n/g, '<br>');
+    return wrap(`
+      <p>${greeting}</p>
+      <p>Wanted to give you a heads up on the last penpal note you wrote to ${firstName}. Here's a note from me:</p>
+      <blockquote style="border-left: 3px solid #D4A843; padding: 4px 16px; margin: 20px 0; color: #333; font-style: italic;">
+        ${noteHtml}
+      </blockquote>
+      <p>You can write another penpal note whenever you want — the composer is on ${firstName}'s page. Reply to this email if anything's unclear.</p>
+      <p>Kevin</p>
+    `);
+  }
   return wrap(`
     <p>${greeting}</p>
     <p>Wanted to give you a heads up — the last penpal note you wrote to ${firstName} didn't make it into this week's campus batch. If that's confusing, hit reply and I'll walk you through it.</p>
