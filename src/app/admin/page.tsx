@@ -145,7 +145,8 @@ export default async function AdminHomePage() {
             label="Penpal queue"
             error={data.messagesQueue.error}
           >
-            {data.messagesQueue.pendingCount === 0 &&
+            {data.messagesQueue.awaitingKevinCount === 0 &&
+            data.messagesQueue.pendingCount === 0 &&
             data.messagesQueue.translatedCount === 0 ? (
               <>
                 <Headline>The queue is empty.</Headline>
@@ -160,10 +161,12 @@ export default async function AdminHomePage() {
             ) : (
               <>
                 <Headline>
-                  {data.messagesQueue.pendingCount +
+                  {data.messagesQueue.awaitingKevinCount +
+                    data.messagesQueue.pendingCount +
                     data.messagesQueue.translatedCount}{' '}
                   note
-                  {data.messagesQueue.pendingCount +
+                  {data.messagesQueue.awaitingKevinCount +
+                    data.messagesQueue.pendingCount +
                     data.messagesQueue.translatedCount ===
                   1
                     ? ''
@@ -171,6 +174,10 @@ export default async function AdminHomePage() {
                   waiting.
                 </Headline>
                 <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 text-sm text-[#666]">
+                  <GapLine
+                    label="Awaiting your approval"
+                    count={data.messagesQueue.awaitingKevinCount}
+                  />
                   <GapLine
                     label="Pending translation"
                     count={data.messagesQueue.pendingCount}

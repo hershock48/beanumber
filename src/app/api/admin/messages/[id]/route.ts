@@ -284,7 +284,36 @@ export async function PATCH(
     }
   }
 
-  await db.update(kidMessages).set(patch).where(eq(kidMessages.id, id));
+  // Race guard for kevin_approve / kevin_decline (2026-07-10). Two
+  // admin clicks on the same awaiting_kevin row could otherwise both
+  // fire alerts / decline emails. Gate the UPDATE on the row still
+  // being in the expected pre-state and treat a zero-row result as a
+  // "someone got here first" 409. Only enforced on Kevin actions —
+  // Simon's translate/deliver actions have their own status guards
+  // above and shouldn't fail here on a legit second click.
+  if (action === 'kevin_approve' || action === 'kevin_decline') {
+    const updated = await db
+      .update(kidMessages)
+      .set(patch)
+      .where(
+        and(
+          eq(kidMessages.id, id),
+          eq(kidMessages.status, 'awaiting_kevin')
+        )
+      )
+      .returning({ id: kidMessages.id });
+    if (updated.length === 0) {
+      return NextResponse.json(
+        {
+          error:
+            'This note is no longer awaiting approval — it may have been handled in another tab.',
+        },
+        { status: 409 }
+      );
+    }
+  } else {
+    await db.update(kidMessages).set(patch).where(eq(kidMessages.id, id));
+  }
 
   // Included-letter cycle stamp (2026-07-10). When Simon marks a
   // holder's letter delivered, we stamp their sponsorship row so

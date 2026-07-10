@@ -65,6 +65,11 @@ function statusLine(preview: KidCardNotePreview, firstName: string): string {
       return `On its way — translated ${when}.`;
     case 'pending':
       return `Waiting to leave the campus (sent ${when}).`;
+    case 'awaiting_kevin':
+      // Kevin approval layer (2026-07-10). Sponsor sees a clear
+      // "review in progress" state rather than a generic "you wrote"
+      // fallback, so it's obvious the note is queued, not lost.
+      return `Kevin's reading it (sent ${when}).`;
     default:
       return `You wrote ${when}.`;
   }

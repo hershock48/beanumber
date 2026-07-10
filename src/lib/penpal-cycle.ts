@@ -115,9 +115,16 @@ export async function getViewerWriteStatus(args: {
   // a monthly sponsor and the cycle column is irrelevant.
   if (rows.some(r => Number(r.monthlyAmount ?? 0) > 0)) return 'monthly';
 
-  // No monthly row. Check for a holder row (childRevealedAt set).
-  if (!rows.some(r => !!r.childRevealedAt)) return 'none';
-
+  // No monthly row — this viewer has at least one non-monthly
+  // sponsorship for this kid, which qualifies them for the holder
+  // included-letter cycle. We used to also require childRevealedAt
+  // (Hold-to-Meet completed), but that produced a bad UX: a
+  // pre-reveal holder would render the "cycle used" upgrade card
+  // instead of the composer. The buyer paid; whether they've
+  // clicked the reveal doesn't change what they're entitled to.
+  // (The kid page's own reveal overlay still gates them out of
+  // seeing the composer visually until they Hold-to-Meet.)
+  //
   // Holder — check if they've already used the cycle by looking at
   // kid_messages directly. Any non-declined sponsor_to_kid message
   // means the free cycle is spent.

@@ -387,22 +387,34 @@ export async function getRosterGapsCard(): Promise<RosterGapsCard> {
 
 export interface MessagesQueueCard {
   ok: boolean;
+  awaitingKevinCount: number;
   pendingCount: number;
   translatedCount: number;
   deliveredLast7Days: number;
-  // Age of the oldest actionable (pending or translated) note, in
-  // whole hours. Null when the queue is empty.
+  // Age of the oldest actionable (awaiting_kevin, pending, or translated)
+  // note, in whole hours. Null when the queue is empty.
   oldestWaitingHours: number | null;
   error?: string;
 }
 
 export async function getMessagesQueueCard(): Promise<MessagesQueueCard> {
   try {
-    // Two counts + one min(created_at) query. Cheaper as three separate
-    // targeted counts than a GROUP BY because status has an index and
-    // each count hits a small subset.
-    const [pendingRows, translatedRows, deliveredRows, oldestRows] =
+    // Counts split by state. Cheaper as separate targeted counts than
+    // a GROUP BY because status has an index and each count hits a
+    // small subset. awaiting_kevin was added 2026-07-10 when Kevin's
+    // approval layer went in — the tile needs to show Kevin's own
+    // queue before Simon's queue.
+    const [awaitingKevinRows, pendingRows, translatedRows, deliveredRows, oldestRows] =
       await Promise.all([
+        db
+          .select({ n: sql<number>`count(*)::int` })
+          .from(kidMessages)
+          .where(
+            and(
+              eq(kidMessages.direction, 'sponsor_to_kid'),
+              eq(kidMessages.status, 'awaiting_kevin')
+            )
+          ),
         db
           .select({ n: sql<number>`count(*)::int` })
           .from(kidMessages)
@@ -439,7 +451,7 @@ export async function getMessagesQueueCard(): Promise<MessagesQueueCard> {
           .where(
             and(
               eq(kidMessages.direction, 'sponsor_to_kid'),
-              sql`${kidMessages.status} IN ('pending', 'translated')`
+              sql`${kidMessages.status} IN ('awaiting_kevin', 'pending', 'translated')`
             )
           ),
       ]);
@@ -453,6 +465,7 @@ export async function getMessagesQueueCard(): Promise<MessagesQueueCard> {
 
     return {
       ok: true,
+      awaitingKevinCount: awaitingKevinRows[0]?.n ?? 0,
       pendingCount: pendingRows[0]?.n ?? 0,
       translatedCount: translatedRows[0]?.n ?? 0,
       deliveredLast7Days: deliveredRows[0]?.n ?? 0,
@@ -461,6 +474,7 @@ export async function getMessagesQueueCard(): Promise<MessagesQueueCard> {
   } catch (err) {
     return {
       ok: false,
+      awaitingKevinCount: 0,
       pendingCount: 0,
       translatedCount: 0,
       deliveredLast7Days: 0,

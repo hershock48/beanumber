@@ -813,7 +813,8 @@ function MessageCard({
               from pending without having to click Save Translation +
               Mark Delivered first. When Simon saves a reply, the
               parent auto-flips to 'delivered' server-side. */}
-          {message.status !== 'declined' && (
+          {message.status !== 'declined' &&
+            message.status !== 'awaiting_kevin' && (
             <ReplySection
               message={message}
               onLocalUpdate={onLocalUpdate}

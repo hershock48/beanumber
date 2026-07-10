@@ -39,7 +39,15 @@ export async function GET() {
       .where(
         and(
           eq(kidMessages.direction, 'sponsor_to_kid'),
-          inArray(kidMessages.status, ['pending', 'translated'])
+          // awaiting_kevin (2026-07-10 approval layer) needs to
+          // light the nav red dot too — the whole point of the
+          // approval step is that Kevin looks at it. Without this,
+          // Kevin has no cue that a note is waiting for him.
+          inArray(kidMessages.status, [
+            'awaiting_kevin',
+            'pending',
+            'translated',
+          ])
         )
       );
     return NextResponse.json({ count: rows[0]?.n ?? 0 });

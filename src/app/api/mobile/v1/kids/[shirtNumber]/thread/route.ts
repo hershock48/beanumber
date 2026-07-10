@@ -318,7 +318,11 @@ async function postHandler(
       and(
         sql`lower(${kidMessages.sponsorEmail}) = ${viewer.email.toLowerCase()}`,
         eq(kidMessages.childId, child.id),
-        inArray(kidMessages.status, ['pending', 'translated'])
+        // Kevin approval layer (2026-07-10). Extending awaiting_kevin
+        // into the rate-limit filter so a mobile writer can't queue
+        // two notes while the first is still waiting for Kevin.
+        // Mirrors src/app/api/sponsor/notes/route.ts.
+        inArray(kidMessages.status, ['awaiting_kevin', 'pending', 'translated'])
       )
     )
     .limit(1);
@@ -341,7 +345,10 @@ async function postHandler(
         childId: child.id,
         direction: 'sponsor_to_kid',
         bodyEn: bodyText,
-        status: 'pending',
+        // Kevin approval layer (2026-07-10). Same as the web POST at
+        // /api/sponsor/notes — new mobile notes must go through
+        // Kevin before Simon sees them.
+        status: 'awaiting_kevin',
       })
       .returning({
         id: kidMessages.id,
@@ -367,23 +374,10 @@ async function postHandler(
       );
     }
 
-    // Simon (campus-side reviewer) also gets the ping so notes coming
-    // in overnight in Uganda time don't wait for him to open the queue.
-    try {
-      await sendSimonNoteAlert({
-        noteId: inserted[0].id,
-        sponsorEmail: viewer.email,
-        sponsorName: null,
-        kidFirstName: child.firstName || 'the kid',
-        kidDisplayName: child.displayName || child.firstName || 'the kid',
-        shirtNumber: child.shirtNumber ?? null,
-        bodyEn: bodyText,
-      });
-    } catch (err) {
-      logger.warn(
-        `[mobile/thread] Simon alert send failed (non-fatal): ${err instanceof Error ? err.message : String(err)}`
-      );
-    }
+    // Kevin approval layer (2026-07-10). Simon alert is no longer
+    // fired on POST — it now fires from the admin PATCH kevin_approve
+    // handler so Simon only hears about greenlit notes. Mirrors the
+    // web sponsor notes route.
 
     const created: MobileThreadMessage = {
       id: inserted[0].id,

@@ -1009,10 +1009,28 @@ const getChildByShirtNumber = cache(async function getChildByShirtNumber(shirtNu
       // Exposed for viewers who can reorder a shirt with this Number
       // (both monthly sponsors and unconverted shirt-holders). The
       // ReorderShirtCard POSTs to /api/sponsor/portal-purchase which
-      // requires the sponsor code to match the session cookie.
+      // verifies the code against the session cookie server-side.
+      //
+      // On multi-sponsor kids there can be TWO sponsorship rows for
+      // this kid — a cookie-loaded row (from sponsorshipPromise) and
+      // an email-matched row (this viewer's own). Under the old
+      // implementation the exposed code came from `sponsorship`, which
+      // resolved to whichever row loaded first — often the co-sponsor's.
+      // The client then POSTed the co-sponsor's code and the server
+      // 401'd because it didn't match the cookie.
+      //
+      // Prefer the email-matched row (guaranteed to be THIS viewer's)
+      // when it exists, and fall back to the cookie-matched row only
+      // when sponsorCodeMatches was true. Never expose an unrelated
+      // sponsor's code.
       sponsor_code:
         (viewerIsSponsor || viewerIsHolder)
-          ? (sponsorship?.SponsorCode as string | undefined)
+          ? (
+              (emailMatchedSponsorship?.SponsorCode as string | undefined) ??
+              (sponsorCodeMatches
+                ? (sponsorship?.SponsorCode as string | undefined)
+                : undefined)
+            )
           : undefined,
       // Surfaced for the impact stats strip in the unified sponsor view.
       // Only populated when this viewer is the verified sponsor, since

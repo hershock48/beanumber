@@ -234,6 +234,22 @@ export async function POST(
       { status: 409 }
     );
   }
+  if (parent.status === 'awaiting_kevin') {
+    // Kevin approval layer (2026-07-10). A reply implies delivery
+    // to the kid, which requires Kevin's greenlight on the parent
+    // first. Without this gate, Simon could reply-and-ship an
+    // awaiting_kevin parent, the auto-flip would set the parent to
+    // 'delivered', Kevin's approval step would be silently bypassed,
+    // and the campus alert (sendSimonNoteAlert) would never fire
+    // for the note Kevin never saw.
+    return NextResponse.json(
+      {
+        error:
+          "Kevin needs to approve this note before a reply can be recorded.",
+      },
+      { status: 409 }
+    );
+  }
 
   // Enforce one reply per parent. Belt-and-suspenders: the app-layer
   // pre-check here + a future partial unique index (deferred; the
