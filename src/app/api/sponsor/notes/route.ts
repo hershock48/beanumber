@@ -81,6 +81,15 @@ export async function POST(request: NextRequest) {
      * the sponsor isn't left wondering where their photo went.
      */
     attachments?: string[];
+    /**
+     * Sponsor's handwritten letter photo (2026-07-10). URL returned
+     * from POST /api/sponsor/notes/photo. When present, this is
+     * treated as the PRIMARY body of the note — Simon prints and
+     * delivers the scan itself, no translation needed. body_en
+     * becomes optional in this case. Buyers write on the physical
+     * letter template we ship in the shirt bag and upload here.
+     */
+    letterImageUrl?: string;
   };
   try {
     body = await request.json();
@@ -128,14 +137,47 @@ export async function POST(request: NextRequest) {
   }
   const attachments = attachmentEntries.length > 0 ? attachmentEntries : null;
 
+  // Handwritten letter photo — same URL hygiene as attachments. When
+  // supplied, this becomes the PRIMARY body of the note and body_en
+  // becomes optional. Simon prints and delivers the scan directly.
+  let letterImageUrl: string | null = null;
+  const rawLetter = (body.letterImageUrl ?? '').trim();
+  if (rawLetter) {
+    try {
+      const u = new URL(rawLetter);
+      if (u.protocol !== 'https:' && u.protocol !== 'http:') {
+        throw new Error('bad protocol');
+      }
+      if (u.username || u.password) {
+        throw new Error('credentials in URL');
+      }
+      letterImageUrl = u.toString();
+    } catch {
+      return NextResponse.json(
+        {
+          error:
+            'The letter photo URL looks malformed. Re-upload the photo and try again.',
+        },
+        { status: 400 }
+      );
+    }
+  }
+
   const rawBody = (body.bodyEn ?? '').trim();
-  if (rawBody.length < MIN_BODY) {
-    return NextResponse.json(
-      {
-        error: `Your penpal note is too short. Say a little more — the campus reads every one of these.`,
-      },
-      { status: 400 }
-    );
+
+  // Body length rules — with the letter photo path, an empty body is
+  // legal (the scan IS the letter). Without it we require the same
+  // 10-1000 range as before. If a body IS typed with a letter present,
+  // we still bound its length so a stray paste doesn't blow up.
+  if (!letterImageUrl) {
+    if (rawBody.length < MIN_BODY) {
+      return NextResponse.json(
+        {
+          error: `Your penpal note is too short. Say a little more, or upload a handwritten letter instead.`,
+        },
+        { status: 400 }
+      );
+    }
   }
   if (rawBody.length > MAX_BODY) {
     return NextResponse.json(
@@ -283,6 +325,11 @@ export async function POST(request: NextRequest) {
         // Sponsor-attached photos (2026-07-08). Null when the sponsor
         // sent a text-only note, which is still the common case.
         attachments,
+        // Sponsor's handwritten letter photo (2026-07-10). Null when
+        // the sponsor typed. When set, Simon prints the scan and
+        // delivers it directly — no translation step needed.
+        letterImageUrl,
+        letterImageUploadedAt: letterImageUrl ? new Date() : null,
       })
       .returning({ id: kidMessages.id, status: kidMessages.status });
 
@@ -307,7 +354,14 @@ export async function POST(request: NextRequest) {
         // channel he's looking at (matters for retention analysis
         // and for how he might frame a personal follow-up).
         sponsorHoldsShirt: !!monthlyRow.childRevealedAt,
-        bodyEn: rawBody,
+        // When the sponsor uploaded a handwritten scan and skipped
+        // typing, the body is empty. Substitute a marker so the
+        // Kevin alert email doesn't render a blank quote block —
+        // and so Kevin knows to click through to see the scan.
+        bodyEn:
+          rawBody.length > 0
+            ? rawBody
+            : '(Handwritten letter — see the scan on the admin queue.)',
       });
     } catch (err) {
       console.warn(
@@ -328,7 +382,13 @@ export async function POST(request: NextRequest) {
         kidDisplayName:
           childRow.displayName || childRow.firstName || 'the kid',
         shirtNumber: childRow.shirtNumber ?? null,
-        bodyEn: rawBody,
+        // Same fallback as the Kevin alert — when only a scan came
+        // in, tell Simon so he opens the queue to see the letter
+        // rather than translating an empty body.
+        bodyEn:
+          rawBody.length > 0
+            ? rawBody
+            : '(Handwritten letter uploaded. Print + deliver as-is.)',
       });
     } catch (err) {
       console.warn(

@@ -42,15 +42,26 @@ import { uploadAttachment } from '@/lib/storage';
 import { SESSION } from '@/lib/constants';
 
 const ALLOWED_TYPES = new Set([
+  // Images — the common case (phone snapshot).
   'image/jpeg',
   'image/jpg',
   'image/png',
   'image/webp',
   'image/heic',
   'image/heif',
+  // PDF + Word — 2026-07-10 extension so the sponsor can upload a
+  // multi-page scan (scanner apps output PDF) or a typed letter
+  // .docx alongside handwritten photos. Mirror of the admin
+  // reply-photo endpoint which accepts the same set.
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
 ]);
 
-const MAX_BASE64_BYTES = 10 * 1024 * 1024;
+// Bumped from 10MB to 20MB base64 (~15MB decoded) 2026-07-10 to
+// cover multi-page phone-scanned PDF letters. Single phone photos
+// still fit comfortably.
+const MAX_BASE64_BYTES = 20 * 1024 * 1024;
 
 async function getViewerEmail(): Promise<string | null> {
   try {
@@ -103,7 +114,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         error:
-          'Only JPEG, PNG, WEBP, or HEIC images work. Convert and try again.',
+          'Supported: JPEG / PNG / WEBP / HEIC photos, PDF, or Word (.doc / .docx). Convert and try again.',
       },
       { status: 400 }
     );
@@ -118,7 +129,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         error:
-          'Photo is too large. Under ~7 MB after decoding, please — shrink it and re-upload.',
+          'File is too large. Under ~15 MB after decoding, please. Shrink or split and re-upload.',
       },
       { status: 413 }
     );

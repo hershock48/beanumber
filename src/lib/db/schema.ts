@@ -1162,6 +1162,17 @@ export const kidMessages = pgTable(
     replyImageUploadedAt: timestamp('reply_image_uploaded_at', {
       withTimezone: true,
     }),
+    // Sponsor's handwritten letter — mirror of the reply flow. When
+    // the sponsor writes physically on the letter template we ship
+    // in the shirt bag, they photograph it and upload it here as
+    // the primary body of the note. body_en becomes optional in
+    // that case (the scan IS the letter). Populated on
+    // direction='sponsor_to_kid' rows only; nullable so
+    // typed-only notes keep working. See migration 0012.
+    letterImageUrl: text('letter_image_url'),
+    letterImageUploadedAt: timestamp('letter_image_uploaded_at', {
+      withTimezone: true,
+    }),
     // Timestamp of when the sponsor-reply notification email actually
     // dispatched successfully (SendGrid accepted the send). Null when
     // either (a) the row is a sponsor->kid parent (only replies notify
