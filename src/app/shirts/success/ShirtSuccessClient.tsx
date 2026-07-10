@@ -164,8 +164,8 @@ function ShippingConfirmation({
 
         <p className="text-base text-[#555] leading-relaxed max-w-md mx-auto mb-4">
           {multi
-            ? <>Expect them within 5&ndash;7 business days. When they arrive, open the bag, look at the back of each shirt &mdash; there&rsquo;s a number pressed below the main design, and every number belongs to a real kid at the campus in Northern Uganda. Neither of us knows which numbers you got. Enter each one at beanumber.org to meet them.</>
-            : <>Expect it within 5&ndash;7 business days. When it arrives, open the bag, find the number pressed on the back of the shirt, and look it up at beanumber.org. Neither of us knows what number you got until you do.</>}
+            ? <>I press each one by hand and I&rsquo;ll get them in the mail as soon as I can. When they arrive, open the bag, look at the back of each shirt &mdash; there&rsquo;s a number pressed below the main design, and every number belongs to a real kid at the campus in Northern Uganda. Neither of us knows which numbers you got. Enter each one at beanumber.org to meet them.</>
+            : <>I press each one by hand and I&rsquo;ll get it in the mail as soon as I can. When it arrives, open the bag, find the number pressed on the back of the shirt, and look it up at beanumber.org. Neither of us knows what number you got until you do.</>}
         </p>
 
         <p className="text-[#777] leading-relaxed max-w-md mx-auto">
@@ -225,8 +225,8 @@ function ShippingConfirmation({
         <div className="space-y-4 text-left">
           <Step num="I">
             {multi
-              ? 'Your shirts are made to order and ship within 5–7 business days. A confirmation email is on its way to you now.'
-              : 'Your shirt is made to order and ships within 5–7 business days. A confirmation email is on its way to you now.'}
+              ? 'Your shirts are made to order — I press each one by hand and I’ll get them in the mail as soon as I can. A confirmation email is on its way to you now.'
+              : 'Your shirt is made to order — I press each one by hand and I’ll get it in the mail as soon as I can. A confirmation email is on its way to you now.'}
           </Step>
           <Step num="II">
             You&rsquo;ll get another email the day {multi ? 'they ship' : 'it ships'}, with tracking.

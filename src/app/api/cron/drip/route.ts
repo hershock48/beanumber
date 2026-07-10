@@ -406,9 +406,9 @@ function shirtSponsorEmail(
         html: wrapEmail(`
           <p style="margin-top: 0;">Hey ${firstName},</p>
           ${multi
-            ? `<p>Your ${numbers.length} shirts are being made right now. I screen-print every one by hand, and yours will ship within the next few days.</p>
+            ? `<p>Your ${numbers.length} shirts are being made right now. I screen-print every one by hand and I&rsquo;ll get them in the mail as soon as I can.</p>
                <p>When they arrive, check the back of each one. Every shirt has a different number pressed below the main design, and every number belongs to a different child at our campus in Northern Uganda. You&rsquo;ll come back to the site, enter each number, and meet them.</p>`
-            : `<p>Your shirt is being made right now. I screen-print every one by hand, and yours will ship within the next few days.</p>
+            : `<p>Your shirt is being made right now. I screen-print every one by hand and I&rsquo;ll get it in the mail as soon as I can.</p>
                <p>When it arrives, check the back of the shirt. There&rsquo;s a number pressed below the main design, and that number belongs to a real child at our campus in Northern Uganda. You&rsquo;ll come back to the site, enter the number, and meet them.</p>`
           }
           <p>You also signed up for monthly sponsorship, which means your $25 a month is already at work. It supports school fees, two meals a day, and medical care at the campus, and that started the day you signed up. You&rsquo;re a sponsor right now, even before the ${multi ? 'shirts arrive' : 'shirt arrives'}.</p>

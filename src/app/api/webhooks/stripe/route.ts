@@ -1188,7 +1188,7 @@ async function sendShirtConfirmationEmail(orderData: {
 
               <p style="margin-top: 0;">Hey ${firstName},</p>
 
-              <p>Your shirt is in the works &mdash; I&rsquo;m screen-printing it by hand right now, and it&rsquo;ll ship within 5&ndash;7 business days.</p>
+              <p>Your shirt is in the works &mdash; I&rsquo;m screen-printing it by hand, and I&rsquo;ll get it in the mail as soon as I can.</p>
 
               <p style="color: #999; font-size: 14px; margin-bottom: 4px;">Your order:</p>
               <p style="font-size: 15px; color: #555; margin-top: 0;">
@@ -1271,7 +1271,7 @@ async function sendMerchConfirmationEmail(orderData: {
       </head>
       <body style="font-family: Georgia, 'Times New Roman', serif; line-height: 1.7; color: #333; max-width: 560px; margin: 0 auto; padding: 30px 20px;">
         <p style="margin-top: 0;">Hey ${firstName},</p>
-        <p>Your <strong>${orderData.merchName}</strong>${sizeLine} is on the make-bench. I&rsquo;ll press <strong>#${orderData.shirtNumber}</strong> on it by hand and ship it within 5&ndash;7 business days.${childLine}</p>
+        <p>Your <strong>${orderData.merchName}</strong>${sizeLine} is on the make-bench. I&rsquo;ll press <strong>#${orderData.shirtNumber}</strong> on it by hand and get it in the mail as soon as I can.${childLine}</p>
         <p style="color: #999; font-size: 14px; margin-bottom: 4px;">Your order:</p>
         <p style="font-size: 15px; color: #555; margin-top: 0;">
           ${orderData.merchName}${sizeLine} &middot; #${orderData.shirtNumber}<br>
