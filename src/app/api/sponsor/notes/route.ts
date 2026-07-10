@@ -279,7 +279,12 @@ export async function POST(request: NextRequest) {
             ? eq(sponsorships.childIdLegacy, childRow.childId)
             : sql`false`
         ),
-        eq(sponsorships.status, 'Active')
+        // Include both 'Active' and 'Holder' statuses. Fresh shirt
+        // buyers get status='Holder' from webhook-bridge.ts (no
+        // monthly = 'Holder'; monthly = 'Active'). Missing 'Holder'
+        // here meant the included-letter path 403'd for the exact
+        // audience it was built for. Fixed after audit 2026-07-10.
+        inArray(sponsorships.status, ['Active', 'Holder'])
       )
     );
 

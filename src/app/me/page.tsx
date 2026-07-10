@@ -963,14 +963,21 @@ function KidCard({
         )}
 
         {/* Per-kid correspondence preview — silent until the sponsor
-            has written to this kid at least once. Monthly-sponsor only
-            per the 2026-07-06 rule change; holders can't write, so
-            they'd never accumulate a thread anyway. Belt-and-
-            suspenders gate here in case a legacy holder somehow has a
-            historical thread. */}
-        {!child.departed && monthlyOrHolder === 'monthly' && (
+            has written to this kid at least once. As of 2026-07-10
+            this also fires for shirt-holders who used their included
+            letter cycle: the reply that comes back IS their surface
+            to see it. Without this, a holder's kid reply would land
+            on /children/[N] but be invisible on /me — muting the exact
+            conversion moment ("your kid wrote back!") that the whole
+            included-letter mechanic is built around. The KidCard's
+            latestUpdate + general "Updates straight from" surfaces
+            stay monthly-only per CLAUDE.md #4; only the reply preview
+            gets extended to holders because the reply is earned.
+            Preview is `null` for holders who haven't used their cycle
+            yet, so the card stays quiet in that state. */}
+        {!child.departed && !!notePreview && (
           <KidCardNotesPreview
-            preview={notePreview ?? null}
+            preview={notePreview}
             firstName={child.firstName || child.displayName}
             kidHref={href}
             childIdLegacy={child.childId || null}

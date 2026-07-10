@@ -47,7 +47,7 @@
  *       audit column. Non-fatal, idempotent, does NOT gate.
  */
 
-import { and, eq, ne, or, sql } from 'drizzle-orm';
+import { and, eq, inArray, ne, or, sql } from 'drizzle-orm';
 import { db } from '@/lib/db/client';
 import {
   sponsorships,
@@ -93,7 +93,13 @@ export async function getViewerWriteStatus(args: {
     .where(
       and(
         sql`lower(${sponsorships.sponsorEmail}) = ${email}`,
-        eq(sponsorships.status, 'Active'),
+        // Include both 'Active' and 'Holder' statuses. Fresh shirt
+        // buyers get status='Holder' from webhook-bridge.ts:225 (no
+        // monthly amount → 'Holder'; monthly amount → 'Active').
+        // Missing 'Holder' here meant the entire included-letter
+        // feature never fired for its target audience. Fixed after
+        // audit 2026-07-10. Legacy $0-Active rows still work.
+        inArray(sponsorships.status, ['Active', 'Holder']),
         or(
           eq(sponsorships.childId, args.childRecordId),
           args.childIdLegacy
@@ -177,7 +183,13 @@ export async function stampHolderFirstLetterCycle(args: {
       .where(
         and(
           sql`lower(${sponsorships.sponsorEmail}) = ${email}`,
-          eq(sponsorships.status, 'Active'),
+          // Include both 'Active' and 'Holder' statuses. Fresh shirt
+        // buyers get status='Holder' from webhook-bridge.ts:225 (no
+        // monthly amount → 'Holder'; monthly amount → 'Active').
+        // Missing 'Holder' here meant the entire included-letter
+        // feature never fired for its target audience. Fixed after
+        // audit 2026-07-10. Legacy $0-Active rows still work.
+        inArray(sponsorships.status, ['Active', 'Holder']),
           or(
             eq(sponsorships.childId, args.childRecordId),
             legacyId ? eq(sponsorships.childIdLegacy, legacyId) : sql`false`

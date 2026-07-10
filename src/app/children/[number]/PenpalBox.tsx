@@ -175,7 +175,11 @@ export function PenpalBox({
     // Anon: lead with the sponsorship story — the school-day framing
     // is what makes a cold visitor care. The penpal is the surprise
     // upside they discover in the body copy below.
-    heading = `Sponsor ${firstName}. Meet him for real.`;
+    // Singular "them" — the roster has both boys and girls (Naume,
+    // Asenath, Amarorwot are female). Matches ReassignReveal's
+    // pronoun handling. No per-kid gender lookup here because this
+    // heading renders for anon visitors who haven't claimed yet.
+    heading = `Sponsor ${firstName}. Meet them for real.`;
   }
 
   // Anon-only href. Holder + signed_in_visitor use the client CTA
@@ -185,9 +189,14 @@ export function PenpalBox({
 
   // Holder who has already used their included letter cycle AND has
   // a real thread (their sent letter + kid's reply): show the real
-  // exchange ABOVE the frosted upgrade card, so they don't lose the
+  // exchange ABOVE a clean upgrade card, so they don't lose the
   // artifact of what they wrote and what came back. Their next-step
   // ask is to keep going at $25/mo.
+  //
+  // When this is true, we suppress the frosted fake-sample thread
+  // below the upgrade card — it would sit BELOW the real thread and
+  // read as a second confusing sample. The overlay's heading + CTA
+  // are enough on their own once they've seen the real thing.
   const showRealHolderThread =
     viewerState === 'holder' && !!thread && thread.length > 0;
 
@@ -211,8 +220,55 @@ export function PenpalBox({
           showed "Write Marvin. Marvin writes back." rendering on
           top of "Sponsor Marvin. Meet him for real."
           Sponsor branch above still renders SectionHeader as
-          the anchor for the real thread + composer. */}
+          the anchor for the real thread + composer.
+          The showRealHolderThread branch renders SectionHeader
+          just above (with the real thread), so the header exists
+          in that case too — this comment applies to the anon /
+          signed-in-visitor / no-thread-yet holder cases. */}
       <div className="relative border border-[#e8e0d4] bg-white">
+        {showRealHolderThread ? (
+          /* Clean upgrade card — no fake-sample thread. The viewer
+             just scrolled past their real letter and their kid's
+             real reply; they don't need a blurred sample below it.
+             Kevin's audit 2026-07-10: 'no duplicate fake thread
+             once they've seen the real one.' */
+          <div className="p-8 md:p-10 text-center bg-[#FFF8F0]">
+            <p className="text-xs font-bold uppercase tracking-[0.3em] text-[#D4A843] mb-3">
+              One letter, one reply &middot; done
+            </p>
+            <p
+              className="text-2xl md:text-[26px] text-[#0d0d0d] mb-4 leading-tight"
+              style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
+            >
+              {heading}
+            </p>
+            <p className="text-[15px] text-[#333] leading-relaxed mb-6 max-w-md mx-auto">
+              You get monthly photos, report cards, and campus
+              updates &mdash; and you and {firstName} keep writing.{' '}
+              <span className="font-bold text-[#0d0d0d]">$25/month.</span>{' '}
+              Cancel anytime.
+            </p>
+            <div className="max-w-md mx-auto">
+              {childRecordId && childId && childDisplayName ? (
+                <PenpalBoxSponsorCta
+                  firstName={firstName}
+                  childRecordId={childRecordId}
+                  childId={childId}
+                  childDisplayName={childDisplayName}
+                  variant="holder"
+                />
+              ) : (
+                <Link
+                  href="/shirts"
+                  className="inline-block bg-[#D4A843] text-[#0d0d0d] font-bold uppercase tracking-wider py-4 px-8 hover:bg-[#c49a3a] transition-colors"
+                >
+                  Sponsor {firstName} &mdash; $25/month
+                </Link>
+              )}
+            </div>
+          </div>
+        ) : (
+          <>
         {/* Frosted preview — a fake sample thread. Reads like the
             real surface would look. */}
         <div
@@ -347,6 +403,8 @@ export function PenpalBox({
             </p>
           </div>
         </div>
+          </>
+        )}
       </div>
     </div>
   );

@@ -74,6 +74,16 @@ export function SendNoteComposer({
   const [mode, setMode] = useState<Mode>('type');
   const [letterImageUrl, setLetterImageUrl] = useState<string | null>(null);
   const [uploadingLetter, setUploadingLetter] = useState(false);
+  // 2026-07-10: for shirt-holders using their included letter, once
+  // they've queued the letter successfully we set this to true and
+  // suppress the "Write your penpal" re-entry button. Otherwise Close
+  // resets stage=idle and the button reappears, but a click would
+  // 403 from the server ("You've already sent the letter that came
+  // with your shirt"). Ugly UX. This flag caches the "cycle spent"
+  // state locally for the rest of this session so the next attempt
+  // is routed to the upgrade card instead. holderCycleAvailable
+  // from the server is stale after the POST.
+  const [cycleSpentThisSession, setCycleSpentThisSession] = useState(false);
 
   async function handlePhotoPick(file: File) {
     if (attachments.length >= MAX_ATTACHMENTS) {
@@ -224,6 +234,14 @@ export function SendNoteComposer({
         return;
       }
       setStage('queued');
+      // Holder-first-letter path: mark the cycle spent locally so
+      // Close on the success card doesn't drop them back into a
+      // composer that will 403. Server truth (kid_messages row now
+      // exists) confirms this on next page load; this is the intra-
+      // page-session cache.
+      if (firstLetterIncluded) {
+        setCycleSpentThisSession(true);
+      }
     } catch {
       setError('Network hiccup. Try again in a moment.');
       setStage('composing');
@@ -236,6 +254,7 @@ export function SendNoteComposer({
     childIdLegacy,
     sponsorName,
     attachments,
+    firstLetterIncluded,
   ]);
 
   const charCount = body.trim().length;
@@ -291,15 +310,22 @@ export function SendNoteComposer({
           </button>
         </div>
       ) : stage === 'idle' ? (
-        <div className="text-center">
-          <button
-            type="button"
-            onClick={() => setStage('composing')}
-            className="inline-block bg-[#D4A843] hover:bg-[#c49a3a] text-[#0d0d0d] px-6 py-3 text-xs font-bold uppercase tracking-wider transition-colors"
-          >
-            Write your penpal
-          </button>
-        </div>
+        // Holder who just used their included cycle in this session:
+        // suppress the re-open path. Reloading the page will replace
+        // this whole composer with the upgrade card from PenpalBox
+        // (server sees the new kid_messages row → holder_used). Until
+        // then we render nothing so a curious click can't hit a 403.
+        cycleSpentThisSession ? null : (
+          <div className="text-center">
+            <button
+              type="button"
+              onClick={() => setStage('composing')}
+              className="inline-block bg-[#D4A843] hover:bg-[#c49a3a] text-[#0d0d0d] px-6 py-3 text-xs font-bold uppercase tracking-wider transition-colors"
+            >
+              Write your penpal
+            </button>
+          </div>
+        )
       ) : (
         <div className="bg-white border border-[#e8e0d4] p-5 md:p-6">
 
