@@ -35,7 +35,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-import { and, eq, inArray, or, sql } from 'drizzle-orm';
+import { and, eq, inArray, ne, or, sql } from 'drizzle-orm';
 import { db } from '@/lib/db/client';
 import { kidMessages, sponsorships, children } from '@/lib/db/schema';
 import { sendKevinNoteAlert, sendSimonNoteAlert } from '@/lib/email';
@@ -236,14 +236,21 @@ export async function POST(request: NextRequest) {
 
   // Writing notes: monthly sponsors write freely; shirt-holders get
   // ONE free letter ("included with the shirt" per the physical letter
-  // template we ship). After that first note reaches 'delivered',
-  // the cycle stamps included_letter_sent_at on their sponsorship row
-  // and subsequent writes 403 until they subscribe monthly.
+  // template we ship). After that first note is on record (pending,
+  // translated, or delivered — anything but declined), the cycle is
+  // spent and subsequent writes 403 until they subscribe monthly.
   //
-  // The 2026-07-06 "monthly required" rule is superseded by this
-  // 2026-07-10 revision (see docs/claude/voice.md penpal section and
-  // src/lib/penpal-cycle.ts). Non-holder non-monthly viewers still
-  // get 403 — they haven't paid for anything yet.
+  // Non-holder non-monthly viewers get 403 — they haven't paid for
+  // anything yet. Anon viewers were already rejected at the 401 check
+  // above.
+  //
+  // The gate reads the kid_messages table directly as the source of
+  // truth — not the sponsorships.included_letter_sent_at column. That
+  // column is an audit trail (stamped on delivery) but is NOT the gate.
+  // Why: stamping on delivery leaves a race window between "holder
+  // POSTs letter A" and "Simon marks A delivered" during which a fast
+  // second POST could slip past. Kevin's rule: no extra free letters.
+  // See src/lib/penpal-cycle.ts for the full write-up.
   const relatedSponsorships = await db
     .select({
       id: sponsorships.id,
@@ -256,8 +263,6 @@ export async function POST(request: NextRequest) {
       // color the Kevin alert email so add-on notes aren't described
       // as coming from the shirt-holder.
       childRevealedAt: sponsorships.childRevealedAt,
-      // 2026-07-10 cycle gate — see src/lib/penpal-cycle.ts.
-      includedLetterSentAt: sponsorships.includedLetterSentAt,
     })
     .from(sponsorships)
     .where(
@@ -293,7 +298,25 @@ export async function POST(request: NextRequest) {
         { status: 403 }
       );
     }
-    if (holderRow.includedLetterSentAt) {
+    // Holder — check the message log for a spent cycle. Any non-declined
+    // sponsor_to_kid message from this email for this kid counts. The
+    // partial unique index kid_messages_active_per_sponsor_kid_idx +
+    // this pre-check together mean a race can't produce two free
+    // letters: the concurrent-POST path is caught by the 23505 branch
+    // in the insert catch below, and the sequential path is caught here.
+    const prior = await db
+      .select({ id: kidMessages.id })
+      .from(kidMessages)
+      .where(
+        and(
+          sql`lower(${kidMessages.sponsorEmail}) = ${email}`,
+          eq(kidMessages.childId, childRow.id),
+          eq(kidMessages.direction, 'sponsor_to_kid'),
+          ne(kidMessages.status, 'declined')
+        )
+      )
+      .limit(1);
+    if (prior.length > 0) {
       return NextResponse.json(
         {
           error: `You've already sent the letter that came with your shirt. Sponsor ${childRow.firstName ?? 'this kid'} at $25/month to keep writing to them.`,

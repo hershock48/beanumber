@@ -5,32 +5,65 @@
  *   "One letter out. One letter back. Included with the shirt.
  *    $25/month keeps you writing."
  *
- * This module holds the two moving parts:
+ * Source of truth
+ * ───────────────
+ * The gate reads the kid_messages table directly, not a stamped
+ * column on sponsorships. A holder is "available" to write iff they
+ * have ZERO non-declined sponsor_to_kid messages for this kid.
  *
- *   1. isHolderCycleAvailable(sponsorEmail, childId)
- *      — read-side check used by /children/[N] to decide whether a
- *        holder viewer should see the composer (cycle available) or
- *        the upgrade card (cycle used).
+ * Why not a stamped column
+ * ────────────────────────
+ * The previous design (2026-07-10 morning) stamped
+ * `sponsorships.included_letter_sent_at` on delivery. That created a
+ * race: between the holder posting letter A and Simon marking it
+ * delivered, the column stayed null, and a second POST during that
+ * window would pass the gate. The 'one pending at a time' limiter
+ * caught the fast-double-post case, but the moment A hit 'delivered'
+ * a second POST could still slip in before the stamp write committed.
+ * Kevin's rule: "no extra free letters. work perfectly."
  *
- *   2. stampHolderFirstLetterCycle(sponsorEmail, childId, now)
- *      — write-side stamp fired when a sponsor's note transitions to
- *        'delivered'. Called from both the Simon "Mark delivered" PATCH
- *        and the reply POST's auto-flip. No-op for monthly sponsors
- *        (they're past the gate; nothing to stamp).
+ * The message row itself is the atomic unit. Its insert is either
+ * committed or not — no coordination window between "note exists"
+ * and "cycle consumed."
  *
- * Both are idempotent + safe to call repeatedly.
+ * The `sponsorships.included_letter_sent_at` column is retained as an
+ * audit trail (first delivery time). It is NOT read by the gate and
+ * NOT used to make write decisions. It's fine if it lags or misses.
+ *
+ * Declined notes don't burn the cycle
+ * ───────────────────────────────────
+ * `direction = 'sponsor_to_kid' AND status != 'declined'` is the gate
+ * predicate. If Simon declines a note, its row still exists but no
+ * longer counts, so the holder can try again. This matches the
+ * original design intent: the buyer isn't cheated by a decline.
+ *
+ * Public API
+ * ──────────
+ *   getViewerWriteStatus({sponsorEmail, childRecordId, childIdLegacy})
+ *     — read-side, called from /children/[N] to decide UI branch.
+ *
+ *   stampHolderFirstLetterCycle({sponsorEmail, childRecordId, now})
+ *     — write-side, called on 'delivered' transitions. Fills the
+ *       audit column. Non-fatal, idempotent, does NOT gate.
  */
 
-import { and, eq, or, sql } from 'drizzle-orm';
+import { and, eq, ne, or, sql } from 'drizzle-orm';
 import { db } from '@/lib/db/client';
-import { sponsorships, children } from '@/lib/db/schema';
+import {
+  sponsorships,
+  children,
+  kidMessages,
+} from '@/lib/db/schema';
 
 /**
  * Returns the sponsor's status against this kid, for gating:
  *   - 'monthly' — monthly sponsor of this kid (unlimited writing)
- *   - 'holder_available' — shirt-holder, hasn't used the free letter yet
- *   - 'holder_used' — shirt-holder, already used the free letter
- *   - 'none' — not a monthly sponsor, not a holder
+ *   - 'holder_available' — shirt-holder, has zero non-declined
+ *     sponsor_to_kid messages for this kid.
+ *   - 'holder_used' — shirt-holder, has at least one non-declined
+ *     sponsor_to_kid message for this kid (pending / translated /
+ *     delivered — all count against the free cycle).
+ *   - 'none' — not a monthly sponsor, not a holder.
  *
  * Accepts either the kid's UUID (children.id) OR their legacy id
  * (children.child_id) — the sponsorships table has rows keyed by
@@ -54,7 +87,6 @@ export async function getViewerWriteStatus(args: {
     .select({
       monthlyAmount: sponsorships.monthlyAmount,
       childRevealedAt: sponsorships.childRevealedAt,
-      includedLetterSentAt: sponsorships.includedLetterSentAt,
       status: sponsorships.status,
     })
     .from(sponsorships)
@@ -75,20 +107,33 @@ export async function getViewerWriteStatus(args: {
 
   // Monthly wins — if any row has a positive monthly amount, they're
   // a monthly sponsor and the cycle column is irrelevant.
-  const monthly = rows.find(r => Number(r.monthlyAmount ?? 0) > 0);
-  if (monthly) return 'monthly';
+  if (rows.some(r => Number(r.monthlyAmount ?? 0) > 0)) return 'monthly';
 
   // No monthly row. Check for a holder row (childRevealedAt set).
-  const holder = rows.find(r => !!r.childRevealedAt);
-  if (!holder) return 'none';
+  if (!rows.some(r => !!r.childRevealedAt)) return 'none';
 
-  return holder.includedLetterSentAt ? 'holder_used' : 'holder_available';
+  // Holder — check if they've already used the cycle by looking at
+  // kid_messages directly. Any non-declined sponsor_to_kid message
+  // means the free cycle is spent.
+  const used = await db
+    .select({ id: kidMessages.id })
+    .from(kidMessages)
+    .where(
+      and(
+        sql`lower(${kidMessages.sponsorEmail}) = ${email}`,
+        eq(kidMessages.childId, args.childRecordId),
+        eq(kidMessages.direction, 'sponsor_to_kid'),
+        ne(kidMessages.status, 'declined')
+      )
+    )
+    .limit(1);
+
+  return used.length > 0 ? 'holder_used' : 'holder_available';
 }
 
 /**
- * Idempotent stamp of the holder's included-letter cycle. Called when
- * a sponsor_to_kid note transitions to 'delivered'. Two things to
- * respect:
+ * Audit-trail stamp. Called when a sponsor_to_kid note transitions
+ * to 'delivered'. Two things to respect:
  *
  *   1. If the sponsor is a monthly sponsor of this kid, they're past
  *      the gate — nothing to stamp. Return silently.
@@ -96,9 +141,10 @@ export async function getViewerWriteStatus(args: {
  *      is currently null, stamp with `now`. Use COALESCE so a concurrent
  *      delivery doesn't clobber an earlier stamp.
  *
- * Never throws — non-fatal. If the DB blip stops the stamp, the worst
- * case is the holder writes a second free letter, which is a small
- * business loss (one extra Simon-hour) that's absorbable.
+ * NOTE: This column is audit-only under the current design. The gate
+ * itself reads kid_messages directly (see getViewerWriteStatus above),
+ * so a missed stamp does NOT let a holder write a second free letter.
+ * Non-fatal, safe to call repeatedly.
  */
 export async function stampHolderFirstLetterCycle(args: {
   sponsorEmail: string;
@@ -144,9 +190,7 @@ export async function stampHolderFirstLetterCycle(args: {
     // Monthly sponsor — nothing to stamp.
     if (rows.some(r => Number(r.monthlyAmount ?? 0) > 0)) return;
 
-    // Find holder row. If missing, nothing to stamp (shouldn't happen —
-    // a delivered note implies write access was granted, which requires
-    // either monthly or holder-with-available-cycle).
+    // Find holder row. If missing, nothing to stamp.
     const holderRow = rows.find(r => !!r.childRevealedAt);
     if (!holderRow) return;
 
