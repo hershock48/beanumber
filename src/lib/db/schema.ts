@@ -818,6 +818,17 @@ export const fulfillments = pgTable(
     orderDate: date('order_date'),
     notes: text('notes'),
 
+    // Idempotency guard added 2026-07-10 after salbetski's order
+    // showed up twice in the admin panel from a Stripe webhook retry.
+    // stripe_session_id is the checkout session that produced this
+    // fulfillment; item_index is 0 for single-item flows or 0..N-1
+    // for cart orders. Together they form a partial unique index so
+    // a duplicate webhook can't create a second row for the same
+    // line item. Legacy rows have both NULL and are excluded from
+    // the index. See migration 0016.
+    stripeSessionId: text('stripe_session_id'),
+    itemIndex: integer('item_index'),
+
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .default(sql`now()`),

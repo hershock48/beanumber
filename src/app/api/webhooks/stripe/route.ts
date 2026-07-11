@@ -14,6 +14,7 @@ import {
 } from '@/lib/db/webhook-bridge';
 import { db } from '@/lib/db/client';
 import { fulfillments } from '@/lib/db/schema';
+import { and, eq } from 'drizzle-orm';
 
 // Allow up to 60 seconds for the webhook handler. The default 10s on
 // Hobby plans is too tight — a shirt order does 8+ Airtable API calls,
@@ -189,6 +190,13 @@ function vinylColorForShirt(shirtColor: string): string {
 
 // Creates one Fulfillment record per shirt in Airtable. Non-fatal — if this
 // fails the order still succeeds. Called from all three shirt flows.
+// Idempotency guard for Stripe webhook retries (2026-07-10). When
+// stripeSessionId + itemIndex are both provided, we skip the INSERT
+// if a matching row already exists. The partial unique index at
+// fulfillments_session_item_uniq_idx catches concurrent-retry doubles
+// that slip past this app-layer pre-check. Callers that don't have a
+// session id (backfills, manual inserts) omit both and get the old
+// behavior — the index doesn't apply to NULL rows.
 async function createFulfillmentRecord(opts: {
   // Stockpile model (May 2026 forward): shirts ship from pre-printed stock,
   // so the order # / matched child are no longer known at purchase time.
@@ -210,6 +218,10 @@ async function createFulfillmentRecord(opts: {
   childName?: string | null;       // optional under stockpile model
   orderDate: string;     // ISO date string
   notes?: string;
+  // Idempotency fields — both required for the guard to fire. Legacy
+  // callers (backfill scripts) can omit and get the old behavior.
+  stripeSessionId?: string;
+  itemIndex?: number;
 }): Promise<void> {
   const vinylFront = vinylColorForShirt(opts.shirtColor);
   const vinylBack = vinylColorForShirt(opts.shirtColor);
@@ -224,6 +236,28 @@ async function createFulfillmentRecord(opts: {
   //    skipped the Postgres fulfillments table. Admin "shirts to ship"
   //    card read empty even when real orders were sitting in donations.
   try {
+    // Idempotency pre-check — cheap query to skip a retry before we
+    // hit the partial unique index. The index is still the last line
+    // of defense against concurrent retries; this saves the noisy
+    // 23505 error path in the common case of a sequential retry.
+    if (opts.stripeSessionId && typeof opts.itemIndex === 'number') {
+      const existing = await db
+        .select({ id: fulfillments.id })
+        .from(fulfillments)
+        .where(
+          and(
+            eq(fulfillments.stripeSessionId, opts.stripeSessionId),
+            eq(fulfillments.itemIndex, opts.itemIndex)
+          )
+        )
+        .limit(1);
+      if (existing.length > 0) {
+        console.log(
+          `[WH] Fulfillment already exists for session=${opts.stripeSessionId} item=${opts.itemIndex} — skipping duplicate insert.`
+        );
+        return;
+      }
+    }
     await db.insert(fulfillments).values({
       orderNumber: typeof opts.shirtNumber === 'number' && !Number.isNaN(opts.shirtNumber) ? opts.shirtNumber : null,
       design: opts.design,
@@ -244,10 +278,26 @@ async function createFulfillmentRecord(opts: {
       childName: opts.childName || null,
       orderDate: opts.orderDate,
       notes: opts.notes || null,
+      stripeSessionId: opts.stripeSessionId ?? null,
+      itemIndex: typeof opts.itemIndex === 'number' ? opts.itemIndex : null,
     });
     const numLabel = typeof opts.shirtNumber === 'number' ? `#${opts.shirtNumber}` : '#TBD';
     console.log(`[WH] Fulfillment PG insert: ${numLabel} ${opts.design} / ${opts.shirtColor} / ${opts.shirtSize} / ${opts.buyerEmail}`);
   } catch (err: unknown) {
+    // Concurrent-retry defense: if the pre-check missed a race window
+    // and both retries reached INSERT, the partial unique index fires
+    // 23505 on the second. Treat that as success (the first insert
+    // already landed the row) — the retry was doing nothing anyway.
+    const pgCode =
+      typeof err === 'object' && err !== null && 'code' in err
+        ? String((err as { code: unknown }).code)
+        : '';
+    if (pgCode === '23505') {
+      console.log(
+        `[WH] Fulfillment already existed (unique-index caught retry) for session=${opts.stripeSessionId} item=${opts.itemIndex}.`
+      );
+      return;
+    }
     const message = err instanceof Error ? err.message : String(err);
     console.error('[WH] Fulfillment PG insert FAILED (queue will be missing this order):', message.slice(0, 300));
     // Don't return — Airtable dual-write below still gets a chance.
@@ -2251,7 +2301,8 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
       // Create Fulfillment records FIRST — before the donation upsert.
       // Order # and Child Name stay blank; Kevin fills them in when he
       // reconciles which stockpile shirts went out.
-      for (const a of assignments) {
+      for (let i = 0; i < assignments.length; i++) {
+        const a = assignments[i];
         try {
           await createFulfillmentRecord({
             design: 'Number Tee',
@@ -2262,6 +2313,10 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
             address: address || null,
             orderDate: donationDate,
             notes: a.continueMonthly ? 'Cart item with monthly opt-in — match pending shipment' : 'Cart item — match pending shipment',
+            // Idempotency: session + line-item index. Prevents Stripe
+            // webhook retries from double-inserting the same cart row.
+            stripeSessionId: session.id,
+            itemIndex: i,
           });
         } catch (err: any) {
           console.error('[WH] Cart fulfillment record failed:', String(err?.message || err).slice(0, 200));
@@ -2727,6 +2782,8 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
           address: address || null,
           orderDate: donationDate,
           notes: 'Shirt + Monthly — match pending shipment',
+          stripeSessionId: session.id,
+          itemIndex: 0,
         });
       } catch (err: any) {
         console.error('[WH] Fulfillment record failed (shirt+monthly):', String(err?.message || err).slice(0, 200));
@@ -2885,6 +2942,8 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
           buyerEmail: email,
           address: address || null,
           orderDate: donationDate,
+          stripeSessionId: session.id,
+          itemIndex: 0,
         });
       } catch (err: any) {
         console.error('[WH] Fulfillment record failed (shirt-only):', String(err?.message || err).slice(0, 200));
@@ -3076,6 +3135,8 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
             address: address || null,
             childName: childDisplayName,
             orderDate: donationDate,
+            stripeSessionId: session.id,
+            itemIndex: 0,
             notes: `Portal reorder — sponsor ${sponsorCode} reordering with their existing #${existingShirtNumber}. Press that number on the back of the shirt below the main design (do NOT assign a new number).`,
           });
         } catch (err: any) {
