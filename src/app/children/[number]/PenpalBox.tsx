@@ -125,28 +125,35 @@ export function PenpalBox({
   if (showComposerPath) {
     return (
       <div className="mt-12 md:mt-16">
-        <SectionHeader firstName={firstName} />
-        {thread && thread.length > 0 ? (
+        {/* Framed penpal zone — 2026-07-10. Kevin's ask: the penpal
+            surface should visually stand out as its own zone on the
+            kid page. A quiet cream fill + gold top-border ties it to
+            the brand's letter accent (same border-l gold used on the
+            sample bubble + the letter-arrival card) without shouting. */}
+        <div className="border-t-4 border-[#D4A843] bg-[#FFFAF0] px-5 py-8 md:px-8 md:py-10">
+          <SectionHeader firstName={firstName} />
+          {thread && thread.length > 0 ? (
+            <div className="mt-6">
+              <NotesThread firstName={firstName} thread={thread} />
+            </div>
+          ) : null}
           <div className="mt-6">
-            <NotesThread firstName={firstName} thread={thread} />
+            <SendNoteComposer
+              childRecordId={childRecordId}
+              childIdLegacy={childIdLegacy ?? null}
+              firstName={firstName}
+              firstLetterIncluded={isHolderFirstLetter}
+            />
           </div>
-        ) : null}
-        <div className="mt-6">
-          <SendNoteComposer
-            childRecordId={childRecordId}
-            childIdLegacy={childIdLegacy ?? null}
-            firstName={firstName}
-            firstLetterIncluded={isHolderFirstLetter}
-          />
+          {/* Personal photo updates from the campus land here — kept
+              visually attached to the penpal thread so the sponsor's
+              single Naume "inbox" is one surface, not two.
+              Holder-first-letter users don't get sponsorPortal — that
+              requires monthly. */}
+          {sponsorPortal && viewerState === 'sponsor' ? (
+            <div className="mt-10">{sponsorPortal}</div>
+          ) : null}
         </div>
-        {/* Personal photo updates from the campus land here — kept
-            visually attached to the penpal thread so the sponsor's
-            single Naume "inbox" is one surface, not two.
-            Holder-first-letter users don't get sponsorPortal — that
-            requires monthly. */}
-        {sponsorPortal && viewerState === 'sponsor' ? (
-          <div className="mt-10">{sponsorPortal}</div>
-        ) : null}
       </div>
     );
   }

@@ -27,6 +27,67 @@ import { useState, useCallback } from 'react';
 const MIN_BODY = 10;
 const MAX_BODY = 1000;
 
+/**
+ * Downscale a File (browser Blob) via <canvas> and return the base64
+ * of the resulting JPEG. Keeps aspect ratio, longest edge = maxDim.
+ *
+ * Why this exists: raw phone camera photos are routinely 4-6 MB. When
+ * we base64-encode them into a JSON POST body, the request balloons
+ * past Vercel's 4.5 MB serverless-body limit and the upload dies with
+ * a generic error before it ever reaches the API route. Resizing to
+ * 2400px @ 85% JPEG drops most phone shots to ~600 KB - 1.5 MB, well
+ * under any limit, without a visible quality hit for our use case
+ * (Simon prints these at postcard size; nobody needs 12 MP).
+ *
+ * createImageBitmap handles JPEG/PNG/WebP/GIF/BMP everywhere and HEIC
+ * on iOS Safari. When it fails (HEIC on desktop Chrome, unsupported
+ * format, etc.), the caller catches and surfaces a friendlier error.
+ */
+async function resizeImageFile(
+  file: File,
+  maxDim: number,
+  quality: number
+): Promise<{ base64: string }> {
+  // Some browsers require the Blob path; File extends Blob so this
+  // works either way. Use { imageOrientation: 'from-image' } so
+  // portrait phone photos come out right-side-up.
+  const bitmap = await createImageBitmap(file, {
+    imageOrientation: 'from-image',
+  });
+  const longest = Math.max(bitmap.width, bitmap.height);
+  const scale = longest > maxDim ? maxDim / longest : 1;
+  const targetW = Math.max(1, Math.round(bitmap.width * scale));
+  const targetH = Math.max(1, Math.round(bitmap.height * scale));
+
+  const canvas = document.createElement('canvas');
+  canvas.width = targetW;
+  canvas.height = targetH;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) {
+    throw new Error("This browser doesn't support the canvas resize step.");
+  }
+  ctx.drawImage(bitmap, 0, 0, targetW, targetH);
+  // Free the bitmap immediately — some browsers hold on to a lot of
+  // memory otherwise, especially on iOS.
+  bitmap.close?.();
+
+  const blob: Blob | null = await new Promise(resolve =>
+    canvas.toBlob(resolve, 'image/jpeg', quality)
+  );
+  if (!blob) {
+    throw new Error("Couldn't encode the resized photo.");
+  }
+
+  const dataUrl = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(new Error('Could not read encoded photo.'));
+    reader.readAsDataURL(blob);
+  });
+  const commaIdx = dataUrl.indexOf(',');
+  return { base64: commaIdx >= 0 ? dataUrl.slice(commaIdx + 1) : dataUrl };
+}
+
 type Stage = 'idle' | 'composing' | 'sending' | 'queued' | 'error';
 type Mode = 'type' | 'handwrite';
 
@@ -85,6 +146,99 @@ export function SendNoteComposer({
   // from the server is stale after the POST.
   const [cycleSpentThisSession, setCycleSpentThisSession] = useState(false);
 
+  // Shared upload path for both attachments AND the handwritten letter
+  // scan. Runs the picked file through a canvas-based downscale so the
+  // JSON POST body fits inside Vercel's 4.5 MB serverless-body limit
+  // (raw phone photos routinely blow past that after base64 inflation,
+  // which is what triggered "Upload failed. Try a smaller file"). PDFs
+  // and Word docs skip the resize and go through as-is.
+  //
+  // Returns the publicUrl on success, or throws with a user-friendly
+  // message on failure. HTTP errors from the server that don't parse
+  // as JSON (e.g. Vercel 413 HTML pages) get a specific fallback so
+  // the composer no longer swallows the real reason.
+  async function encodeAndUpload(file: File): Promise<string> {
+    let filename = file.name || 'upload';
+    let contentType = file.type || 'application/octet-stream';
+    let dataBase64: string;
+
+    if (file.type.startsWith('image/')) {
+      // Image path: draw into canvas at max 2400px longest edge, encode
+      // as JPEG @ 85%. A 12 MP iPhone photo drops from ~4-6 MB to
+      // ~600 KB - 1.5 MB post-resize, easily under Vercel's limit
+      // even after base64 inflation. Canvas.toBlob('image/jpeg')
+      // works for JPEG/PNG/WebP/GIF sources. HEIC works on iOS Safari
+      // (native decode) but not on desktop Chrome — we detect that
+      // failure and surface a friendly message.
+      try {
+        const resized = await resizeImageFile(file, 2400, 0.85);
+        dataBase64 = resized.base64;
+        contentType = 'image/jpeg';
+        filename = (file.name || 'photo').replace(/\.[^.]+$/, '') + '.jpg';
+      } catch (err) {
+        // HEIC on non-Safari is the common miss here. Give the sponsor
+        // a concrete next step instead of a generic "try another
+        // format" that they can't act on.
+        if (
+          file.type === 'image/heic' ||
+          file.type === 'image/heif' ||
+          /\.heic?$/i.test(file.name)
+        ) {
+          throw new Error(
+            "This looks like an iPhone HEIC photo, and this browser can't open it. On your iPhone, take a screenshot of the photo and upload that instead."
+          );
+        }
+        throw new Error(
+          err instanceof Error && err.message
+            ? err.message
+            : "Couldn't read that image on this device. Try another photo or a different browser."
+        );
+      }
+    } else {
+      // Non-image (PDF, DOC, DOCX): read as base64, pass content-type
+      // through unchanged. No client-side size limit here — the server
+      // still enforces its own 15 MB decoded cap.
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result));
+        reader.onerror = () => reject(new Error('Could not read file'));
+        reader.readAsDataURL(file);
+      });
+      const commaIdx = dataUrl.indexOf(',');
+      dataBase64 = commaIdx >= 0 ? dataUrl.slice(commaIdx + 1) : dataUrl;
+    }
+
+    const res = await fetch('/api/sponsor/notes/photo', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({ filename, contentType, dataBase64 }),
+    });
+    // Read the body as text first so we can distinguish a JSON error
+    // response (parseable) from an HTML error page (Vercel 413) and
+    // give a useful message either way.
+    const raw = await res.text();
+    let data: { publicUrl?: string; error?: string } = {};
+    try {
+      data = JSON.parse(raw);
+    } catch {
+      // Body wasn't JSON. Fall through with data empty; message below
+      // will use res.status.
+    }
+    if (!res.ok || !data.publicUrl) {
+      if (res.status === 413) {
+        throw new Error(
+          'That file is too big. Try a smaller photo or a screenshot.'
+        );
+      }
+      throw new Error(
+        data.error ||
+          `Upload failed (HTTP ${res.status}). Try again, or attach a smaller file.`
+      );
+    }
+    return String(data.publicUrl);
+  }
+
   async function handlePhotoPick(file: File) {
     if (attachments.length >= MAX_ATTACHMENTS) {
       setError(
@@ -95,36 +249,11 @@ export function SendNoteComposer({
     setError(null);
     setUploadingPhoto(true);
     try {
-      const dataUrl = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(String(reader.result));
-        reader.onerror = () => reject(new Error('Could not read file'));
-        reader.readAsDataURL(file);
-      });
-      const commaIdx = dataUrl.indexOf(',');
-      const dataBase64 = commaIdx >= 0 ? dataUrl.slice(commaIdx + 1) : dataUrl;
-
-      const res = await fetch('/api/sponsor/notes/photo', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'same-origin',
-        body: JSON.stringify({
-          filename: file.name || 'photo.jpg',
-          contentType: file.type || 'image/jpeg',
-          dataBase64,
-        }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.publicUrl) {
-        setError(
-          data.error || 'Photo upload failed. Try a smaller file or another format.'
-        );
-        return;
-      }
-      setAttachments(prev => [...prev, String(data.publicUrl)]);
+      const publicUrl = await encodeAndUpload(file);
+      setAttachments(prev => [...prev, publicUrl]);
     } catch (e) {
       setError(
-        e instanceof Error ? e.message : 'Could not read that image.'
+        e instanceof Error ? e.message : 'Photo upload failed.'
       );
     } finally {
       setUploadingPhoto(false);
@@ -146,36 +275,11 @@ export function SendNoteComposer({
     setError(null);
     setUploadingLetter(true);
     try {
-      const dataUrl = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(String(reader.result));
-        reader.onerror = () => reject(new Error('Could not read file'));
-        reader.readAsDataURL(file);
-      });
-      const commaIdx = dataUrl.indexOf(',');
-      const dataBase64 = commaIdx >= 0 ? dataUrl.slice(commaIdx + 1) : dataUrl;
-
-      const res = await fetch('/api/sponsor/notes/photo', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'same-origin',
-        body: JSON.stringify({
-          filename: file.name || 'letter.jpg',
-          contentType: file.type || 'image/jpeg',
-          dataBase64,
-        }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.publicUrl) {
-        setError(
-          data.error || 'Upload failed. Try a smaller file or another format.'
-        );
-        return;
-      }
-      setLetterImageUrl(String(data.publicUrl));
+      const publicUrl = await encodeAndUpload(file);
+      setLetterImageUrl(publicUrl);
     } catch (e) {
       setError(
-        e instanceof Error ? e.message : 'Could not read that file.'
+        e instanceof Error ? e.message : 'Upload failed.'
       );
     } finally {
       setUploadingLetter(false);

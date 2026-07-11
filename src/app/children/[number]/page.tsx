@@ -2152,26 +2152,6 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
                   </div>
                 )} */}
 
-        {/* ── Reorder another shirt with #N ───────────────────────
-            2026-07-10 mechanic (Kevin): a sponsor OR unconverted
-            shirt-holder can order another shirt with the SAME
-            Number pressed on it. Different color, an extra, a spare
-            — same kid, same Number, NOT a new sponsorship and NOT a
-            new child pairing. Component enforces its own copy on
-            both sides (buyer + Kevin at the press) so nobody gets
-            confused. Departed kids skip: the relationship has a
-            different frame there. */}
-        {!child.departed_at &&
-          (child.viewer_is_sponsor || child.viewer_is_holder) &&
-          child.sponsor_code && (
-            <ReorderShirtCard
-              firstName={firstName}
-              shirtNumber={Number(number)}
-              sponsorCode={child.sponsor_code}
-              returnTo={`/children/${number}`}
-            />
-          )}
-
         {/* ── Public campus newsfeed ───────────────────────────────
             Visible to anyone — sponsor or not. The ask block above
             (right-column CTA: 'Stay with X' for non-sponsors,
@@ -2201,6 +2181,28 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
             currentFirstName={firstName}
           />
         )}
+
+        {/* ── Reorder another shirt with #N ───────────────────────
+            2026-07-10 mechanic (Kevin): a sponsor OR unconverted
+            shirt-holder can order another shirt with the SAME
+            Number pressed on it. Different color, an extra, a spare
+            — same kid, same Number, NOT a new sponsorship and NOT a
+            new child pairing. Positioned AFTER OtherKidsAtCampus per
+            Kevin's 2026-07-10 request — the "meet someone else"
+            block is the campus-wide beat; the reorder card is
+            personal-relationship-specific and reads better below.
+            Departed kids skip: the relationship has a different
+            frame there. */}
+        {!child.departed_at &&
+          (child.viewer_is_sponsor || child.viewer_is_holder) &&
+          child.sponsor_code && (
+            <ReorderShirtCard
+              firstName={firstName}
+              shirtNumber={Number(number)}
+              sponsorCode={child.sponsor_code}
+              returnTo={`/children/${number}`}
+            />
+          )}
 
         {/* ── Kids you've met ──
             Client-side localStorage history. Renders nothing until
