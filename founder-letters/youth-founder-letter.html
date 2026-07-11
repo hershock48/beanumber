@@ -45,6 +45,12 @@
     margin-top: 0.55in;
     line-height: 1.35;
   }
+  /* Kill the default paragraph gap so "Founder, Be A Number" sits
+     directly under "Mr. Kevin" — same treatment as the adult letter's
+     signature block. */
+  .signature-block p {
+    margin-bottom: 0;
+  }
   .signature-block .name {
     font-weight: 700;
   }
@@ -74,7 +80,8 @@
   <p class="signoff">Ever,</p>
 
   <div class="signature-block">
-    <p class="name">Kevin</p>
+    <p class="name">Mr. Kevin</p>
+    <p>Founder, Be A Number</p>
   </div>
 
 </div>
