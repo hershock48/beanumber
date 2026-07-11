@@ -48,28 +48,38 @@ async function resizeImageFile(
   maxDim: number,
   quality: number
 ): Promise<{ base64: string }> {
-  // Some browsers require the Blob path; File extends Blob so this
-  // works either way. Use { imageOrientation: 'from-image' } so
-  // portrait phone photos come out right-side-up.
-  const bitmap = await createImageBitmap(file, {
-    imageOrientation: 'from-image',
-  });
-  const longest = Math.max(bitmap.width, bitmap.height);
+  // Two decode paths — try the modern one first, fall back on older
+  // browsers. Both end at the same canvas.toBlob JPEG encode.
+  //
+  //   1. createImageBitmap: fast, handles EXIF orientation via
+  //      { imageOrientation: 'from-image' } (iOS 15+ / Safari 15+ /
+  //      recent Chrome + Firefox). Preferred.
+  //   2. HTMLImageElement via URL.createObjectURL: universal — works
+  //      on every browser + every image format the browser can render
+  //      (HEIC on iOS Safari included). No EXIF auto-rotate, but
+  //      modern iPhone photos have baked-in orientation for camera
+  //      captures so the visible result is upright in the common
+  //      case. Fallback path only.
+  //
+  // Both throw with a friendly message on failure so the composer's
+  // catch surfaces something the sponsor can act on.
+  const decoded = await decodeImage(file);
+
+  const longest = Math.max(decoded.width, decoded.height);
   const scale = longest > maxDim ? maxDim / longest : 1;
-  const targetW = Math.max(1, Math.round(bitmap.width * scale));
-  const targetH = Math.max(1, Math.round(bitmap.height * scale));
+  const targetW = Math.max(1, Math.round(decoded.width * scale));
+  const targetH = Math.max(1, Math.round(decoded.height * scale));
 
   const canvas = document.createElement('canvas');
   canvas.width = targetW;
   canvas.height = targetH;
   const ctx = canvas.getContext('2d');
   if (!ctx) {
+    decoded.cleanup?.();
     throw new Error("This browser doesn't support the canvas resize step.");
   }
-  ctx.drawImage(bitmap, 0, 0, targetW, targetH);
-  // Free the bitmap immediately — some browsers hold on to a lot of
-  // memory otherwise, especially on iOS.
-  bitmap.close?.();
+  ctx.drawImage(decoded.source, 0, 0, targetW, targetH);
+  decoded.cleanup?.();
 
   const blob: Blob | null = await new Promise(resolve =>
     canvas.toBlob(resolve, 'image/jpeg', quality)
@@ -86,6 +96,55 @@ async function resizeImageFile(
   });
   const commaIdx = dataUrl.indexOf(',');
   return { base64: commaIdx >= 0 ? dataUrl.slice(commaIdx + 1) : dataUrl };
+}
+
+// Decode-image helper. Returns something drawable into a canvas plus
+// its intrinsic size and an optional cleanup fn (bitmap.close or
+// URL.revokeObjectURL). Preferred path: createImageBitmap. Fallback:
+// HTMLImageElement via a blob URL for pre-createImageBitmap browsers
+// (older iOS Safari, some in-app WebViews).
+async function decodeImage(file: File): Promise<{
+  source: CanvasImageSource;
+  width: number;
+  height: number;
+  cleanup?: () => void;
+}> {
+  if (typeof createImageBitmap === 'function') {
+    try {
+      const bitmap = await createImageBitmap(file, {
+        imageOrientation: 'from-image',
+      });
+      return {
+        source: bitmap,
+        width: bitmap.width,
+        height: bitmap.height,
+        cleanup: () => bitmap.close(),
+      };
+    } catch {
+      // Fall through to the HTMLImageElement path.
+    }
+  }
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const el = new Image();
+      el.onload = () => resolve(el);
+      el.onerror = () =>
+        reject(
+          new Error("This browser couldn't open that image. Try a JPEG or PNG.")
+        );
+      el.src = url;
+    });
+    return {
+      source: img,
+      width: img.naturalWidth,
+      height: img.naturalHeight,
+      cleanup: () => URL.revokeObjectURL(url),
+    };
+  } catch (err) {
+    URL.revokeObjectURL(url);
+    throw err;
+  }
 }
 
 type Stage = 'idle' | 'composing' | 'sending' | 'queued' | 'error';

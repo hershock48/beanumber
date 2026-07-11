@@ -444,33 +444,10 @@ async function getLatestChildUpdate(
  * doing while the sponsor has been on board — not 1:1 financial
  * earmarking (see funding_model.md).
  */
-function computeSponsorStats(startDate: string | undefined, monthlyAmount = 25): {
-  daysAsSponsor: number;
-  mealsSupported: number;
-  schoolDaysSupported: number;
-  totalContributedUsd: number;
-} {
-  if (!startDate) {
-    return { daysAsSponsor: 0, mealsSupported: 0, schoolDaysSupported: 0, totalContributedUsd: 0 };
-  }
-  const start = new Date(startDate);
-  const now = new Date();
-  const ms = Math.max(0, now.getTime() - start.getTime());
-  const days = Math.floor(ms / (24 * 60 * 60 * 1000));
-  // Two campus meals per child per day (porridge in the morning, hot lunch).
-  const meals = days * 2;
-  // School-week ratio applied to the elapsed days.
-  const schoolDays = Math.round(days * (5 / 7));
-  // Months elapsed, charged monthly at monthlyAmount.
-  const monthsElapsed = Math.max(1, Math.floor(days / 30) + 1);
-  const total = monthsElapsed * monthlyAmount;
-  return {
-    daysAsSponsor: days,
-    mealsSupported: meals,
-    schoolDaysSupported: schoolDays,
-    totalContributedUsd: total,
-  };
-}
+// computeSponsorStats was removed 2026-07-10 alongside the stats
+// strip in SponsorPortalSections. Sponsor days / meals / school-days /
+// total $ are no longer surfaced anywhere in the app; keeping the
+// pure-computation helper around was dead weight.
 
 /**
  * Returns true when this donor already has an Active Sponsorship in
@@ -575,10 +552,7 @@ async function resolvePortalData(child: {
   viewer_is_sponsor?: boolean;
   record_id?: string;
   child_id?: string;
-  sponsorship_start_date?: string | null;
-  monthly_amount?: number | null;
 }): Promise<{
-  stats: ReturnType<typeof computeSponsorStats>;
   latestChildUpdate: Awaited<ReturnType<typeof getLatestChildUpdate>>;
 } | null> {
   if (!child.viewer_is_sponsor || (!child.record_id && !child.child_id)) {
@@ -588,13 +562,7 @@ async function resolvePortalData(child: {
     id: child.record_id ?? '',
     childId: child.child_id ?? '',
   });
-  return {
-    stats: computeSponsorStats(
-      child.sponsorship_start_date ?? undefined,
-      child.monthly_amount ?? 25
-    ),
-    latestChildUpdate,
-  };
+  return { latestChildUpdate };
 }
 
 /**
@@ -2021,7 +1989,6 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
                 child.viewer_is_sponsor && portalData ? (
                   <SponsorPortalSections
                     firstName={firstName}
-                    stats={portalData.stats}
                     latestChildUpdate={portalData.latestChildUpdate}
                   />
                 ) : null

@@ -9,9 +9,10 @@
  *
  * The stats strip (days as sponsor / meals / school days / total to
  * campus) was removed 2026-07-10 per Kevin — it read as clutter and
- * competed with the real content (the kid's actual update). The
- * `stats` prop is retained on the interface for backward compat with
- * page.tsx wiring; the values are simply not rendered.
+ * competed with the real content (the kid's actual update). The prop,
+ * the computeSponsorStats helper in page.tsx, and the values on the
+ * child object were all cleaned up in the same pass — no dead work
+ * runs on the render path anymore.
  *
  * The campus newsletter used to render here too. It now lives in
  * the public CampusNewsfeed component below this section — visible
@@ -26,12 +27,6 @@
 
 interface PortalSectionsProps {
   firstName: string;
-  stats: {
-    daysAsSponsor: number;
-    mealsSupported: number;
-    schoolDaysSupported: number;
-    totalContributedUsd: number;
-  };
   latestChildUpdate: {
     title: string;
     content: string;
@@ -42,12 +37,8 @@ interface PortalSectionsProps {
 
 export function SponsorPortalSections({
   firstName,
-  stats,
   latestChildUpdate,
 }: PortalSectionsProps) {
-  // stats prop is unused (see docblock) — reference it to keep the
-  // interface stable without producing a TS unused-variable warning.
-  void stats;
   return (
     <div className="mt-10 md:mt-14 space-y-6 md:space-y-8">
       {/* ── Latest update for this specific kid ─────────────────── */}
