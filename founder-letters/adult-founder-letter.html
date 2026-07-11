@@ -4,48 +4,47 @@
 <meta charset="UTF-8">
 <title>Be A Number — Founder Letter (Adult version)</title>
 <style>
-  /* Letter-sized page, no browser margins — the padding on .letter
-     is the printed margin. Matches the format Kevin has been shipping
-     inside the shirt bags. */
-  @page { size: 8.5in 11in; margin: 0; }
+  /* 100×150mm shirt-bag insert size (2026-07-11). Same paper stock
+     Kevin's other inserts print on so the founder letter lands as a
+     matched piece inside the bag. All spacing / typography is tuned
+     to fill this page without cramping. */
+  @page { size: 100mm 150mm; margin: 0; }
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
   html, body {
     background: white;
     color: #0d0d0d;
     font-family: Georgia, 'Times New Roman', serif;
-    font-size: 12pt;
-    line-height: 1.55;
+    font-size: 8.4pt;
+    line-height: 1.42;
   }
 
   .letter {
-    width: 8.5in;
-    min-height: 11in;
-    padding: 0.85in 0.9in;
+    width: 100mm;
+    min-height: 150mm;
+    padding: 6mm 7mm 5mm;
     background: white;
   }
 
-  /* Small globe icon centered at the top — matches the printed
-     original Kevin's using. Africa-facing Earth in a thin circle. */
+  /* Africa-facing globe. Scaled down for the smaller page but still
+     the eye-catching mark at the top. */
   .brand-mark {
     display: block;
-    width: 0.75in;
-    height: 0.75in;
-    /* Reduced bottom margin so the bigger mark can sit closer to
-       "Howdy!" without pushing the body copy too far down the page. */
-    margin: 0 auto 0.25in;
+    width: 14mm;
+    height: 14mm;
+    margin: 0 auto 2.5mm;
   }
 
   p {
-    margin-bottom: 0.18in;
+    margin-bottom: 2mm;
   }
 
   .signoff {
-    margin-top: 0.28in;
+    margin-top: 3mm;
   }
   .signature-block {
-    margin-top: 0.55in;
-    line-height: 1.35;
+    margin-top: 5mm;
+    line-height: 1.28;
   }
   /* Kill the default paragraph gap between "Kevin Hershock" and
      "Founder, Be A Number" so the title sits directly under the
