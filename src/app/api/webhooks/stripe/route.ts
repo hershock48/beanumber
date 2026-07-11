@@ -2177,7 +2177,34 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
     }
 
     const email = session.customer_email || session.customer_details?.email || '';
-    const name = session.customer_details?.name || session.metadata?.donor_name || 'Anonymous';
+    // Name resolution — three-way fallback (2026-07-10 middle-path fix).
+    // 1. The name the buyer typed on our own cart form
+    //    (metadata.customer_name from create-cart-checkout, or
+    //     metadata.customer_name from portal-purchase — same key).
+    // 2. Stripe's cardholder name (customer_details.name) collected
+    //    at Stripe's hosted checkout page. This is the authoritative
+    //    name on the payment method.
+    // 3. Legacy metadata.donor_name (never actually written by the
+    //    current cart, kept for old Donorbox migrations).
+    // 4. 'Anonymous' fallback so downstream inserts never crash on
+    //    NULL, but this now really means "we couldn't get a name
+    //    from ANY source" — a rare case worth flagging in logs.
+    //
+    // Old order was Stripe-first, which meant buyers who typed a
+    // name on our form but had a blank cardholder name on Stripe
+    // still got recorded as whatever Stripe returned (often empty
+    // → 'Anonymous'). The site form is the buyer's actual choice
+    // and should win when present.
+    const siteFormName =
+      (session.metadata?.customer_name || '').trim() ||
+      (session.metadata?.donor_name || '').trim();
+    const stripeCardholderName = (session.customer_details?.name || '').trim();
+    const name = siteFormName || stripeCardholderName || 'Anonymous';
+    if (name === 'Anonymous') {
+      console.log(
+        `[WH] No name resolved from any source for session ${session.id}; recorded as Anonymous.`
+      );
+    }
     const organization = session.custom_fields?.find(f => f.key === 'organization')?.text?.value || '';
     const referralRaw = session.custom_fields?.find(f => f.key === 'referral')?.text?.value || '';
     const phone = session.customer_details?.phone || '';

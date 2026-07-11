@@ -27,6 +27,12 @@ export function CartDrawer() {
   // when they didn&rsquo;t arrive via the /shirts?code=X magic URL.
   const [codeInputOpen, setCodeInputOpen] = useState(false);
   const [codeInputValue, setCodeInputValue] = useState('');
+  // Optional buyer name — 2026-07-10 middle-path fix. Blank goes
+  // through as "Anonymous" per Kevin's call, so we don't kill any
+  // conversion. When they DO type something, the webhook prefers
+  // this over the Stripe cardholder name so the confirmation email
+  // (and Kevin's admin panel) shows the name they actually chose.
+  const [buyerName, setBuyerName] = useState('');
 
   async function handleCheckout() {
     if (items.length === 0) return;
@@ -44,6 +50,7 @@ export function CartDrawer() {
             size: i.size,
             continueMonthly: i.continueMonthly,
           })),
+          ...(buyerName.trim() ? { name: buyerName.trim() } : {}),
           ...(refCode ? { ref_code: refCode } : {}),
           // Send the raw promo code to the server even when the
           // current cart shape rejects it — the API re-validates
@@ -294,6 +301,24 @@ export function CartDrawer() {
                 </button>
               </form>
             )}
+
+            {/* Optional buyer name (2026-07-10). Soft-required — the
+                placeholder invites but blank still checks out. Prevents
+                buyers from silently becoming "Anonymous" in Kevin's
+                admin panel just because they didn't bother filling
+                Stripe's cardholder field. Not required for shipping,
+                which Stripe collects separately. */}
+            <div className="flex flex-col gap-1">
+              <input
+                type="text"
+                value={buyerName}
+                onChange={e => setBuyerName(e.target.value)}
+                placeholder="What should we call you? (optional)"
+                autoComplete="name"
+                maxLength={80}
+                className="border border-[#e8e0d4] bg-white px-3 py-2 text-sm text-[#0d0d0d] focus:outline-none focus:border-[#D4A843]"
+              />
+            </div>
 
             {error && (
               <p className="text-sm text-red-600">{error}</p>

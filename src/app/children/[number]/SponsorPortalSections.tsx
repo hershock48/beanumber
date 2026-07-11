@@ -5,9 +5,13 @@
  * kid — no separate /sponsor destination required.
  *
  * Sections (each conditional on its source data being present):
- *   - Stats strip: days as sponsor, meals supported, school days,
- *     dollars to campus. Computed from sponsorship start date.
  *   - Latest update from this specific child (Child Updates table).
+ *
+ * The stats strip (days as sponsor / meals / school days / total to
+ * campus) was removed 2026-07-10 per Kevin — it read as clutter and
+ * competed with the real content (the kid's actual update). The
+ * `stats` prop is retained on the interface for backward compat with
+ * page.tsx wiring; the values are simply not rendered.
  *
  * The campus newsletter used to render here too. It now lives in
  * the public CampusNewsfeed component below this section — visible
@@ -41,16 +45,11 @@ export function SponsorPortalSections({
   stats,
   latestChildUpdate,
 }: PortalSectionsProps) {
+  // stats prop is unused (see docblock) — reference it to keep the
+  // interface stable without producing a TS unused-variable warning.
+  void stats;
   return (
     <div className="mt-10 md:mt-14 space-y-6 md:space-y-8">
-      {/* ── Stats strip ─────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-3">
-        <StatCard label="days as sponsor" value={stats.daysAsSponsor.toString()} />
-        <StatCard label="meals supported" value={stats.mealsSupported.toLocaleString()} />
-        <StatCard label="school days" value={stats.schoolDaysSupported.toString()} />
-        <StatCard label="total to campus" value={`$${stats.totalContributedUsd}`} />
-      </div>
-
       {/* ── Latest update for this specific kid ─────────────────── */}
       {latestChildUpdate && (
         <div className="bg-white border border-[#e8e0d4] p-5 md:p-7">
@@ -99,22 +98,6 @@ export function SponsorPortalSections({
         </div>
       )}
 
-    </div>
-  );
-}
-
-function StatCard({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="bg-white border border-[#e8e0d4] px-3 py-3 md:py-4 text-center">
-      <p
-        className="text-2xl md:text-[28px] text-[#D4A843] leading-none"
-        style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 700 }}
-      >
-        {value}
-      </p>
-      <p className="text-[10px] md:text-[11px] uppercase tracking-[0.12em] text-[#888] mt-1.5">
-        {label}
-      </p>
     </div>
   );
 }
