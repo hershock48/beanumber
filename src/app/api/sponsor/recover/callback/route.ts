@@ -65,14 +65,23 @@ export async function GET(request: NextRequest) {
     console.warn('[Recovery] advanceDripOnClaim threw:', err);
   });
 
-  // Land on the homepage with the Number-input prefilled and
-  // highlighted ("Welcome back, enter your Number"). The Number
-  // lookup is the consistent ritual that gates every user's entry
-  // to the rest of the site — even after sign-in. The home page
-  // reads ?welcome=1 to render the welcome treatment, and ?n=N
-  // to prefill the input. When the user submits the form from
-  // that state, the homepage forwards just_signed_in=1 to the
-  // kid page so the ClaimGate's "first sign-in" branch still
-  // fires correctly.
+  // If the token carries a real shirt number, land on the homepage
+  // with the Number-input prefilled and highlighted ("Welcome back,
+  // enter your Number"). The Number lookup is the consistent ritual
+  // that gates every user's entry to the rest of the site — even
+  // after sign-in. The home page reads ?welcome=1 to render the
+  // welcome treatment, and ?n=N to prefill the input. When the user
+  // submits the form from that state, the homepage forwards
+  // just_signed_in=1 to the kid page so the ClaimGate's "first
+  // sign-in" branch still fires correctly.
+  //
+  // shirtNumber === 0 is the "no landing kid yet" sentinel — used
+  // for backfilled Holder rows whose stockpile shirt hasn't been
+  // reconciled to a specific kid number. Send those users to /me
+  // so they land in a valid signed-in state (their kid card will
+  // appear there once Kevin assigns a number to their fulfillment).
+  if (!shirtNumber || shirtNumber <= 0) {
+    return NextResponse.redirect(`${SITE_URL}/me?welcome=1`);
+  }
   return NextResponse.redirect(`${SITE_URL}/?welcome=1&n=${shirtNumber}`);
 }

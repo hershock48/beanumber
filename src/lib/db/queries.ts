@@ -350,8 +350,13 @@ export async function isChildClaimedByOtherEmail(
  * Email-only sign-in fallback. Returns the most recent Active or
  * Holder sponsorship for this email, hydrated with the linked
  * kid&rsquo;s shirt number and first name so the recovery route can
- * mint a magic link without a second round-trip. Returns null if no
- * matching sponsorship resolves to a kid with a shirt number.
+ * mint a magic link without a second round-trip.
+ *
+ * Returns null only when the email has NO Active/Holder sponsorship
+ * at all. A shirt-holder whose sponsorship is not yet linked to a kid
+ * (order queued but no number assigned) still returns a result — the
+ * shirtNumber is null and firstName is null in that case, and the
+ * caller lands them on /me instead of a kid page.
  *
  * Mirrors the dual-source kid join used by getViewerSponsorships
  * (UUID FK first, legacy ChildID text second) so transition-state
@@ -390,6 +395,9 @@ export async function getMostRecentSponsorshipForEmail(viewerEmail: string) {
     )
     .limit(10);
 
+  // First pass: prefer any row that resolves to a kid with a shirt
+  // number. That's the ideal magic-link target (drops the user onto
+  // /children/[N] and prefills the Number ritual).
   for (const row of rows) {
     const shirtNumber = row.childShirtNumber;
     if (typeof shirtNumber !== 'number' || shirtNumber <= 0) continue;
@@ -401,6 +409,23 @@ export async function getMostRecentSponsorshipForEmail(viewerEmail: string) {
       sponsorCode: row.sponsorCode,
       shirtNumber,
       firstName,
+    };
+  }
+
+  // Fallback: the email has a sponsorship but the linked kid has no
+  // shirt number yet (or no kid is linked at all). Common for pre-
+  // cutover shirt buyers backfilled as Holders — Kevin has their
+  // fulfillment on the stockpile but hasn't stamped a number on their
+  // shirt yet. Return the most recent sponsor code with shirtNumber
+  // null. The callback route lands them on /me so they can wait for
+  // their number to arrive, and future sign-ins from the same email
+  // will upgrade to the shirt-page path once the number is assigned.
+  const first = rows[0];
+  if (first) {
+    return {
+      sponsorCode: first.sponsorCode,
+      shirtNumber: null as number | null,
+      firstName: null as string | null,
     };
   }
   return null;
@@ -1381,6 +1406,70 @@ export async function getCampusFeedSotm(args: {
     childFirstName: r.childFirstName,
     childShirtNumber: r.childShirtNumber,
     childPhotoUrl: r.childPhotoUrl,
+  }));
+}
+
+/**
+ * Every fulfillment row for a buyer email, joined to the kid whose
+ * shirt number matches. Used by the sign-in self-heal path and the
+ * one-off orphan backfill script to materialize Holder sponsorships
+ * from a fulfillment when no sponsorship row exists yet.
+ *
+ * The kid join is nullable: pre-shipping fulfillments have no
+ * `order_number` (Kevin hasn't reconciled a number from the stockpile
+ * yet), so the child columns come back null. That's fine — the caller
+ * still creates a childless Holder sponsorship so the buyer can sign
+ * in and land on /me while they wait for the shirt.
+ */
+export interface FulfillmentWithChildRow {
+  fulfillmentId: string;
+  orderNumber: number | null;
+  orderDate: Date | null;
+  createdAt: Date;
+  buyerName: string | null;
+  childId: string | null;
+  childIdLegacy: string | null;
+  childDisplayName: string | null;
+  childFirstName: string | null;
+  childLastInitial: string | null;
+  childShirtNumber: number | null;
+}
+
+export async function getFulfillmentsWithChildForBuyerEmail(
+  buyerEmail: string
+): Promise<FulfillmentWithChildRow[]> {
+  if (!buyerEmail) return [];
+  const emailLower = buyerEmail.toLowerCase();
+  const rows = await db
+    .select({
+      fulfillmentId: fulfillments.id,
+      orderNumber: fulfillments.orderNumber,
+      orderDate: fulfillments.orderDate,
+      createdAt: fulfillments.createdAt,
+      buyerName: fulfillments.buyerName,
+      childId: children.id,
+      childIdLegacy: children.childId,
+      childDisplayName: children.displayName,
+      childFirstName: children.firstName,
+      childLastInitial: children.lastInitial,
+      childShirtNumber: children.shirtNumber,
+    })
+    .from(fulfillments)
+    .leftJoin(children, eq(children.shirtNumber, fulfillments.orderNumber))
+    .where(sql`lower(${fulfillments.buyerEmail}) = ${emailLower}`)
+    .orderBy(desc(fulfillments.orderDate), desc(fulfillments.createdAt));
+  return rows.map(r => ({
+    fulfillmentId: r.fulfillmentId,
+    orderNumber: r.orderNumber,
+    orderDate: r.orderDate ? new Date(r.orderDate) : null,
+    createdAt: r.createdAt,
+    buyerName: r.buyerName,
+    childId: r.childId,
+    childIdLegacy: r.childIdLegacy,
+    childDisplayName: r.childDisplayName,
+    childFirstName: r.childFirstName,
+    childLastInitial: r.childLastInitial,
+    childShirtNumber: r.childShirtNumber,
   }));
 }
 

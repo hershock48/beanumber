@@ -16,7 +16,7 @@
  *     `audit()` helper so we have a paper trail from day one.
  */
 
-import { and, eq, sql } from 'drizzle-orm';
+import { and, desc, eq, sql } from 'drizzle-orm';
 import { db } from './client';
 import {
   auditLog,
@@ -26,6 +26,7 @@ import {
   donations,
   donationChildren,
   donors,
+  fulfillments,
   sponsorships,
   subscriptions,
 } from './schema';
@@ -443,7 +444,11 @@ export interface CreateSponsorshipInput {
   sponsorCode: string;
   sponsorEmail: string;
   sponsorName?: string | null;
-  childId: string;
+  // Nullable: an orphaned buyer whose shirt has not been reconciled
+  // from the stockpile yet has no kid linked. The email-only sign-in
+  // path materializes a childless Holder in that case so the buyer
+  // can still sign in and land on /me.
+  childId: string | null;
   childIdLegacy?: string | null;
   childDisplayName?: string | null;
   monthlyAmount: number;
@@ -480,6 +485,228 @@ export async function createSponsorship(input: CreateSponsorshipInput) {
     after: inserted[0] as Record<string, unknown>,
   });
   return inserted[0];
+}
+
+/**
+ * Ensure a Holder sponsorship row exists for every fulfillment on the
+ * given buyer email. Idempotent by design: skips any fulfillment whose
+ * child (or, when the shirt is un-reconciled, whose email) already
+ * has a matching sponsorship row.
+ *
+ * Runs in two contexts:
+ *   1. Sign-in self-heal — the email-only recovery endpoint calls this
+ *      before minting a magic link so a pre-cutover shirt buyer who
+ *      never got a Postgres sponsorship row still gets a working link.
+ *   2. Backfill — scripts/backfill-orphaned-buyers.ts calls this for
+ *      every fulfillment-having email with no sponsorship at all,
+ *      unblocking the cohort in one pass.
+ *
+ * Two shapes of Holder row can result:
+ *   - Fulfillment has an order_number that maps to a children row →
+ *     Holder row linked to that kid. Sign-in lands on /children/[N].
+ *   - Fulfillment has no order_number yet (Kevin hasn't reconciled a
+ *     shirt from the stockpile) → childless Holder row. Sign-in lands
+ *     on /me. Kevin will link the kid later at reconciliation time.
+ *
+ * Returns a summary so callers can report what happened.
+ */
+export interface MaterializedHolderRow {
+  sponsorshipId: string;
+  sponsorCode: string;
+  fulfillmentId: string;
+  orderNumber: number | null;
+  childId: string | null;
+  childDisplayName: string | null;
+}
+
+export interface MaterializeHolderSponsorshipsResult {
+  buyerEmail: string;
+  fulfillmentsScanned: number;
+  created: MaterializedHolderRow[];
+  skippedExisting: number;
+  skippedError: number;
+}
+
+// Sponsor-code minter matching the shape used elsewhere (webhook,
+// send-link/route.ts). BAN-YYYY-NNN with a 3-digit tail. Backfill
+// runs are small (< 60 orphans) so the birthday-paradox risk within
+// a single execution is negligible.
+function generateHolderSponsorCode(): string {
+  const year = new Date().getFullYear();
+  const tail = Math.floor(Math.random() * 900) + 100;
+  return `BAN-${year}-${tail}`;
+}
+
+export async function materializeHolderSponsorshipsForBuyer(
+  buyerEmailRaw: string,
+  opts: { actorType?: AuditActorType } = {}
+): Promise<MaterializeHolderSponsorshipsResult> {
+  const buyerEmail = (buyerEmailRaw || '').trim().toLowerCase();
+  const result: MaterializeHolderSponsorshipsResult = {
+    buyerEmail,
+    fulfillmentsScanned: 0,
+    created: [],
+    skippedExisting: 0,
+    skippedError: 0,
+  };
+  if (!buyerEmail) return result;
+
+  // Pull every fulfillment for the email, joined to any kid whose
+  // shirt_number matches order_number. The join is nullable — a
+  // fulfillment queued in the stockpile with no assigned shirt number
+  // yet comes back with childId=null; we still materialize a
+  // childless Holder for it so sign-in works before shipping.
+  const rows = await db
+    .select({
+      fulfillmentId: fulfillments.id,
+      orderNumber: fulfillments.orderNumber,
+      orderDate: fulfillments.orderDate,
+      buyerName: fulfillments.buyerName,
+      childId: children.id,
+      childIdLegacy: children.childId,
+      childDisplayName: children.displayName,
+      childFirstName: children.firstName,
+    })
+    .from(fulfillments)
+    .leftJoin(children, eq(children.shirtNumber, fulfillments.orderNumber))
+    .where(sql`lower(${fulfillments.buyerEmail}) = ${buyerEmail}`)
+    .orderBy(desc(fulfillments.orderDate), desc(fulfillments.createdAt));
+
+  result.fulfillmentsScanned = rows.length;
+
+  // Load every existing sponsorship for this email once so per-row
+  // idempotency checks are in-memory (fast + no chatty queries).
+  const existing = await db
+    .select({
+      id: sponsorships.id,
+      childId: sponsorships.childId,
+      sponsorCode: sponsorships.sponsorCode,
+    })
+    .from(sponsorships)
+    .where(sql`lower(${sponsorships.sponsorEmail}) = ${buyerEmail}`);
+
+  const existingChildIds = new Set(
+    existing.map(e => e.childId).filter((v): v is string => !!v)
+  );
+  // Whether the email has ANY childless holder row already. We only
+  // want one placeholder row per orphan buyer, even if they bought
+  // multiple un-numbered shirts — the placeholder just gates sign-in
+  // until Kevin reconciles their shirts and stamps numbers.
+  let hasChildlessHolder = existing.some(e => !e.childId);
+
+  const today = new Date().toISOString().slice(0, 10);
+
+  for (const f of rows) {
+    if (f.childId) {
+      // Fulfillment resolves to a real kid. If a sponsorship for this
+      // buyer email + child already exists, leave it alone.
+      if (existingChildIds.has(f.childId)) {
+        result.skippedExisting += 1;
+        continue;
+      }
+      try {
+        const inserted = await createSponsorship({
+          sponsorCode: generateHolderSponsorCode(),
+          sponsorEmail: buyerEmail,
+          sponsorName: f.buyerName ?? null,
+          childId: f.childId,
+          childIdLegacy: f.childIdLegacy ?? null,
+          childDisplayName:
+            f.childDisplayName ||
+            (f.childFirstName ? f.childFirstName : null) ||
+            null,
+          monthlyAmount: 0,
+          status: 'Holder',
+          sponsorshipStartDate: f.orderDate
+            ? new Date(f.orderDate).toISOString().slice(0, 10)
+            : today,
+        });
+        // Match the auth_status semantics that the legacy Airtable
+        // sponsorships used, so verify-code-style paths still recognize
+        // the row. Non-fatal on failure.
+        try {
+          await db
+            .update(sponsorships)
+            .set({ authStatus: 'Active', updatedAt: new Date() })
+            .where(eq(sponsorships.id, inserted.id));
+        } catch {
+          /* non-fatal */
+        }
+        existingChildIds.add(f.childId);
+        result.created.push({
+          sponsorshipId: inserted.id,
+          sponsorCode: inserted.sponsorCode,
+          fulfillmentId: f.fulfillmentId,
+          orderNumber: f.orderNumber ?? null,
+          childId: f.childId,
+          childDisplayName:
+            f.childDisplayName || f.childFirstName || null,
+        });
+      } catch (err) {
+        console.error(
+          '[materializeHolders] failed to create sponsorship for',
+          buyerEmail,
+          'order #' + f.orderNumber,
+          err
+        );
+        result.skippedError += 1;
+      }
+    } else {
+      // No kid yet (order_number unset or points at a shirt number
+      // with no matching kid row). One childless placeholder Holder
+      // is enough per email — subsequent fulfillments will fold into
+      // it when Kevin reconciles their number.
+      if (hasChildlessHolder) {
+        result.skippedExisting += 1;
+        continue;
+      }
+      try {
+        const inserted = await createSponsorship({
+          sponsorCode: generateHolderSponsorCode(),
+          sponsorEmail: buyerEmail,
+          sponsorName: f.buyerName ?? null,
+          childId: null,
+          childIdLegacy: null,
+          childDisplayName: null,
+          monthlyAmount: 0,
+          status: 'Holder',
+          sponsorshipStartDate: f.orderDate
+            ? new Date(f.orderDate).toISOString().slice(0, 10)
+            : today,
+        });
+        try {
+          await db
+            .update(sponsorships)
+            .set({ authStatus: 'Active', updatedAt: new Date() })
+            .where(eq(sponsorships.id, inserted.id));
+        } catch {
+          /* non-fatal */
+        }
+        hasChildlessHolder = true;
+        result.created.push({
+          sponsorshipId: inserted.id,
+          sponsorCode: inserted.sponsorCode,
+          fulfillmentId: f.fulfillmentId,
+          orderNumber: null,
+          childId: null,
+          childDisplayName: null,
+        });
+      } catch (err) {
+        console.error(
+          '[materializeHolders] failed to create childless holder for',
+          buyerEmail,
+          err
+        );
+        result.skippedError += 1;
+      }
+    }
+  }
+  // opts.actorType left in the signature for future hookups (audit
+  // rows already carry actorType='webhook' via createSponsorship's
+  // default). Keeping the arg lets callers thread through 'migration'
+  // for backfills without breaking source stability.
+  void opts.actorType;
+  return result;
 }
 
 export interface UpdateSponsorshipStatusInput {

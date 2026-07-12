@@ -247,6 +247,17 @@ export default async function MePage() {
   ]);
   const campusNowIso = serverCampusNow();
 
+  // Split out childless-holder placeholders from real kid rows.
+  // A childless holder is a sponsorship row with no linked child —
+  // created by the sign-in self-heal / backfill when a shirt buyer
+  // pre-dates the Airtable → Postgres cutover and their fulfillment
+  // isn't yet reconciled to a specific Number. These rows keep the
+  // sponsor signed in and let their kid card appear later when Kevin
+  // stamps a number on their shirt, but they don't belong in the
+  // Your Kids grid: there's no kid to render.
+  const rawKidRows = rawRows.filter(r => !!r.child.recordId);
+  const hasPendingShirt = rawRows.length > rawKidRows.length;
+
   // Dedupe by kid record ID. A user could end up with multiple
   // sponsorship rows for the same kid (Active + Holder, or two
   // Holder rows from a previous bug), and the roster would render
@@ -254,7 +265,7 @@ export default async function MePage() {
   // holder row when both exist for the same kid, since the
   // monthly relationship is the more meaningful one to surface.
   const byKidRecord = new Map<string, SponsorshipRow>();
-  for (const r of rawRows) {
+  for (const r of rawKidRows) {
     const key = r.child.recordId || r.recordId;
     const existing = byKidRecord.get(key);
     if (!existing) {
@@ -466,33 +477,72 @@ export default async function MePage() {
         </header>
 
         {rows.length === 0 ? (
-          <div className="bg-white border border-[#e8e0d4] p-8 md:p-12 text-center">
-            <p
-              className="text-2xl text-[#0d0d0d] mb-3"
-              style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
-            >
-              You&rsquo;re signed in, but you don&rsquo;t own any
-              Numbers yet.
-            </p>
-            <p className="text-[#666] mb-6 max-w-md mx-auto">
-              Get a Shirt. The Number on the back is a real kid at the
-              campus &mdash; you meet them when the shirt arrives.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-3 justify-center">
-              <Link
-                href="/shirts"
-                className="px-6 py-3 bg-[#D4A843] hover:bg-[#c49a3a] text-[#0d0d0d] text-xs font-bold uppercase tracking-wider transition-colors"
+          hasPendingShirt ? (
+            // Signed-in shirt buyer whose fulfillment hasn&rsquo;t been
+            // reconciled to a specific Number yet. The kid card can&rsquo;t
+            // render because there&rsquo;s no kid linked, but the buyer is
+            // holding a real shirt in the queue &mdash; so we tell them
+            // that instead of pretending they haven&rsquo;t bought
+            // anything.
+            <div className="bg-white border border-[#e8e0d4] p-8 md:p-12 text-center">
+              <p className="text-xs font-bold uppercase tracking-[0.3em] text-[#D4A843] mb-3">
+                Your shirt is being prepared
+              </p>
+              <p
+                className="text-2xl text-[#0d0d0d] mb-3"
+                style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
               >
-                Shop the Shirts
-              </Link>
-              <Link
-                href="/campus"
-                className="px-6 py-3 bg-white border border-[#0d0d0d] hover:bg-[#0d0d0d] hover:text-white text-[#0d0d0d] text-xs font-bold uppercase tracking-wider transition-colors"
-              >
-                Meet the campus
-              </Link>
+                You&rsquo;re in. Your Number is on the way.
+              </p>
+              <p className="text-[#666] mb-6 max-w-md mx-auto">
+                We&rsquo;ll email you when your shirt ships with the
+                Number stamped inside. The kid it belongs to will
+                show up here as soon as it does.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                <Link
+                  href="/campus"
+                  className="px-6 py-3 bg-[#D4A843] hover:bg-[#c49a3a] text-[#0d0d0d] text-xs font-bold uppercase tracking-wider transition-colors"
+                >
+                  Meet the campus
+                </Link>
+                <Link
+                  href="/news"
+                  className="px-6 py-3 bg-white border border-[#0d0d0d] hover:bg-[#0d0d0d] hover:text-white text-[#0d0d0d] text-xs font-bold uppercase tracking-wider transition-colors"
+                >
+                  Read the latest letter
+                </Link>
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="bg-white border border-[#e8e0d4] p-8 md:p-12 text-center">
+              <p
+                className="text-2xl text-[#0d0d0d] mb-3"
+                style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
+              >
+                You&rsquo;re signed in, but you don&rsquo;t own any
+                Numbers yet.
+              </p>
+              <p className="text-[#666] mb-6 max-w-md mx-auto">
+                Get a Shirt. The Number on the back is a real kid at the
+                campus &mdash; you meet them when the shirt arrives.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                <Link
+                  href="/shirts"
+                  className="px-6 py-3 bg-[#D4A843] hover:bg-[#c49a3a] text-[#0d0d0d] text-xs font-bold uppercase tracking-wider transition-colors"
+                >
+                  Shop the Shirts
+                </Link>
+                <Link
+                  href="/campus"
+                  className="px-6 py-3 bg-white border border-[#0d0d0d] hover:bg-[#0d0d0d] hover:text-white text-[#0d0d0d] text-xs font-bold uppercase tracking-wider transition-colors"
+                >
+                  Meet the campus
+                </Link>
+              </div>
+            </div>
+          )
         ) : (
           <>
             {/* ── Campus newsletter — moved to top ─────────────────

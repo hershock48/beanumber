@@ -8,7 +8,11 @@
  * redirects them back to /children/[number] in authenticated mode.
  *
  * Format: `<base64url(JSON payload)>.<base64url(HMAC-SHA256(payload))>`
- * Payload: `{ c: sponsorCode, n: shirtNumber, e: expirySeconds }`.
+ * Payload: `{ c: sponsorCode, n: shirtNumber, e: expirySeconds }` —
+ * `n` is 0 when the sponsorship has no linked shirt number yet (e.g.
+ * a backfilled Holder for a pre-cutover buyer whose stockpile shirt
+ * hasn't been reconciled). The callback interprets `n === 0` as
+ * "no landing kid — send them to /me instead of /children/[N]."
  *
  * Signing secret: reuses CRON_SECRET. That secret is already a
  * high-entropy random string Kevin has set in Vercel; sharing it
@@ -33,11 +37,15 @@ function signPayload(b64Payload: string, secret: string): string {
 
 export function makeRecoveryToken(
   sponsorCode: string,
-  shirtNumber: number,
+  shirtNumber: number | null | undefined,
   ttlSeconds: number = DEFAULT_TTL_SECONDS
 ): string {
   const exp = Math.floor(Date.now() / 1000) + ttlSeconds;
-  const payload = JSON.stringify({ c: sponsorCode, n: shirtNumber, e: exp });
+  const n =
+    typeof shirtNumber === 'number' && Number.isFinite(shirtNumber) && shirtNumber > 0
+      ? shirtNumber
+      : 0;
+  const payload = JSON.stringify({ c: sponsorCode, n, e: exp });
   const b64Payload = Buffer.from(payload).toString('base64url');
   const sig = signPayload(b64Payload, getSecret());
   return `${b64Payload}.${sig}`;
@@ -70,6 +78,8 @@ export function verifyRecoveryToken(
     const nowSec = Math.floor(Date.now() / 1000);
     if (typeof payload?.e !== 'number' || payload.e < nowSec) return null;
     if (typeof payload?.c !== 'string' || typeof payload?.n !== 'number') return null;
+    // shirtNumber === 0 is the "no landing kid, redirect to /me"
+    // sentinel — see makeRecoveryToken. Callers must handle it.
     return { sponsorCode: payload.c, shirtNumber: payload.n };
   } catch {
     return null;

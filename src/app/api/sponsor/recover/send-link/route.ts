@@ -43,7 +43,10 @@ import {
   getMostRecentSponsorshipForEmail,
   isChildClaimedByOtherEmail,
 } from '@/lib/db/queries';
-import { createSponsorship } from '@/lib/db/mutations';
+import {
+  createSponsorship,
+  materializeHolderSponsorshipsForBuyer,
+} from '@/lib/db/mutations';
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.beanumber.org';
 
@@ -83,22 +86,59 @@ export async function POST(request: NextRequest) {
     // This is the returning-sponsor-on-a-new-device path — they don't
     // need to remember which number is theirs.
     if (!shirtNumber) {
-      const found = await getMostRecentSponsorshipForEmail(email);
+      let found = await getMostRecentSponsorshipForEmail(email);
+      // SELF-HEAL for pre-cutover buyers (Randi James et al.): if
+      // the email has no sponsorship but DOES have a fulfillment row
+      // in Postgres, the buyer got orphaned by the Airtable → Postgres
+      // webhook cutover and never got a sponsorship written. Create a
+      // Holder row on the fly (linked to the kid whose shirt they got
+      // if the order_number is set; childless placeholder otherwise)
+      // and retry. Subsequent sign-ins hit the fast path directly.
       if (!found) {
-        // No existing sponsorship found, and we have no shirt number
-        // to claim with. Return privacy success.
+        try {
+          const materialized = await materializeHolderSponsorshipsForBuyer(email);
+          if (materialized.created.length > 0) {
+            console.log(
+              `[Recovery] Self-healed ${materialized.created.length} orphaned Holder row(s) for ${email}:`,
+              materialized.created.map(c => c.sponsorCode).join(', ')
+            );
+            found = await getMostRecentSponsorshipForEmail(email);
+          }
+        } catch (err) {
+          console.error(
+            `[Recovery] Self-heal materialization failed for ${email}:`,
+            err
+          );
+        }
+      }
+      if (!found) {
+        // No existing sponsorship AND no fulfillment we could
+        // materialize from. Return privacy success so we don't leak
+        // whether an email is in the system.
         console.log(
-          `[Recovery] No existing sponsorship for ${email} (email-only); nothing to send.`
+          `[Recovery] No sponsorship or fulfillment for ${email} (email-only); nothing to send.`
         );
         return NextResponse.json(responseShape);
       }
       // We have a valid sponsor — build the link directly. Skip the
       // child-lookup + create-Holder paths below since we already have
-      // sponsorCode + shirtNumber.
+      // sponsorCode + shirtNumber (which may be null for a childless
+      // holder; makeRecoveryToken normalizes null → 0 sentinel and
+      // the callback lands them on /me).
       try {
         const token = makeRecoveryToken(found.sponsorCode, found.shirtNumber);
         const callbackUrl = `${SITE_URL}/api/sponsor/recover/callback?t=${encodeURIComponent(token)}`;
         const fromEmail = process.env.SENDGRID_FROM_EMAIL || 'Kevin@beanumber.org';
+        // Body copy varies slightly by whether we can name the kid.
+        // Childless holders (no shirt reconciled yet) land on /me,
+        // so the message can't promise "you'll land on {Kid}'s page."
+        const hasKid =
+          typeof found.shirtNumber === 'number' &&
+          found.shirtNumber > 0 &&
+          found.firstName;
+        const bodyLine = hasKid
+          ? `Tap the button below to sign in. You&rsquo;ll land on ${found.firstName}&rsquo;s page. From there, the &ldquo;Your kids&rdquo; link in the nav has every kid you sponsor or hold.`
+          : `Tap the button below to sign in. Your shirt is being prepared &mdash; once your Number is stamped and shipped, the kid it belongs to will show up on your My Campus page.`;
         const html = `
           <!DOCTYPE html>
           <html>
@@ -108,12 +148,7 @@ export async function POST(request: NextRequest) {
             </head>
             <body style="font-family: Georgia, 'Times New Roman', serif; line-height: 1.7; color: #333; max-width: 560px; margin: 0 auto; padding: 30px 20px;">
               <p style="margin-top: 0;">Hey there,</p>
-              <p>
-                Tap the button below to sign in. You&rsquo;ll land on
-                ${found.firstName}&rsquo;s page. From there, the
-                &ldquo;Your kids&rdquo; link in the nav has every kid
-                you sponsor or hold.
-              </p>
+              <p>${bodyLine}</p>
               <p style="text-align: center; margin: 28px 0;">
                 <a href="${callbackUrl}" style="display: inline-block; background: #D4A843; color: #0d0d0d; font-weight: bold; text-decoration: none; padding: 14px 32px; font-size: 15px; letter-spacing: 0.05em; text-transform: uppercase;">
                   Sign in
