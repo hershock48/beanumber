@@ -15,6 +15,7 @@ import {
 import { db } from '@/lib/db/client';
 import { fulfillments } from '@/lib/db/schema';
 import { and, eq } from 'drizzle-orm';
+import { generateUniqueSponsorCode } from '@/lib/sponsor-codes';
 
 // Allow up to 60 seconds for the webhook handler. The default 10s on
 // Hobby plans is too tight — a shirt order does 8+ Airtable API calls,
@@ -1568,12 +1569,9 @@ function escapeHtml(s: string): string {
     .replace(/'/g, '&#39;');
 }
 
-// Generate a unique sponsor code (e.g. BAN-2026-427)
-function generateSponsorCode(): string {
-  const year = new Date().getFullYear();
-  const randomNum = Math.floor(Math.random() * 900) + 100; // 100-999
-  return `BAN-${year}-${randomNum}`;
-}
+// Sponsor code minting lives in @/lib/sponsor-codes as
+// generateUniqueSponsorCode() — DB-checked so we never mint a code
+// that collides with an existing sponsorships row.
 
 // Fetch a child record to enrich the sponsorship with display data
 async function fetchChildRecord(childRecordId: string): Promise<any | null> {
@@ -1614,7 +1612,7 @@ async function createSponsorshipRecord(data: {
   // the physical moment.
   alreadyRevealed?: boolean;
 }): Promise<{ recordId: string; sponsorCode: string }> {
-  const sponsorCode = generateSponsorCode();
+  const sponsorCode = await generateUniqueSponsorCode();
   const today = new Date().toISOString().split('T')[0];
 
   // POSTGRES FIRST. Source of truth since the June 22 migration. Idempotent
@@ -2414,7 +2412,7 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
         // link. One Sponsorship per cart (even if multiple +monthly
         // items rolled into one sub in subscription mode).
         try {
-          const sponsorCode = generateSponsorCode();
+          const sponsorCode = await generateUniqueSponsorCode();
           const monthlyAmount = SHIRT_PRICE * monthlyOptIns.length;
           await createSponsorshipFromCartCheckout({
             sponsorCode,

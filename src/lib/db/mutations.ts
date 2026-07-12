@@ -18,6 +18,7 @@
 
 import { and, desc, eq, sql } from 'drizzle-orm';
 import { db } from './client';
+import { generateUniqueSponsorCode } from '../sponsor-codes';
 import {
   auditLog,
   children,
@@ -527,16 +528,6 @@ export interface MaterializeHolderSponsorshipsResult {
   skippedError: number;
 }
 
-// Sponsor-code minter matching the shape used elsewhere (webhook,
-// send-link/route.ts). BAN-YYYY-NNN with a 3-digit tail. Backfill
-// runs are small (< 60 orphans) so the birthday-paradox risk within
-// a single execution is negligible.
-function generateHolderSponsorCode(): string {
-  const year = new Date().getFullYear();
-  const tail = Math.floor(Math.random() * 900) + 100;
-  return `BAN-${year}-${tail}`;
-}
-
 export async function materializeHolderSponsorshipsForBuyer(
   buyerEmailRaw: string,
   opts: { actorType?: AuditActorType } = {}
@@ -606,7 +597,7 @@ export async function materializeHolderSponsorshipsForBuyer(
       }
       try {
         const inserted = await createSponsorship({
-          sponsorCode: generateHolderSponsorCode(),
+          sponsorCode: await generateUniqueSponsorCode(),
           sponsorEmail: buyerEmail,
           sponsorName: f.buyerName ?? null,
           childId: f.childId,
@@ -662,7 +653,7 @@ export async function materializeHolderSponsorshipsForBuyer(
       }
       try {
         const inserted = await createSponsorship({
-          sponsorCode: generateHolderSponsorCode(),
+          sponsorCode: await generateUniqueSponsorCode(),
           sponsorEmail: buyerEmail,
           sponsorName: f.buyerName ?? null,
           childId: null,

@@ -47,6 +47,7 @@ import {
   createSponsorship,
   materializeHolderSponsorshipsForBuyer,
 } from '@/lib/db/mutations';
+import { generateUniqueSponsorCode } from '@/lib/sponsor-codes';
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.beanumber.org';
 
@@ -59,14 +60,6 @@ const schema = z.object({
   // number handy on a new device.
   shirtNumber: z.number().int().positive().optional(),
 });
-
-// Generate a unique sponsor code (e.g. BAN-2026-427). Same shape used
-// by the webhook + admin sync paths.
-function generateSponsorCode(): string {
-  const year = new Date().getFullYear();
-  const randomNum = Math.floor(Math.random() * 900) + 100;
-  return `BAN-${year}-${randomNum}`;
-}
 
 export async function POST(request: NextRequest) {
   // Always return this same shape, regardless of which path fires.
@@ -209,7 +202,7 @@ export async function POST(request: NextRequest) {
       }
       try {
         const created = await createSponsorship({
-          sponsorCode: generateSponsorCode(),
+          sponsorCode: await generateUniqueSponsorCode(),
           sponsorEmail: email,
           childId: child.id,
           childIdLegacy: child.childId,

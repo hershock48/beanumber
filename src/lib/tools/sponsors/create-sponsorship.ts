@@ -9,6 +9,7 @@ import { logger } from '../../logger';
 import { ValidationResult, success, failure } from '../../validation';
 import { assignSponsorToChild, getSponsorshipById } from '../../airtable';
 import { VALIDATION, SPONSOR_CODE_PATTERN, SPONSORSHIP_STATUS } from '../../constants';
+import { generateUniqueSponsorCode } from '../../sponsor-codes';
 
 // ============================================================================
 // INPUT/OUTPUT INTERFACES
@@ -83,14 +84,9 @@ function validateInput(input: unknown): ValidationResult<CreateSponsorshipInput>
   });
 }
 
-/**
- * Generate a unique sponsor code
- */
-function generateSponsorCode(): string {
-  const year = new Date().getFullYear();
-  const randomNum = Math.floor(Math.random() * 900) + 100; // 100-999
-  return `BAN-${year}-${randomNum}`;
-}
+// Sponsor code generation lives in @/lib/sponsor-codes as
+// generateUniqueSponsorCode() — DB-checked against Postgres so no
+// two sponsorships share a code.
 
 // ============================================================================
 // MAIN TOOL FUNCTION
@@ -150,7 +146,7 @@ export async function createSponsorshipTool(
     }
 
     // Generate unique sponsor code
-    const sponsorCode = generateSponsorCode();
+    const sponsorCode = await generateUniqueSponsorCode();
 
     // Assign sponsor to child
     const updatedRecord = await assignSponsorToChild(recordId, {

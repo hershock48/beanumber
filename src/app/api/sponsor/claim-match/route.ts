@@ -39,24 +39,13 @@ import {
   getSponsorshipByStripeSubscriptionId,
 } from '@/lib/db/queries';
 import { createSponsorship, linkDonationToChild } from '@/lib/db/mutations';
+import { generateUniqueSponsorCode } from '@/lib/sponsor-codes';
 import { db } from '@/lib/db/client';
 import { sponsorships } from '@/lib/db/schema';
 
 const requestSchema = z.object({
   shirtNumber: z.number().int().positive(),
 });
-
-/**
- * Generate a sponsor code in the BAN-YYYY-NNN format. Uses the same
- * pattern as the webhook's generator. Collision-resistant enough for
- * BAN's volume; a future migration could swap in a counter-backed
- * generator if collisions ever happen in practice.
- */
-function generateSponsorCode(): string {
-  const year = new Date().getFullYear();
-  const num = Math.floor(Math.random() * 900) + 100; // 100-999
-  return `BAN-${year}-${num}`;
-}
 
 /** Compute integer years between an ISO date string and today. */
 function yearsSince(isoDate: string | Date): number {
@@ -266,7 +255,7 @@ export async function POST(request: NextRequest) {
     // 9. Create the Sponsorship record. ChildRevealedAt set to now —
     // the buyer is literally meeting their child right now, no reason
     // to lockbox them.
-    const sponsorCode = generateSponsorCode();
+    const sponsorCode = await generateUniqueSponsorCode();
     const today = new Date().toISOString().split('T')[0];
 
     // Status semantics: monthlyOptIn ⇒ Active (paying), else Holder.

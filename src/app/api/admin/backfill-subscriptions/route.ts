@@ -26,18 +26,13 @@ import {
 } from '@/lib/db/schema';
 import { eq, sql, and, or, isNull } from 'drizzle-orm';
 import { upsertSubscription, createSponsorship } from '@/lib/db/mutations';
+import { generateUniqueSponsorCode } from '@/lib/sponsor-codes';
 
 async function getStripe() {
   const StripeModule = (await import('stripe')).default;
   const secretKey = process.env.STRIPE_SECRET_KEY;
   if (!secretKey) throw new Error('STRIPE_SECRET_KEY not set');
   return new StripeModule(secretKey, { apiVersion: '2025-12-15.clover' });
-}
-
-function generateSponsorCode(): string {
-  const year = new Date().getFullYear();
-  const rand = Math.floor(Math.random() * 900) + 100;
-  return `BAN-${year}-${rand}`;
 }
 
 interface BackfillResult {
@@ -351,7 +346,7 @@ export async function GET(request: NextRequest) {
               .limit(1);
             if (existing.length === 0) {
               await createSponsorship({
-                sponsorCode: generateSponsorCode(),
+                sponsorCode: await generateUniqueSponsorCode(),
                 sponsorEmail: email,
                 sponsorName: donorName,
                 childId: childRecordId,

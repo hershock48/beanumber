@@ -7,6 +7,7 @@ import { getAirtableConfig } from './env';
 import { logger, startTimer } from './logger';
 import { DatabaseError } from './errors';
 import { AIRTABLE_FIELDS, AUTH_STATUS, UPDATE_STATUS, SPONSORSHIP_STATUS, CACHE } from './constants';
+import { generateUniqueSponsorCode } from './sponsor-codes';
 import type {
   AirtableSponsorshipRecord,
   AirtableUpdateRecord,
@@ -740,10 +741,10 @@ export async function createSponsorship(data: {
     childId: data.childId,
   });
 
-  // Generate sponsor code: BAN-YYYY-XXX
-  const year = new Date().getFullYear();
-  const randomNum = Math.floor(Math.random() * 900) + 100; // 100-999
-  const sponsorCode = `BAN-${year}-${randomNum}`;
+  // Sponsor code — DB-checked against Postgres so we don't collide
+  // with any existing sponsorship. Legacy Airtable-only path; keep
+  // shape identical for compatibility with existing records.
+  const sponsorCode = await generateUniqueSponsorCode();
 
   const fields: Record<string, unknown> = {
     [AIRTABLE_FIELDS.SPONSORSHIPS.SPONSOR_CODE]: sponsorCode,

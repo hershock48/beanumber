@@ -33,6 +33,7 @@ import {
   createSponsorship,
   upsertSubscription,
 } from '@/lib/db/mutations';
+import { generateUniqueSponsorCode } from '@/lib/sponsor-codes';
 
 /**
  * Map a Stripe subscription `status` to our local Sponsorship status.
@@ -65,12 +66,6 @@ function mapStatus(stripeStatus: string): 'Active' | 'Cancelled' | null {
     default:
       return null;
   }
-}
-
-function generateSponsorCode(): string {
-  const year = new Date().getFullYear();
-  const rand = Math.floor(Math.random() * 900 + 100);
-  return `BAN-${year}-${rand}`;
 }
 
 interface SyncReport {
@@ -326,7 +321,7 @@ export async function POST(request: NextRequest) {
           hasChild = !!(claimable.childId || resolvedChildId);
         } else {
           await createSponsorship({
-            sponsorCode: generateSponsorCode(),
+            sponsorCode: await generateUniqueSponsorCode(),
             sponsorEmail: customerEmail,
             sponsorName: customerName || customerEmail,
             childId: resolvedChildId || '',
