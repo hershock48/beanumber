@@ -177,7 +177,7 @@ export function SignInModal({
             </p>
             <p className="text-[#d8cfc1] text-sm md:text-base leading-relaxed">
               Open the email and tap the button. You&rsquo;ll be signed in
-              on this device for 30 days. Link expires in 30 minutes.
+              on this device for 30 days. Link is good for 24 hours.
             </p>
             <p className="text-xs text-[#a89e8d] mt-5 leading-relaxed">
               Not showing up? Email{' '}

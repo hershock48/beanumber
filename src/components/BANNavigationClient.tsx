@@ -187,6 +187,11 @@ export function BANNavigationClient({
     { href: '/founder', label: 'Story' },
   ];
 
+  // Signed-out users see Sign in as a visible outlined pill button
+  // — subordinate to Donate but no longer indistinguishable from the
+  // other nav labels. Users kept telling Kevin "I don't see where to
+  // sign in" because it read as small grey text next to a big yellow
+  // Donate button. Fixed 2026-07-12.
   const authButton = signedIn ? (
     <form
       action="/api/sponsor/logout"
@@ -204,10 +209,10 @@ export function BANNavigationClient({
   ) : (
     <Link
       href="/signin"
-      className={`text-xs font-bold uppercase tracking-[0.15em] transition-colors ${
+      className={`px-4 py-2 border border-[#0d0d0d] text-xs font-bold uppercase tracking-[0.15em] transition-colors ${
         currentPath === '/signin'
-          ? 'text-[#D4A843]'
-          : 'text-[#888] hover:text-[#0d0d0d]'
+          ? 'bg-[#0d0d0d] text-white'
+          : 'text-[#0d0d0d] hover:bg-[#0d0d0d] hover:text-white'
       }`}
     >
       Sign in
@@ -229,13 +234,15 @@ export function BANNavigationClient({
       </button>
     </form>
   ) : (
-    <Link
-      href="/signin"
-      onClick={() => setMobileOpen(false)}
-      className="block px-3 py-2.5 text-sm font-bold uppercase tracking-wider text-[#888] hover:text-[#0d0d0d] transition-colors"
-    >
-      Sign in
-    </Link>
+    <div className="px-3 pt-2">
+      <Link
+        href="/signin"
+        onClick={() => setMobileOpen(false)}
+        className="block w-full text-center py-3 border border-[#0d0d0d] text-[#0d0d0d] hover:bg-[#0d0d0d] hover:text-white font-bold uppercase tracking-wider text-sm transition-colors"
+      >
+        Sign in
+      </Link>
+    </div>
   );
 
   return (

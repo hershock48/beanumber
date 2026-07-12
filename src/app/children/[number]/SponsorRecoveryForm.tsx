@@ -115,7 +115,7 @@ export function SponsorRecoveryForm({
         </p>
         <p className="text-[#d8cfc1] text-sm leading-relaxed">
           Click it to open #{shirtNumber}&rsquo;s page already signed in.
-          The link expires in 30 minutes.
+          Link is good for 24 hours.
         </p>
         <p className="text-xs text-[#a89e8d] leading-relaxed mt-3">
           Nothing showing up? Email{' '}

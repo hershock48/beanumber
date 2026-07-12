@@ -21,7 +21,13 @@
  */
 import crypto from 'crypto';
 
-const DEFAULT_TTL_SECONDS = 30 * 60; // 30 minutes
+// 24 hours. The old 30-minute TTL was leftover paranoia — most users
+// don't check email the moment they request a link. "Requested one at
+// dinner, tapped it after the kids were in bed" is a normal pattern
+// and the 30-minute expiry broke it silently. 24 hours is still
+// dramatically shorter than a real password (which never expires) and
+// covers ~99% of the human latency between request and tap.
+const DEFAULT_TTL_SECONDS = 24 * 60 * 60;
 
 function getSecret(): string {
   const secret = process.env.CRON_SECRET;

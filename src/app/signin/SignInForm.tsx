@@ -1,23 +1,35 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 
 /**
- * Sign-in form, hosted as a full page at /signin. Two states:
+ * Sign-in form, hosted as a full page at /signin. Three states:
  *
- *   idle  — the form (email + optional shirt number)
- *   sent  — confirmation: "check your email"
+ *   idle    — the form (email + optional shirt number)
+ *   sending — awaiting the send-link response
+ *   sent    — confirmation: "check your email" + resend affordance
+ *
+ * The 'sent' state carries a Resend button gated by a client-side
+ * cooldown that matches the server's throttle window. The server
+ * silently succeeds during throttle, so the cooldown is really a UX
+ * guardrail — it stops users from mashing the button when the email
+ * is just taking a minute to arrive.
  *
  * Reads ?n= from the URL to pre-fill the shirt number when arriving
  * from a kid page's Claim card.
  */
+const RESEND_COOLDOWN_SECONDS = 25;
+
 export function SignInForm() {
   const params = useSearchParams();
   const [email, setEmail] = useState('');
   const [shirtNumber, setShirtNumber] = useState<string>('');
   const [state, setState] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState('');
+  const [cooldown, setCooldown] = useState(0);
+  const [resends, setResends] = useState(0);
+  const cooldownTimerRef = useRef<number | null>(null);
 
   // Contextual headline. /me bounces here with reason=your-kids when
   // someone taps 'Your kids' in the nav without a session. Other
@@ -34,9 +46,23 @@ export function SignInForm() {
     }
   }, [params]);
 
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!email || state === 'sending') return;
+  // Cooldown timer — ticks down once per second. Runs only while
+  // active so it doesn't leak render cycles on the idle form.
+  useEffect(() => {
+    if (cooldown <= 0) return;
+    cooldownTimerRef.current = window.setTimeout(() => {
+      setCooldown(c => Math.max(0, c - 1));
+    }, 1000);
+    return () => {
+      if (cooldownTimerRef.current !== null) {
+        window.clearTimeout(cooldownTimerRef.current);
+        cooldownTimerRef.current = null;
+      }
+    };
+  }, [cooldown]);
+
+  const send = useCallback(async () => {
+    if (!email) return;
     const trimmed = shirtNumber.trim();
     const n = trimmed ? parseInt(trimmed, 10) : undefined;
     if (trimmed && (!Number.isFinite(n) || (n as number) < 1)) {
@@ -59,9 +85,38 @@ export function SignInForm() {
         return;
       }
       setState('sent');
+      setCooldown(RESEND_COOLDOWN_SECONDS);
     } catch (err: any) {
       setState('error');
       setErrorMessage(err?.message || 'Network error. Try again.');
+    }
+  }, [email, shirtNumber]);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (state === 'sending') return;
+    await send();
+  }
+
+  async function resend() {
+    if (cooldown > 0 || state === 'sending') return;
+    setResends(r => r + 1);
+    setCooldown(RESEND_COOLDOWN_SECONDS);
+    // Keep the 'sent' state — we don't want to hop back to 'sending'
+    // and hide the confirmation text. Fire-and-forget; the server
+    // returns success regardless of throttle.
+    try {
+      const trimmed = shirtNumber.trim();
+      const n = trimmed ? parseInt(trimmed, 10) : undefined;
+      await fetch('/api/sponsor/recover/send-link', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(n ? { email, shirtNumber: n } : { email }),
+      });
+    } catch {
+      // Silent — the cooldown UI is the only thing that needs to
+      // stay honest. If the network is out, resend fails silently
+      // and the user can try again after the cooldown.
     }
   }
 
@@ -75,24 +130,52 @@ export function SignInForm() {
           className="text-3xl md:text-4xl text-[#0d0d0d] mb-3 leading-tight"
           style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
         >
-          Link sent.
+          Link sent to {email}.
         </h1>
-        <p className="text-[#555] text-base leading-relaxed mb-2">
+        <p className="text-[#555] text-base leading-relaxed mb-4">
           Open the email and tap the button. You&rsquo;ll be signed in
-          on this device for 30 days.
+          on this device for 30 days. Link is good for 24 hours.
         </p>
-        <p className="text-sm text-[#888] leading-relaxed mb-5">
-          Link expires in 30 minutes.
-        </p>
-        <p className="text-sm text-[#888] leading-relaxed">
-          Not showing up after a minute? Email{' '}
+
+        {/* Spam-folder hint. Deliverability WILL fail for a fraction
+            of sends no matter what we do; the user needs to know
+            without having to ask. */}
+        <div className="bg-[#FFF8F0] border border-[#e8e0d4] p-4 mb-5">
+          <p className="text-sm text-[#555] leading-relaxed">
+            <span className="font-bold text-[#0d0d0d]">Not seeing it?</span>{' '}
+            Check your spam folder. Sometimes the first email from us
+            lands there — mark it as safe and future links won&rsquo;t.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={resend}
+          disabled={cooldown > 0}
+          className="w-full px-5 py-3 border-2 border-[#0d0d0d] hover:bg-[#0d0d0d] hover:text-white text-[#0d0d0d] font-bold text-sm uppercase tracking-wider transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-[#0d0d0d]"
+        >
+          {cooldown > 0
+            ? `Resend in ${cooldown}s`
+            : resends > 0
+            ? 'Send another'
+            : 'Resend'}
+        </button>
+
+        {resends > 0 && (
+          <p className="text-xs text-[#888] mt-3 text-center leading-relaxed">
+            Sent again. If the first one shows up too, either link works.
+          </p>
+        )}
+
+        <p className="text-xs text-[#888] mt-5 leading-relaxed text-center">
+          Still stuck? Email{' '}
           <a
             href="mailto:Kevin@beanumber.org"
             className="text-[#D4A843] hover:underline font-bold"
           >
             Kevin@beanumber.org
-          </a>
-          .
+          </a>{' '}
+          and I&rsquo;ll sort it out personally.
         </p>
       </div>
     );
@@ -101,9 +184,9 @@ export function SignInForm() {
   // Headline + body adapt to context. /me bounces here for unsigned
   // users → make it obvious why they're here. Magic-link callback
   // failures → acknowledge the failure.
-  let headline = 'Sign in to your view.';
+  let headline = 'Sign in.';
   let body =
-    "Enter your email. We'll send a one-tap link. Tap it and you're in.";
+    'Enter your email. We send a one-tap link — no password to remember, no account to create. This is how sign-in works on Be A Number.';
 
   if (reason === 'your-kids') {
     headline = 'Sign in to see your kids.';
@@ -112,7 +195,7 @@ export function SignInForm() {
   } else if (errorParam === 'expired') {
     headline = 'That link expired.';
     body =
-      "Magic links last 30 minutes. Enter your email below and we'll send a fresh one.";
+      "Links are good for 24 hours. Enter your email below and we'll send a fresh one.";
   } else if (errorParam === 'unavailable') {
     headline = 'We couldn’t find that sponsorship.';
     body =
@@ -170,8 +253,8 @@ export function SignInForm() {
             disabled={state === 'sending'}
           />
           <span className="text-xs text-[#888] mt-1.5 block">
-            Skip it if you&rsquo;re a returning sponsor &mdash;
-            we&rsquo;ll find you by email.
+            Only if you just got a shirt and want to claim the Number
+            on the back. Returning sponsors can skip this.
           </span>
         </label>
 

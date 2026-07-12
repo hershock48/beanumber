@@ -61,6 +61,29 @@ const schema = z.object({
   shirtNumber: z.number().int().positive().optional(),
 });
 
+// In-memory throttle: one link per (lowercased email) per 20 seconds.
+// Scoped per lambda instance, which is imperfect on Vercel but good
+// enough for the actual threat (a user hammering the resend button
+// while their inbox catches up). A determined attacker could still
+// spread requests across instances, but the endpoint returns the same
+// {success:true} response either way and the throttle is UX polish,
+// not security. Move to Redis when we can justify the dependency.
+const RESEND_WINDOW_MS = 20 * 1000;
+const recentSends = new Map<string, number>();
+function shouldThrottle(emailLower: string): boolean {
+  const last = recentSends.get(emailLower);
+  const now = Date.now();
+  // Reap old entries opportunistically so the Map doesn't grow forever.
+  if (recentSends.size > 500) {
+    for (const [k, ts] of recentSends) {
+      if (now - ts > RESEND_WINDOW_MS) recentSends.delete(k);
+    }
+  }
+  if (last && now - last < RESEND_WINDOW_MS) return true;
+  recentSends.set(emailLower, now);
+  return false;
+}
+
 export async function POST(request: NextRequest) {
   // Always return this same shape, regardless of which path fires.
   // The page UI shows "Check your email" either way. Privacy first.
@@ -73,6 +96,15 @@ export async function POST(request: NextRequest) {
     }
     const { email } = parsed.data;
     const shirtNumber = parsed.data.shirtNumber;
+
+    // Throttle before any DB work. Silent success on throttle so the
+    // client-side UX still shows "check your email" — the previous
+    // send should be arriving. Client also has a cooldown timer on
+    // the resend button; this is belt-and-suspenders.
+    if (shouldThrottle(email.toLowerCase())) {
+      console.log(`[Recovery] Throttled resend for ${email}`);
+      return NextResponse.json(responseShape);
+    }
 
     // EMAIL-ONLY SIGN-IN: no shirt number supplied. Look up the
     // email's most recent active Sponsorship and mint a link for it.
@@ -150,7 +182,7 @@ export async function POST(request: NextRequest) {
               <p style="color: #888; font-size: 13px;">
                 This device will remember you for 30 days &mdash; no
                 need to use this link again unless you change devices
-                or clear cookies. Link expires in 30 minutes.
+                or clear cookies. Link is good for 24 hours.
               </p>
               <hr style="border: none; border-top: 1px solid #e8e0d4; margin: 24px 0;">
               <p style="font-size: 12px; color: #999; line-height: 1.5;">
@@ -297,7 +329,7 @@ export async function POST(request: NextRequest) {
             </a>
           </p>
           <p style="color: #888; font-size: 13px;">
-            This link expires in 30 minutes. If you didn&rsquo;t request it, you can ignore this email.
+            This link is good for 24 hours. If you didn&rsquo;t request it, you can ignore this email.
           </p>
           <hr style="border: none; border-top: 1px solid #e8e0d4; margin: 24px 0;">
           <p style="font-size: 12px; color: #999; line-height: 1.5;">
