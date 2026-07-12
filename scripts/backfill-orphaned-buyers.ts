@@ -168,9 +168,14 @@ async function main() {
   }
 }
 
+let exitCode = 0;
 main()
   .catch(err => {
     console.error(err);
-    process.exit(1);
+    exitCode = 1;
   })
-  .finally(() => process.exit(0));
+  // Explicit process.exit is required because the pg client keeps the
+  // connection pool open — otherwise the Node event loop would hang
+  // after main() resolves. Route the code through a mutable so the
+  // catch handler's failure state actually propagates.
+  .finally(() => process.exit(exitCode));
