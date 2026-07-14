@@ -54,15 +54,22 @@
     display: flex; align-items: center; justify-content: space-between;
     gap: 24px;
   }
-  .lockup { display: flex; align-items: center; gap: 16px; }
-  .lockup img.gcs-logo { height: 42px; width: auto; }
-  .lockup img.ban-logo { height: 38px; width: auto; }
+  .lockup { display: flex; align-items: center; gap: 22px; }
+  .lockup img.gcs-logo { height: 60px; width: auto; }
+  .lockup img.ban-logo { height: 56px; width: auto; }
   .lockup .divider {
-    color: var(--ink-4);
-    font-size: 18px;
+    color: var(--gcs-gold);
+    font-size: 24px;
     font-weight: 300;
     line-height: 1;
     user-select: none;
+    opacity: 0.9;
+  }
+  @media (max-width: 780px) {
+    .lockup { gap: 14px; }
+    .lockup img.gcs-logo { height: 44px; }
+    .lockup img.ban-logo { height: 40px; }
+    .lockup .divider { font-size: 18px; }
   }
   .nav-cta {
     display: flex; align-items: center; gap: 20px;
@@ -976,24 +983,6 @@
         </div>
       </div>
 
-    </div>
-  </div>
-</section>
-
-<!-- ─── PRECEDENT ───────────────────────────────────────────────── -->
-<section class="precedent">
-  <div class="container">
-    <div class="precedent-block">
-      <div class="pre-kicker">This has been done before</div>
-      <p>
-        Legacy Christian Academy up in Minnesota has been doing
-        something like this since 2007. They started with 100
-        kids at a Uganda campus and now they&rsquo;re at 300.
-        World Vision runs a version of it in schools across 40
-        states through their Ignite program. Christian school
-        plus East African campus is a real, working model.
-      </p>
-      <span class="attribution">Gramercy would be the first Be A Number partner school anywhere.</span>
     </div>
   </div>
 </section>
