@@ -225,14 +225,15 @@ export async function mirrorSponsorship(args: MirrorSponsorshipArgs) {
   const statusForRow = args.monthlyAmount > 0 ? 'Active' : 'Holder';
 
   if (!childPgId) {
-    // Sponsorships.childId is nullable, but the schema would benefit
-    // from at least a legacy id for debugging. Insert with NULL UUID,
-    // legacy text preserved.
+    // Sponsorships.childId is nullable at both the schema layer and
+    // (as of 2026-07-12) the TypeScript CreateSponsorshipInput type,
+    // so `null` passes cleanly. The legacy text id preserves intent
+    // for debugging even when we can't resolve the UUID.
     return await createSponsorship({
       sponsorCode: args.sponsorCode,
       sponsorEmail: args.sponsorEmail,
       sponsorName: args.sponsorName ?? null,
-      childId: null as unknown as string, // schema allows NULL on this FK
+      childId: null,
       childIdLegacy: args.childLegacyId ?? null,
       childDisplayName: args.childDisplayName ?? null,
       monthlyAmount: args.monthlyAmount,
