@@ -1,0 +1,1116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- Draft mockup, not public. Prevents search engines from indexing while
+     Kara and the Gramercy team are reviewing. Remove this meta tag when
+     the program is ready for public discovery. -->
+<meta name="robots" content="noindex, nofollow">
+<title>Gramercy × Be A Number: Every Warrior. A pen pal in Uganda.</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lora:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  /* ─── tokens ─────────────────────────────────────────────────── */
+  :root {
+    --gcs-green: #2a4835;
+    --gcs-green-dark: #1f3527;
+    --gcs-green-mist: #eaf1ec;
+    --gcs-gold: #fdc625;
+    --ban-gold: #D4A843;
+    --ink: #0d0d0d;
+    --ink-2: #333;
+    --ink-3: #555;
+    --ink-4: #888;
+    --cream: #FFF8F0;
+    --white: #ffffff;
+    --hairline: #e8e0d4;
+    --hairline-green: #c8d4cc;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    color: var(--ink-2);
+    line-height: 1.6;
+    background: var(--white);
+    -webkit-font-smoothing: antialiased;
+  }
+  .serif { font-family: 'Lora', Georgia, serif; }
+  .container { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
+  .container-narrow { max-width: 820px; margin: 0 auto; padding: 0 24px; }
+
+  /* ─── nav ────────────────────────────────────────────────────── */
+  .nav {
+    background: var(--white);
+    border-bottom: 1px solid var(--hairline);
+    padding: 18px 0;
+    position: sticky; top: 0; z-index: 50;
+  }
+  .nav-inner {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 24px;
+  }
+  .lockup { display: flex; align-items: center; gap: 16px; }
+  .lockup img.gcs-logo { height: 42px; width: auto; }
+  .lockup img.ban-logo { height: 38px; width: auto; }
+  .lockup .divider {
+    color: var(--ink-4);
+    font-size: 18px;
+    font-weight: 300;
+    line-height: 1;
+    user-select: none;
+  }
+  .nav-cta {
+    display: flex; align-items: center; gap: 20px;
+  }
+  .nav-link {
+    color: var(--ink-3); text-decoration: none;
+    font-size: 13px; font-weight: 600;
+  }
+  .nav-link:hover { color: var(--gcs-green); }
+  .nav-btn {
+    background: var(--gcs-green); color: var(--white);
+    text-decoration: none;
+    padding: 10px 18px;
+    font-size: 12px; font-weight: 700;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    transition: background 0.15s;
+  }
+  .nav-btn:hover { background: var(--gcs-green-dark); }
+
+  /* ─── hero ───────────────────────────────────────────────────── */
+  .hero {
+    background: var(--cream);
+    padding: 80px 0 100px;
+    border-bottom: 1px solid var(--hairline);
+    position: relative;
+    overflow: hidden;
+  }
+  .hero-inner { position: relative; z-index: 2; }
+  .hero-kicker {
+    font-size: 11px; font-weight: 700;
+    letter-spacing: 0.32em; text-transform: uppercase;
+    color: var(--gcs-green);
+    margin-bottom: 20px;
+    display: flex; align-items: center; gap: 12px;
+    justify-content: center;
+  }
+  .hero-kicker::before, .hero-kicker::after {
+    content: ''; height: 1px; flex: 0 1 60px;
+    background: var(--gcs-green);
+    opacity: 0.4;
+  }
+  .hero h1 {
+    font-family: 'Lora', Georgia, serif;
+    font-weight: 700;
+    font-size: 72px;
+    line-height: 1.03;
+    letter-spacing: -0.02em;
+    color: var(--ink);
+    margin-bottom: 24px;
+    text-align: center;
+    max-width: 820px;
+    margin-left: auto; margin-right: auto;
+  }
+  .hero h1 .accent { color: var(--gcs-green); }
+  .hero-sub {
+    font-size: 20px;
+    line-height: 1.55;
+    color: var(--ink-3);
+    text-align: center;
+    max-width: 700px;
+    margin: 0 auto 40px;
+  }
+  .hero-ctas {
+    display: flex; gap: 16px; justify-content: center;
+    flex-wrap: wrap;
+  }
+  .btn-primary {
+    background: var(--gcs-gold); color: var(--ink);
+    text-decoration: none;
+    padding: 18px 32px;
+    font-size: 13px; font-weight: 700;
+    letter-spacing: 0.1em; text-transform: uppercase;
+    display: inline-block;
+    transition: transform 0.1s, background 0.15s;
+  }
+  .btn-primary:hover { background: #e8b41f; transform: translateY(-1px); }
+  .btn-secondary {
+    background: var(--white); color: var(--gcs-green);
+    border: 2px solid var(--gcs-green);
+    text-decoration: none;
+    padding: 16px 30px;
+    font-size: 13px; font-weight: 700;
+    letter-spacing: 0.1em; text-transform: uppercase;
+    display: inline-block;
+    transition: background 0.15s, color 0.15s;
+  }
+  .btn-secondary:hover { background: var(--gcs-green); color: var(--white); }
+
+  /* ─── section base ───────────────────────────────────────────── */
+  .section { padding: 96px 0; }
+  .section-tight { padding: 72px 0; }
+  .section-kicker {
+    font-size: 11px; font-weight: 700;
+    letter-spacing: 0.28em; text-transform: uppercase;
+    color: var(--gcs-green);
+    margin-bottom: 12px;
+    text-align: center;
+  }
+  .section h2 {
+    font-family: 'Lora', Georgia, serif;
+    font-weight: 700;
+    font-size: 42px;
+    line-height: 1.1;
+    color: var(--ink);
+    margin-bottom: 20px;
+    text-align: center;
+    max-width: 700px;
+    margin-left: auto; margin-right: auto;
+  }
+  .section-lead {
+    font-size: 18px;
+    line-height: 1.6;
+    color: var(--ink-3);
+    text-align: center;
+    max-width: 660px;
+    margin: 0 auto 56px;
+  }
+
+  /* ─── overview prose block ───────────────────────────────────── */
+  .overview {
+    background: var(--gcs-green-mist);
+    padding: 72px 0;
+    border-top: 1px solid var(--hairline);
+    border-bottom: 1px solid var(--hairline);
+  }
+  .overview p {
+    font-family: 'Lora', Georgia, serif;
+    font-size: 22px;
+    line-height: 1.6;
+    color: var(--ink);
+    text-align: center;
+    font-weight: 500;
+  }
+  .overview p + p { margin-top: 20px; }
+
+  /* ─── three moments ──────────────────────────────────────────── */
+  .moments {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 4px;
+    margin-top: 24px;
+    background: var(--hairline);
+    border: 1px solid var(--hairline);
+  }
+  .moment {
+    background: var(--white);
+    padding: 44px 32px 40px;
+    position: relative;
+  }
+  .moment-tag {
+    font-size: 11px; font-weight: 700;
+    letter-spacing: 0.24em; text-transform: uppercase;
+    color: var(--gcs-gold);
+    margin-bottom: 8px;
+  }
+  .moment h3 {
+    font-family: 'Lora', Georgia, serif;
+    font-weight: 700;
+    font-size: 26px;
+    color: var(--ink);
+    margin-bottom: 14px;
+    line-height: 1.15;
+  }
+  .moment .when {
+    font-size: 12px; font-weight: 600;
+    color: var(--gcs-green);
+    margin-bottom: 16px;
+    letter-spacing: 0.05em;
+  }
+  .moment p {
+    font-size: 15px;
+    line-height: 1.65;
+    color: var(--ink-3);
+  }
+
+  /* ─── curriculum callout ─────────────────────────────────────── */
+  .curriculum {
+    background: var(--ink);
+    color: var(--white);
+    padding: 96px 0;
+  }
+  .curriculum .section-kicker { color: var(--gcs-gold); }
+  .curriculum h2 { color: var(--white); }
+  .curriculum .section-lead { color: #c8d4cc; }
+  .curriculum-grid {
+    display: grid;
+    grid-template-columns: 1.1fr 1fr;
+    gap: 56px;
+    align-items: start;
+    margin-top: 40px;
+  }
+  .curriculum-list {
+    list-style: none;
+    padding: 0;
+  }
+  .curriculum-list li {
+    padding: 16px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    color: #d8dfd9;
+    font-size: 15px;
+    line-height: 1.55;
+  }
+  .curriculum-list li:last-child { border-bottom: none; }
+  .curriculum-list .check {
+    color: var(--gcs-gold);
+    font-weight: 700;
+    font-size: 14px;
+    flex-shrink: 0;
+    margin-top: 3px;
+  }
+  .curriculum-list strong {
+    color: var(--white);
+    font-weight: 600;
+  }
+  .curriculum-frame {
+    background: var(--gcs-green-dark);
+    border: 1px solid rgba(253, 198, 37, 0.2);
+    padding: 32px 32px 28px;
+  }
+  .curriculum-frame .frame-tag {
+    font-size: 11px; font-weight: 700;
+    letter-spacing: 0.24em; text-transform: uppercase;
+    color: var(--gcs-gold);
+    margin-bottom: 12px;
+  }
+  .curriculum-frame h4 {
+    font-family: 'Lora', Georgia, serif;
+    font-weight: 700;
+    font-size: 20px;
+    color: var(--white);
+    margin-bottom: 14px;
+    line-height: 1.25;
+  }
+  .curriculum-frame p {
+    color: #c8d4cc;
+    font-size: 14px;
+    line-height: 1.65;
+  }
+  .curriculum-frame p + p { margin-top: 12px; }
+
+  /* ─── pen pal mechanic (honest) ──────────────────────────────── */
+  .mechanic {
+    background: var(--cream);
+    padding: 96px 0;
+  }
+  .mechanic-cols {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-top: 40px;
+    max-width: 900px;
+    margin-left: auto; margin-right: auto;
+  }
+  .mech-step {
+    text-align: center;
+  }
+  .mech-num {
+    font-family: 'Lora', Georgia, serif;
+    font-weight: 700;
+    font-size: 32px;
+    color: var(--gcs-gold);
+    line-height: 1;
+    margin-bottom: 12px;
+  }
+  .mech-step .label {
+    font-size: 11px; font-weight: 700;
+    letter-spacing: 0.15em; text-transform: uppercase;
+    color: var(--gcs-green);
+    margin-bottom: 8px;
+    display: block;
+  }
+  .mech-step p {
+    font-size: 14px;
+    color: var(--ink-3);
+    line-height: 1.55;
+  }
+  .mech-arrow {
+    display: flex; align-items: center; justify-content: center;
+    color: var(--hairline-green);
+    font-size: 22px;
+    align-self: center;
+  }
+  .mech-note {
+    text-align: center;
+    margin-top: 40px;
+    font-size: 14px;
+    color: var(--ink-4);
+    font-style: italic;
+    max-width: 640px;
+    margin-left: auto; margin-right: auto;
+    line-height: 1.6;
+  }
+
+  /* ─── two paths — family + donor ─────────────────────────────── */
+  .paths {
+    background: var(--gcs-green);
+    color: var(--white);
+    padding: 96px 0;
+  }
+  .paths .section-kicker { color: var(--gcs-gold); }
+  .paths h2 { color: var(--white); }
+  .paths .section-lead { color: #d8e0da; }
+  .path-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 28px;
+    margin-top: 20px;
+  }
+  .path-card {
+    background: var(--gcs-green-dark);
+    border: 1px solid rgba(253, 198, 37, 0.2);
+    padding: 44px 38px 40px;
+    display: flex; flex-direction: column;
+  }
+  .path-tag {
+    font-size: 11px; font-weight: 700;
+    letter-spacing: 0.28em; text-transform: uppercase;
+    color: var(--gcs-gold);
+    margin-bottom: 14px;
+  }
+  .path-card h3 {
+    font-family: 'Lora', Georgia, serif;
+    font-weight: 700;
+    font-size: 28px;
+    line-height: 1.2;
+    margin-bottom: 16px;
+    color: var(--white);
+  }
+  .path-card > p {
+    color: #c8d4cc;
+    font-size: 15px;
+    line-height: 1.65;
+    margin-bottom: 22px;
+  }
+  .tier-list {
+    list-style: none; padding: 0;
+    margin: 0 0 24px;
+    border-top: 1px solid rgba(255,255,255,0.08);
+  }
+  .tier-list li {
+    padding: 14px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+    display: flex; justify-content: space-between; align-items: baseline;
+    gap: 12px;
+    font-size: 14px;
+    color: #d8dfd9;
+    line-height: 1.4;
+  }
+  .tier-list li strong {
+    color: var(--white); font-weight: 600;
+  }
+  .tier-list li .price {
+    font-family: 'Lora', Georgia, serif;
+    font-weight: 700;
+    color: var(--gcs-gold);
+    white-space: nowrap;
+    font-size: 15px;
+  }
+  .tier-list .subrow {
+    display: block;
+    font-size: 12px; color: #a8b8ae;
+    margin-top: 3px; font-weight: 400;
+  }
+  .path-price {
+    font-family: 'Lora', Georgia, serif;
+    font-weight: 700;
+    font-size: 32px;
+    color: var(--white);
+    margin-bottom: 4px;
+  }
+  .path-price small {
+    font-family: 'Inter', sans-serif;
+    font-weight: 400;
+    font-size: 14px;
+    color: #a8b8ae;
+    margin-left: 4px;
+    letter-spacing: 0;
+  }
+  .path-note {
+    font-size: 13px; color: #a8b8ae;
+    margin-bottom: 24px;
+    line-height: 1.6;
+  }
+  .path-cta {
+    background: var(--gcs-gold); color: var(--ink);
+    text-decoration: none;
+    padding: 16px 28px;
+    font-size: 12px; font-weight: 700;
+    letter-spacing: 0.1em; text-transform: uppercase;
+    text-align: center;
+    transition: background 0.15s;
+    display: block;
+    margin-top: auto;
+  }
+  .path-cta:hover { background: #e8b41f; }
+  .path-fine {
+    font-size: 12px; color: #a8b8ae;
+    text-align: center;
+    margin-top: 12px;
+    line-height: 1.5;
+  }
+
+  /* ─── donor context bar (Rotary / foundations) ───────────────── */
+  .donor-context {
+    background: rgba(253, 198, 37, 0.08);
+    border: 1px solid rgba(253, 198, 37, 0.2);
+    padding: 20px 24px;
+    margin-top: 20px;
+    font-size: 13px;
+    color: #d8dfd9;
+    line-height: 1.6;
+  }
+  .donor-context strong { color: var(--gcs-gold); font-weight: 600; }
+
+  /* ─── precedent / social proof ───────────────────────────────── */
+  .precedent {
+    background: var(--white);
+    padding: 72px 0;
+  }
+  .precedent-block {
+    max-width: 780px;
+    margin: 0 auto;
+    padding: 32px 40px;
+    border-left: 4px solid var(--gcs-gold);
+    background: var(--cream);
+  }
+  .precedent-block .pre-kicker {
+    font-size: 11px; font-weight: 700;
+    letter-spacing: 0.24em; text-transform: uppercase;
+    color: var(--gcs-green);
+    margin-bottom: 12px;
+  }
+  .precedent-block p {
+    font-family: 'Lora', Georgia, serif;
+    font-size: 20px;
+    color: var(--ink);
+    line-height: 1.6;
+    font-weight: 500;
+  }
+  .precedent-block .attribution {
+    font-family: 'Inter', sans-serif;
+    font-style: normal;
+    font-size: 12px;
+    color: var(--ink-4);
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    margin-top: 16px;
+    line-height: 1.5;
+    display: block;
+  }
+
+  /* ─── know grow go bridge ────────────────────────────────────── */
+  .bridge {
+    background: var(--white);
+    padding: 96px 0;
+    border-top: 1px solid var(--hairline);
+    border-bottom: 1px solid var(--hairline);
+  }
+  .kgg {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 32px;
+    max-width: 900px;
+    margin: 40px auto 0;
+    text-align: center;
+  }
+  .kgg-word {
+    font-family: 'Lora', Georgia, serif;
+    font-weight: 700;
+    font-size: 56px;
+    color: var(--gcs-green);
+    line-height: 1;
+    letter-spacing: -0.02em;
+    margin-bottom: 12px;
+  }
+  .kgg-desc {
+    font-size: 15px;
+    color: var(--ink-3);
+    line-height: 1.6;
+    max-width: 240px;
+    margin: 0 auto;
+  }
+
+  /* ─── kevin note ─────────────────────────────────────────────── */
+  .kevin-note {
+    background: var(--cream);
+    padding: 72px 0;
+  }
+  .kevin-note-inner {
+    max-width: 640px;
+    margin: 0 auto;
+    text-align: center;
+  }
+  .kevin-note h3 {
+    font-family: 'Lora', Georgia, serif;
+    font-weight: 700;
+    font-size: 26px;
+    color: var(--ink);
+    margin-bottom: 20px;
+    line-height: 1.2;
+  }
+  .kevin-note p {
+    font-size: 16px;
+    color: var(--ink-3);
+    line-height: 1.7;
+    margin-bottom: 16px;
+  }
+  .kevin-note .signature {
+    margin-top: 20px;
+    font-family: 'Lora', Georgia, serif;
+    font-size: 18px;
+    font-style: italic;
+    color: var(--ink);
+  }
+  .kevin-note .signature small {
+    display: block;
+    font-family: 'Inter', sans-serif;
+    font-style: normal;
+    font-size: 12px;
+    color: var(--ink-4);
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    margin-top: 4px;
+  }
+  .draft-mark {
+    background: #fff3cd;
+    color: #7a5a00;
+    padding: 6px 12px;
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-bottom: 20px;
+  }
+
+  /* ─── trust bar ──────────────────────────────────────────────── */
+  .trust {
+    background: var(--ink);
+    color: var(--white);
+    padding: 40px 0;
+  }
+  .trust-inner {
+    display: flex; flex-wrap: wrap;
+    align-items: center; justify-content: space-between;
+    gap: 20px;
+    font-size: 13px;
+  }
+  .trust-inner span { color: #b8b8b8; }
+  .trust-inner strong { color: var(--white); font-weight: 600; }
+
+  /* ─── footer ─────────────────────────────────────────────────── */
+  footer {
+    background: var(--gcs-green-dark);
+    color: #c8d4cc;
+    padding: 56px 0 32px;
+    font-size: 14px;
+  }
+  .footer-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 40px;
+  }
+  footer h4 {
+    color: var(--gcs-gold);
+    font-size: 12px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+  footer p, footer a { color: #a8b8ae; line-height: 1.7; text-decoration: none; }
+  footer a:hover { color: var(--gcs-gold); }
+  .footer-bottom {
+    margin-top: 40px; padding-top: 24px;
+    border-top: 1px solid rgba(255,255,255,0.1);
+    font-size: 12px;
+    color: #7a8a80;
+    text-align: center;
+  }
+
+  /* ─── responsive ─────────────────────────────────────────────── */
+  @media (max-width: 780px) {
+    .hero h1 { font-size: 44px; }
+    .hero-sub { font-size: 17px; }
+    .section h2 { font-size: 30px; }
+    .section { padding: 64px 0; }
+    .overview p { font-size: 18px; }
+    .moments, .path-grid, .kgg, .footer-grid, .curriculum-grid { grid-template-columns: 1fr; }
+    .mechanic-cols { grid-template-columns: 1fr; }
+    .mech-arrow { transform: rotate(90deg); padding: 8px 0; }
+    .kgg-word { font-size: 44px; }
+    .precedent-block { padding: 24px 24px; }
+    .precedent-block p { font-size: 17px; }
+    .nav-link { display: none; }
+    .curriculum-grid { gap: 32px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ─── NAV ─────────────────────────────────────────────────────── -->
+<nav class="nav">
+  <div class="container nav-inner">
+    <div class="lockup">
+      <img src="gcs-logo.svg" alt="Gramercy Christian School" class="gcs-logo">
+      <span class="divider" aria-hidden="true">×</span>
+      <img src="ban-logo.svg" alt="Be A Number" class="ban-logo">
+    </div>
+    <div class="nav-cta">
+      <a href="#program" class="nav-link">The program</a>
+      <a href="#curriculum" class="nav-link">Curriculum</a>
+      <a href="#paths" class="nav-link">Sponsor</a>
+      <a href="#paths" class="nav-btn">Get started</a>
+    </div>
+  </div>
+</nav>
+
+<!-- ─── HERO ────────────────────────────────────────────────────── -->
+<section class="hero">
+  <div class="container hero-inner">
+    <div class="hero-kicker">Gramercy Christian × Be A Number</div>
+    <h1>Every Warrior.<br><span class="accent">A pen pal in Uganda.</span></h1>
+    <p class="hero-sub">
+      Every Gramercy kid gets a shirt with a Number pressed on
+      the back. That Number is a real student at a Christian
+      school we support in Northern Uganda. Your kid meets them,
+      writes to them all year, and their $25 a month keeps them
+      in school.
+    </p>
+    <div class="hero-ctas">
+      <a href="#paths" class="btn-primary">For families ($25/mo)</a>
+      <a href="#paths" class="btn-secondary">For donors + partners</a>
+    </div>
+  </div>
+</section>
+
+<!-- ─── OVERVIEW PROSE ──────────────────────────────────────────── -->
+<section class="overview" id="program">
+  <div class="container-narrow">
+    <p>
+      There&rsquo;s a small Christian school we support in Northern
+      Uganda. Every Be A Number shirt has a Number pressed on the
+      back that belongs to a real student there.
+    </p>
+    <p>
+      Every Warrior at Gramercy gets a shirt. On the first day of
+      school the whole class meets their kids together. From there
+      the Warriors write once a month, the mail bag from Uganda
+      opens once a month at assembly, and the pairing sticks as
+      long as your kid is at Gramercy.
+    </p>
+  </div>
+</section>
+
+<!-- ─── THREE STUDENT MOMENTS ───────────────────────────────────── -->
+<section class="section">
+  <div class="container">
+    <div class="section-kicker">What the school year looks like</div>
+    <h2>One kickoff, then a monthly rhythm.</h2>
+    <p class="section-lead">
+      One big assembly in August when everyone meets their kid.
+      A short writing block once a month after that. A mail bag
+      from Uganda that opens at monthly assembly. That&rsquo;s the
+      whole shape.
+    </p>
+    <div class="moments">
+
+      <div class="moment">
+        <div class="moment-tag">01</div>
+        <div class="when">First week of school &middot; Meeting Day</div>
+        <h3>The whole school meets their kids.</h3>
+        <p>
+          Every Warrior gets their shirt at assembly, flips it,
+          and finds a Number on the back. On the big screen
+          they Hold to Meet, one class at a time, and their
+          pen pal shows up. Photo, name, a couple lines about
+          who this kid is. From that morning on they&rsquo;re paired.
+        </p>
+      </div>
+
+      <div class="moment">
+        <div class="moment-tag">02</div>
+        <div class="when">Once a month &middot; Writing time</div>
+        <h3>The classroom writes.</h3>
+        <p>
+          A short block, maybe 20 minutes, folded into Bible or
+          homeroom. K5 through 2nd draw a picture and dictate a
+          line or two. 3rd through 6th write a paragraph. Upper
+          school writes a real letter with a prayer request. Kara
+          gets the prompt packet from us so no teacher has to
+          invent the lesson.
+        </p>
+      </div>
+
+      <div class="moment">
+        <div class="moment-tag">03</div>
+        <div class="when">Once a month &middot; Letters Day</div>
+        <h3>The mail bag from Uganda opens.</h3>
+        <p>
+          Same monthly assembly. Some letters read aloud, the
+          rest sent home in backpacks. Some months bring more
+          than others (Uganda has holidays and rainy seasons
+          too), but every reply is in the kid&rsquo;s own hand.
+        </p>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ─── CURRICULUM ──────────────────────────────────────────────── -->
+<section class="curriculum" id="curriculum">
+  <div class="container">
+    <div class="section-kicker">For Kara and the teachers</div>
+    <h2>Nobody at Gramercy has to build this from scratch.</h2>
+    <p class="section-lead">
+      We hand the school everything you&rsquo;d need on your end to
+      actually run the program. It maps to the ACSI Great Commission
+      Project framework Gramercy already teaches, so no teacher has
+      to invent a new curriculum. It&rsquo;s the working version of a
+      missions unit that&rsquo;s already in your Bible class.
+    </p>
+
+    <div class="curriculum-grid">
+
+      <ul class="curriculum-list">
+        <li>
+          <span class="check">◆</span>
+          <span><strong>Teacher packet PDF.</strong> Six lessons, grade-differentiated K5&ndash;12. Print or project. Ready for the first day of school.</span>
+        </li>
+        <li>
+          <span class="check">◆</span>
+          <span><strong>Assembly slide decks.</strong> Meeting Day for the first week, plus one for each monthly Letters Day. Chapel-ready. My intro video included.</span>
+        </li>
+        <li>
+          <span class="check">◆</span>
+          <span><strong>Prompt library.</strong> 20+ age-graded writing prompts by month, plus prayer requests and drawing prompts for lower school.</span>
+        </li>
+        <li>
+          <span class="check">◆</span>
+          <span><strong>Prayer cards + hall poster.</strong> Each student takes home a printed card with their pen pal&rsquo;s photo, name, and one prayer request. Big Uganda map for the hallway.</span>
+        </li>
+        <li>
+          <span class="check">◆</span>
+          <span><strong>Monthly campus video.</strong> Two-minute update from the Uganda campus. Something Kara or a teacher can play at chapel or in Bible class.</span>
+        </li>
+        <li>
+          <span class="check">◆</span>
+          <span><strong>Cross-curricular hooks.</strong> Suggested ties into geography (find Uganda), math ($25 &times; 12 &times; 350), Bible (the Great Commission is not abstract now), art (illustrate your letter).</span>
+        </li>
+        <li>
+          <span class="check">◆</span>
+          <span><strong>Optional annual video call.</strong> One live 20-minute call from the Uganda campus to a Gramercy assembly, once per school year. Our team on the ground hosts.</span>
+        </li>
+      </ul>
+
+      <div class="curriculum-frame">
+        <div class="frame-tag">ACSI alignment</div>
+        <h4>Fits the framework Gramercy already teaches.</h4>
+        <p>
+          ACSI&rsquo;s Great Commission Project asks Christian
+          schools to partner long-term with a specific place and
+          a specific group of people. That&rsquo;s what this is.
+          A real campus with real kids that your school stays
+          connected to year after year.
+        </p>
+        <p>
+          It also fits the K&ndash;12 progression ACSI already
+          teaches: little kids pray for a place, middle grades
+          write letters, upper school funds and eventually
+          travels. This program lets Gramercy do all three at
+          once, with the same kids on the other end.
+        </p>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ─── HONEST PEN PAL MECHANIC ─────────────────────────────────── -->
+<section class="mechanic">
+  <div class="container">
+    <div class="section-kicker">How the letters actually get across</div>
+    <h2>I want to be straight about how this works.</h2>
+    <p class="section-lead">
+      Every other sponsorship program promises letters. Most of
+      them never deliver. Here&rsquo;s exactly what happens on
+      our end so nobody at Gramercy is surprised.
+    </p>
+
+    <div class="mechanic-cols">
+      <div class="mech-step">
+        <div class="mech-num">01</div>
+        <span class="label">At Gramercy</span>
+        <p>Your Warrior writes at school. Paper or Chromebook, up to the teacher.</p>
+      </div>
+      <div class="mech-arrow">&rsaquo;</div>
+      <div class="mech-step">
+        <div class="mech-num">02</div>
+        <span class="label">At the campus</span>
+        <p>Our team in Uganda reads the letter to your Warrior&rsquo;s pen pal and helps them write a reply by hand.</p>
+      </div>
+      <div class="mech-arrow">&rsaquo;</div>
+      <div class="mech-step">
+        <div class="mech-num">03</div>
+        <span class="label">Back to Gramercy</span>
+        <p>The handwritten reply comes back with the mail bag. Your Warrior sees the actual letter.</p>
+      </div>
+    </div>
+
+    <p class="mech-note">
+      I&rsquo;m not going to promise every kid gets a reply
+      every single month. Uganda has its own weeks, its own
+      holidays, its own rainy seasons. What I&rsquo;ll promise
+      is that every letter your Warrior sends actually gets
+      read to their pen pal, and every reply that comes back is
+      that kid&rsquo;s own words in their own hand.
+    </p>
+  </div>
+</section>
+
+<!-- ─── TWO PATHS ───────────────────────────────────────────────── -->
+<section class="paths" id="paths">
+  <div class="container">
+    <div class="section-kicker">Two ways to pay for it</div>
+    <h2>Some families will. Others will need a donor.</h2>
+    <p class="section-lead">
+      Some Gramercy families will cover their own kid. That&rsquo;s
+      the classic path. But this only works if every Warrior gets
+      in, and we know not every family can swing $25 a month. So
+      a Rotary chapter, a foundation, or a Warrior Club donor can
+      underwrite a class, a grade, or the whole school. Nobody at
+      Gramercy gets left out.
+    </p>
+    <div class="path-grid">
+
+      <!-- FAMILIES -->
+      <div class="path-card">
+        <div class="path-tag">For families</div>
+        <h3>One shirt, one kid, $25 a month.</h3>
+        <p>
+          Your Warrior gets the shirt with a Number on the back.
+          That Number is a real kid at the Uganda campus. Your
+          Warrior wears the shirt on program days, writes to
+          their kid at school, and the monthly $25 covers school,
+          meals, and medical care over there.
+        </p>
+        <div class="path-price">$25<small>/month per Warrior</small></div>
+        <div class="path-note">
+          Comes with the shirt, your kid&rsquo;s photo and story,
+          the letter thread, and an end-of-year report card. All
+          in your own portal on beanumber.org. Cancel anytime.
+        </div>
+        <a href="mailto:kevin@beanumber.org?subject=Gramercy%20family%20interest" class="path-cta">Start with a shirt</a>
+        <p class="path-fine">
+          If $25 a month isn&rsquo;t doable, your Warrior still
+          gets in. A donor covers the ones that aren&rsquo;t
+          personally sponsored so no kid at Gramercy sits out.
+        </p>
+      </div>
+
+      <!-- DONORS -->
+      <div class="path-card">
+        <div class="path-tag">For donors + partners</div>
+        <h3>Cover a class, a grade, or all 350.</h3>
+        <p>
+          For a Rotary chapter, a community foundation, an alumni
+          family, or a Warrior Club donor who wants to underwrite
+          the program at scale. Shirts ship in one box to the
+          school office. You get one invoice. Named recognition
+          available if you want it.
+        </p>
+        <ul class="tier-list">
+          <li>
+            <span>
+              <strong>One classroom</strong> (20 Warriors)
+              <span class="subrow">Fits inside a Rotary District Grant</span>
+            </span>
+            <span class="price">~$6.5K / yr</span>
+          </li>
+          <li>
+            <span>
+              <strong>One grade</strong> (~30 Warriors)
+              <span class="subrow">Foundation or family sponsor tier</span>
+            </span>
+            <span class="price">~$10K / yr</span>
+          </li>
+          <li>
+            <span>
+              <strong>The whole school</strong> (350 Warriors)
+              <span class="subrow">Major partnership. Rotary Global Grant candidate.</span>
+            </span>
+            <span class="price">Custom</span>
+          </li>
+        </ul>
+        <a href="mailto:kevin@beanumber.org?subject=Gramercy%20partnership%20proposal" class="path-cta">Request a proposal</a>
+        <div class="donor-context">
+          <strong>Rotary chapters:</strong> Basic Education &amp;
+          Literacy is one of your seven focus areas. The
+          classroom tier fits inside a District Grant. A
+          full-grade or all-school underwrite qualifies for a
+          Global Grant (30K+ project, DDF-eligible).<br><br>
+          <strong>Community foundations:</strong> We provide
+          the standard grant packet (executive summary, need,
+          budget, outcomes, other funding sources) so you can
+          take it straight to your board.
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ─── PRECEDENT ───────────────────────────────────────────────── -->
+<section class="precedent">
+  <div class="container">
+    <div class="precedent-block">
+      <div class="pre-kicker">This has been done before</div>
+      <p>
+        Legacy Christian Academy up in Minnesota has been doing
+        something like this since 2007. They started with 100
+        kids at a Uganda campus and now they&rsquo;re at 300.
+        World Vision runs a version of it in schools across 40
+        states through their Ignite program. Christian school
+        plus East African campus is a real, working model.
+      </p>
+      <span class="attribution">Gramercy would be the first Be A Number partner school anywhere.</span>
+    </div>
+  </div>
+</section>
+
+<!-- ─── KNOW GROW GO BRIDGE ─────────────────────────────────────── -->
+<section class="bridge">
+  <div class="container">
+    <div class="section-kicker">Gramercy&rsquo;s own words</div>
+    <h2>KNOW. GROW. GO.</h2>
+    <p class="section-lead">
+      Gramercy already talks about raising kids who KNOW the
+      Lord, GROW in their faith, and GO into all the world with
+      the Gospel. Most of us can&rsquo;t physically go all the
+      time. This is a way for every Warrior to be going anyway,
+      every month, from Newport.
+    </p>
+    <div class="kgg">
+      <div>
+        <div class="kgg-word">KNOW</div>
+        <p class="kgg-desc">Every Warrior meets a real kid at another Christian school on the other side of the world. Name, face, story.</p>
+      </div>
+      <div>
+        <div class="kgg-word">GROW</div>
+        <p class="kgg-desc">Letters go back and forth all year. Prayers get specific. A relationship your Warrior carries for as long as they&rsquo;re at Gramercy.</p>
+      </div>
+      <div>
+        <div class="kgg-word">GO</div>
+        <p class="kgg-desc">$25 a month covers a school day, meals, and medical care for their kid in Uganda. Every month.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── KEVIN'S NOTE (placeholder) ──────────────────────────────── -->
+<section class="kevin-note">
+  <div class="kevin-note-inner">
+    <div class="draft-mark">Kevin: please rewrite in your own words</div>
+    <h3>A note from me.</h3>
+    <p>
+      Howdy. About sixteen years ago I ended up in Northern
+      Uganda for the first time. Post-war zone, no running
+      water where I stayed, mostly just watching a Ugandan
+      friend of mine rebuild his community one kid at a time.
+      Be A Number is the mechanic I&rsquo;ve been using to
+      keep that going from the US ever since.
+    </p>
+    <p>
+      A Christian school in North Carolina wasn&rsquo;t part
+      of the plan when I started. But when Kara reached out
+      about linking 350 Gramercy kids to 350 of ours, I
+      thought: this is what the mechanic was supposed to
+      become.
+    </p>
+    <p>
+      Every letter your Warriors write, one of our kids
+      hears out loud. Every reply your kid gets is real
+      handwriting. I&rsquo;m all in. Reach out any time.
+    </p>
+    <div class="signature">
+      Kevin Hershock
+      <small>Founder, Be A Number</small>
+    </div>
+  </div>
+</section>
+
+<!-- ─── TRUST BAR ───────────────────────────────────────────────── -->
+<section class="trust">
+  <div class="container trust-inner">
+    <div>
+      <strong>Be A Number, International</strong>
+      <span> &middot; US 501(c)(3) nonprofit &middot; EIN 93-1948872</span>
+    </div>
+    <div>
+      <span>Christian school partner in Northern Uganda</span>
+    </div>
+  </div>
+</section>
+
+<!-- ─── FOOTER ──────────────────────────────────────────────────── -->
+<footer>
+  <div class="container">
+    <div class="footer-grid">
+
+      <div>
+        <h4>Gramercy Christian School</h4>
+        <p>
+          Newport, NC<br>
+          (252) 223-5199<br>
+          <a href="https://gramercychristian.org">gramercychristian.org</a>
+        </p>
+      </div>
+
+      <div>
+        <h4>Be A Number</h4>
+        <p>
+          <a href="mailto:kevin@beanumber.org">kevin@beanumber.org</a><br>
+          <a href="https://beanumber.org">beanumber.org</a><br>
+          US 501(c)(3) &middot; EIN 93-1948872
+        </p>
+      </div>
+
+      <div>
+        <h4>Questions?</h4>
+        <p>
+          I answer every email personally. Parents, teachers,
+          Warrior Club donors, Rotary folks, foundation program
+          officers. Send whatever you&rsquo;ve got and I&rsquo;ll
+          write back.
+        </p>
+      </div>
+
+    </div>
+
+    <div class="footer-bottom">
+      A partnership between Gramercy Christian School and Be A Number, International.<br>
+      All shirt proceeds and monthly sponsorships fund the Christian school campus in Northern Uganda.
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>
