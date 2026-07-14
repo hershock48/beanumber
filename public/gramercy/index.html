@@ -3,11 +3,38 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
 <!-- Draft mockup, not public. Prevents search engines from indexing while
      Kara and the Gramercy team are reviewing. Remove this meta tag when
      the program is ready for public discovery. -->
 <meta name="robots" content="noindex, nofollow">
+
 <title>Gramercy × Be A Number: Every Warrior. A pen pal in Uganda.</title>
+<meta name="description" content="A program that gives every Gramercy student a shirt, a pen pal at a Christian school in Northern Uganda, and their kid&rsquo;s year of school for $25 a month.">
+
+<!-- Favicon — reuses BAN&rsquo;s existing icon set from public/. Browsers
+     auto-request /favicon.ico too but explicit links guarantee it. -->
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/apple-icon.png">
+
+<!-- Open Graph — iMessage/Slack/Facebook/LinkedIn preview cards. Without
+     these the shared link renders as a blank white box. Image is an
+     absolute URL because scrapers won&rsquo;t resolve relative paths. -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Be A Number">
+<meta property="og:url" content="https://www.beanumber.org/gramercy">
+<meta property="og:title" content="Gramercy Christian × Be A Number">
+<meta property="og:description" content="Every Warrior gets a shirt with a Number pressed on the back. That Number is a real student at a Christian school we support in Northern Uganda. $25 a month keeps them in school.">
+<meta property="og:image" content="https://www.beanumber.org/images/impact/mother-child-portrait.jpg">
+<meta property="og:image:width" content="3520">
+<meta property="og:image:height" content="1980">
+
+<!-- Twitter Card — Twitter/X reads these before falling back to OG. -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Gramercy Christian × Be A Number">
+<meta name="twitter:description" content="Every Warrior gets a shirt with a Number pressed on the back. That Number is a real student at a Christian school we support in Northern Uganda. $25 a month keeps them in school.">
+<meta name="twitter:image" content="https://www.beanumber.org/images/impact/mother-child-portrait.jpg">
 <!-- Font strategy: system stack + Georgia. Beanumber.org's CSP blocks
      external font hosts, so Google Fonts links would fail silently and
      log console errors. Georgia carries the same editorial serif feel
