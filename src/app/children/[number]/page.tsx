@@ -1490,89 +1490,60 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
               </Link>
             </div>
           ) : (
-            /* Anon strip — post-2026-07-08 consolidation. Covers both
-               populations that used to get their own surface:
-                 - Monthly sponsors landing on a new device (was:
-                   AlreadySponsoringBanner at page top).
-                 - Shirt-holders who haven't signed in yet (was: the
-                   old "NOT SIGNED IN — Have a Be A Number shirt?" line).
-               One line, one CTA. The gold-shimmer treatment moved
-               over from the killed AlreadySponsoringBanner so the
-               moment still catches the eye of a returning sponsor
-               who might otherwise scroll past. */
-            /* AnonStripShimmer client wrapper gates the animation
-               on the RevealOverlay curtain lifting. Without it,
-               cold visitors — the audience the shimmer is meant to
-               catch — miss the first sweep behind the reveal blur.
-               See AnonStripShimmer.tsx for the ready-detection logic. */
+            /* Anon strip — 2026-07-12 rebuild. Serves TWO audiences in
+               one surface instead of only speaking to returning sponsors:
+                 - Cold visitor (came from a shared link, hasn't heard
+                   of BAN): sees the sponsorship pitch ("Sponsor {Kid}
+                   for $25/mo") with a gold Start-with-a-shirt CTA.
+                 - Returning sponsor / shirt-holder on a new device:
+                   sees "Already a sponsor? Sign in" as a secondary
+                   link below the primary ask.
+               Previously the strip led with "Sign in to your view"
+               and assumed the visitor was a known sponsor. Cold
+               visitors got nothing at the top of the page and had to
+               scroll past the bio to find the $25/mo pitch buried
+               inside PenpalBox.
+
+               Shimmer removed on this variant: adding a price to the
+               message made the shimmer read as marketing polish, not
+               a warm nudge. AnonStripShimmer wrapper stays because
+               it also hides the strip during the reveal moment — the
+               opacity gate is what keeps the strip from bleeding
+               through the RevealOverlay curtain on first visit. */
             <AnonStripShimmer shirtNumber={Number(number)}>
-            <div className="relative overflow-hidden ban-viewer-strip-shimmer-host py-3 border-y border-[#e8e0d4] mb-8">
-              <style>{`
-                @keyframes banViewerStripShimmer {
-                  0% {
-                    transform: translateX(-120%) skewX(-18deg);
-                    opacity: 0;
-                  }
-                  15% { opacity: 1; }
-                  85% { opacity: 1; }
-                  100% {
-                    transform: translateX(120%) skewX(-18deg);
-                    opacity: 0;
-                  }
-                }
-                /* Shimmer only runs when the wrapper's data attribute
-                   flips to 'true' — which AnonStripShimmer sets after
-                   the reveal completes (or a 4s safety timer). Before
-                   that, no ::after content is painted at all. */
-                .anon-strip-shimmer-wrap[data-anon-strip-ready="true"] .ban-viewer-strip-shimmer-host::after {
-                  content: '';
-                  position: absolute;
-                  top: 0;
-                  bottom: 0;
-                  left: 0;
-                  width: 35%;
-                  background: linear-gradient(
-                    90deg,
-                    transparent 0%,
-                    rgba(212, 168, 67, 0.0) 20%,
-                    rgba(212, 168, 67, 0.35) 50%,
-                    rgba(212, 168, 67, 0.0) 80%,
-                    transparent 100%
-                  );
-                  pointer-events: none;
-                  animation:
-                    banViewerStripShimmer 1.8s ease-out 0.4s,
-                    banViewerStripShimmer 1.8s ease-out 5.4s;
-                  animation-fill-mode: both;
-                  mix-blend-mode: multiply;
-                }
-              `}</style>
-              <div className="relative z-10 flex flex-col md:flex-row md:items-center md:justify-between gap-2">
-                <div>
-                  <span className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mr-3">
-                    Not signed in
-                  </span>
-                  <span className="text-[15px] text-[#555]">
-                    Sponsoring monthly or hold a Be A Number shirt?
-                    Sign in to your view.
+            <div className="py-3 md:py-4 border-y border-[#e8e0d4] mb-8">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 md:gap-6">
+                <div className="text-[15px] leading-snug text-[#333]">
+                  <span className="font-bold text-[#0d0d0d]">
+                    Sponsor {firstName} for $25/mo.
+                  </span>{' '}
+                  <span className="text-[#555]">
+                    Covers a full school day, plus a real penpal on
+                    the other end.
                   </span>
                 </div>
-                {/* Magic-link flow — same route + params the killed
-                    ClaimGate used ("CLAIM #N →"). Enter email, get
-                    the one-tap link, callback drops the sponsor_session
-                    cookie and lands the visitor on the homepage with
-                    the number prefilled, which forwards them back to
-                    /children/N?just_signed_in=1 for the reveal. See
-                    /api/sponsor/recover/callback. The legacy
-                    /sponsor/login route (email + sponsor code) is
-                    intentionally avoided — sponsors rarely remember
-                    their code, so it's high friction. */}
-                <Link
-                  href={`/signin?n=${number}`}
-                  className="text-sm font-bold text-[#D4A843] hover:underline whitespace-nowrap"
-                >
-                  Sign in &rarr;
-                </Link>
+                <div className="flex items-center gap-4 whitespace-nowrap flex-shrink-0">
+                  {/* Primary CTA — shirt-first per non-negotiable #4.
+                      Every new sponsorship traces back to a shirt
+                      purchase; /shirts is the correct entry, not a
+                      direct sponsor-checkout link. Same routing pattern
+                      the PenpalBox anon variant uses. */}
+                  <Link
+                    href="/shirts"
+                    className="inline-block bg-[#D4A843] text-[#0d0d0d] hover:bg-[#c49a3a] font-bold uppercase tracking-wider text-xs py-2.5 px-4 transition-colors"
+                  >
+                    Start with a shirt &rarr;
+                  </Link>
+                  {/* Secondary — for returning sponsors / holders on a
+                      new device. Magic-link flow at /signin?n=N. */}
+                  <Link
+                    href={`/signin?n=${number}`}
+                    className="text-xs text-[#666] hover:text-[#D4A843] hover:underline"
+                  >
+                    Already a sponsor?{' '}
+                    <span className="font-bold">Sign in</span>
+                  </Link>
+                </div>
               </div>
             </div>
             </AnonStripShimmer>
