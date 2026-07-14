@@ -678,9 +678,12 @@
 <nav class="nav">
   <div class="container nav-inner">
     <div class="lockup">
-      <img src="gcs-logo.svg" alt="Gramercy Christian School" class="gcs-logo">
+      <!-- Absolute paths (not relative) because Vercel serves this
+           HTML at /gramercy without a trailing slash, which would
+           resolve relative img srcs to the site root and 404. -->
+      <img src="/gramercy/gcs-logo.svg" alt="Gramercy Christian School" class="gcs-logo">
       <span class="divider" aria-hidden="true">×</span>
-      <img src="ban-logo.svg" alt="Be A Number" class="ban-logo">
+      <img src="/gramercy/ban-logo.svg" alt="Be A Number" class="ban-logo">
     </div>
     <div class="nav-cta">
       <a href="#program" class="nav-link">The program</a>
