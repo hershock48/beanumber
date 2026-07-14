@@ -1522,7 +1522,14 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
                     the other end.
                   </span>
                 </div>
-                <div className="flex items-center gap-4 whitespace-nowrap flex-shrink-0">
+                {/* Wrap allows the primary CTA + secondary link to stack
+                    vertically on very narrow screens (iPhone SE, older
+                    Android) where the two side-by-side would overflow
+                    the ~280px content column. On roomier phones they
+                    stay on one line. Each child keeps whitespace-nowrap
+                    so the button label and link phrase don't fracture
+                    mid-word. */}
+                <div className="flex items-center gap-x-4 gap-y-2 flex-wrap flex-shrink-0">
                   {/* Primary CTA — shirt-first per non-negotiable #4.
                       Every new sponsorship traces back to a shirt
                       purchase; /shirts is the correct entry, not a
@@ -1530,7 +1537,7 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
                       the PenpalBox anon variant uses. */}
                   <Link
                     href="/shirts"
-                    className="inline-block bg-[#D4A843] text-[#0d0d0d] hover:bg-[#c49a3a] font-bold uppercase tracking-wider text-xs py-2.5 px-4 transition-colors"
+                    className="inline-block whitespace-nowrap bg-[#D4A843] text-[#0d0d0d] hover:bg-[#c49a3a] font-bold uppercase tracking-wider text-xs py-2.5 px-4 transition-colors"
                   >
                     Start with a shirt &rarr;
                   </Link>
@@ -1538,7 +1545,7 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
                       new device. Magic-link flow at /signin?n=N. */}
                   <Link
                     href={`/signin?n=${number}`}
-                    className="text-xs text-[#666] hover:text-[#D4A843] hover:underline"
+                    className="text-xs whitespace-nowrap text-[#666] hover:text-[#D4A843] hover:underline"
                   >
                     Already a sponsor?{' '}
                     <span className="font-bold">Sign in</span>

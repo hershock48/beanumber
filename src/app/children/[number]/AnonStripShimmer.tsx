@@ -1,32 +1,36 @@
 'use client';
 
 /**
- * AnonStripShimmer — client-only wrapper that gates the anon
- * viewer-state strip's gold shimmer animation on the reveal
- * completing.
+ * AnonStripShimmer — client-only wrapper that hides the anon
+ * viewer-state strip until the RevealOverlay curtain finishes.
  *
- * The shimmer was ported from the killed AlreadySponsoringBanner
- * onto the anon strip on 2026-07-08. The banner used to defer its
- * mount until the `ban-reveal-done` event fired, so the first
- * shimmer sweep landed after the RevealOverlay curtain lifted.
- * When the strip inherited the effect but not the mount gate,
- * cold visitors — the exact audience the shimmer is meant to
- * catch — lost the first sweep behind the reveal blur.
+ * History: originally a two-job wrapper — (1) hide until the reveal
+ * completes, and (2) gate a gold shimmer animation on the strip. The
+ * shimmer was killed 2026-07-12 when the strip's copy switched from a
+ * soft sign-in nudge ("Sign in to your view") to a two-audience
+ * conversion pitch ("Sponsor {Kid} for $25/mo") — animated gold on a
+ * kid's page with a price attached read as marketing polish, not a
+ * warm nudge. Only the reveal-hiding half of this wrapper is still
+ * doing real work; name kept for continuity, could be renamed to
+ * something like `HideDuringReveal` in a future cleanup pass.
  *
- * This wrapper adds a `data-ready="true"` attribute (used by the
- * CSS `[data-ready] .ban-viewer-strip-shimmer-host::after {...}`
- * selector to actually start the animation) once one of:
+ * The `data-anon-strip-ready` attribute below is dead — no CSS reads
+ * it anymore — but kept for symmetry with the opacity gate. Cheap to
+ * leave, easy to reintroduce a shimmer-style effect later if we ever
+ * want one that only fires post-reveal.
+ *
+ * The `ready` flag flips once one of:
  *   - The `ban-reveal-done` window event fires
  *   - localStorage['ban-revealed-{N}'] === 'yes' (RevealOverlay
  *     short-circuits on return visits and doesn't dispatch the
  *     event; we infer completion from its persistent flag)
  *   - A 4s safety timeout (RevealOverlay finishes at ~3.8s; the
  *     safety fallback catches the case where the event dispatch
- *     was suppressed for whatever reason so the strip never
- *     shimmerless)
+ *     was suppressed for whatever reason)
  *
- * Renders children immediately either way — the strip is visible
- * from server render onwards. Only the shimmer animation is gated.
+ * Renders children immediately with opacity: 0, then fades in
+ * ~250ms after ready. Pointer events also gated so the invisible
+ * strip doesn't intercept clicks during the reveal moment.
  */
 
 import { useEffect, useRef, useState } from 'react';
