@@ -102,10 +102,27 @@ export async function sendEmail(options: EmailOptions): Promise<EmailSendResult>
       plainTextOnly: options.plainTextOnly,
     });
 
-    return result;
+    // FAILOVER. sendEmailViaGmail returns { success: false } instead
+    // of throwing — the classic case is an expired OAuth refresh
+    // token (invalid_grant), which historically meant EVERY outbound
+    // email died silently until Kevin regenerated the token (the
+    // Ashley/Randi magic-link outage). If SendGrid is configured,
+    // fall through to it instead of returning the failure, and log
+    // with the same greppable ATTENTION tag the recovery endpoint
+    // uses so the Gmail-side outage still surfaces in Vercel logs.
+    if (result.success || !config.sendgridApiKey) {
+      return result;
+    }
+    logger.error(
+      `ATTENTION Gmail send failed (${result.error || 'unknown'}) — failing over to SendGrid`,
+      {
+        to: recipients.map(r => logger.maskEmail(r.email)),
+        subject: options.subject,
+      }
+    );
   }
 
-  // Fall back to SendGrid
+  // SendGrid path — either Gmail isn't configured, or it failed above.
   try {
     // Lazy load SendGrid to avoid initialization errors if API key is missing
     const sgMail = (await import('@sendgrid/mail')).default;
