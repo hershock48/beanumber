@@ -4,8 +4,8 @@
  * Validates the signed token, resolves the sponsor's email from
  * Postgres (so the cookie we drop matches the format the rest of the
  * app expects), sets a 365-day sponsor_session cookie (length lives in
- * SESSION.MAX_AGE_DAYS), and redirects the user back to the homepage
- * with the Number prefilled so they go through the gateway ritual.
+ * SESSION.MAX_AGE_DAYS), and lands the user directly on their kid's
+ * page, signed in.
  *
  * Failure modes — bad signature, expired token, missing sponsorship —
  * all redirect to /signin with a soft error, so a user with a dead
@@ -65,15 +65,15 @@ export async function GET(request: NextRequest) {
     console.warn('[Recovery] advanceDripOnClaim threw:', err);
   });
 
-  // If the token carries a real shirt number, land on the homepage
-  // with the Number-input prefilled and highlighted ("Welcome back,
-  // enter your Number"). The Number lookup is the consistent ritual
-  // that gates every user's entry to the rest of the site — even
-  // after sign-in. The home page reads ?welcome=1 to render the
-  // welcome treatment, and ?n=N to prefill the input. When the user
-  // submits the form from that state, the homepage forwards
-  // just_signed_in=1 to the kid page so the ClaimGate's "first
-  // sign-in" branch still fires correctly.
+  // If the token carries a real shirt number, deep-link STRAIGHT to
+  // the kid's page, signed in. The email button promises "Open
+  // {Kid}'s page" — for a while this redirect landed on the homepage
+  // with the Number prefilled instead (the "gateway ritual"), which
+  // meant two extra taps after an email round-trip and a button that
+  // didn't do what it said. The ritual is right for organic entry
+  // (typing the number off the shirt at the homepage); after a
+  // magic-link click it's friction. just_signed_in=1 drives the kid
+  // page's "Welcome / #N is yours" viewer-state strip.
   //
   // shirtNumber === 0 is the "no landing kid yet" sentinel — used
   // for backfilled Holder rows whose stockpile shirt hasn't been
@@ -83,5 +83,7 @@ export async function GET(request: NextRequest) {
   if (!shirtNumber || shirtNumber <= 0) {
     return NextResponse.redirect(`${SITE_URL}/me?welcome=1`);
   }
-  return NextResponse.redirect(`${SITE_URL}/?welcome=1&n=${shirtNumber}`);
+  return NextResponse.redirect(
+    `${SITE_URL}/children/${shirtNumber}?just_signed_in=1`
+  );
 }
