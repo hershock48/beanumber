@@ -12,7 +12,7 @@
       },
       "channel": "development",
       "env": {
-        "EXPO_PUBLIC_API_BASE_URL": "https://beanumber.org"
+        "EXPO_PUBLIC_API_BASE_URL": "https://www.beanumber.org"
       }
     },
     "preview": {
@@ -22,7 +22,7 @@
       },
       "channel": "preview",
       "env": {
-        "EXPO_PUBLIC_API_BASE_URL": "https://beanumber.org"
+        "EXPO_PUBLIC_API_BASE_URL": "https://www.beanumber.org"
       }
     },
     "production": {
@@ -32,7 +32,7 @@
         "resourceClass": "m-medium"
       },
       "env": {
-        "EXPO_PUBLIC_API_BASE_URL": "https://beanumber.org"
+        "EXPO_PUBLIC_API_BASE_URL": "https://www.beanumber.org"
       }
     }
   },

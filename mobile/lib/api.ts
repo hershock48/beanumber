@@ -17,7 +17,15 @@
 import Constants from 'expo-constants';
 import { getAccessToken, refreshToken } from './auth';
 
+// Resolution order:
+//   1. EXPO_PUBLIC_API_BASE_URL — set per-profile in eas.json, inlined
+//      at build time. The one EAS builds actually use.
+//   2. app.json extra.apiBaseUrl — dev/Expo Go escape hatch.
+//   3. Production www host. Bare beanumber.org 307s to www, and a
+//      redirect on a POST body is a straight request-eater — always
+//      target www directly.
 const API_BASE_URL =
+  process.env.EXPO_PUBLIC_API_BASE_URL ||
   (Constants.expoConfig?.extra?.apiBaseUrl as string | undefined) ||
   'https://www.beanumber.org';
 
@@ -125,6 +133,13 @@ export async function authFetch(
 
 /**
  * authFetch + JSON parse + non-2xx → ApiError convenience wrapper.
+ *
+ * Envelope unwrap: the /api/mobile/v1/* data routes wrap their
+ * payloads in `{ success: true, data: <T>, timestamp }` (the server's
+ * createSuccessResponse helper). Callers here type against the
+ * PAYLOAD, so we unwrap transparently. Routes that return raw JSON
+ * (auth, push, deferred-link, claim) pass through untouched — they
+ * don't match the envelope shape.
  */
 export async function authJson<T>(
   path: string,
@@ -135,7 +150,16 @@ export async function authJson<T>(
     const body = await res.text().catch(() => '');
     throw new ApiError(body || res.statusText, res.status);
   }
-  return (await res.json()) as T;
+  const json = (await res.json()) as unknown;
+  if (
+    json !== null &&
+    typeof json === 'object' &&
+    (json as { success?: unknown }).success === true &&
+    'data' in (json as Record<string, unknown>)
+  ) {
+    return (json as { data: T }).data;
+  }
+  return json as T;
 }
 
 /**
@@ -195,13 +219,18 @@ export interface MobileKidViewer {
   canReadNotes: boolean;
   canWriteNotes: boolean;
   canReadUpdates: boolean;
+  /** True when nobody holds this number yet and the viewer may claim
+   *  it. Drives the reveal screen's "Keep #N" CTA. */
+  canClaim?: boolean;
 }
 
 export interface MobileKidDetail {
+  reserved?: boolean;
   id: string;
   firstName: string;
   shirtNumber: number;
   photoUrl?: string | null;
+  photoUrls?: string[];
   ageYears?: number | null;
   gradeLabel?: string | null;
   intro?: string | null;
@@ -212,10 +241,61 @@ export interface MobileKidDetail {
 }
 
 export async function getMobileKid(shirtNumber: number): Promise<MobileKidDetail> {
-  const data = await authJson<{ kid: MobileKidDetail }>(
-    `/api/mobile/v1/kids/${shirtNumber}`
-  );
-  return data.kid;
+  // The kid detail IS the payload — no extra nesting.
+  return authJson<MobileKidDetail>(`/api/mobile/v1/kids/${shirtNumber}`);
+}
+
+// ─── Claim + email linking ────────────────────────────────────────────
+
+export interface ClaimResult {
+  ok: true;
+  role: 'monthly' | 'holder';
+  alreadyYours: boolean;
+  shirtNumber: number;
+  kidFirstName: string;
+}
+
+export class NumberClaimedError extends ApiError {
+  constructor() {
+    super('number_claimed', 409);
+  }
+}
+
+/**
+ * POST /api/mobile/v1/claim — make this number the viewer's.
+ * Throws NumberClaimedError when someone else already holds it;
+ * plain ApiError on anything else.
+ */
+export async function claimNumber(shirtNumber: number): Promise<ClaimResult> {
+  const res = await authFetch('/api/mobile/v1/claim', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ shirtNumber }),
+  });
+  if (res.status === 409) {
+    const body = await res.json().catch(() => ({}));
+    if (body?.code === 'number_claimed') throw new NumberClaimedError();
+    throw new ApiError(body?.error || 'Conflict', 409);
+  }
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new ApiError(text || res.statusText, res.status);
+  }
+  return (await res.json()) as ClaimResult;
+}
+
+/**
+ * POST /api/mobile/v1/link/request — ask the server to email a
+ * confirmation link to the viewer's purchase email. Always resolves
+ * success-shaped (privacy: the server never reveals whether the email
+ * exists); throws only on network/auth failures.
+ */
+export async function requestEmailLink(email: string): Promise<void> {
+  await authJson<{ success: boolean }>('/api/mobile/v1/link/request', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email }),
+  });
 }
 
 export interface KidUpdate {
@@ -299,15 +379,12 @@ export async function sendNote(
   shirtNumber: number,
   body: string
 ): Promise<SentMessage> {
-  const data = await authJson<{ message: SentMessage }>(
-    `/api/mobile/v1/kids/${shirtNumber}/thread`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ body }),
-    }
-  );
-  return data.message;
+  // The created message IS the payload — no extra nesting.
+  return authJson<SentMessage>(`/api/mobile/v1/kids/${shirtNumber}/thread`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ body }),
+  });
 }
 
 export interface CampusFeedItem {
@@ -363,10 +440,13 @@ export interface LatestNewsletter {
 
 export async function getLatestNewsletter(): Promise<LatestNewsletter | null> {
   try {
-    const data = await authJson<{ newsletter: LatestNewsletter }>(
-      '/api/mobile/v1/newsletter/latest'
-    );
-    return data.newsletter ?? null;
+    // The newsletter IS the payload; the server signals "none yet"
+    // with id: null rather than a 404.
+    const data = await authJson<
+      (LatestNewsletter & { id: string | null }) | null
+    >('/api/mobile/v1/newsletter/latest');
+    if (!data || !data.id) return null;
+    return data as LatestNewsletter;
   } catch (err) {
     if (err instanceof ApiError && err.status === 404) return null;
     throw err;
@@ -398,7 +478,7 @@ export interface MeBilling {
 export interface MeResponse {
   userId: string;
   email: string;
-  firstName?: string;
+  firstName?: string | null;
   sponsorships: MeMineSponsorship[];
   purchases: MePurchase[];
   billing: MeBilling;

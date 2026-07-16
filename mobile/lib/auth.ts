@@ -45,7 +45,9 @@ type Listener = (state: AuthState) => void;
 
 // ─── Config ───────────────────────────────────────────────────────
 
+// Same resolution order as lib/api.ts — keep the two in lockstep.
 const API_BASE_URL =
+  process.env.EXPO_PUBLIC_API_BASE_URL ||
   (Constants.expoConfig?.extra?.apiBaseUrl as string | undefined) ||
   'https://www.beanumber.org';
 
