@@ -505,13 +505,13 @@ async function postHandler(
 }
 
 export const GET = withErrorHandling(
-  getHandler as (request: NextRequest) => Promise<NextResponse>,
+  getHandler,
   'GET',
   '/api/mobile/v1/kids/[shirtNumber]/thread'
 );
 
 export const POST = withErrorHandling(
-  postHandler as (request: NextRequest) => Promise<NextResponse>,
+  postHandler,
   'POST',
   '/api/mobile/v1/kids/[shirtNumber]/thread'
 );

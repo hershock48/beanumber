@@ -154,7 +154,7 @@ async function handler(
 }
 
 export const GET = withErrorHandling(
-  handler as (request: NextRequest) => Promise<NextResponse>,
+  handler,
   'GET',
   '/api/mobile/v1/kids/[shirtNumber]/timeline'
 );

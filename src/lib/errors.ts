@@ -292,14 +292,25 @@ export function noContentResponse(): NextResponse {
 /**
  * Wraps an API route handler with error handling
  */
-export function withErrorHandling<T extends Request = Request>(
-  handler: (request: T) => Promise<NextResponse>,
+export function withErrorHandling<
+  T extends Request = Request,
+  A extends unknown[] = unknown[],
+>(
+  handler: (request: T, ...args: A) => Promise<NextResponse>,
   method?: string,
   path?: string
 ) {
-  return async (request: T): Promise<NextResponse> => {
+  // Forward EVERY argument, not just the request. Next.js App Router
+  // calls dynamic route handlers as (request, context) where context
+  // carries `params` — a wrapper typed (request) => ... silently
+  // dropped context, so `await context.params` threw a TypeError
+  // inside every wrapped [param] route and the wrapper dutifully
+  // turned its own bug into a 500. The `handler as (request) => ...`
+  // casts at the call sites were the tell: a cast that "fixes" a
+  // signature mismatch is the compiler being overruled, not wrong.
+  return async (request: T, ...args: A): Promise<NextResponse> => {
     try {
-      return await handler(request);
+      return await handler(request, ...args);
     } catch (error) {
       return createErrorResponse(error, method, path);
     }
