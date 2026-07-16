@@ -21,9 +21,11 @@ import { createSuccessResponse, withErrorHandling } from '@/lib/errors';
 import { requireMobileAuth } from '@/lib/auth';
 import {
   getDonorByEmail,
-  getMobileMineKidsForEmail,
+  getMobileMineKidsForEmails,
   getPurchasesForEmail,
 } from '@/lib/db/queries';
+import { getViewerEmails } from '@/lib/mobile-viewer';
+import { resolveShirtNumberForClaim } from '@/lib/claim-resolve';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -65,14 +67,21 @@ async function handler(request: NextRequest): Promise<NextResponse> {
   logger.apiRequest(method, path);
 
   const viewer = await requireMobileAuth(request);
+  const emails = await getViewerEmails(viewer);
 
-  const [mine, purchases, donor] = await Promise.all([
-    getMobileMineKidsForEmail(viewer.email),
-    getPurchasesForEmail(viewer.email),
-    getDonorByEmail(viewer.email),
+  // Purchases + donor lookups are keyed per-email; try the whole set
+  // (linked purchase email first — getViewerEmails orders it first
+  // because that's where the money data actually lives).
+  const [mine, purchasesPerEmail, donorsPerEmail] = await Promise.all([
+    getMobileMineKidsForEmails(emails),
+    Promise.all(emails.map(e => getPurchasesForEmail(e).catch(() => []))),
+    Promise.all(emails.map(e => getDonorByEmail(e).catch(() => null))),
   ]);
+  const purchases = purchasesPerEmail.flat();
+  const donor = donorsPerEmail.find(Boolean) ?? null;
 
-  const sponsorships: MobileMeSponsorship[] = mine.map(r => {
+  const sponsorships: MobileMeSponsorship[] = [];
+  for (const r of mine) {
     const monthly = Number(r.monthlyAmount ?? 0);
     // "You sponsor" applies when the viewer's own sponsorship is
     // Active + $25/mo. "Someone else sponsors" applies when the row
@@ -81,16 +90,30 @@ async function handler(request: NextRequest): Promise<NextResponse> {
     // $25/mo; the mobile UI surfaces the holder framing regardless).
     const sponsoredBy: 'you' | 'someoneElse' =
       r.status === 'Active' && monthly > 0 ? 'you' : 'someoneElse';
-    return {
-      kidFirstName: r.firstName ?? r.displayName?.split(' ')[0] ?? 'them',
+    // Cycle-number rows (claimed #54+) come back name-less from the
+    // join — no children row carries their number. Resolve the
+    // canonical kid so the Me list shows a name, not "them".
+    let kidFirstName = r.firstName ?? r.displayName?.split(' ')[0] ?? null;
+    if (!kidFirstName && r.claimedShirtNumber) {
+      try {
+        const resolved = await resolveShirtNumberForClaim(
+          r.claimedShirtNumber
+        );
+        kidFirstName = resolved?.firstName ?? null;
+      } catch {
+        kidFirstName = null;
+      }
+    }
+    sponsorships.push({
+      kidFirstName: kidFirstName ?? 'them',
       shirtNumber: r.shirtNumber ?? null,
       monthlyAmount: monthly,
       sponsoredBy,
       // sponsorOfRecord is intentionally omitted when we don't have a
       // co-sponsor name to attribute. If we later join to any monthly
       // sponsor for the same kid, that name goes here.
-    };
-  });
+    });
+  }
 
   const purchaseItems: MobileMePurchase[] = purchases.map(p => {
     const shirtDisplay =
@@ -112,13 +135,20 @@ async function handler(request: NextRequest): Promise<NextResponse> {
     };
   });
 
-  const firstName = donor?.name
-    ? donor.name.split(/\s+/)[0]
-    : viewer.email.split('@')[0] || null;
+  // Real name only — donor row first, then the name the sponsor gave
+  // at checkout. NEVER derived from the email local-part: "Hey
+  // Beanumber48." reads like a bug, and Apple relay addresses produce
+  // pure noise. Null means the client greets without a name.
+  const sponsorName = mine.find(r => r.sponsorName?.trim())?.sponsorName;
+  const nameSource = donor?.name?.trim() || sponsorName?.trim() || null;
+  const firstName = nameSource ? nameSource.split(/\s+/)[0] : null;
 
   const billing: MobileMeBilling = {
     cardLast4: null,
-    receiptsEmail: viewer.email,
+    // Receipts land where Stripe sends them — the linked purchase
+    // email when one exists (getViewerEmails orders it first), the
+    // provider email otherwise.
+    receiptsEmail: emails[0] ?? viewer.email,
     hasCardOnFile: Boolean(donor?.stripeCustomerId),
   };
 

@@ -22,13 +22,11 @@ import {
   createErrorResponse,
 } from '@/lib/errors';
 import { requireMobileAuth } from '@/lib/auth';
+import { getViewerEmails } from '@/lib/mobile-viewer';
 import { db } from '@/lib/db/client';
 import { kidMessages, sponsorships } from '@/lib/db/schema';
-import {
-  getChildByShirtNumber,
-  getNoteThreadForSponsorAndChild,
-} from '@/lib/db/queries';
-import { canonicalShirtNumber } from '@/lib/mobile/shirt-cycle';
+import { getNoteThreadForSponsorAndChild } from '@/lib/db/queries';
+import { resolveShirtNumberForClaim } from '@/lib/claim-resolve';
 import { sendKevinNoteAlert } from '@/lib/email';
 import type { Child } from '@/lib/db/schema';
 
@@ -77,38 +75,62 @@ export interface MobileThreadLockedResponse {
 
 interface MonthlySponsorshipMatch {
   id: string;
+  sponsorEmail: string;
   childRevealedAt: Date | null;
 }
 
 /**
  * Resolve the kid + verify the viewer has an ACTIVE MONTHLY
- * sponsorship of them. Returns the resolved child + the sponsorship
- * match (with `childRevealedAt` — used to color the Kevin alert
- * email). Returns `{ locked: true }` when the viewer is not eligible;
- * caller renders a 403 with the locked-card payload.
+ * sponsorship of them, matching across the viewer's whole EMAIL SET
+ * (provider + linked purchase email). The child match covers three
+ * row shapes: UUID FK, real legacy ChildID (canonical numbers), and
+ * the synthetic per-number legacy id + claimed_shirt_number pair
+ * (cycle numbers — those rows never carry the canonical kid's ids).
+ *
+ * Returns the resolved child + the sponsorship match (with
+ * `childRevealedAt` — colors the Kevin alert email — and
+ * `sponsorEmail` — the identity the note is filed under, so web and
+ * mobile see one thread). Returns `{ locked: true }` when the viewer
+ * is not eligible; caller renders a 403 with the locked-card payload.
  */
 async function resolveMonthlyOrLocked(args: {
   shirtNumber: number;
-  viewerEmail: string;
+  viewerEmails: string[];
 }): Promise<
   | { locked: true; kidFirstName: string | null }
   | { locked: false; child: Child; monthly: MonthlySponsorshipMatch }
 > {
-  let child: Child | null = await getChildByShirtNumber(args.shirtNumber);
-  if (!child) {
-    const canonical = canonicalShirtNumber(args.shirtNumber);
-    if (canonical) child = await getChildByShirtNumber(canonical);
-  }
-  if (!child) {
+  const identity = await resolveShirtNumberForClaim(args.shirtNumber);
+  if (!identity) {
     // Caller turns the null path into a NotFoundError; we short-circuit
     // here by throwing so the shape stays clean.
     throw new NotFoundError('Kid not found');
   }
+  const child = identity.canonicalRow;
 
-  const email = args.viewerEmail.toLowerCase();
+  const emails = args.viewerEmails
+    .map(e => e.trim().toLowerCase())
+    .filter(Boolean);
+  if (emails.length === 0) {
+    return { locked: true, kidFirstName: child.firstName ?? null };
+  }
+
+  const childMatches = [
+    eq(sponsorships.claimedShirtNumber, args.shirtNumber),
+    ...(child.id ? [eq(sponsorships.childId, child.id)] : []),
+    ...(child.childId
+      ? [eq(sponsorships.childIdLegacy, child.childId)]
+      : []),
+    // Cycle numbers: the synthetic per-number legacy id.
+    ...(identity.childUuid === null
+      ? [eq(sponsorships.childIdLegacy, identity.childIdLegacy)]
+      : []),
+  ];
+
   const rows = await db
     .select({
       id: sponsorships.id,
+      sponsorEmail: sponsorships.sponsorEmail,
       status: sponsorships.status,
       monthlyAmount: sponsorships.monthlyAmount,
       childRevealedAt: sponsorships.childRevealedAt,
@@ -116,13 +138,8 @@ async function resolveMonthlyOrLocked(args: {
     .from(sponsorships)
     .where(
       and(
-        sql`lower(${sponsorships.sponsorEmail}) = ${email}`,
-        or(
-          eq(sponsorships.childId, child.id),
-          child.childId
-            ? eq(sponsorships.childIdLegacy, child.childId)
-            : sql`false`
-        ),
+        inArray(sql`lower(${sponsorships.sponsorEmail})`, emails),
+        or(...childMatches),
         eq(sponsorships.status, 'Active')
       )
     )
@@ -134,7 +151,11 @@ async function resolveMonthlyOrLocked(args: {
   return {
     locked: false,
     child,
-    monthly: { id: monthly.id, childRevealedAt: monthly.childRevealedAt },
+    monthly: {
+      id: monthly.id,
+      sponsorEmail: monthly.sponsorEmail,
+      childRevealedAt: monthly.childRevealedAt,
+    },
   };
 }
 
@@ -191,9 +212,10 @@ async function getHandler(
   }
 
   const viewer = await requireMobileAuth(request);
+  const viewerEmails = await getViewerEmails(viewer);
   const resolved = await resolveMonthlyOrLocked({
     shirtNumber,
-    viewerEmail: viewer.email,
+    viewerEmails,
   });
   if (resolved.locked) {
     const locked: MobileThreadLockedResponse = {
@@ -204,10 +226,26 @@ async function getHandler(
     return NextResponse.json(locked, { status: 403 });
   }
 
-  const rows = await getNoteThreadForSponsorAndChild({
-    sponsorEmail: viewer.email,
-    childRecordId: resolved.child.id,
-  });
+  // The thread lives under whichever email(s) wrote the notes. Merge
+  // across the viewer's set — after an email link, notes written on
+  // the web under the purchase email and in-app under the provider
+  // email are ONE conversation with the kid.
+  const perEmail = await Promise.all(
+    viewerEmails.map(email =>
+      getNoteThreadForSponsorAndChild({
+        sponsorEmail: email,
+        childRecordId: resolved.child.id,
+      }).catch(() => [])
+    )
+  );
+  const seenIds = new Set<string>();
+  const rows = perEmail
+    .flat()
+    .filter(r => (seenIds.has(r.id) ? false : (seenIds.add(r.id), true)))
+    .sort(
+      (a, b) =>
+        new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+    );
 
   const messages: MobileThreadMessage[] = rows.map(r => ({
     id: r.id,
@@ -296,9 +334,10 @@ async function postHandler(
     );
   }
 
+  const viewerEmails = await getViewerEmails(viewer);
   const resolved = await resolveMonthlyOrLocked({
     shirtNumber,
-    viewerEmail: viewer.email,
+    viewerEmails,
   });
   if (resolved.locked) {
     const locked: MobileThreadLockedResponse = {
@@ -309,14 +348,20 @@ async function postHandler(
     return NextResponse.json(locked, { status: 403 });
   }
   const { child, monthly } = resolved;
+  // File the note under the email that OWNS the monthly sponsorship —
+  // that's the identity the web thread reads, the admin queue shows,
+  // and the reply push targets. Using the raw provider email here
+  // would fork the conversation into two half-threads.
+  const noteEmail = monthly.sponsorEmail.trim().toLowerCase();
 
-  // Rate limit: one pending-or-translated note per (sponsor, kid).
+  // Rate limit: one queued note per (sponsor, kid) across the whole
+  // email set — two emails, one person, one slot in the queue.
   const existing = await db
     .select({ id: kidMessages.id })
     .from(kidMessages)
     .where(
       and(
-        sql`lower(${kidMessages.sponsorEmail}) = ${viewer.email.toLowerCase()}`,
+        inArray(sql`lower(${kidMessages.sponsorEmail})`, viewerEmails),
         eq(kidMessages.childId, child.id),
         // Kevin approval layer (2026-07-10). Extending awaiting_kevin
         // into the rate-limit filter so a mobile writer can't queue
@@ -340,7 +385,7 @@ async function postHandler(
     const inserted = await db
       .insert(kidMessages)
       .values({
-        sponsorEmail: viewer.email.toLowerCase(),
+        sponsorEmail: noteEmail,
         sponsorName: null,
         childId: child.id,
         direction: 'sponsor_to_kid',
@@ -360,11 +405,13 @@ async function postHandler(
     try {
       await sendKevinNoteAlert({
         noteId: inserted[0].id,
-        sponsorEmail: viewer.email,
+        sponsorEmail: noteEmail,
         sponsorName: null,
         kidFirstName: child.firstName || 'the kid',
         kidDisplayName: child.displayName || child.firstName || 'the kid',
-        shirtNumber: child.shirtNumber ?? null,
+        // The number the sponsor holds — for cycle numbers the
+        // canonical row's own number is a different shirt.
+        shirtNumber,
         sponsorHoldsShirt: !!monthly.childRevealedAt,
         bodyEn: bodyText,
       });

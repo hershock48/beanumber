@@ -1,14 +1,21 @@
 /**
  * GET /api/mobile/v1/kids/[shirtNumber]
  *
- * Full kid detail for the mobile kid page. Wraps everything the mobile
- * profile view needs — base fields + structured bio + viewer role +
- * per-viewer access flags — in one round-trip so the RN screen can
- * render without a chain of dependent fetches.
+ * Full kid detail for the mobile kid page + reveal screen. Base
+ * fields + structured bio + viewer role + per-viewer access flags in
+ * one round-trip so the RN screens render without dependent fetches.
  *
- * Cycle-shirt fallback (#67, #100, …) mirrors the web
- * /api/children/[number] endpoint so mobile and web resolve the same
- * kid for the same URL.
+ * Resolution goes through the SAME resolver the claim flow uses
+ * (src/lib/claim-resolve.ts): canonical numbers (≤53) hit their real
+ * children row; cycle numbers (54+) resolve through the Batches table
+ * with the hardcoded era math as safety net. Mobile and web can't
+ * drift on which kid a number belongs to.
+ *
+ * Viewer role is PER-NUMBER first: a claimed_shirt_number match on
+ * any of the viewer's emails (provider + linked — see
+ * src/lib/mobile-viewer.ts) makes them the holder/sponsor of THIS
+ * number, which is what gates correspondence. Child-identity matching
+ * is the fallback for rows claimed before the per-number backfill.
  *
  * Auth: mobile bearer. Bio + base fields are returned even for a
  * "cold" viewer (someone signed in but not linked to this kid) — that
@@ -26,13 +33,12 @@ import {
 } from '@/lib/errors';
 import { requireMobileAuth } from '@/lib/auth';
 import {
-  getChildByShirtNumber,
+  findSponsorshipForEmailAndClaimedNumber,
   getViewerSponsorshipForChild,
-  isChildClaimedByOtherEmail,
 } from '@/lib/db/queries';
+import { getViewerEmails } from '@/lib/mobile-viewer';
+import { resolveShirtNumberForClaim } from '@/lib/claim-resolve';
 import { sponsorGradeLabel, ageYearsFromDob } from '@/lib/mobile/format';
-import { canonicalShirtNumber } from '@/lib/mobile/shirt-cycle';
-import type { Child } from '@/lib/db/schema';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -59,6 +65,10 @@ export interface MobileKidViewer {
   canReadNotes: boolean;
   canWriteNotes: boolean;
   canReadUpdates: boolean;
+  /** True when the viewer can claim this number right now — nobody
+   *  (including them) holds it yet. Drives the reveal screen's
+   *  "Keep #N" CTA. */
+  canClaim: boolean;
 }
 
 export interface MobileKidResponse {
@@ -68,8 +78,20 @@ export interface MobileKidResponse {
   shirtNumber: number | null;
   photoUrl: string | null;
   photoUrls: string[];
+  ageYears: number | null;
+  gradeLabel: string | null;
+  /** One human detail for the reveal screen, composed from the kid's
+   *  "loves" field. Null when we don't have one. */
+  intro: string | null;
   bio: MobileKidBio;
   viewer: MobileKidViewer;
+}
+
+/** Compose the reveal screen's one-line human detail. */
+function introFor(firstName: string, loves: string | null): string | null {
+  const detail = loves?.trim().replace(/\.+$/, '');
+  if (!detail) return null;
+  return `${firstName} loves ${detail}.`;
 }
 
 async function handler(
@@ -88,35 +110,25 @@ async function handler(
 
   const viewer = await requireMobileAuth(request);
 
-  // Direct lookup, then cycle-shirt fallback so #67 → its canonical kid.
-  let child: Child | null = await getChildByShirtNumber(shirtNumber);
-  if (!child) {
-    const canonicalNum = canonicalShirtNumber(shirtNumber);
-    if (canonicalNum) {
-      const canonical = await getChildByShirtNumber(canonicalNum);
-      if (canonical) {
-        child = {
-          ...canonical,
-          shirtNumber,
-          childId: `HSP/BAN-${String(shirtNumber).padStart(3, '0')}`,
-        };
-      }
-    }
-  }
-  if (!child) {
+  const identity = await resolveShirtNumberForClaim(shirtNumber);
+  if (!identity) {
     throw new NotFoundError('Kid not found');
   }
+  const child = identity.canonicalRow;
 
   // Reserved-for-auction kids don't have a profile to surface.
-  if (child.reservedForAuction) {
+  if (identity.reservedForAuction) {
     logger.apiResponse(method, path, 200);
     return createSuccessResponse({
       reserved: true,
       id: child.id,
-      firstName: child.firstName ?? 'them',
+      firstName: identity.firstName,
       shirtNumber: shirtNumber,
       photoUrl: null,
       photoUrls: [],
+      ageYears: null,
+      gradeLabel: null,
+      intro: null,
       bio: {
         fullName: '',
         ageYears: null,
@@ -132,48 +144,83 @@ async function handler(
         canReadNotes: false,
         canWriteNotes: false,
         canReadUpdates: false,
+        canClaim: false,
       },
     } satisfies MobileKidResponse);
   }
 
-  // Viewer-role resolution. Mirrors the /children/[N] page's rules —
-  // monthly requires Active + monthlyAmount > 0; holder is Active-$0
-  // or Holder status; otherSponsor is "this viewer has an Active or
-  // Holder sponsorship of ANOTHER kid but not this one"; anonymous is
-  // the fallback.
-  const summary = await getViewerSponsorshipForChild(viewer.email, {
-    id: child.id,
-    childId: child.childId,
-  });
-  let roleForKid: MobileKidViewerRole;
-  if (summary?.kind === 'sponsor') {
-    roleForKid = 'monthly';
-  } else if (summary?.kind === 'holder') {
-    roleForKid = 'holder';
-  } else {
-    // No sponsorship of THIS kid. If they're claimed by anyone else,
-    // this viewer is a stranger to this kid — treat as anonymous. We
-    // can't tell here whether the viewer sponsors OTHER kids without a
-    // second query; the mobile client resolves that via /kids/mine.
-    // 'otherSponsor' role is reserved for a future join that surfaces
-    // "you sponsor 3 kids but not this one" without an extra fetch.
-    const claimedByAnother = await isChildClaimedByOtherEmail(
-      { id: child.id, childId: child.childId },
-      viewer.email
+  // ── Viewer-role resolution ────────────────────────────────────────
+  // Per-NUMBER first (claimed_shirt_number is the authoritative
+  // ownership column), then child-identity fallback for pre-backfill
+  // rows. Both checks run across the viewer's whole email set.
+  const emails = await getViewerEmails(viewer);
+
+  let roleForKid: MobileKidViewerRole = 'anonymous';
+  let sponsoredSince: string | null = null;
+  let matched = false;
+  for (const email of emails) {
+    const byNumber = await findSponsorshipForEmailAndClaimedNumber(
+      email,
+      shirtNumber
     );
-    roleForKid = claimedByAnother ? 'anonymous' : 'anonymous';
+    if (byNumber) {
+      const amount = Number(byNumber.monthlyAmount ?? 0);
+      roleForKid =
+        byNumber.status === 'Active' && amount > 0 ? 'monthly' : 'holder';
+      sponsoredSince = byNumber.sponsorshipStartDate ?? null;
+      matched = true;
+      if (roleForKid === 'monthly') break;
+      continue;
+    }
+    const summary = await getViewerSponsorshipForChild(email, {
+      id: child.id,
+      childId: child.childId ?? identity.childIdLegacy,
+    });
+    if (summary) {
+      const kind = summary.kind === 'sponsor' ? 'monthly' : 'holder';
+      // Don't demote a monthly found under another email.
+      if (roleForKid !== 'monthly') {
+        roleForKid = kind;
+        sponsoredSince = summary.sponsorshipStartDate ?? null;
+      }
+      matched = true;
+      if (kind === 'monthly') break;
+    }
+  }
+
+  // Claimability — only meaningful for viewers with no relationship
+  // to this number. The claim endpoint re-checks authoritatively; this
+  // flag just decides whether the reveal screen offers the CTA.
+  let canClaim = false;
+  if (!matched) {
+    try {
+      const { isNumberClaimedOutsideEmails } = await import(
+        '@/lib/db/queries'
+      );
+      const takenByOther = await isNumberClaimedOutsideEmails(
+        shirtNumber,
+        identity.childUuid ? null : identity.childIdLegacy,
+        emails
+      );
+      canClaim = !takenByOther;
+    } catch {
+      canClaim = false;
+    }
   }
 
   const canReadNotes = roleForKid === 'monthly';
   const canWriteNotes = roleForKid === 'monthly';
   const canReadUpdates = roleForKid === 'monthly' || roleForKid === 'holder';
 
+  const ageYears = ageYearsFromDob(child.dateOfBirth);
+  const gradeLabel = sponsorGradeLabel(child.gradeClass);
+
   const bio: MobileKidBio = {
     fullName:
       child.displayName ||
       `${child.firstName ?? 'Child'} ${child.lastInitial ?? ''}`.trim(),
-    ageYears: ageYearsFromDob(child.dateOfBirth),
-    gradeLabel: sponsorGradeLabel(child.gradeClass),
+    ageYears,
+    gradeLabel,
     // The current schema doesn't carry "favorite class" or "wants to be"
     // as their own columns — the loves + childQuote fields cover that
     // territory. We surface loves as favoriteClass and childQuote as
@@ -183,24 +230,30 @@ async function handler(
     wantsToBe: child.childQuote ?? null,
     family: child.familyContext ?? null,
     homeVillage: child.homeVillage ?? null,
-    sponsoredSince: summary?.sponsorshipStartDate
-      ? new Date(summary.sponsorshipStartDate).toISOString()
+    sponsoredSince: sponsoredSince
+      ? new Date(sponsoredSince).toISOString()
       : null,
   };
 
   const responseBody: MobileKidResponse = {
     reserved: false,
     id: child.id,
-    firstName: child.firstName ?? 'them',
-    shirtNumber: child.shirtNumber ?? shirtNumber,
+    firstName: identity.firstName,
+    // Always the number the viewer asked about — for cycle numbers the
+    // canonical row's own number is a different shirt entirely.
+    shirtNumber,
     photoUrl: child.profilePhotoUrl ?? null,
     photoUrls: (child.photoUrls as string[] | null) ?? [],
+    ageYears,
+    gradeLabel,
+    intro: introFor(identity.firstName, child.loves ?? null),
     bio,
     viewer: {
       roleForKid,
       canReadNotes,
       canWriteNotes,
       canReadUpdates,
+      canClaim,
     },
   };
 

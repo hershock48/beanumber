@@ -2,11 +2,20 @@
  * GET /api/mobile/v1/kids/mine
  *
  * The signed-in mobile user's "Your kids" list. Returns kids they hold
- * (shirt buyers who claimed a number via Hold-to-Meet) plus kids they
- * sponsor monthly. One row per sponsorship — a viewer with two monthly
- * sponsorships gets two rows; the shirt-holder relationship shows up
- * as one row with `roleForViewer='holder'` when they haven't converted
- * to $25/mo yet.
+ * (shirt buyers who claimed a number) plus kids they sponsor monthly.
+ *
+ * Identity: matches sponsorships on the viewer's EMAIL SET — the
+ * provider email they signed in with AND the verified purchase email
+ * linked via /api/mobile/v1/link/* (see src/lib/mobile-viewer.ts).
+ * Single-email matching was the original build's biggest gap: an
+ * Apple-relay sign-in matched nothing and the app looked empty for
+ * exactly the people who owned the most.
+ *
+ * Numbers: per-number claims (claimed_shirt_number) are authoritative.
+ * Cycle numbers (54+) have no children row of their own — the row
+ * comes back childless from the join and we resolve the canonical kid
+ * for display through the same resolver the claim flow uses, so #67's
+ * holder sees the same kid on mobile as on web.
  *
  * Auth: mobile bearer (see requireMobileAuth). No cookie fallback.
  * Response: 200 with array; 401 when the bearer is missing/invalid.
@@ -17,9 +26,11 @@ import { logger } from '@/lib/logger';
 import { createSuccessResponse, withErrorHandling } from '@/lib/errors';
 import { requireMobileAuth } from '@/lib/auth';
 import {
-  getMobileMineKidsForEmail,
+  getMobileMineKidsForEmails,
   getLatestUpdateForChild,
 } from '@/lib/db/queries';
+import { getViewerEmails } from '@/lib/mobile-viewer';
+import { resolveShirtNumberForClaim } from '@/lib/claim-resolve';
 import { sponsorGradeLabel, ageYearsFromDob } from '@/lib/mobile/format';
 
 export const dynamic = 'force-dynamic';
@@ -46,28 +57,59 @@ async function handler(request: NextRequest): Promise<NextResponse> {
   const path = '/api/mobile/v1/kids/mine';
   logger.apiRequest(method, path);
 
-  // TODO(auth-agent): once the mobile JWT verifier lands, this stays
-  // exactly as-is — the helper resolves to { userId, email } either way.
   const viewer = await requireMobileAuth(request);
+  const emails = await getViewerEmails(viewer);
 
-  const rows = await getMobileMineKidsForEmail(viewer.email);
+  const rows = await getMobileMineKidsForEmails(emails);
 
   // Latest update per kid. Sequential because the sponsor rarely has
   // more than a handful of kids and the per-kid query is cheap; if the
   // /me digest ever needs to fan-out to 100 kids at once, batch this.
   const items: MobileKidsMineItem[] = [];
   for (const r of rows) {
-    if (!r.childRecordId) continue;
     const monthly = Number(r.monthlyAmount ?? 0);
     const roleForViewer: 'monthly' | 'holder' =
       r.status === 'Active' && monthly > 0 ? 'monthly' : 'holder';
 
+    // Display identity. Canonical rows come hydrated from the join.
+    // Cycle-number rows (claimed #54+, no children row) resolve their
+    // canonical kid here — same math as the web claim + /me surfaces.
+    let childRecordId = r.childRecordId;
+    let childIdLegacy = r.childIdLegacy;
+    let firstName = r.firstName;
+    let displayName = r.displayName;
+    let photoUrl = r.profilePhotoUrl;
+    let gradeClass = r.gradeClass;
+    let dateOfBirth: Date | string | null = r.dateOfBirth;
+    if (!childRecordId && r.claimedShirtNumber) {
+      try {
+        const resolved = await resolveShirtNumberForClaim(
+          r.claimedShirtNumber
+        );
+        const canonical = resolved?.canonicalRow;
+        if (canonical) {
+          childRecordId = canonical.id;
+          childIdLegacy = canonical.childId;
+          firstName = canonical.firstName;
+          displayName = canonical.displayName;
+          photoUrl = canonical.profilePhotoUrl;
+          gradeClass = canonical.gradeClass;
+          dateOfBirth = canonical.dateOfBirth;
+        }
+      } catch {
+        // Non-fatal — the row renders numberless-kid-less below and
+        // gets skipped, same as before resolution existed.
+      }
+    }
+
+    if (!childRecordId) continue; // truly childless (unclaimed checkout row)
+
     let lastUpdatePreview: string | null = null;
-    if (r.childIdLegacy) {
+    if (childIdLegacy) {
       try {
         const latest = await getLatestUpdateForChild({
-          id: r.childRecordId,
-          childId: r.childIdLegacy,
+          id: childRecordId,
+          childId: childIdLegacy,
         });
         lastUpdatePreview = latest?.title ?? null;
       } catch {
@@ -78,12 +120,12 @@ async function handler(request: NextRequest): Promise<NextResponse> {
     }
 
     items.push({
-      id: r.childRecordId,
-      firstName: r.firstName ?? r.displayName?.split(' ')[0] ?? 'them',
+      id: childRecordId,
+      firstName: firstName ?? displayName?.split(' ')[0] ?? 'them',
       shirtNumber: r.shirtNumber ?? null,
-      photoUrl: r.profilePhotoUrl ?? null,
-      ageYears: ageYearsFromDob(r.dateOfBirth),
-      gradeLabel: sponsorGradeLabel(r.gradeClass),
+      photoUrl: photoUrl ?? null,
+      ageYears: ageYearsFromDob(dateOfBirth),
+      gradeLabel: sponsorGradeLabel(gradeClass),
       roleForViewer,
       // Placeholder until the read-state table exists. The web /me
       // computes unread via a cookie-persisted last-seen map; mobile
@@ -93,8 +135,22 @@ async function handler(request: NextRequest): Promise<NextResponse> {
     });
   }
 
+  // Dedupe: with two emails in the set, the same kid can arrive on
+  // two rows (e.g. holder row on the purchase email + co-sponsor row
+  // on the provider email). One card per (kid, number) pair; monthly
+  // beats holder when both exist.
+  const seen = new Map<string, MobileKidsMineItem>();
+  for (const item of items) {
+    const key = `${item.id}:${item.shirtNumber ?? 'none'}`;
+    const prior = seen.get(key);
+    if (!prior || (prior.roleForViewer === 'holder' && item.roleForViewer === 'monthly')) {
+      seen.set(key, item);
+    }
+  }
+  const deduped = Array.from(seen.values());
+
   logger.apiResponse(method, path, 200);
-  const body: MobileKidsMineResponse = { kids: items };
+  const body: MobileKidsMineResponse = { kids: deduped };
   return createSuccessResponse(body);
 }
 

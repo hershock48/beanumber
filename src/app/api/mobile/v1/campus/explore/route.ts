@@ -15,9 +15,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { logger } from '@/lib/logger';
 import { createSuccessResponse, withErrorHandling } from '@/lib/errors';
 import { requireMobileAuth } from '@/lib/auth';
+import { getViewerEmails } from '@/lib/mobile-viewer';
 import {
   getExploreKids,
-  getMobileMineKidsForEmail,
+  getMobileMineKidsForEmails,
 } from '@/lib/db/queries';
 import { sponsorGradeLabel, ageYearsFromDob } from '@/lib/mobile/format';
 
@@ -61,7 +62,7 @@ async function handler(request: NextRequest): Promise<NextResponse> {
 
   let excludeChildIds: string[] = [];
   if (excludeMine) {
-    const mine = await getMobileMineKidsForEmail(viewer.email);
+    const mine = await getMobileMineKidsForEmails(await getViewerEmails(viewer));
     excludeChildIds = mine
       .map(r => r.childRecordId)
       .filter((v): v is string => !!v);

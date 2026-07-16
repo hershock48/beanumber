@@ -14,7 +14,7 @@
  *     strings.
  */
 
-import { and, desc, eq, inArray, isNotNull, or, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNotNull, notInArray, or, sql } from 'drizzle-orm';
 import { db } from './client';
 import {
   children,
@@ -378,8 +378,27 @@ export async function isNumberClaimedByOtherEmail(
   cycleLegacyId: string | null,
   excludingEmail: string
 ): Promise<boolean> {
+  return isNumberClaimedOutsideEmails(shirtNumber, cycleLegacyId, [
+    excludingEmail,
+  ]);
+}
+
+/**
+ * Email-SET variant of isNumberClaimedByOtherEmail — the mobile claim
+ * path excludes BOTH of the viewer's emails (provider + linked
+ * purchase email), so a number already held under either of them
+ * never reads as "taken by someone else."
+ */
+export async function isNumberClaimedOutsideEmails(
+  shirtNumber: number,
+  cycleLegacyId: string | null,
+  excludingEmails: string[]
+): Promise<boolean> {
   if (!Number.isFinite(shirtNumber)) return false;
-  const emailLower = excludingEmail.toLowerCase();
+  const emailsLower = Array.from(
+    new Set(excludingEmails.map(e => e.trim().toLowerCase()).filter(Boolean))
+  );
+  if (emailsLower.length === 0) return false;
   const numberMatches = [
     eq(sponsorships.claimedShirtNumber, shirtNumber),
     ...(cycleLegacyId
@@ -391,7 +410,7 @@ export async function isNumberClaimedByOtherEmail(
     .from(sponsorships)
     .where(
       and(
-        sql`lower(${sponsorships.sponsorEmail}) <> ${emailLower}`,
+        notInArray(sql`lower(${sponsorships.sponsorEmail})`, emailsLower),
         or(
           eq(sponsorships.status, 'Active'),
           eq(sponsorships.status, 'Holder')
@@ -1370,11 +1389,14 @@ export async function getNoteThreadForSponsorAndChild(args: {
  */
 export interface MobileMineKidRow {
   sponsorshipId: string;
+  sponsorEmail: string;
+  sponsorName: string | null;
   childRecordId: string | null;
   childIdLegacy: string | null;
   firstName: string | null;
   displayName: string | null;
   shirtNumber: number | null;
+  claimedShirtNumber: number | null;
   profilePhotoUrl: string | null;
   gradeClass: string | null;
   dateOfBirth: Date | null;
@@ -1384,14 +1406,25 @@ export interface MobileMineKidRow {
   createdAt: Date;
 }
 
+/** Single-email convenience wrapper — see getMobileMineKidsForEmails. */
 export async function getMobileMineKidsForEmail(
   viewerEmail: string
 ): Promise<MobileMineKidRow[]> {
-  if (!viewerEmail) return [];
-  const emailLower = viewerEmail.toLowerCase();
+  return getMobileMineKidsForEmails(viewerEmail ? [viewerEmail] : []);
+}
+
+export async function getMobileMineKidsForEmails(
+  viewerEmails: string[]
+): Promise<MobileMineKidRow[]> {
+  const emailsLower = Array.from(
+    new Set(viewerEmails.map(e => e.trim().toLowerCase()).filter(Boolean))
+  );
+  if (emailsLower.length === 0) return [];
   const rows = await db
     .select({
       sponsorshipId: sponsorships.id,
+      sponsorEmail: sponsorships.sponsorEmail,
+      sponsorName: sponsorships.sponsorName,
       childRecordId: sql<string | null>`coalesce(${children.id}, child_legacy.id)`,
       childIdLegacy: sql<
         string | null
@@ -1402,9 +1435,15 @@ export async function getMobileMineKidsForEmail(
       displayName: sql<
         string | null
       >`coalesce(${children.displayName}, child_legacy.display_name)`,
+      // The number the viewer HOLDS. claimed_shirt_number is
+      // authoritative (per-number claims, migration 0017); the kid
+      // rows' shirt_number is the canonical-roster fallback for rows
+      // claimed before the backfill. Cycle numbers (54+) only exist
+      // in claimed_shirt_number — the legacy join finds no row.
       shirtNumber: sql<
         number | null
-      >`coalesce(${children.shirtNumber}, child_legacy.shirt_number)`,
+      >`coalesce(${sponsorships.claimedShirtNumber}, ${children.shirtNumber}, child_legacy.shirt_number)`,
+      claimedShirtNumber: sponsorships.claimedShirtNumber,
       profilePhotoUrl: sql<
         string | null
       >`coalesce(${children.profilePhotoUrl}, child_legacy.profile_photo_url)`,
@@ -1430,7 +1469,7 @@ export async function getMobileMineKidsForEmail(
     )
     .where(
       and(
-        sql`lower(${sponsorships.sponsorEmail}) = ${emailLower}`,
+        inArray(sql`lower(${sponsorships.sponsorEmail})`, emailsLower),
         or(
           eq(sponsorships.status, 'Active'),
           eq(sponsorships.status, 'Holder')
@@ -1452,11 +1491,14 @@ export async function getMobileMineKidsForEmail(
     })
     .map(r => ({
       sponsorshipId: r.sponsorshipId,
+      sponsorEmail: r.sponsorEmail,
+      sponsorName: r.sponsorName,
       childRecordId: r.childRecordId,
       childIdLegacy: r.childIdLegacy,
       firstName: r.firstName,
       displayName: r.displayName,
       shirtNumber: r.shirtNumber,
+      claimedShirtNumber: r.claimedShirtNumber,
       profilePhotoUrl: r.profilePhotoUrl,
       gradeClass: r.gradeClass,
       dateOfBirth: r.dateOfBirth,

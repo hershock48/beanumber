@@ -22,11 +22,12 @@ import {
 } from '@/lib/errors';
 import { requireMobileAuth } from '@/lib/auth';
 import {
-  getChildByShirtNumber,
+  findSponsorshipForEmailAndClaimedNumber,
   getViewerSponsorshipForChild,
   getPublishedUpdatesForChild,
 } from '@/lib/db/queries';
-import { canonicalShirtNumber } from '@/lib/mobile/shirt-cycle';
+import { getViewerEmails } from '@/lib/mobile-viewer';
+import { resolveShirtNumberForClaim } from '@/lib/claim-resolve';
 import type { Child } from '@/lib/db/schema';
 
 export const dynamic = 'force-dynamic';
@@ -61,21 +62,39 @@ async function handler(
 
   const viewer = await requireMobileAuth(request);
 
-  let child: Child | null = await getChildByShirtNumber(shirtNumber);
-  if (!child) {
-    const canonicalNum = canonicalShirtNumber(shirtNumber);
-    if (canonicalNum) child = await getChildByShirtNumber(canonicalNum);
-  }
-  if (!child) {
+  // Same resolver as the claim flow — canonical row ≤53, Batches
+  // cycle math 54+ — so mobile and web agree on which kid a number is.
+  const identity = await resolveShirtNumberForClaim(shirtNumber);
+  if (!identity) {
     throw new NotFoundError('Kid not found');
   }
+  const child: Child = identity.canonicalRow;
 
-  const summary = await getViewerSponsorshipForChild(viewer.email, {
-    id: child.id,
-    childId: child.childId,
-  });
-  // Updates read gate: sponsor (monthly) OR holder of THIS kid.
-  if (!summary) {
+  // Updates read gate: sponsor (monthly) OR holder of THIS kid, on
+  // ANY of the viewer's emails. Per-number claims count — a cycle
+  // number's holder row carries claimed_shirt_number + the synthetic
+  // legacy id, never the canonical kid's own identity.
+  const emails = await getViewerEmails(viewer);
+  let allowed = false;
+  for (const email of emails) {
+    const byNumber = await findSponsorshipForEmailAndClaimedNumber(
+      email,
+      shirtNumber
+    );
+    if (byNumber) {
+      allowed = true;
+      break;
+    }
+    const summary = await getViewerSponsorshipForChild(email, {
+      id: child.id,
+      childId: child.childId ?? identity.childIdLegacy,
+    });
+    if (summary) {
+      allowed = true;
+      break;
+    }
+  }
+  if (!allowed) {
     throw new AuthorizationError(
       `Updates from ${child.firstName ?? 'this kid'} unlock once you're the shirt holder or monthly sponsor.`
     );
