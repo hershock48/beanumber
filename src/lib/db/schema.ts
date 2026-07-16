@@ -1320,10 +1320,13 @@ export const mobileUsers = pgTable(
     email: text('email').notNull(),
     appleSub: text('apple_sub'),
     googleSub: text('google_sub'),
-    // Cached lower-cased email of the sponsorship this user is linked
-    // to, if any. Refreshed on every sign-in so a sponsor who changed
-    // their email in Stripe eventually re-links. NULL for users with
-    // no matching sponsor row.
+    // Lower-cased sponsorship email this user is linked to, if any.
+    // Set two ways: (1) automatically at sign-in when the provider
+    // email matches a sponsorship row, (2) via the verified magic-link
+    // flow (/api/mobile/v1/link/*) when the purchase email differs
+    // from the sign-in email. Once set it is NEVER cleared by a
+    // sign-in (see findOrCreateMobileUser's COALESCE) — only a fresh
+    // link/confirm can change it. NULL for users with no match yet.
     linkedSponsorEmail: text('linked_sponsor_email'),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()

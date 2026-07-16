@@ -41,6 +41,15 @@ export async function findOrCreateMobileUser(
 
   const now = new Date();
 
+  // On re-sign-in, NEVER clobber an existing linked_sponsor_email
+  // with null. The magic-link flow (/api/mobile/v1/link/*) stamps a
+  // verified purchase email onto this row; the provider email often
+  // matches nothing (Apple private relay), so `linkedSponsorEmail`
+  // computed above is null for exactly the users who most need the
+  // link preserved. COALESCE keeps the existing value and only fills
+  // in a fresh match when the row had none.
+  const keepLinked = sql`coalesce(${mobileUsers.linkedSponsorEmail}, ${linkedSponsorEmail})`;
+
   if (identity.provider === 'apple') {
     const [row] = await db
       .insert(mobileUsers)
@@ -55,14 +64,14 @@ export async function findOrCreateMobileUser(
         target: mobileUsers.appleSub,
         set: {
           email: identity.email,
-          linkedSponsorEmail,
+          linkedSponsorEmail: keepLinked,
           lastSeenAt: now,
         },
       })
       .returning();
     return {
       user: row,
-      hasSponsorships: linkedSponsorEmail !== null,
+      hasSponsorships: row.linkedSponsorEmail !== null,
     };
   }
 
@@ -80,14 +89,14 @@ export async function findOrCreateMobileUser(
       target: mobileUsers.googleSub,
       set: {
         email: identity.email,
-        linkedSponsorEmail,
+        linkedSponsorEmail: keepLinked,
         lastSeenAt: now,
       },
     })
     .returning();
   return {
     user: row,
-    hasSponsorships: linkedSponsorEmail !== null,
+    hasSponsorships: row.linkedSponsorEmail !== null,
   };
 }
 
