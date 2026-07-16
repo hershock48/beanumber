@@ -1532,33 +1532,34 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
                     so the button label and link phrase don't fracture
                     mid-word. */}
                 <div className="flex items-center gap-x-4 gap-y-2 flex-wrap flex-shrink-0">
-                  {/* Primary CTA — shirt-first per non-negotiable #4.
-                      Every new sponsorship traces back to a shirt
-                      purchase; /shirts is the correct entry, not a
-                      direct sponsor-checkout link. Same routing pattern
-                      the PenpalBox anon variant uses. */}
-                  <Link
-                    href="/shirts"
-                    className="inline-block whitespace-nowrap bg-[#D4A843] text-[#0d0d0d] hover:bg-[#c49a3a] font-bold uppercase tracking-wider text-xs py-2.5 px-4 transition-colors"
-                  >
-                    Start with a shirt &rarr;
-                  </Link>
-                  {/* Secondary — serves BOTH returning sponsors on a
-                      new device AND the person holding a new shirt
-                      with this number who hasn't claimed it yet. The
-                      previous copy ("Already a sponsor? Sign in")
-                      excluded the second group — the exact person the
-                      product is built around — and left them with a
-                      primary CTA telling them to buy a shirt they're
-                      already holding. Magic-link flow at /signin?n=N
-                      handles sign-in and first-time claim through the
-                      same form. */}
+                  {/* Primary CTA — SIGN IN (Kevin, 2026-07-16). The
+                      realistic anon visitor on /[N] already owns the
+                      shirt with this Number — they bought it, read the
+                      number off the back, and typed it in. Telling
+                      that person to "Start with a shirt" was backwards,
+                      and until they sign in we can't tell a monthly
+                      sponsor from a holder from a stranger. Sign-in is
+                      the gate for all three: sponsors get their view
+                      back, holders get the one-tap upgrade, new
+                      claimers take the number. Sponsorship itself is
+                      session-gated (non-negotiable #4), so this IS the
+                      sponsor path. */}
                   <Link
                     href={`/signin?n=${number}`}
+                    className="inline-block whitespace-nowrap bg-[#D4A843] text-[#0d0d0d] hover:bg-[#c49a3a] font-bold uppercase tracking-wider text-xs py-2.5 px-4 transition-colors"
+                  >
+                    Sign in to sponsor &rarr;
+                  </Link>
+                  {/* Secondary — genuinely cold visitors (shared link,
+                      no shirt). A NEW shirt carries its own Number and
+                      its own kid, not this one, so the copy stays
+                      honest about what /shirts is. */}
+                  <Link
+                    href="/shirts"
                     className="text-xs whitespace-nowrap text-[#666] hover:text-[#D4A843] hover:underline"
                   >
-                    Have a shirt or sponsoring?{' '}
-                    <span className="font-bold">Sign in</span>
+                    No shirt yet?{' '}
+                    <span className="font-bold">Start with a shirt</span>
                   </Link>
                 </div>
               </div>
@@ -2071,17 +2072,13 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
         </ClaimGate>
 
         {/* ── Post-reveal claim prompt ─────────────────────────────
-            The rung that went missing in the 2026-07-12 anon-strip
-            rebuild. The strip above the hero speaks to cold visitors
-            ("Start with a shirt") and returning sponsors ("Already a
-            sponsor? Sign in") — but not to the person the product is
-            built around: someone holding a NEW shirt, post-reveal, at
-            their emotional peak, who isn't a sponsor yet. "Start with
-            a shirt" tells a shirt-owner to buy a shirt; "Already a
-            sponsor?" reads as not-for-them. This card asks for the
-            smallest possible commitment — claim the number, free, no
-            password — and self-manages the moment: fades in ~5s after
-            mount (after the reveal animation lands), dismissible
+            Speaks to the person the product is built around: someone
+            holding a NEW shirt, post-reveal, at their emotional peak,
+            who isn't signed in yet. The strip above the hero and the
+            PenpalBox both lead with "Sign in to sponsor"; this card
+            makes the smallest possible ask on its own beat — claim
+            the number, free, no password — timed to the reveal
+            ('ban-reveal-done' + ~5s of stillness), dismissible
             per-kid via localStorage. Gated OFF for anyone signed in
             (sponsor, holder, or signed in for a different kid) and
             for Shirt + Stay cookie-holders, who get the stronger

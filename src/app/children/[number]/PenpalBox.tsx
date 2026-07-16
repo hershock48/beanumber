@@ -191,8 +191,18 @@ export function PenpalBox({
 
   // Anon-only href. Holder + signed_in_visitor use the client CTA
   // component below, which POSTs to create-sponsor-checkout.
+  //
+  // Anon CTA is SIGN-IN-FIRST (Kevin, 2026-07-16). The realistic anon
+  // visitor on /[N] bought a shirt, read #N off the back, and typed it
+  // in — probably their first visit. Until they sign in we can't tell
+  // a monthly sponsor from a holder from a stranger, and sponsorship
+  // itself is gated behind a session anyway (non-negotiable #4). So
+  // the pitch leads to sign-in, and the holder-upgrade / sponsor view
+  // takes over from there. /shirts is the secondary for genuinely
+  // cold visitors — with honest copy: a NEW shirt carries its own
+  // Number and its own kid, it does not carry {firstName}'s.
   const anonCtaHref = `/signin?n=${shirtNumber}`;
-  const anonCtaLabel = `Sign in to write ${firstName}`;
+  const anonCtaLabel = `Sign in to sponsor ${firstName}`;
 
   // Holder who has already used their included letter cycle AND has
   // a real thread (their sent letter + kid's reply): show the real
@@ -370,17 +380,21 @@ export function PenpalBox({
               </p>
             )}
             {viewerState === 'anon' ? (
-              /* Anon variant: TWO CTAs stacked. Anon covers both
-                 populations:
-                   - Existing sponsors on a new device / signed out
-                     → primary "Sign in to write" (magic link)
-                   - Cold visitors who don't yet sponsor
-                     → secondary "Sponsor {firstName} — $25/month"
-                     which routes through /shirts (shirt-first per
-                     non-negotiable #4).
-                 Split visually so the choice is obvious — the same
-                 button pretending to be both roles was Kevin's
-                 complaint in the previous round. */
+              /* Anon variant, rebuilt 2026-07-16 per Kevin. The old
+                 secondary CTA said "Sponsor {firstName} — $25/month →
+                 we'll ship you a shirt with {firstName}'s number on
+                 the back," which is backwards: a new shirt carries
+                 whatever Number is next in the batch, not this kid's
+                 — this kid's Number is on the shirt the visitor is
+                 probably already holding. The realistic anon visitor
+                 bought a shirt, typed the number off the back, and
+                 landed here for the first time. So:
+                   - Primary: sign in to sponsor. Sign-in is the gate
+                     for everyone — it tells us whether they're a
+                     monthly sponsor (view comes back), a holder
+                     (one-tap upgrade takes over), or new (claim).
+                   - Secondary: /shirts for genuinely cold visitors,
+                     with honest copy about what a new shirt is. */
               <div className="flex flex-col gap-3 items-center">
                 <Link
                   href={anonCtaHref}
@@ -388,18 +402,24 @@ export function PenpalBox({
                 >
                   {anonCtaLabel}
                 </Link>
-                <p className="text-xs uppercase tracking-[0.15em] text-[#888] font-bold">
-                  or, new here?
+                <p className="text-xs text-[#888] leading-relaxed max-w-xs text-center">
+                  Got the shirt with #{shirtNumber}? Signing in makes
+                  this page yours. Already sponsoring monthly? Your
+                  view comes right back &mdash; nothing new gets
+                  charged.
+                </p>
+                <p className="text-xs uppercase tracking-[0.15em] text-[#888] font-bold mt-2">
+                  no shirt yet?
                 </p>
                 <Link
                   href="/shirts"
                   className="inline-block w-full max-w-xs text-center bg-white border-2 border-[#0d0d0d] text-[#0d0d0d] font-bold uppercase tracking-wider py-4 px-8 hover:bg-[#0d0d0d] hover:text-white transition-colors"
                 >
-                  Sponsor {firstName} &mdash; $25/month
+                  Start with a shirt
                 </Link>
                 <p className="text-xs text-[#888] leading-relaxed max-w-xs text-center mt-1">
-                  We&rsquo;ll ship you a shirt with {firstName}&rsquo;s number
-                  on the back. Then this whole page is yours.
+                  Every shirt carries its own Number, and every Number
+                  is a real kid to meet.
                 </p>
               </div>
             ) : childRecordId && childId && childDisplayName ? (

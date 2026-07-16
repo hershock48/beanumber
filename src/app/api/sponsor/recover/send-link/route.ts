@@ -83,8 +83,21 @@ const schema = z.object({
 // not security. Move to Redis when we can justify the dependency.
 const RESEND_WINDOW_MS = 20 * 1000;
 const recentSends = new Map<string, number>();
-function shouldThrottle(emailLower: string): boolean {
+/**
+ * Peek-only throttle check. Deliberately does NOT record a send —
+ * that's markSend()'s job, called only on branches that actually
+ * dispatch an email. The old combined check-and-record meant a
+ * request that sent NOTHING (number claimed by someone else, no
+ * matching sponsorship, validation dead ends) still armed the
+ * 20-second window, so a user who mistyped their shirt number and
+ * corrected it seconds later got a silent no-op and a "check your
+ * email" for an email that was never going to come.
+ */
+function isThrottled(emailLower: string): boolean {
   const last = recentSends.get(emailLower);
+  return Boolean(last && Date.now() - last < RESEND_WINDOW_MS);
+}
+function markSend(emailLower: string): void {
   const now = Date.now();
   // Reap old entries opportunistically so the Map doesn't grow forever.
   if (recentSends.size > 500) {
@@ -92,9 +105,7 @@ function shouldThrottle(emailLower: string): boolean {
       if (now - ts > RESEND_WINDOW_MS) recentSends.delete(k);
     }
   }
-  if (last && now - last < RESEND_WINDOW_MS) return true;
   recentSends.set(emailLower, now);
-  return false;
 }
 
 export async function POST(request: NextRequest) {
@@ -123,7 +134,7 @@ export async function POST(request: NextRequest) {
     // client-side UX still shows "check your email" — the previous
     // send should be arriving. Client also has a cooldown timer on
     // the resend button; this is belt-and-suspenders.
-    if (shouldThrottle(email.toLowerCase())) {
+    if (isThrottled(email.toLowerCase())) {
       console.log(`[Recovery] Throttled resend for ${email}`);
       return NextResponse.json(responseShape);
     }
@@ -252,6 +263,7 @@ export async function POST(request: NextRequest) {
             </body>
           </html>
         `;
+        markSend(email.toLowerCase());
         const sendResult = await sendEmail({
           to: { email, name: '' },
           from: { email: fromEmail, name: 'Be A Number' },
@@ -480,6 +492,7 @@ export async function POST(request: NextRequest) {
       </html>
     `;
 
+    markSend(email.toLowerCase());
     const result = await sendEmail({
       to: { email, name: '' },
       from: { email: fromEmail, name: 'Be A Number' },
