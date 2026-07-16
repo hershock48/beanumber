@@ -21,14 +21,31 @@ import {
 // line. The animation is short enough that running unconditionally
 // on mount is fine; if the user scrolls down later the numbers are
 // already at their final value.
+//
+// SSR fix (2026-07-16 conversion audit): initial state is `end`, not
+// 0 — the server HTML used to read "0 Students · 0 Patients Served",
+// which is the trust section saying the opposite of the truth to
+// search engines, no-JS visitors, and anyone on a slow connection.
+// Now the real numbers are in the HTML from the first byte; on
+// hydration the effect resets to 0 and plays the same count-up. The
+// initial client render matches the server render (both `end`), so
+// there's no hydration mismatch — the animation is purely a
+// post-hydration enhancement, exactly what it should have been.
 // ---------------------------------------------------------------------------
 function useCountUp(end: number, duration = 1800) {
-  const [count, setCount] = useState(0);
+  const [count, setCount] = useState(end);
   const started = useRef(false);
 
   useEffect(() => {
     if (started.current) return;
     started.current = true;
+    // Respect reduced-motion: keep the real number, skip the replay.
+    if (
+      typeof window !== 'undefined' &&
+      window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+    ) {
+      return;
+    }
     const start = performance.now();
     let raf = 0;
     const step = (now: number) => {
@@ -158,9 +175,15 @@ function HomePageInner({ initialChildren }: { initialChildren: Child[] }) {
             Open the bag to meet them.
           </h1>
           <div className="mb-10" />
+          {/* 83¢/day: Gourville's pennies-a-day research — the same
+              commitment framed daily got 52% compliance vs 30% framed
+              as an annual total. Daily framing assimilates to trivial
+              known expenses (a coffee, a vending machine) instead of
+              comparing against big ones. One clause, biggest cheap
+              lift from the 2026-07-16 conversion audit. */}
           <p className="text-lg md:text-xl text-[#FFF8F0]/80 mb-12 max-w-xl mx-auto leading-snug italic">
             The shirt is how you meet them.<br />
-            $25 a month is how you stay.
+            $25 a month — 83&cent; a day — is how you stay.
           </p>
 
           {/* Welcome chip — appears only when the user has just
@@ -453,7 +476,7 @@ function HomePageInner({ initialChildren }: { initialChildren: Child[] }) {
               </div>
               <h3 className="text-lg font-semibold text-[#0d0d0d] mb-3">Stay With Them</h3>
               <p className="text-[#777] text-sm leading-relaxed">
-                For $25/month you stay connected. Write to your Kid and see their handwritten replies, photos of your child through the year, a year-end report card, and the monthly campus newsletter.
+                For $25/month &mdash; about 83&cent; a day &mdash; you stay connected. Write to your Kid and see their handwritten replies, photos of your child through the year, a year-end report card, and the monthly campus newsletter.
               </p>
             </div>
           </div>
