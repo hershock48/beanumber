@@ -94,8 +94,17 @@ export async function POST(request: NextRequest) {
     if (!parsed.success) {
       return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
     }
-    const { email } = parsed.data;
+    // Trim + lowercase-normalize before anything else. Mobile
+    // autofill and copy-paste routinely append trailing whitespace,
+    // and zod's .email() accepts it silently. Every DB lookup below
+    // compares against lower(sponsor_email), so untrimmed input
+    // would silently miss a real sponsorship. Same for the send:
+    // an email with a trailing space is a different SMTP address.
+    const email = parsed.data.email.trim();
     const shirtNumber = parsed.data.shirtNumber;
+    console.log(
+      `[Recovery] request: email=<${email}> shirtNumber=${shirtNumber ?? 'none'}`
+    );
 
     // Throttle before any DB work. Silent success on throttle so the
     // client-side UX still shows "check your email" — the previous
@@ -150,8 +159,23 @@ export async function POST(request: NextRequest) {
       // sponsorCode + shirtNumber (which may be null for a childless
       // holder; makeRecoveryToken normalizes null → 0 sentinel and
       // the callback lands them on /me).
+      let token: string;
       try {
-        const token = makeRecoveryToken(found.sponsorCode, found.shirtNumber);
+        token = makeRecoveryToken(found.sponsorCode, found.shirtNumber);
+      } catch (err) {
+        // makeRecoveryToken throws when CRON_SECRET is missing. If that
+        // env var ever drops out of Vercel, every sign-in silently
+        // fails. ATTENTION-tag so it&rsquo;s greppable alongside the
+        // send-failure logs below.
+        console.error(
+          `[Recovery] ATTENTION email-only token gen FAILED for ${email}:`,
+          err
+        );
+        return NextResponse.json(responseShape);
+      }
+      try {
+        // token is now guaranteed set above; keeping try/catch below
+        // for the send + HTML build.
         const callbackUrl = `${SITE_URL}/api/sponsor/recover/callback?t=${encodeURIComponent(token)}`;
         // Use the same FROM address the working transactional emails
         // (shirt-order confirmations, sponsor welcome, etc.) use. The
@@ -177,8 +201,12 @@ export async function POST(request: NextRequest) {
           typeof found.shirtNumber === 'number' &&
           found.shirtNumber > 0 &&
           found.firstName;
+        // Nav link is 'My Campus' — was renamed from 'Your kids' on
+        // 2026-07-06. Stale copy referring to 'Your kids' in the nav
+        // meant users clicked the email, landed on the site, then
+        // couldn't find the surface the email pointed them at.
         const bodyLine = hasKid
-          ? `Tap the button below to sign in. You&rsquo;ll land on ${found.firstName}&rsquo;s page. From there, the &ldquo;Your kids&rdquo; link in the nav has every kid you sponsor or hold.`
+          ? `Tap the button below to sign in. You&rsquo;ll land on ${found.firstName}&rsquo;s page. From there, the &ldquo;My Campus&rdquo; link in the nav has every kid you sponsor or hold.`
           : `Tap the button below to sign in. Your shirt is being prepared &mdash; once your Number is stamped and shipped, the kid it belongs to will show up on your My Campus page.`;
         const html = `
           <!DOCTYPE html>
@@ -321,7 +349,12 @@ export async function POST(request: NextRequest) {
     try {
       token = makeRecoveryToken(sponsorCode, shirtNumber);
     } catch (err) {
-      console.error('[Recovery] Token generation failed', err);
+      // Missing CRON_SECRET or other signing failure. ATTENTION-tag
+      // so Vercel logs surface it alongside the send-failure logs.
+      console.error(
+        `[Recovery] ATTENTION claim-path token gen FAILED for ${email} #${shirtNumber}:`,
+        err
+      );
       return NextResponse.json(responseShape);
     }
     const callbackUrl = `${SITE_URL}/api/sponsor/recover/callback?t=${encodeURIComponent(token)}`;

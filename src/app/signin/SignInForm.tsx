@@ -132,9 +132,26 @@ export function SignInForm() {
         >
           Link sent to {email}.
         </h1>
-        <p className="text-[#555] text-base leading-relaxed mb-4">
+        <p className="text-[#555] text-base leading-relaxed mb-2">
           Open the email and tap the button. You&rsquo;ll be signed in
           on this device for 30 days. Link is good for 24 hours.
+        </p>
+        {/* Escape hatch for typo&rsquo;d emails. Without this a user who
+            mistyped had to refresh to get back to the form. */}
+        <p className="text-sm text-[#888] mb-4">
+          Wrong email?{' '}
+          <button
+            type="button"
+            onClick={() => {
+              setState('idle');
+              setResends(0);
+              setCooldown(0);
+            }}
+            className="text-[#D4A843] hover:underline font-bold"
+          >
+            Edit it
+          </button>
+          .
         </p>
 
         {/* Spam-folder hint. Deliverability WILL fail for a fraction
