@@ -250,7 +250,7 @@ export async function POST(request: NextRequest) {
               </a>
             </p>
             <p style="color: #888; font-size: 13px;">
-              The link signs you in for 30 days. Any questions, just reply &mdash; comes straight to me.
+              The link signs you in and this device will remember you. Any questions, reply &mdash; comes straight to me.
             </p>
             <hr style="border: none; border-top: 1px solid #e8e0d4; margin: 24px 0;">
             <p style="font-size: 12px; color: #999; line-height: 1.5;">
