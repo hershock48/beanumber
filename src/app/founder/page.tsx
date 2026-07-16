@@ -4,6 +4,7 @@ import { BANNavigation } from '@/components/BANNavigation';
 import { BANFooter } from '@/components/BANFooter';
 
 export const metadata: Metadata = {
+  alternates: { canonical: '/founder' },
   title: "Our Story",
   description: "When the war in Northern Uganda ended, most organizations left. Kevin and Simon stayed. This is the story of how they built something that lasts.",
   openGraph: {
@@ -74,7 +75,7 @@ export default function Founder() {
           <div className="space-y-6 mb-16">
             <div className="mb-8 overflow-hidden">
               <img
-                src="/images/story/kevin-elder.png"
+                src="/images/story/kevin-elder.jpg"
                 alt="Kevin Hershock with a community elder in Northern Uganda"
                 className="w-full max-w-md mx-auto object-cover"
               />
@@ -132,7 +133,7 @@ export default function Founder() {
           <div className="space-y-6 mb-16">
             <div className="mb-8 overflow-hidden">
               <img
-                src="/images/story/simon-leader.png"
+                src="/images/story/simon-leader.jpg"
                 alt="Simon Peter Wilobo in Omoro District, Northern Uganda"
                 className="w-full max-w-md mx-auto object-cover"
               />

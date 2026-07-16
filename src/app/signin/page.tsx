@@ -18,11 +18,19 @@
  */
 
 import { Suspense } from 'react';
+import type { Metadata } from 'next';
 import { BANNavigation } from '@/components/BANNavigation';
 import { BANFooter } from '@/components/BANFooter';
 import { SignInForm } from './SignInForm';
 
 export const dynamic = 'force-dynamic';
+
+export const metadata: Metadata = {
+  title: 'Sign in',
+  // Utility page — nothing for a search result. noindex keeps the
+  // crawl budget on the pages that convert.
+  robots: { index: false, follow: true },
+};
 
 export default function SignInPage() {
   return (

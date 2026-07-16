@@ -3,6 +3,7 @@ import Link from 'next/link';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
+  alternates: { canonical: '/reports/2025-impact-financial-summary' },
   title: "2025 Impact & Financial Summary",
   description: "One-page overview of 2025 outcomes and financials. 700+ medical outreach, 60 women trained, 96.7% program allocation. All reports independently reviewed and publicly available.",
   openGraph: {

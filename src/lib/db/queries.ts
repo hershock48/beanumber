@@ -646,6 +646,47 @@ export interface CampusNewsletterEntry {
 }
 
 /**
+ * One published newsletter by id — the /news/[id] article page.
+ * Only returns Sent/published issues so drafts can't be pulled up
+ * by guessing UUIDs.
+ */
+export async function getNewsletterById(
+  id: string
+): Promise<(CampusNewsletterEntry & { teaser?: string }) | null> {
+  if (!id || !/^[0-9a-f-]{36}$/i.test(id)) return null;
+  const rows = await db
+    .select({
+      id: newsletters.id,
+      title: newsletters.title,
+      subject: newsletters.subject,
+      teaser: newsletters.teaser,
+      bodyHtml: newsletters.bodyHtml,
+      heroPhotoUrl: newsletters.heroPhotoUrl,
+      publishedAt: newsletters.publishedAt,
+      status: newsletters.status,
+    })
+    .from(newsletters)
+    .where(
+      and(
+        eq(newsletters.id, id),
+        or(eq(newsletters.status, 'Sent'), isNotNull(newsletters.publishedAt))
+      )
+    )
+    .limit(1);
+  const r = rows[0];
+  if (!r) return null;
+  return {
+    id: r.id,
+    title: r.title ?? '',
+    subject: r.subject ?? '',
+    teaser: r.teaser ?? undefined,
+    bodyHtml: r.bodyHtml ?? '',
+    heroPhotoUrl: r.heroPhotoUrl ?? undefined,
+    publishedAt: r.publishedAt ? new Date(r.publishedAt).toISOString() : undefined,
+  };
+}
+
+/**
  * Recent published campus newsletters, newest first. Same shape
  * as the existing newsletter-feed.ts function it replaces.
  */

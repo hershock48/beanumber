@@ -26,6 +26,7 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 export const metadata: Metadata = {
+  alternates: { canonical: '/news' },
   title: 'Campus news',
   description:
     'Monthly updates from the campus in Omoro District, Northern Uganda — what the school, clinic, and kids are doing this month.',
@@ -144,6 +145,40 @@ export default async function NewsPage({
               here and on every kid&rsquo;s page on the site.
             </p>
           </div>
+        )}
+
+        {/* Issue archive — plain crawlable links to each issue's own
+            page (/news/[id]). The accordion feed above is the reading
+            experience; these links are how each issue gets its own
+            URL into search engines and how a reader shares one
+            specific month. */}
+        {hasContent && (
+          <section className="mt-12 md:mt-16">
+            <p className="text-xs font-bold uppercase tracking-[0.25em] text-[#D4A843] mb-4">
+              Issue archive
+            </p>
+            <ul className="space-y-2">
+              {newsletters.map(n => (
+                <li key={n.id}>
+                  <Link
+                    href={`/news/${n.id}`}
+                    className="text-[#0d0d0d] hover:text-[#D4A843] underline decoration-[#e8e0d4] hover:decoration-[#D4A843] underline-offset-4 transition-colors"
+                  >
+                    {n.subject || n.title || 'From the campus'}
+                    {n.publishedAt && (
+                      <span className="text-[#999] no-underline ml-2 text-sm">
+                        &middot;{' '}
+                        {new Date(n.publishedAt).toLocaleDateString('en-US', {
+                          month: 'long',
+                          year: 'numeric',
+                        })}
+                      </span>
+                    )}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </section>
         )}
 
         {/* Bottom CTAs — relationship paths into the rest of BAN */}

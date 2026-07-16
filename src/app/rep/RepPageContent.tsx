@@ -184,7 +184,7 @@ export default function RepPageContent() {
         <div className="max-w-4xl mx-auto grid grid-cols-2 gap-4">
           <div className="relative aspect-[4/3] bg-[#f5f0e8] overflow-hidden">
             <Image
-              src="/images/story/kids-hugging.png"
+              src="/images/story/kids-hugging.jpg"
               alt="Children at the campus"
               fill
               className="object-cover"
@@ -192,7 +192,7 @@ export default function RepPageContent() {
           </div>
           <div className="relative aspect-[4/3] bg-[#f5f0e8] overflow-hidden">
             <Image
-              src="/images/impact-page/lead-image-kevin.png"
+              src="/images/impact-page/lead-image-kevin.jpg"
               alt="Kevin with a mother and child in Northern Uganda"
               fill
               className="object-cover"

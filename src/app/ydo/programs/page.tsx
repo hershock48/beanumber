@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 
 export const metadata: Metadata = {
+  alternates: { canonical: '/ydo/programs' },
   title: "Our Programs",
   description: "YDO implements education support, vocational training, psycho-social support, and child protection programs in Northern Uganda, empowering war-affected communities.",
   openGraph: {

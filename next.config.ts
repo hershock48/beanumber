@@ -58,6 +58,18 @@ const nextConfig: NextConfig = {
   async redirects() {
     return [
       {
+        // Canonical host. The Vercel-level apex→www redirect was
+        // issuing 307 (temporary), which tells search engines to
+        // keep both hosts in the index and splits whatever link
+        // equity beanumber.org accrues. This app-level rule answers
+        // 308 (permanent) so the engines consolidate onto www.
+        // Matched by host header so it only fires for the apex.
+        source: '/:path*',
+        has: [{ type: 'host', value: 'beanumber.org' }],
+        destination: 'https://www.beanumber.org/:path*',
+        permanent: true,
+      },
+      {
         // /sponsorship → /shirts. The page went through a
         // kid-picker → explore → sign-in-gated arc. Pointing the
         // legacy URL straight at /shirts keeps cold visitors on

@@ -4,6 +4,7 @@ import Image from 'next/image';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
+  alternates: { canonical: '/governance' },
   title: "Governance & Financials",
   description: "Be A Number, International is a 501(c)(3) public charity (EIN: 93-1948872). In 2025, 96.7% of funding directly supported programs. View our financial stewardship and governance structure.",
   openGraph: {

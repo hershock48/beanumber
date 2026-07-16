@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 
 export const metadata: Metadata = {
+  alternates: { canonical: '/ydo/about' },
   title: "About Us",
   description: "Youth Development Organisation Uganda (YDO) is a Ugandan nonprofit based in Gulu District that rehabilitates and empowers war-affected communities through education, psycho-social support, and advocacy.",
   openGraph: {

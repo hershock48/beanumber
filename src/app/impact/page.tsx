@@ -5,6 +5,7 @@ import { BANNavigation } from '@/components/BANNavigation';
 import { BANFooter } from '@/components/BANFooter';
 
 export const metadata: Metadata = {
+  alternates: { canonical: '/impact' },
   title: '2025 Impact',
   description:
     'What happened on six acres in Northern Uganda in 2025. 700+ patients treated, 68 adults trained, 30 local jobs, school capacity for 380.',
@@ -215,7 +216,7 @@ export default function Impact() {
         <div className="max-w-4xl mx-auto">
           <div className="relative w-full aspect-[16/9] bg-[#f5f0e8] border border-[#e8e0d4] overflow-hidden">
             <Image
-              src="/images/impact-page/lead-image-kevin.png"
+              src="/images/impact-page/lead-image-kevin.jpg"
               alt="Kevin seated with a mother and child in Northern Uganda"
               fill
               className="object-cover"

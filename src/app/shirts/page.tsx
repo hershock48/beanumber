@@ -2,6 +2,7 @@ import { Suspense } from 'react';
 import ShirtsPageContent from './ShirtsPageContent';
 
 export const metadata = {
+  alternates: { canonical: '/shirts' },
   title: 'Shirts',
   description: 'Every Shirt has a Number. Heavyweight blanks. Handmade to order. Your Number belongs to a real Child.',
 };

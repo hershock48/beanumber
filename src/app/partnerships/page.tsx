@@ -4,6 +4,7 @@ import Image from 'next/image';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
+  alternates: { canonical: '/partnerships' },
   title: "Partnerships",
   description: "Be A Number partners with University of Worcester (UK), Youth Development Organization (YDO), and Rotary Clubs to ensure program quality, accountability, and replicability across post-conflict regions.",
   openGraph: {

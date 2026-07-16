@@ -1136,6 +1136,14 @@ export async function generateMetadata({ params }: ChildPageProps) {
   // to spoil the reveal. The child's name and photo only appear in the page
   // body itself — by then the viewer has already chosen to meet them.
   return {
+    // noindex (2026-07-16 SEO pass): 300 shirt numbers render
+    // near-identical thin HTML here (the content is behind the
+    // Hold-to-Meet reveal), which search engines read as mass
+    // duplicate content and which can drag the whole domain. The
+    // indexable kid surface is /meet/[id] — public, full bio in the
+    // HTML, no number to spoil. follow keeps link equity moving
+    // through the page.
+    robots: { index: false, follow: true },
     // Layout template appends '| Be A Number' — the old literal
     // rendered 'Be A Number · Meet your child | Be A Number'.
     title: 'Meet your child',

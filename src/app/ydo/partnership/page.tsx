@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 
 export const metadata: Metadata = {
+  alternates: { canonical: '/ydo/partnership' },
   title: "Our Partnership",
   description: "YDO collaborates as a core implementation partner with Be A Number, International, combining strategic systems design with local execution capacity in Northern Uganda.",
   openGraph: {

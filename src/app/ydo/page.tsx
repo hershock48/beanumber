@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 
 export const metadata: Metadata = {
+  alternates: { canonical: '/ydo' },
   title: "Home",
   description: "Youth Development Organisation Uganda (YDO) rehabilitates war-affected communities in Northern Uganda through education, psycho-social support, vocational training, and advocacy for children's rights.",
   openGraph: {

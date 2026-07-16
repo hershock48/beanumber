@@ -62,12 +62,17 @@ interface Child {
   shirt_number_end?: number;
 }
 
-function HomePageInner() {
+function HomePageInner({ initialChildren }: { initialChildren: Child[] }) {
   const [searchNumber, setSearchNumber] = useState('');
-  const [children, setChildren] = useState<Child[]>([]);
-  const [loading, setLoading] = useState(true);
   const router = useRouter();
   const searchInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Roster arrives from the server component (already shuffled, once
+  // per ISR regeneration) so the carousel is in the initial HTML —
+  // faces for the first paint, content for search engines, no
+  // spinner, no pop-in. Replaces the old client fetch of
+  // /api/children.
+  const childrenWithPhotos = initialChildren.filter(c => !!c.photo_url);
 
   // Welcome state: user just signed in via magic link and an OLDER
   // email link redirected them to /?welcome=1&n=N (new links deep-
@@ -114,27 +119,6 @@ function HomePageInner() {
     const delta = el.clientWidth * 0.8;
     el.scrollBy({ left: direction === 'right' ? delta : -delta, behavior: 'smooth' });
   };
-  // Shuffled client-side after fetch so every visit surfaces different kids.
-  const [childrenWithPhotos, setChildrenWithPhotos] = useState<Child[]>([]);
-
-  useEffect(() => {
-    fetch('/api/children')
-      .then(res => res.json())
-      .then(data => {
-        const all = (data.children || []) as Child[];
-        setChildren(all);
-        // Shuffle the subset that have photos (Fisher-Yates)
-        const arr = all.filter(c => !!c.photo_url);
-        for (let i = arr.length - 1; i > 0; i--) {
-          const j = Math.floor(Math.random() * (i + 1));
-          [arr[i], arr[j]] = [arr[j], arr[i]];
-        }
-        setChildrenWithPhotos(arr);
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
-  }, []);
-
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     const n = searchNumber.trim();
@@ -318,11 +302,7 @@ function HomePageInner() {
           </p>
         </div>
 
-        {loading ? (
-          <div className="text-center py-16">
-            <div className="inline-block w-8 h-8 border-2 border-[#D4A843]/20 border-t-[#D4A843] rounded-full animate-spin" />
-          </div>
-        ) : childrenWithPhotos.length === 0 ? (
+        {childrenWithPhotos.length === 0 ? (
           <div className="text-center py-16 bg-white border border-[#e8e0d4] max-w-md mx-auto">
             <p className="text-[#0d0d0d] text-lg mb-2 font-medium">New profiles coming soon.</p>
             <p className="text-[#999] text-sm mb-8 px-6">
@@ -573,8 +553,12 @@ function HomePageInner() {
  * opposite: the null fallback made the entire homepage render blank
  * until hydration.
  */
-export function HomePageContent() {
-  return <HomePageInner />;
+export function HomePageContent({
+  initialChildren,
+}: {
+  initialChildren: Child[];
+}) {
+  return <HomePageInner initialChildren={initialChildren} />;
 }
 
 // ---------------------------------------------------------------------------

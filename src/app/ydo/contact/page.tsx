@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 
 export const metadata: Metadata = {
+  alternates: { canonical: '/ydo/contact' },
   title: "Contact Us",
   description: "Get in touch with Youth Development Organisation Uganda (YDO) in Gulu District, Northern Uganda.",
   openGraph: {
