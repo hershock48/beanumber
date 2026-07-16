@@ -232,7 +232,7 @@ export function PenpalBox({
           just above (with the real thread), so the header exists
           in that case too — this comment applies to the anon /
           signed-in-visitor / no-thread-yet holder cases. */}
-      <div className="relative border border-[#e8e0d4] bg-white">
+      <div className="relative border border-[#e8e0d4] bg-white overflow-hidden">
         {showRealHolderThread ? (
           /* Clean upgrade card — no fake-sample thread. The viewer
              just scrolled past their real letter and their kid's
@@ -277,9 +277,22 @@ export function PenpalBox({
         ) : (
           <>
         {/* Frosted preview — a fake sample thread. Reads like the
-            real surface would look. */}
+            real surface would look.
+
+            LAYERING FIX 2026-07-16. This used to be the in-flow
+            element with the CTA absolutely positioned on top
+            (absolute inset-0 + flex-center). The CTA content is
+            TALLER than the sample thread on most viewports, so it
+            overflowed the card — the heading spilled above the top
+            border, buttons landed on the sample quotes through a
+            white/40 frost, and the whole section read as broken
+            (Kevin's screenshot, kid #230). Layers are now inverted:
+            the samples are the absolutely-positioned BACKDROP
+            (cropped by the card's overflow-hidden) and the CTA is
+            in normal flow, so the card is always exactly as tall as
+            its content and nothing can ever collide. */}
         <div
-          className="relative overflow-hidden"
+          className="absolute inset-0"
           style={{ filter: 'blur(3.5px) saturate(1.1)' }}
           aria-hidden="true"
         >
@@ -318,9 +331,12 @@ export function PenpalBox({
           </div>
         </div>
 
-        {/* Overlay pill + CTA. Sits on top of the blur, non-blurred. */}
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/40 backdrop-blur-[1px]">
-          <div className="max-w-md w-full mx-auto text-center px-6 py-8">
+        {/* CTA layer. In normal flow (sizes the card); the frost is
+            stronger than the old white/40 so the sample letters ghost
+            through as texture instead of fighting the copy for
+            legibility. */}
+        <div className="relative bg-white/85 backdrop-blur-[2px]">
+          <div className="max-w-md w-full mx-auto text-center px-6 py-10 md:py-12">
             <p
               className="text-2xl md:text-[26px] text-[#0d0d0d] mb-3 leading-tight"
               style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}

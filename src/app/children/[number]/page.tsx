@@ -2092,7 +2092,12 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
           !child.viewer_is_sponsor &&
           !child.viewer_is_holder &&
           !showClaimCard && (
-            <div className="mt-12 md:mt-16">
+            /* max-w-2xl matches the reading column above (bio +
+               PenpalBox live in a max-w-2xl column inside the
+               max-w-5xl main). Without the constraint this card
+               rendered edge-to-edge of the 5xl main and read as a
+               full-width slab under the narrower penpal card. */
+            <div className="mt-12 md:mt-16 max-w-2xl mx-auto">
               <ClaimThisNumberCard
                 shirtNumber={Number(number)}
                 firstName={firstName}
