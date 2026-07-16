@@ -192,7 +192,13 @@ function HomePageInner({ initialChildren }: { initialChildren: Child[] }) {
             style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
           >
             One shirt. One kid.<br />
-            Open the bag to meet them.
+            {/* Kevin 2026-07-16: this line was rewrapping to leave
+                "them." alone on line three. md+ gets one unbreakable
+                line; below md the nbsp in "meet them." keeps the
+                only allowed wrap at "Open the bag / to meet them." */}
+            <span className="md:whitespace-nowrap">
+              Open the bag to meet them.
+            </span>
           </h1>
           <div className="mb-10" />
           {/* 83¢/day: Gourville's pennies-a-day research — the same
