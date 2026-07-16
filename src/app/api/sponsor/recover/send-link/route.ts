@@ -153,7 +153,23 @@ export async function POST(request: NextRequest) {
       try {
         const token = makeRecoveryToken(found.sponsorCode, found.shirtNumber);
         const callbackUrl = `${SITE_URL}/api/sponsor/recover/callback?t=${encodeURIComponent(token)}`;
-        const fromEmail = process.env.SENDGRID_FROM_EMAIL || 'Kevin@beanumber.org';
+        // Use the same FROM address the working transactional emails
+        // (shirt-order confirmations, sponsor welcome, etc.) use. The
+        // previous hardcoded fallback of 'Kevin@beanumber.org' meant
+        // that if Kevin's Gmail Workspace didn't have that exact
+        // capitalization / Send-As identity configured, the Gmail API
+        // would accept the send but the recipient&rsquo;s inbox would
+        // silently drop it as unauthenticated. Diagnosed 2026-07-16
+        // after Ashley + Randi reported never receiving links while
+        // the same account was successfully sending Thank You emails
+        // to the same recipients hours apart.
+        const fromEmail =
+          process.env.GMAIL_FROM_EMAIL ||
+          process.env.SENDGRID_FROM_EMAIL ||
+          'Kevin@beanumber.org';
+        console.log(
+          `[Recovery] email-only send: to=${email} from=${fromEmail}`
+        );
         // Body copy varies slightly by whether we can name the kid.
         // Childless holders (no shirt reconciled yet) land on /me,
         // so the message can't promise "you'll land on {Kid}'s page."
@@ -310,7 +326,16 @@ export async function POST(request: NextRequest) {
     }
     const callbackUrl = `${SITE_URL}/api/sponsor/recover/callback?t=${encodeURIComponent(token)}`;
 
-    const fromEmail = process.env.SENDGRID_FROM_EMAIL || 'Kevin@beanumber.org';
+    // Same GMAIL_FROM_EMAIL alignment as the email-only branch above.
+    // Hardcoded 'Kevin@beanumber.org' fallback was the silent-drop
+    // cause when Gmail Workspace's Send-As identity didn't match.
+    const fromEmail =
+      process.env.GMAIL_FROM_EMAIL ||
+      process.env.SENDGRID_FROM_EMAIL ||
+      'Kevin@beanumber.org';
+    console.log(
+      `[Recovery] claim-path send: to=${email} #${shirtNumber} from=${fromEmail}`
+    );
     const subject = isFreshClaim
       ? `#${shirtNumber} is yours — open ${firstName}'s page`
       : `Sign in to ${firstName}'s page`;
