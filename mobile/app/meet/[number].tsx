@@ -19,7 +19,7 @@
  * loading spinner — the transition IS the loading state).
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { View, useWindowDimensions } from 'react-native';
+import { Alert, View } from 'react-native';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -34,9 +34,11 @@ import { HoldButton } from '../../components/reveal/HoldButton';
 import { AmbientGlow } from '../../components/reveal/AmbientGlow';
 import { KidReveal } from '../../components/reveal/KidReveal';
 import {
+  claimNumber,
   getMobileKid,
   MobileKidDetail,
   ApiError,
+  NumberClaimedError,
 } from '../../lib/api';
 import { revealCompletion } from '../../lib/haptics';
 
@@ -120,7 +122,7 @@ export default function MeetScreen() {
   const retryFetch = useCallback(() => {
     setFetchError(null);
     setPhase('idle');
-    kidPromise.current = getKidByShirtNumber(number);
+    kidPromise.current = getMobileKid(number);
     kidPromise.current
       .then(k => setKid(k))
       .catch((err: ApiError) => {
@@ -128,6 +130,62 @@ export default function MeetScreen() {
         setPhase('failed');
       });
   }, [number]);
+
+  // ── Claim — the explicit "Keep #N" moment ────────────────────────
+  // NEVER automatic: a shared /meet link must not steal the number
+  // from the person actually holding the shirt. The viewer taps, the
+  // server binds (or blocks), and the screen re-frames around the
+  // new relationship.
+  const [claiming, setClaiming] = useState(false);
+  const handleClaim = useCallback(async () => {
+    if (!kid || claiming) return;
+    setClaiming(true);
+    try {
+      const result = await claimNumber(number);
+      // Locally reflect the new role so the CTAs re-frame instantly.
+      setKid(prev =>
+        prev
+          ? {
+              ...prev,
+              viewer: {
+                ...prev.viewer,
+                roleForKid: result.role,
+                canClaim: false,
+                canReadUpdates: true,
+                canReadNotes: result.role === 'monthly',
+                canWriteNotes: result.role === 'monthly',
+              },
+            }
+          : prev
+      );
+      // Fresh holders get the conversion moment; a bound monthly row
+      // goes straight to the kid page with the composer open.
+      if (result.role === 'monthly') {
+        router.replace(`/children/${number}?compose=1`);
+      } else {
+        router.replace(`/keep-going/${number}`);
+      }
+    } catch (err) {
+      if (err instanceof NumberClaimedError) {
+        Alert.alert(
+          `#${number} is already spoken for`,
+          `Someone else has already claimed this number. If you're the one holding the shirt, email kevin@beanumber.org — a person answers, and we'll get it sorted.`
+        );
+        setKid(prev =>
+          prev
+            ? { ...prev, viewer: { ...prev.viewer, canClaim: false } }
+            : prev
+        );
+      } else {
+        Alert.alert(
+          "That didn't go through",
+          'Check your connection and try again in a moment.'
+        );
+      }
+    } finally {
+      setClaiming(false);
+    }
+  }, [kid, claiming, number, router]);
 
   const buttonLayerStyle = useAnimatedStyle(() => ({
     opacity: buttonLayerOpacity.value,
@@ -240,21 +298,32 @@ export default function MeetScreen() {
               intro: kid.intro ?? undefined,
               location: kid.location || 'Hope Bridge Primary · Omoro District, Uganda',
             }}
+            // CTA ladder, in order of the viewer's relationship:
+            //   unclaimed number  → "Keep #N" (explicit claim — the
+            //                       shirt-holder moment)
+            //   monthly sponsor   → straight to the composer
+            //   everyone else     → the conversion ask
             primaryLabel={
-              kid.viewer.canWriteNotes
-                ? `Send ${kid.firstName} a note`
-                : `Yes, sponsor ${kid.firstName}`
+              kid.viewer.canClaim
+                ? claiming
+                  ? 'Making it yours…'
+                  : `Keep #${number} — it's yours`
+                : kid.viewer.canWriteNotes
+                  ? `Send ${kid.firstName} a note`
+                  : `Yes, sponsor ${kid.firstName}`
             }
             onPrimaryPress={() => {
-              if (kid.viewer.canWriteNotes) {
-                router.push(`/children/${kid.shirtNumber}?compose=1`);
+              if (kid.viewer.canClaim) {
+                void handleClaim();
+              } else if (kid.viewer.canWriteNotes) {
+                router.push(`/children/${number}?compose=1`);
               } else {
-                router.push(`/keep-going/${kid.shirtNumber}`);
+                router.push(`/keep-going/${number}`);
               }
             }}
             secondaryLabel={`Look around ${kid.firstName}'s page`}
             onSecondaryPress={() => {
-              router.push(`/children/${kid.shirtNumber}`);
+              router.push(`/children/${number}`);
             }}
           />
         </Animated.View>

@@ -116,3 +116,34 @@ export function resolveIncomingUrl(url: string | null): string | null {
   if (!parsed) return null;
   return routeFor(parsed);
 }
+
+// ─── Meet-intent helpers (merged from the old lib/deep-link.ts) ──────
+//
+// The sign-in screen reads "was the app opened via /meet/[N]?" to
+// drive its headline + post-sign-in destination. Lived in a
+// confusingly-near-duplicate file (deep-link.ts vs deepLink.ts) —
+// merged here 2026-07-16 so there is exactly one deep-link module.
+
+/**
+ * Extract a shirt number from a `/meet/N` path. Returns null when
+ * the URL is null / not a meet path / not a valid number.
+ */
+export function extractMeetShirtNumber(url: string | null): number | null {
+  if (!url) return null;
+  const parsed = parseIncomingUrl(url);
+  if (!parsed) return null;
+  const match = parsed.pathname.match(/^\/meet\/(\d+)\/?$/);
+  if (!match) return null;
+  const n = Number(match[1]);
+  if (!Number.isFinite(n) || n <= 0 || Math.floor(n) !== n) return null;
+  return n;
+}
+
+export async function getInitialMeetShirtNumber(): Promise<number | null> {
+  try {
+    const url = await Linking.getInitialURL();
+    return extractMeetShirtNumber(url);
+  } catch {
+    return null;
+  }
+}

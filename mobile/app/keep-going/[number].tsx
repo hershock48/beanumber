@@ -39,7 +39,7 @@ export default function KeepGoingScreen() {
     const url = `${API_BASE_URL}/children/${shirtNumber}?source=app&intent=sponsor`;
     try {
       await WebBrowser.openBrowserAsync(url, {
-        presentationStyle: WebBrowser.WebBrowserPresentationStyle.PageSheet,
+        presentationStyle: WebBrowser.WebBrowserPresentationStyle.PAGE_SHEET,
       });
     } finally {
       // Return to the kid page regardless of outcome. If they converted,
@@ -50,7 +50,6 @@ export default function KeepGoingScreen() {
   };
 
   const firstName = kid?.firstName ?? 'them';
-  const pronoun = 'him'; // TODO: pull pronoun from kid data when we add it
 
   return (
     <SafeAreaView
@@ -99,8 +98,10 @@ export default function KeepGoingScreen() {
           align="center"
           style={{ marginTop: SPACING.l }}
         >
-          Write {pronoun}. {pronoun.charAt(0).toUpperCase() + pronoun.slice(1)}{' '}
-          writes back. {firstName}'s updates and photos land every month.
+          {/* Singular "they" until the schema carries a pronoun field —
+              never guess a kid's pronoun from a name. */}
+          Write to {firstName}. {firstName} writes back. Updates and
+          photos land every month.
         </Text>
         <Text
           variant="bodySmall"
@@ -124,7 +125,7 @@ export default function KeepGoingScreen() {
         </Button>
         <View style={{ marginTop: SPACING.m, alignItems: 'center' }}>
           <Button variant="ghost" onPress={goKidPage}>
-            Not yet — meet {pronoun} first
+            Not yet — meet {firstName} first
           </Button>
         </View>
       </View>

@@ -41,7 +41,7 @@ import { useAuth } from '../../hooks/useAuth';
 import {
   extractMeetShirtNumber,
   getInitialMeetShirtNumber,
-} from '../../lib/deep-link';
+} from '../../lib/deepLink';
 
 // Dev bypass — visible only when EXPO_PUBLIC_MOBILE_DEV_AUTH=1 in the
 // client env AND the server has MOBILE_DEV_AUTH=1 set. Both are cleaned

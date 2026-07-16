@@ -12,8 +12,9 @@
  * Zero gold CTAs on this whole screen. Home is a place to be, not a
  * funnel. Pull-to-refresh spinner tinted umber (never gold).
  */
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  AppState,
   ScrollView,
   View,
   RefreshControl,
@@ -28,7 +29,10 @@ import { Skeleton } from '../../components/design/Skeleton';
 import { KidCard } from '../../components/kids/KidCard';
 import { FeedCard } from '../../components/home/FeedCard';
 import { NewsletterCard } from '../../components/home/NewsletterCard';
+import { EnterNumberSheet } from '../../components/home/EnterNumberSheet';
+import { LinkEmailSheet } from '../../components/account/LinkEmailSheet';
 import {
+  getMe,
   getMyKids,
   getCampusFeed,
   getLatestNewsletter,
@@ -37,29 +41,34 @@ import {
   CampusFeedItem,
   LatestNewsletter,
 } from '../../lib/api';
-import { useAuth } from '../../hooks/useAuth';
 
 export default function SponsorHome() {
   const router = useRouter();
-  const { user } = useAuth();
   const [kids, setKids] = useState<MyKidRow[]>([]);
   const [feed, setFeed] = useState<CampusFeedItem[]>([]);
   const [newsletter, setNewsletter] = useState<LatestNewsletter | null>(null);
   const [explore, setExplore] = useState<MyKidRow[]>([]);
+  const [firstName, setFirstName] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [numberSheetOpen, setNumberSheetOpen] = useState(false);
+  const [linkSheetOpen, setLinkSheetOpen] = useState(false);
 
   const load = useCallback(async () => {
-    const [k, f, n, e] = await Promise.allSettled([
+    const [k, f, n, e, m] = await Promise.allSettled([
       getMyKids(),
       getCampusFeed({ limit: 10 }),
       getLatestNewsletter(),
       getExploreKids({ limit: 3, excludeMine: true }),
+      getMe(),
     ]);
     if (k.status === 'fulfilled') setKids(k.value);
     if (f.status === 'fulfilled') setFeed(f.value.items);
     if (n.status === 'fulfilled') setNewsletter(n.value);
     if (e.status === 'fulfilled') setExplore(e.value);
+    // Real name from the server (donor record / checkout name) — never
+    // derived from the email local-part. Null greets namelessly.
+    if (m.status === 'fulfilled') setFirstName(m.value.firstName ?? null);
   }, []);
 
   useEffect(() => {
@@ -67,13 +76,25 @@ export default function SponsorHome() {
     load().finally(() => setLoading(false));
   }, [load]);
 
+  // Refetch on foreground return — the email-link flow finishes in the
+  // user's mail app / browser, so the kids appear the moment they
+  // come back without needing a manual pull-to-refresh.
+  const appState = useRef(AppState.currentState);
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', next => {
+      if (appState.current.match(/inactive|background/) && next === 'active') {
+        void load();
+      }
+      appState.current = next;
+    });
+    return () => sub.remove();
+  }, [load]);
+
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     await load();
     setRefreshing(false);
   }, [load]);
-
-  const firstName = user?.email ? deriveFirstName(user.email) : 'friend';
 
   return (
     <SafeAreaView
@@ -94,7 +115,7 @@ export default function SponsorHome() {
         {/* Greeting */}
         <View style={{ paddingHorizontal: SPACING.l, marginTop: SPACING.l }}>
           <Text variant="h1" color="ink">
-            Hey {firstName}.
+            {firstName ? `Hey ${firstName}.` : 'Hey there.'}
           </Text>
         </View>
 
@@ -105,10 +126,47 @@ export default function SponsorHome() {
             <YourKidsSkeleton />
           ) : kids.length === 0 ? (
             <View style={{ paddingHorizontal: SPACING.l }}>
-              <Text variant="bodySmall" color="umber">
-                No kids on your account yet. When someone claims a shirt with
-                your card on it, they'll land here.
+              <Text variant="body" color="ink">
+                Holding a shirt? The kid on the other end of that Number
+                is waiting to meet you.
               </Text>
+              <Pressable
+                onPress={() => setNumberSheetOpen(true)}
+                accessibilityRole="button"
+                style={{
+                  marginTop: SPACING.m,
+                  backgroundColor: COLORS.gold,
+                  paddingVertical: SPACING.m,
+                  borderRadius: RADIUS.pill,
+                  alignItems: 'center',
+                }}
+              >
+                <Text
+                  color="ink"
+                  style={{
+                    fontFamily: TEXT_STYLES.h3.fontFamily,
+                    fontSize: 15,
+                  }}
+                >
+                  Enter your Number
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => setLinkSheetOpen(true)}
+                accessibilityRole="button"
+                style={{ marginTop: SPACING.m, alignSelf: 'center' }}
+              >
+                <Text
+                  color="ink"
+                  style={{
+                    fontFamily: TEXT_STYLES.textLink.fontFamily,
+                    fontSize: TEXT_STYLES.textLink.fontSize,
+                    textDecorationLine: 'underline',
+                  }}
+                >
+                  Already claimed yours on the website? Connect that email
+                </Text>
+              </Pressable>
             </View>
           ) : (
             <ScrollView
@@ -272,6 +330,15 @@ export default function SponsorHome() {
           </View>
         ) : null}
       </ScrollView>
+
+      <EnterNumberSheet
+        visible={numberSheetOpen}
+        onClose={() => setNumberSheetOpen(false)}
+      />
+      <LinkEmailSheet
+        visible={linkSheetOpen}
+        onClose={() => setLinkSheetOpen(false)}
+      />
     </SafeAreaView>
   );
 }
@@ -336,9 +403,3 @@ function FeedSkeleton() {
   );
 }
 
-function deriveFirstName(email: string): string {
-  const local = email.split('@')[0] || '';
-  const chunk = local.split(/[._+]/)[0] || local;
-  if (!chunk) return 'friend';
-  return chunk.charAt(0).toUpperCase() + chunk.slice(1).toLowerCase();
-}

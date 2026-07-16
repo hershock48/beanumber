@@ -22,12 +22,14 @@ import { ListItem } from '../../components/design/ListItem';
 import { Skeleton } from '../../components/design/Skeleton';
 import { deleteAccount, getMe, MeResponse } from '../../lib/api';
 import { useAuth } from '../../hooks/useAuth';
+import { LinkEmailSheet } from '../../components/account/LinkEmailSheet';
 
 export default function MeTab() {
   const { signOut } = useAuth();
   const [me, setMe] = useState<MeResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [linkSheetOpen, setLinkSheetOpen] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -275,6 +277,11 @@ export default function MeTab() {
                   }}
                 />
                 <ListItem
+                  title="Connect a purchase email"
+                  showChevron
+                  onPress={() => setLinkSheetOpen(true)}
+                />
+                <ListItem
                   title="Cancel a sponsorship"
                   showChevron
                   onPress={() => {
@@ -332,6 +339,11 @@ export default function MeTab() {
           </>
         ) : null}
       </ScrollView>
+
+      <LinkEmailSheet
+        visible={linkSheetOpen}
+        onClose={() => setLinkSheetOpen(false)}
+      />
     </SafeAreaView>
   );
 }

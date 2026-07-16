@@ -28,12 +28,14 @@ import { Text } from '../../components/design/Text';
 import { Card } from '../../components/design/Card';
 import { Skeleton } from '../../components/design/Skeleton';
 import { getMyKids, MyKidRow } from '../../lib/api';
+import { LinkEmailSheet } from '../../components/account/LinkEmailSheet';
 
 export default function NotesTab() {
   const router = useRouter();
   const [kids, setKids] = useState<MyKidRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [linkSheetOpen, setLinkSheetOpen] = useState(false);
 
   const load = useCallback(async () => {
     const rows = await getMyKids();
@@ -81,9 +83,25 @@ export default function NotesTab() {
         ) : kids.length === 0 ? (
           <View style={{ paddingHorizontal: SPACING.l, marginTop: SPACING.l }}>
             <Text variant="body" color="umber">
-              When someone claims one of the shirts on your card, you'll be
-              able to write your penpal here.
+              Once you've met your Number's kid, this is where the letters
+              live — yours going out, theirs coming back.
             </Text>
+            <Pressable
+              onPress={() => setLinkSheetOpen(true)}
+              accessibilityRole="button"
+              style={{ marginTop: SPACING.l, alignSelf: 'flex-start' }}
+            >
+              <Text
+                color="ink"
+                style={{
+                  fontFamily: TEXT_STYLES.textLink.fontFamily,
+                  fontSize: TEXT_STYLES.textLink.fontSize,
+                  textDecorationLine: 'underline',
+                }}
+              >
+                Shirt under a different email? Connect it →
+              </Text>
+            </Pressable>
           </View>
         ) : (
           <View
@@ -107,6 +125,11 @@ export default function NotesTab() {
           </View>
         )}
       </ScrollView>
+
+      <LinkEmailSheet
+        visible={linkSheetOpen}
+        onClose={() => setLinkSheetOpen(false)}
+      />
     </SafeAreaView>
   );
 }

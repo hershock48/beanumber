@@ -1,9 +1,10 @@
 # Be A Number — mobile app
 
-Native iPhone + Android app for BAN sponsors, built with React Native via Expo.
+Native iPhone + Android app for BAN shirt holders and sponsors, built with React Native via Expo (SDK 55, expo-router).
 
-> **Spec:** `docs/claude/app_build.md` in the repo root. Read it before changing anything.
-> **Status:** v0.1 — scaffolding. Number entry screen exists with no API wiring yet.
+> **Design brief:** `docs/claude/app_build.md` in the repo root. Read it before changing anything.
+> **Domain model:** `docs/claude/app_model.md` — the number as bearer instrument, buyer/sponsor split.
+> **Status (2026-07-16):** feature-complete client against `/api/mobile/v1/*`. Sign in with Apple/Google, Hold-to-Meet reveal with in-app claim, kid pages with penpal threads (monthly-gated), campus feed + explore, newsletter, push notifications with contextual permission asks, deferred links (QR before install), email linking for purchases made under a different address, in-app account deletion. Store submission blockers are Kevin-side — see `docs/app-store-submission.md`.
 
 ---
 
@@ -31,6 +32,11 @@ This is what lets you see the app on your actual iPhone or Android phone while w
 
 You don't need Xcode or Android Studio for development. Expo Go handles all of that.
 
+> Heads-up: Sign in with Apple doesn't run inside Expo Go. For dev
+> preview, set `EXPO_PUBLIC_MOBILE_DEV_AUTH=1` locally (and
+> `MOBILE_DEV_AUTH=1` on the server) to show the dev sign-in button.
+> Both flags come out before store submission.
+
 ---
 
 ## How to run the app on your phone
@@ -54,49 +60,41 @@ To stop the server, press `Ctrl+C` in Terminal.
 
 ---
 
-## What you see at v0.1
-
-A single screen — type your shirt number, tap "Meet your kid." The kid profile screen and API wiring land in Phase 1.
-
-This is intentionally minimal. The goal of this commit is: project is set up, runs on a real device, brand colors are right, basic input flow works. We build on top of this incrementally.
-
----
-
 ## What's in the project
 
 ```
 mobile/
-├── App.tsx                  # Root component. Currently the number entry screen.
-├── app.json                 # Expo config: name, identifiers, deep link domains.
-├── assets/                  # Placeholder icons + splash (we replace these with BAN art).
-├── index.ts                 # Expo entry point.
-├── package.json
-├── tsconfig.json
-└── README.md                # This file.
+├── app/                     # expo-router screens (file = route)
+│   ├── (auth)/sign-in.tsx   #   Apple / Google sign-in
+│   ├── (tabs)/              #   Home · Explore · Penpal · Me
+│   ├── meet/[number].tsx    #   Hold-to-Meet reveal + "Keep #N" claim
+│   ├── children/[number]/   #   kid page + updates
+│   ├── keep-going/[number]  #   post-reveal $25/mo conversion (web handoff)
+│   └── newsletter/[id].tsx
+├── components/              # design system + screen sections
+├── hooks/                   # useAuth, deep-link + push bridges
+├── lib/                     # api client, auth, push, theme, deepLink
+├── app.json                 # Expo config: identifiers, deep link domains
+├── eas.json                 # EAS build profiles (API base URL lives here)
+└── README.md                # This file
 ```
 
-The `node_modules/` folder is local to the mobile project and not shared with the web. The web app at `/src/` is untouched.
+The `node_modules/` folder is local to the mobile project and not shared with the web. The web app at `/src/` is untouched — the app talks to it only through `/api/mobile/v1/*` plus the public kid endpoints.
 
 ---
 
 ## Don't change these without checking the spec first
 
 - `app.json` — bundle identifier (`org.beanumber.app`) and deep link domains. These get registered with Apple and Google; changing them mid-build breaks Universal Links / App Links.
-- Brand colors in `App.tsx` (currently inlined; moving to a theme file in Phase 1). Source of truth is `voice.md` in the repo docs.
+- `eas.json` — `EXPO_PUBLIC_API_BASE_URL` must stay on `https://www.beanumber.org` (the apex 307s to www, and redirects eat POST bodies).
+- `lib/theme.ts` — brand colors + type scale. Source of truth is `voice.md` + the design brief.
+- The reveal choreography in `components/reveal/` — timings come from the brief's 3.2 annotations, not taste.
 
 ---
 
-## What's coming next
+## Shipping a build
 
-Phase 0 is this scaffolding. Phase 1 (next) is:
-
-- NativeWind (Tailwind for React Native) so we stop inlining styles
-- Expo Router for navigation
-- Real kid profile screen reading from the existing `/api` on beanumber.org
-- Custom font loading (Lora serif)
-- The reveal animation — the brand moment
-
-See `docs/claude/app_build.md` Section 17 for the full phase breakdown.
+Builds go through EAS (`eas build --profile production`), submissions through `eas submit`. The Kevin-side prerequisites (Apple Developer Program, Play Console, OAuth client IDs, server env vars) are tracked in `docs/app-store-submission.md`.
 
 ---
 

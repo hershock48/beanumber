@@ -32,7 +32,9 @@ interface Props {
 
 const VARIANT_MAP: Record<
   Variant,
-  { radius: number; elevation: typeof ELEVATION.e1 }
+  // ViewStyle-shaped, not `typeof ELEVATION.e1` — the e1/e2 presets
+  // are `as const` literals whose numeric fields don't cross-assign.
+  { radius: number; elevation: import('react-native').ViewStyle }
 > = {
   default: { radius: RADIUS.card, elevation: ELEVATION.e1 },
   large: { radius: RADIUS.cardLarge, elevation: ELEVATION.e1 },
