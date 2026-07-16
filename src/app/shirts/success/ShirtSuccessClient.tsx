@@ -41,17 +41,28 @@ export function ShirtSuccessClient() {
       return;
     }
 
-    // Memo §2 one-tap prerequisite: drop a long-lived cookie tying this
-    // browser to the shirt purchase session. Days/weeks later when the
-    // buyer comes back to /children/[number] to meet their child, the
-    // page reads this cookie, looks up the Donation, and threads the
+    // Memo §2 one-tap prerequisite: persist a long-lived cookie tying
+    // this browser to the shirt purchase session. Days/weeks later when
+    // the buyer comes back to /children/[number] to meet their child,
+    // the page reads this cookie, looks up the Donation, and threads the
     // buyer's Stripe Customer ID into the sponsor checkout — so the
     // "Yes, stay with [name]" button uses the saved payment method
     // instead of forcing a fresh card entry. Cookie holds only the
     // Stripe Checkout Session ID (recoverable, not a credential).
-    if (typeof document !== 'undefined' && sessionId.startsWith('cs_')) {
-      document.cookie =
-        `ban_buyer_session=${sessionId}; max-age=7776000; path=/; samesite=lax`;
+    //
+    // Set SERVER-SIDE via /api/buyer-session, not document.cookie:
+    // Safari's ITP caps JS-written cookies at 7 days no matter what
+    // max-age you request, and shirts take longer than a week to
+    // arrive. An HTTP-set cookie gets the full 90 days on iOS too.
+    // Fire-and-forget — the order confirmation must render regardless.
+    if (sessionId.startsWith('cs_')) {
+      fetch('/api/buyer-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId }),
+      }).catch(() => {
+        // Non-fatal: the buyer can still claim via /signin later.
+      });
     }
 
     let cancelled = false;
