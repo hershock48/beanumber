@@ -20,13 +20,13 @@ import Link from 'next/link';
  * Mechanics:
  *   - Only shows for unsigned visitors. Existing sponsors (cookie)
  *     never see it.
- *   - Delays entrance by ~5s after mount so it doesn't compete with
- *     the reveal animation. The reveal finishes around 3.8s; this
- *     card appears after a beat of stillness.
+ *   - Waits for the Hold-to-Meet reveal to finish (the
+ *     'ban-reveal-done' event), then holds ~5s of stillness before
+ *     fading in. On return visits (reveal already done, per
+ *     localStorage) it eases in after a short beat instead.
  *   - "Maybe later" persists per-kid in localStorage so dismissal
  *     sticks across return visits to this number.
- *   - Click → opens the existing SignInModal pre-filled with this
- *     number (the modal pulls the number from the URL).
+ *   - Click → /signin with this number pre-filled via ?n=.
  *
  * Brand voice (per voice.md): direct, specific, no "just," no jargon.
  */
@@ -54,10 +54,43 @@ export function ClaimThisNumberCard({
         return;
       }
     } catch {}
-    // Hold a beat after the reveal animation lands (~3.8s total) so
-    // this card doesn't compete with the moment. Soft fade in after.
-    const t = window.setTimeout(() => setVisible(true), 4800);
-    return () => clearTimeout(t);
+
+    // Timing is anchored to the REVEAL, not to mount. The original
+    // implementation assumed the reveal auto-ran (~3.8s) and used a
+    // flat 4.8s mount delay; under Hold-to-Meet the reveal waits for
+    // the user, so a mount timer could mark the card visible while
+    // they're still holding. Anchor on the same signals
+    // AnonStripShimmer uses:
+    //   - localStorage['ban-revealed-N'] — reveal already done on a
+    //     prior visit; short beat, then show.
+    //   - 'ban-reveal-done' window event — reveal just finished;
+    //     hold ~5s of stillness after the confetti, then fade in.
+    let timer: number | null = null;
+    const showAfter = (ms: number) => {
+      timer = window.setTimeout(() => setVisible(true), ms);
+    };
+
+    let alreadyRevealed = false;
+    try {
+      alreadyRevealed =
+        localStorage.getItem(`ban-revealed-${shirtNumber}`) === 'yes';
+    } catch {}
+
+    if (alreadyRevealed) {
+      // Return visit — no reveal moment to respect, but still ease in
+      // rather than popping alongside the page.
+      showAfter(1500);
+      return () => {
+        if (timer !== null) clearTimeout(timer);
+      };
+    }
+
+    const onRevealDone = () => showAfter(5000);
+    window.addEventListener('ban-reveal-done', onRevealDone);
+    return () => {
+      window.removeEventListener('ban-reveal-done', onRevealDone);
+      if (timer !== null) clearTimeout(timer);
+    };
   }, [shirtNumber]);
 
   if (dismissed) return null;
@@ -87,7 +120,7 @@ export function ClaimThisNumberCard({
         <p className="text-[#d8cfc1] text-sm md:text-base leading-relaxed mb-5">
           {viewerLooksLikeBuyer
             ? `Sign in to lock #${shirtNumber} in as yours. Every update from ${firstName}'s campus comes back to this page — no payment, no password.`
-            : `If you got a Shirt with this Number on the back, sign in and #${shirtNumber} is yours. We'll remember you on this device for 30 days. No payment, no password.`}
+            : `If you got a Shirt with this Number on the back, sign in and #${shirtNumber} is yours. We'll remember you on this device. No payment, no password.`}
         </p>
         <div className="flex flex-col sm:flex-row sm:items-center gap-3">
           <Link

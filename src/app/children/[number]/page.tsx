@@ -23,7 +23,9 @@ import {
   getRecentCampusNewsletters,
   type CampusNewsletterEntry,
 } from '@/lib/newsletter-feed';
-import { SponsorRecoveryForm } from './SponsorRecoveryForm';
+// SponsorRecoveryForm import removed 2026-07-16 — the component
+// hasn't rendered on this page since the sign-in ask consolidated
+// into the viewer-state strip + /signin. File kept for reference.
 import { OtherKidsAtCampus } from './OtherKidsAtCampus';
 import { ClaimThisNumberCard } from './ClaimThisNumberCard';
 import { ClaimGate } from './ClaimGate';
@@ -1541,13 +1543,21 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
                   >
                     Start with a shirt &rarr;
                   </Link>
-                  {/* Secondary — for returning sponsors / holders on a
-                      new device. Magic-link flow at /signin?n=N. */}
+                  {/* Secondary — serves BOTH returning sponsors on a
+                      new device AND the person holding a new shirt
+                      with this number who hasn't claimed it yet. The
+                      previous copy ("Already a sponsor? Sign in")
+                      excluded the second group — the exact person the
+                      product is built around — and left them with a
+                      primary CTA telling them to buy a shirt they're
+                      already holding. Magic-link flow at /signin?n=N
+                      handles sign-in and first-time claim through the
+                      same form. */}
                   <Link
                     href={`/signin?n=${number}`}
                     className="text-xs whitespace-nowrap text-[#666] hover:text-[#D4A843] hover:underline"
                   >
-                    Already a sponsor?{' '}
+                    Have a shirt or sponsoring?{' '}
                     <span className="font-bold">Sign in</span>
                   </Link>
                 </div>
@@ -2059,6 +2069,37 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
           </div>
         </div>
         </ClaimGate>
+
+        {/* ── Post-reveal claim prompt ─────────────────────────────
+            The rung that went missing in the 2026-07-12 anon-strip
+            rebuild. The strip above the hero speaks to cold visitors
+            ("Start with a shirt") and returning sponsors ("Already a
+            sponsor? Sign in") — but not to the person the product is
+            built around: someone holding a NEW shirt, post-reveal, at
+            their emotional peak, who isn't a sponsor yet. "Start with
+            a shirt" tells a shirt-owner to buy a shirt; "Already a
+            sponsor?" reads as not-for-them. This card asks for the
+            smallest possible commitment — claim the number, free, no
+            password — and self-manages the moment: fades in ~5s after
+            mount (after the reveal animation lands), dismissible
+            per-kid via localStorage. Gated OFF for anyone signed in
+            (sponsor, holder, or signed in for a different kid) and
+            for Shirt + Stay cookie-holders, who get the stronger
+            ClaimMatchCard at the top instead. Departed kids skip it —
+            memorial pages make no asks. */}
+        {!child.departed_at &&
+          !child.viewer_signed_in &&
+          !child.viewer_is_sponsor &&
+          !child.viewer_is_holder &&
+          !showClaimCard && (
+            <div className="mt-12 md:mt-16">
+              <ClaimThisNumberCard
+                shirtNumber={Number(number)}
+                firstName={firstName}
+                viewerLooksLikeBuyer={viewerLooksLikeBuyer}
+              />
+            </div>
+          )}
 
         {/* NOTE: the "Updates straight from {firstName}" section used
             to render here as its own block. Merged into PenpalBox via
