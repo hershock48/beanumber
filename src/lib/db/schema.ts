@@ -342,6 +342,16 @@ export const sponsorships = pgTable(
     // animation fires.
     childRevealedAt: timestamp('child_revealed_at', { withTimezone: true }),
 
+    // Which physical shirt NUMBER this row owns. Claims are per-
+    // number, not per-kid (migration 0017): numbers are exclusive
+    // 1-to-1 physical objects while kid relationships are many-to-
+    // many. NULL = this row holds no number — co-sponsors added via
+    // /meet, and childless checkout rows that haven't been claimed
+    // yet. Set by the claim paths (send-link bind/create,
+    // claim-match) and the 0017 backfill. The /me #N badge and the
+    // already-claimed check both key on this column.
+    claimedShirtNumber: integer('claimed_shirt_number'),
+
     // "One letter included with the shirt" (2026-07-10). Shirt-holders
     // (child_revealed_at set, no monthly amount yet) can write one
     // free note to their kid; when that note reaches 'delivered' at
@@ -391,6 +401,11 @@ export const sponsorships = pgTable(
     ),
     statusIdx: index('sponsorships_status_idx').on(table.status),
     airtableIdx: index('sponsorships_airtable_idx').on(table.airtableId),
+    // Partial: most rows (co-sponsors, unclaimed checkout rows) hold
+    // no number. Mirrors drizzle/0017.
+    claimedShirtNumberIdx: index('sponsorships_claimed_shirt_number_idx').on(
+      table.claimedShirtNumber
+    ),
   })
 );
 

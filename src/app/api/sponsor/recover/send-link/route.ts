@@ -51,10 +51,11 @@ import { makeRecoveryToken } from '@/lib/recovery-tokens';
 import {
   findChildlessSponsorshipForEmail,
   findSponsorshipForEmailAndChild,
-  getChildByShirtNumber,
+  findSponsorshipForEmailAndClaimedNumber,
   getMostRecentSponsorshipForEmail,
-  isChildClaimedByOtherEmail,
+  isNumberClaimedByOtherEmail,
 } from '@/lib/db/queries';
+import { resolveShirtNumberForClaim } from '@/lib/claim-resolve';
 import {
   bindSponsorshipToChild,
   createSponsorship,
@@ -224,16 +225,23 @@ export async function POST(request: NextRequest) {
         // Body copy varies slightly by whether we can name the kid.
         // Childless holders (no shirt reconciled yet) land on /me,
         // so the message can't promise "you'll land on {Kid}'s page."
-        const hasKid =
-          typeof found.shirtNumber === 'number' &&
-          found.shirtNumber > 0 &&
-          found.firstName;
+        const hasNumber =
+          typeof found.shirtNumber === 'number' && found.shirtNumber > 0;
+        const hasKid = hasNumber && found.firstName;
         // Nav link is 'My Campus' — was renamed from 'Your kids' on
         // 2026-07-06. Stale copy referring to 'Your kids' in the nav
         // meant users clicked the email, landed on the site, then
         // couldn't find the surface the email pointed them at.
+        //
+        // Three states, not two: a cycle-number holder (#54+) has a
+        // real number but no children row to name the kid from —
+        // they get the your-kid phrasing, NOT the shirt-is-being-
+        // prepared copy (their shirt arrived; that's how they
+        // claimed).
         const bodyLine = hasKid
           ? `Tap the button below to sign in. You&rsquo;ll land on ${found.firstName}&rsquo;s page. From there, the &ldquo;My Campus&rdquo; link in the nav has every kid you sponsor or hold.`
+          : hasNumber
+          ? `Tap the button below to sign in. You&rsquo;ll land on your kid&rsquo;s page &mdash; #${found.shirtNumber} is yours. From there, the &ldquo;My Campus&rdquo; link in the nav has every kid you sponsor or hold.`
           : `Tap the button below to sign in. Your shirt is being prepared &mdash; once your Number is stamped and shipped, the kid it belongs to will show up on your My Campus page.`;
         const html = `
           <!DOCTYPE html>
@@ -293,20 +301,35 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(responseShape);
     }
 
-    // 1. Resolve the kid for this shirt number.
-    const child = await getChildByShirtNumber(shirtNumber);
-    if (!child) {
-      console.log(`[Recovery] No child for #${shirtNumber}; nothing to send.`);
+    // 1. Resolve the NUMBER to a claim identity. Canonical numbers
+    // (≤53) resolve to their real children row; cycle numbers (54+)
+    // resolve through the same Batches math the kid page uses, with
+    // a synthetic per-number legacy id and NO row UUID. This used to
+    // be a bare getChildByShirtNumber() call, which meant every
+    // number past the canonical roster silently no-op'd — Postgres
+    // has no rows for them.
+    const identity = await resolveShirtNumberForClaim(shirtNumber);
+    if (!identity) {
+      console.log(`[Recovery] No kid resolves for #${shirtNumber}; nothing to send.`);
       return NextResponse.json(responseShape);
     }
-    const displayName =
-      child.displayName ||
-      `${child.firstName || 'Child'} ${child.lastInitial || ''}`.trim();
-    const firstName = child.firstName || displayName.split(' ')[0] || 'them';
-    const childContext = { id: child.id, childId: child.childId };
+    if (identity.reservedForAuction) {
+      console.log(`[Recovery] #${shirtNumber} is reserved; nothing to send.`);
+      return NextResponse.json(responseShape);
+    }
+    const { displayName, firstName } = identity;
+    const childContext = {
+      id: identity.childUuid ?? '',
+      childId: identity.childIdLegacy,
+    };
 
-    // 2. SIGN-IN PATH: do they already own this number?
-    const existing = await findSponsorshipForEmailAndChild(email, childContext);
+    // 2. SIGN-IN PATH: do they already own this number? Check the
+    // per-number column first (authoritative), then the child-
+    // identity match (covers rows claimed before the 0017 backfill
+    // and the canonical-number rows whose identity IS the kid).
+    const existing =
+      (await findSponsorshipForEmailAndClaimedNumber(email, shirtNumber)) ??
+      (await findSponsorshipForEmailAndChild(email, childContext));
     let sponsorCode = existing?.sponsorCode ?? null;
     let isFreshClaim = false;
 
@@ -318,7 +341,17 @@ export async function POST(request: NextRequest) {
     //          kid instead of minting a duplicate row.
     //      3c. Create — brand-new claimer, mint a Holder row.
     if (!sponsorCode) {
-      const alreadyTaken = await isChildClaimedByOtherEmail(childContext, email);
+      // Per-NUMBER claim check (migration 0017). The old per-kid
+      // check fired on legitimate claims whenever the kid had
+      // co-sponsors — multiple sponsors per kid is the model working
+      // as designed; only the NUMBER is exclusive. The synthetic
+      // legacy id is passed for cycle numbers only (see the query's
+      // doc comment for why canonical numbers must not match on it).
+      const alreadyTaken = await isNumberClaimedByOtherEmail(
+        shirtNumber,
+        identity.childUuid ? null : identity.childIdLegacy,
+        email
+      );
       if (alreadyTaken) {
         // 3a. Deliberately NOT the silent privacy response. A shirt
         // number is printed on a physical object — the person typing
@@ -347,9 +380,10 @@ export async function POST(request: NextRequest) {
         if (childless) {
           const bound = await bindSponsorshipToChild({
             sponsorshipId: childless.id,
-            childId: child.id,
-            childIdLegacy: child.childId,
+            childId: identity.childUuid,
+            childIdLegacy: identity.childIdLegacy,
             childDisplayName: displayName,
+            claimedShirtNumber: shirtNumber,
             actorType: 'sponsor',
           });
           sponsorCode = bound.sponsorCode;
@@ -377,12 +411,13 @@ export async function POST(request: NextRequest) {
         const created = await createSponsorship({
           sponsorCode: await generateUniqueSponsorCode(),
           sponsorEmail: email,
-          childId: child.id,
-          childIdLegacy: child.childId,
+          childId: identity.childUuid,
+          childIdLegacy: identity.childIdLegacy,
           childDisplayName: displayName,
           monthlyAmount: 0,
           status: 'Holder',
           sponsorshipStartDate: new Date().toISOString().slice(0, 10),
+          claimedShirtNumber: shirtNumber,
         });
         sponsorCode = created.sponsorCode;
         // The legacy Airtable Holder row set AuthStatus=Active so the

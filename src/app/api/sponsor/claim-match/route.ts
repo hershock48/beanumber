@@ -34,10 +34,11 @@ import { SESSION, SPONSORSHIP_STATUS, AUTH_STATUS } from '@/lib/constants';
 import { sendSponsorWelcomeEmail } from '@/lib/email';
 import {
   findSponsorshipForEmailAndChild,
-  getChildByShirtNumber,
+  findSponsorshipForEmailAndClaimedNumber,
   getDonationWithDonorByCheckoutSessionId,
   getSponsorshipByStripeSubscriptionId,
 } from '@/lib/db/queries';
+import { resolveShirtNumberForClaim } from '@/lib/claim-resolve';
 import { createSponsorship, linkDonationToChild } from '@/lib/db/mutations';
 import { generateUniqueSponsorCode } from '@/lib/sponsor-codes';
 import { db } from '@/lib/db/client';
@@ -143,22 +144,25 @@ export async function POST(request: NextRequest) {
     }
     const sessionId = buyerSessionCookie.value.trim();
 
-    // 3. Look up the Child by shirt number
-    const child = await getChildByShirtNumber(shirtNumber);
-    if (!child) {
+    // 3. Resolve the NUMBER to a claim identity — canonical numbers
+    // map to their real children row; cycle numbers (54+) resolve via
+    // the Batches math with a synthetic per-number legacy id and no
+    // row UUID. Same resolver as the send-link claim path; the old
+    // direct row lookup here 404'd every cycle number.
+    const identity = await resolveShirtNumberForClaim(shirtNumber);
+    if (!identity) {
       return NextResponse.json({ error: 'Child not found for that number.' }, { status: 404 });
     }
-    if (child.reservedForAuction) {
+    if (identity.reservedForAuction) {
       return NextResponse.json(
         { error: 'That number is reserved and cannot be claimed.' },
         { status: 409 }
       );
     }
-    const childRecordId = child.id;
-    const childLegacyId = child.childId;
-    const childDisplayName =
-      child.displayName ||
-      `${child.firstName || 'Child'} ${child.lastInitial || ''}`.trim();
+    const child = identity.canonicalRow;
+    const childRecordId = identity.childUuid;
+    const childLegacyId = identity.childIdLegacy;
+    const childDisplayName = identity.displayName;
     const childLocation = child.schoolLocation;
     // childAge on the sponsorship snapshot must be an actual age (or
     // empty). The old fallback wrote raw grade codes (LK / UK / P1–P5)
@@ -235,13 +239,18 @@ export async function POST(request: NextRequest) {
     }
 
     // 8b. Defense-in-depth idempotency: even without a subscription ID,
-    // if this buyer already has an Active/Holder sponsorship on this
-    // kid, return it instead of creating a duplicate.
+    // if this buyer already owns this NUMBER (or has a row on this
+    // claim identity), return it instead of creating a duplicate.
     {
-      const existing = await findSponsorshipForEmailAndChild(sponsorEmail, {
-        id: childRecordId,
-        childId: childLegacyId,
-      });
+      const existing =
+        (await findSponsorshipForEmailAndClaimedNumber(
+          sponsorEmail,
+          shirtNumber
+        )) ??
+        (await findSponsorshipForEmailAndChild(sponsorEmail, {
+          id: childRecordId ?? '',
+          childId: childLegacyId,
+        }));
       if (existing) {
         await setSponsorSessionCookie(cookieStore, sponsorEmail, existing.sponsorCode);
         return NextResponse.json({
@@ -280,6 +289,7 @@ export async function POST(request: NextRequest) {
         sponsorshipStartDate: today,
         childRevealedAt: new Date(),
         visibleToSponsor: true,
+        claimedShirtNumber: shirtNumber,
       });
     } catch (err) {
       console.error('[ClaimMatch] Sponsorship create failed:', err);
@@ -314,8 +324,10 @@ export async function POST(request: NextRequest) {
     );
 
     // 10. Best-effort: backfill the Donation→Child link so reporting
-    // sees the connection. Non-fatal.
-    await linkDonationToChild(donation.donationId, childRecordId);
+    // sees the connection. Non-fatal. Cycle numbers have no children
+    // row to link (childRecordId null) — linkDonationToChild no-ops
+    // on a falsy id.
+    await linkDonationToChild(donation.donationId, childRecordId ?? '');
 
     // 11. Send the no-code welcome email. This is the first email a
     // Shirt + Stay buyer gets that names their child, since the shirt

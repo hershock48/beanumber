@@ -458,6 +458,10 @@ export interface CreateSponsorshipInput {
   sponsorshipStartDate?: string | null; // YYYY-MM-DD
   childRevealedAt?: Date | null;
   visibleToSponsor?: boolean;
+  // Per-number ownership (migration 0017). Set by the claim paths;
+  // omit for co-sponsor adds and childless checkout rows — those
+  // hold no number.
+  claimedShirtNumber?: number | null;
 }
 
 export async function createSponsorship(input: CreateSponsorshipInput) {
@@ -476,6 +480,7 @@ export async function createSponsorship(input: CreateSponsorshipInput) {
       sponsorshipStartDate: input.sponsorshipStartDate ?? null,
       childRevealedAt: input.childRevealedAt ?? null,
       visibleToSponsor: input.visibleToSponsor ?? true,
+      claimedShirtNumber: input.claimedShirtNumber ?? null,
     })
     .returning();
   await audit({
@@ -506,9 +511,13 @@ export async function createSponsorship(input: CreateSponsorshipInput) {
  */
 export async function bindSponsorshipToChild(input: {
   sponsorshipId: string;
-  childId: string;
+  /** Children row UUID for canonical numbers; null for cycle numbers
+   *  (no row exists — identity lives in childIdLegacy). */
+  childId: string | null;
   childIdLegacy?: string | null;
   childDisplayName?: string | null;
+  /** The shirt number this claim takes ownership of. */
+  claimedShirtNumber?: number | null;
   actorType?: AuditActorType;
 }) {
   const beforeRows = await db
@@ -531,6 +540,7 @@ export async function bindSponsorshipToChild(input: {
       childId: input.childId,
       childIdLegacy: input.childIdLegacy ?? null,
       childDisplayName: input.childDisplayName ?? null,
+      claimedShirtNumber: input.claimedShirtNumber ?? null,
       childRevealedAt: new Date(),
       updatedAt: new Date(),
     })

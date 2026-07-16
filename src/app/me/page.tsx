@@ -31,6 +31,7 @@ import {
   getNoteThreadPreviewsForSponsor,
   type KidCardNotePreview,
 } from '@/lib/db/queries';
+import { resolveShirtNumberForClaim } from '@/lib/claim-resolve';
 import { KidCardNotesPreview } from './KidCardNotesPreview';
 import { fetchOmoroWeather, serverCampusNow } from '@/lib/omoro';
 import { pickKidMilestone, type Milestone } from '@/lib/milestones';
@@ -50,6 +51,15 @@ interface SponsorshipRow {
   monthlyAmount: number;
   monthlyOrHolder: 'monthly' | 'holder';
   startDate?: string;
+  /**
+   * True when THIS row owns its shirt number
+   * (sponsorships.claimed_shirt_number is set). Co-sponsors added
+   * via /meet sponsor the kid but hold no number — their card gets
+   * no #N badge (CLAUDE.md non-negotiable #4). child.shirtNumber can
+   * still be populated for them as a link fallback, which is why the
+   * badge keys on this flag and not on the number's presence.
+   */
+  ownsNumber: boolean;
   /**
    * Timestamp the viewer claimed this kid via /children/[N] Hold-to-Meet.
    * Null when the sponsorship exists but the viewer never claimed a
@@ -126,14 +136,84 @@ async function getViewerEmail(): Promise<string | null> {
 async function fetchSponsorshipsForEmail(email: string): Promise<SponsorshipRow[]> {
   try {
     const rows = await getViewerSponsorships(email);
-    return rows.map(r => {
+    return await Promise.all(rows.map(async r => {
       const monthlyAmount = Number(r.monthlyAmount ?? 0);
       const monthlyOrHolder: 'monthly' | 'holder' =
         r.status === 'Active' && monthlyAmount > 0 ? 'monthly' : 'holder';
+
+      // Cycle-number rows (claimed #54+) have no children row to
+      // join — their identity is the synthetic per-number legacy id.
+      // Resolve the canonical kid through the same Batches math the
+      // kid page uses so the card gets a real name and photo instead
+      // of "A kid at the campus" with a ghost avatar.
+      // dateOfBirth is Date|null from the joined query but a string
+      // from the raw children row (Drizzle date() columns come back
+      // as strings) — the union covers both; new Date() handles
+      // either at render time.
+      let kid: {
+        recordId: string;
+        firstName: string | null;
+        displayName: string | null;
+        photoUrl: string | null;
+        departedAt: Date | string | null;
+        dateOfBirth: Date | string | null;
+        gradeClass: string | null;
+        sotmMonth: string | null;
+        sotmReason: string | null;
+      } = {
+        recordId: r.childRecordId ?? '',
+        firstName: r.childFirstName,
+        displayName: r.childDisplayName,
+        photoUrl: r.childPhotoUrl,
+        departedAt: r.childDepartedAt,
+        dateOfBirth: r.childDateOfBirth,
+        gradeClass: r.childGradeClass,
+        sotmMonth: r.childSotmMonth,
+        sotmReason: r.childSotmReason,
+      };
+      if (
+        !kid.recordId &&
+        typeof r.claimedShirtNumber === 'number' &&
+        r.claimedShirtNumber > 0
+      ) {
+        try {
+          const identity = await resolveShirtNumberForClaim(r.claimedShirtNumber);
+          if (identity) {
+            const c = identity.canonicalRow;
+            kid = {
+              // Deliberately NOT the canonical row's id: sponsorship-
+              // scoped lookups (notes, updates) must not leak across
+              // the cycle boundary. Display fields only.
+              recordId: '',
+              firstName: c.firstName,
+              displayName: identity.displayName,
+              photoUrl: c.profilePhotoUrl,
+              departedAt: c.departedAt,
+              dateOfBirth: c.dateOfBirth,
+              gradeClass: c.gradeClass,
+              sotmMonth: c.studentOfMonthMonth,
+              sotmReason: c.studentOfMonthReason,
+            };
+          }
+        } catch {
+          // Display-only enrichment — the card still renders with
+          // the number even if the resolver hiccups.
+        }
+      }
+
       const displayName =
-        r.childDisplayName || r.childFirstName || 'A kid at the campus';
-      const firstName =
-        r.childFirstName || displayName.split(' ')[0] || 'them';
+        kid.displayName || kid.firstName || 'A kid at the campus';
+      const firstName = kid.firstName || displayName.split(' ')[0] || 'them';
+      // The row's OWN claimed number wins; the kid's shirt_number is
+      // the fallback for pre-backfill rows. Co-sponsor rows (claimed
+      // null after backfill) fall back to the kid's number for the
+      // page LINK only — the #N badge below is gated on claimed.
+      const shirtNumber =
+        typeof r.claimedShirtNumber === 'number' && r.claimedShirtNumber > 0
+          ? r.claimedShirtNumber
+          : typeof r.childShirtNumber === 'number'
+            ? r.childShirtNumber
+            : undefined;
       return {
         recordId: r.sponsorshipId,
         sponsorCode: r.sponsorCode ?? '',
@@ -141,31 +221,30 @@ async function fetchSponsorshipsForEmail(email: string): Promise<SponsorshipRow[
         monthlyAmount,
         monthlyOrHolder,
         startDate: r.sponsorshipStartDate ?? undefined,
+        ownsNumber:
+          typeof r.claimedShirtNumber === 'number' && r.claimedShirtNumber > 0,
         revealedAt: r.childRevealedAt
           ? new Date(r.childRevealedAt).toISOString()
           : null,
         child: {
-          recordId: r.childRecordId ?? '',
+          recordId: kid.recordId,
           childId: r.childIdLegacy ?? '',
-          shirtNumber:
-            typeof r.childShirtNumber === 'number'
-              ? r.childShirtNumber
-              : undefined,
+          shirtNumber,
           displayName,
           firstName,
-          photoUrl: r.childPhotoUrl ?? undefined,
-          departed: !!r.childDepartedAt,
-          dateOfBirth: r.childDateOfBirth
-            ? new Date(r.childDateOfBirth).toISOString()
+          photoUrl: kid.photoUrl ?? undefined,
+          departed: !!kid.departedAt,
+          dateOfBirth: kid.dateOfBirth
+            ? new Date(kid.dateOfBirth).toISOString()
             : null,
-          gradeCode: isGradeCode(r.childGradeClass)
-            ? (r.childGradeClass as GradeCode)
+          gradeCode: isGradeCode(kid.gradeClass)
+            ? (kid.gradeClass as GradeCode)
             : null,
-          sotmMonth: r.childSotmMonth ?? null,
-          sotmReason: r.childSotmReason ?? null,
+          sotmMonth: kid.sotmMonth ?? null,
+          sotmReason: kid.sotmReason ?? null,
         },
       };
-    });
+    }));
   } catch {
     return [];
   }
@@ -902,7 +981,12 @@ function KidCard({
   // possible for a sponsorship pointing at a deleted or half-migrated
   // kid row), render as a non-interactive div rather than a dead
   // href='#' link that scrolls to top on click.
-  const hasClaimedNumber = !!revealedAt;
+  // Number badge = this ROW owns the number (claimed_shirt_number
+  // set) AND the reveal happened. `revealedAt` alone was the old
+  // gate, which wrongly badged co-sponsors — they have a reveal
+  // timestamp from meeting the kid via /meet, but the number belongs
+  // to whoever holds the shirt.
+  const hasClaimedNumber = !!revealedAt && row.ownsNumber;
   // Every sponsored kid — shirt-holder or co-sponsor — routes to
   // /children/[N] when the kid has a shirt number. Previously
   // co-sponsors were dumped on /meet/[id], a stripped-down surface

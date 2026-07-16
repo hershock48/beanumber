@@ -194,6 +194,11 @@ export async function getViewerSponsorships(viewerEmail: string) {
       sponsorshipStartDate: sponsorships.sponsorshipStartDate,
       stripeSubscriptionId: sponsorships.stripeSubscriptionId,
       childRevealedAt: sponsorships.childRevealedAt,
+      // Per-number ownership (migration 0017). NULL for co-sponsor
+      // rows and unclaimed checkout rows. The /me badge keys on this,
+      // and cycle-number rows (no children row to join) use it to
+      // resolve their display kid.
+      claimedShirtNumber: sponsorships.claimedShirtNumber,
       childRecordId: sql<string | null>`coalesce(${children.id}, child_legacy.id)`,
       childIdLegacy: sql<string | null>`coalesce(${children.childId}, child_legacy.child_id)`,
       childFirstName: sql<string | null>`coalesce(${children.firstName}, child_legacy.first_name)`,
@@ -291,6 +296,15 @@ export async function findSponsorshipForEmailAndChild(
 ) {
   if (!email || (!child.id && !child.childId)) return null;
   const emailLower = email.toLowerCase();
+  // Build the child-identity match defensively: cycle-number
+  // identities carry an EMPTY id (no children row exists for numbers
+  // past the canonical roster), and comparing a uuid column against
+  // '' is a Postgres type error, not a non-match. Only include the
+  // predicates whose inputs are real.
+  const childMatches = [
+    ...(child.id ? [eq(sponsorships.childId, child.id)] : []),
+    ...(child.childId ? [eq(sponsorships.childIdLegacy, child.childId)] : []),
+  ];
   const rows = await db
     .select()
     .from(sponsorships)
@@ -301,10 +315,7 @@ export async function findSponsorshipForEmailAndChild(
           eq(sponsorships.status, 'Active'),
           eq(sponsorships.status, 'Holder')
         ),
-        or(
-          eq(sponsorships.childId, child.id),
-          eq(sponsorships.childIdLegacy, child.childId)
-        )
+        or(...childMatches)
       )
     )
     .orderBy(
@@ -313,6 +324,83 @@ export async function findSponsorshipForEmailAndChild(
     )
     .limit(1);
   return rows[0] ?? null;
+}
+
+/**
+ * Sign-in fast path for the claim flow: does this email already own
+ * this NUMBER? Matches on claimed_shirt_number, the authoritative
+ * per-number ownership column (migration 0017).
+ */
+export async function findSponsorshipForEmailAndClaimedNumber(
+  email: string,
+  shirtNumber: number
+) {
+  if (!email || !Number.isFinite(shirtNumber)) return null;
+  const emailLower = email.toLowerCase();
+  const rows = await db
+    .select()
+    .from(sponsorships)
+    .where(
+      and(
+        sql`lower(${sponsorships.sponsorEmail}) = ${emailLower}`,
+        or(
+          eq(sponsorships.status, 'Active'),
+          eq(sponsorships.status, 'Holder')
+        ),
+        eq(sponsorships.claimedShirtNumber, shirtNumber)
+      )
+    )
+    .orderBy(
+      sql`case when ${sponsorships.status} = 'Active' then 0 else 1 end`,
+      desc(sponsorships.createdAt)
+    )
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+/**
+ * Is this NUMBER claimed by any other email? The per-number
+ * replacement for the per-kid isChildClaimedByOtherEmail check —
+ * which fired on legitimate claims whenever a kid had co-sponsors
+ * (multiple sponsors per kid is the model working as designed) and
+ * could never see cycle numbers at all.
+ *
+ * Matches claimed_shirt_number (authoritative). For CYCLE numbers the
+ * caller also passes the synthetic per-number legacy id
+ * (`HSP/BAN-0NN`) as a second match — safe there because that id is
+ * only ever written by the claim paths. It must NOT be passed for
+ * canonical numbers: co-sponsor rows created via /meet carry the
+ * kid's real legacy ChildID, and matching on it would reintroduce
+ * the per-kid false block this function exists to remove.
+ */
+export async function isNumberClaimedByOtherEmail(
+  shirtNumber: number,
+  cycleLegacyId: string | null,
+  excludingEmail: string
+): Promise<boolean> {
+  if (!Number.isFinite(shirtNumber)) return false;
+  const emailLower = excludingEmail.toLowerCase();
+  const numberMatches = [
+    eq(sponsorships.claimedShirtNumber, shirtNumber),
+    ...(cycleLegacyId
+      ? [eq(sponsorships.childIdLegacy, cycleLegacyId)]
+      : []),
+  ];
+  const rows = await db
+    .select({ id: sponsorships.id })
+    .from(sponsorships)
+    .where(
+      and(
+        sql`lower(${sponsorships.sponsorEmail}) <> ${emailLower}`,
+        or(
+          eq(sponsorships.status, 'Active'),
+          eq(sponsorships.status, 'Holder')
+        ),
+        or(...numberMatches)
+      )
+    )
+    .limit(1);
+  return rows.length > 0;
 }
 
 /**
@@ -370,7 +458,13 @@ export async function getMostRecentSponsorshipForEmail(viewerEmail: string) {
       sponsorCode: sponsorships.sponsorCode,
       sponsorshipStartDate: sponsorships.sponsorshipStartDate,
       createdAt: sponsorships.createdAt,
-      childShirtNumber: sql<number | null>`coalesce(${children.shirtNumber}, child_legacy.shirt_number)`,
+      // Prefer the row's OWN claimed number over the joined kid's
+      // shirt_number: a cycle-number holder (#70) is linked to a
+      // canonical kid whose shirt_number is different (#36 in the
+      // Juliet example) — landing them there would be the wrong
+      // number identity. claimed_shirt_number is the number they
+      // actually own.
+      childShirtNumber: sql<number | null>`coalesce(${sponsorships.claimedShirtNumber}, ${children.shirtNumber}, child_legacy.shirt_number)`,
       childFirstName: sql<string | null>`coalesce(${children.firstName}, child_legacy.first_name)`,
       childDisplayName: sql<string | null>`coalesce(${children.displayName}, child_legacy.display_name)`,
     })
@@ -401,10 +495,13 @@ export async function getMostRecentSponsorshipForEmail(viewerEmail: string) {
   for (const row of rows) {
     const shirtNumber = row.childShirtNumber;
     if (typeof shirtNumber !== 'number' || shirtNumber <= 0) continue;
+    // firstName is null (not 'them') when the kid can't be named —
+    // cycle-number rows have no children row to join. The caller
+    // branches its email copy on this: named kid vs "your kid."
     const firstName =
       row.childFirstName ||
       (row.childDisplayName ? row.childDisplayName.split(' ')[0] : null) ||
-      'them';
+      null;
     return {
       sponsorCode: row.sponsorCode,
       shirtNumber,
