@@ -31,6 +31,7 @@ import { FeedCard } from '../../components/home/FeedCard';
 import { NewsletterCard } from '../../components/home/NewsletterCard';
 import { EnterNumberSheet } from '../../components/home/EnterNumberSheet';
 import { LinkEmailSheet } from '../../components/account/LinkEmailSheet';
+import { campusPresenceLine } from '../../lib/campusTime';
 import {
   getMe,
   getMyKids,
@@ -200,6 +201,20 @@ export default function SponsorHome() {
         {/* From the campus */}
         <View style={{ marginTop: SPACING.section }}>
           <SectionHeader>From the campus</SectionHeader>
+          {/* Presence — Omoro is UTC+3 and this line knows it. The
+              campus stops being a photo archive and becomes a place
+              where it's currently Tuesday afternoon. */}
+          <View
+            style={{
+              paddingHorizontal: SPACING.l,
+              marginTop: -SPACING.s,
+              marginBottom: SPACING.m,
+            }}
+          >
+            <Text variant="bodySmall" color="umber">
+              {campusPresenceLine()}
+            </Text>
+          </View>
           <View style={{ paddingHorizontal: SPACING.l }}>
             {loading && feed.length === 0 ? (
               <FeedSkeleton />

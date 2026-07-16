@@ -336,6 +336,8 @@ export interface ThreadResponse {
     sentAt: string;
     body: string;
     statusText?: string;
+    /** 1–4 letter-journey stage on sponsor notes; null on replies. */
+    stage?: number | null;
   }>;
   kidIsWritingBack: boolean;
   locked?: boolean;
@@ -373,6 +375,8 @@ export interface SentMessage {
   sentAt: string;
   body: string;
   statusText?: string;
+  /** 1–4 letter-journey stage — a fresh send starts at 1. */
+  stage?: number | null;
 }
 
 export async function sendNote(

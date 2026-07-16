@@ -15,6 +15,7 @@ import {
   View,
   Pressable,
   RefreshControl,
+  Share,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -46,6 +47,8 @@ import {
   ThreadResponse,
 } from '../../../lib/api';
 import { requestPermissionIfAppropriate } from '../../../lib/push';
+import { kidPresenceLine } from '../../../lib/campusTime';
+import { API_BASE_URL } from '../../../lib/api';
 
 const HERO_HEIGHT_APPROX = 520;
 
@@ -317,6 +320,17 @@ export default function KidPage() {
           sponsoredSinceLabel={showSponsoredSince ? sponsoredSinceLabel : null}
         />
 
+        {/* Presence — the kid exists RIGHT NOW, seven time zones away.
+            Recomputed on every render, so the page reads differently
+            morning vs night. This is the world-getting-smaller line. */}
+        <View
+          style={{ paddingHorizontal: SPACING.l, marginTop: SPACING.m }}
+        >
+          <Text variant="bodySmall" color="umber">
+            {kidPresenceLine(kid.firstName)}
+          </Text>
+        </View>
+
         {kid.intro ? (
           <View
             style={{
@@ -396,6 +410,53 @@ export default function KidPage() {
             </Text>
           </View>
         ) : null}
+
+        {/* Introduce — the native share sheet, pointed at the public
+            /meet page (kid-as-themselves, no number attached, so a
+            shared link can never collide with the shirt-holder's
+            claim). Word of mouth IS the growth engine: every sponsor
+            who shows off their kid is a shirt sale waiting to happen,
+            and "look who I know in Uganda" is the fun of the whole
+            thing. */}
+        <View
+          style={{
+            marginTop: SPACING.section,
+            paddingHorizontal: SPACING.l,
+          }}
+        >
+          <Text variant="body" color="ink">
+            Know someone who'd love {kid.firstName}?
+          </Text>
+          <Pressable
+            onPress={() => {
+              // Honest per-role framing: "my penpal" is a monthly
+              // sponsor's truth; a holder shares the kid behind their
+              // Number; anyone else just shares a kid worth knowing.
+              const relationship =
+                kid.viewer.roleForKid === 'monthly'
+                  ? 'my penpal at the Be A Number campus in Uganda'
+                  : kid.viewer.roleForKid === 'holder'
+                    ? 'the kid on the other end of my Number'
+                    : 'a kid at the Be A Number campus in Uganda';
+              void Share.share({
+                message: `Meet ${kid.firstName} — ${relationship}. ${API_BASE_URL}/meet/${kid.id}`,
+              });
+            }}
+            accessibilityRole="button"
+            style={{ marginTop: SPACING.s, alignSelf: 'flex-start' }}
+          >
+            <Text
+              color="ink"
+              style={{
+                fontFamily: TEXT_STYLES.textLink.fontFamily,
+                fontSize: TEXT_STYLES.textLink.fontSize,
+                textDecorationLine: 'underline',
+              }}
+            >
+              Introduce them →
+            </Text>
+          </Pressable>
+        </View>
       </Animated.ScrollView>
 
       {showFAB ? (

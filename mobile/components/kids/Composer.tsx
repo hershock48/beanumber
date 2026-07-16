@@ -20,6 +20,7 @@ import { Button } from '../design/Button';
 import { Input } from '../design/Input';
 import { Sheet } from '../design/Sheet';
 import * as haptics from '../../lib/haptics';
+import { composerPresenceLine } from '../../lib/campusTime';
 
 const SOFT_LIMIT = 800;
 const COUNTER_THRESHOLD = 100;
@@ -156,6 +157,17 @@ export function Composer({
             </Text>
           </Pressable>
         </View>
+
+        {/* Presence — where the note is headed, right now. The night
+            variant ("your note will be waiting when the campus wakes
+            up") turns the time difference from friction into warmth. */}
+        <Text
+          variant="caption"
+          color="umber"
+          style={{ marginBottom: SPACING.m }}
+        >
+          {composerPresenceLine(kidFirstName)}
+        </Text>
 
         {/* Text area */}
         <Input

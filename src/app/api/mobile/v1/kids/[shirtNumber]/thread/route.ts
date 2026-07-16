@@ -45,6 +45,19 @@ export interface MobileThreadMessage {
   body: string;
   statusText: string;
   /**
+   * Where this note is on its physical journey, 1–4:
+   *   1 Sent (awaiting Kevin's review)
+   *   2 At the campus (with the campus team)
+   *   3 Translated (in the Sunday batch)
+   *   4 In the kid's hands (delivered)
+   * Null on kid replies and declined notes. The mobile client renders
+   * this as the letter-journey stepper — the wait between send and
+   * delivery is real (letters travel in Sunday batches), and showing
+   * the note moving is what makes that wait feel alive instead of
+   * silent.
+   */
+  stage: 1 | 2 | 3 | 4 | null;
+  /**
    * Public URL of the kid's scanned handwritten reply photo when
    * this message is a kidToSponsor row uploaded via the 2026-07-08
    * scanned-reply workflow. Null on:
@@ -174,6 +187,26 @@ function lockedCopyFor(kidFirstName: string | null): string {
  * the web NotesThread so the same message reads the same in both
  * places.
  */
+/** Journey stage for the stepper — see MobileThreadMessage.stage. */
+function stageFor(row: {
+  direction: 'sponsor_to_kid' | 'kid_to_sponsor';
+  status: string;
+}): 1 | 2 | 3 | 4 | null {
+  if (row.direction === 'kid_to_sponsor') return null;
+  switch (row.status) {
+    case 'awaiting_kevin':
+      return 1;
+    case 'pending':
+      return 2;
+    case 'translated':
+      return 3;
+    case 'delivered':
+      return 4;
+    default:
+      return null; // declined and anything unknown — no journey to show
+  }
+}
+
 function statusTextFor(row: {
   direction: 'sponsor_to_kid' | 'kid_to_sponsor';
   status: string;
@@ -261,6 +294,7 @@ async function getHandler(
       status: r.status,
       deliveredAt: r.deliveredAt,
     }),
+    stage: stageFor({ direction: r.direction, status: r.status }),
     // Scanned reply photo — null except on kid_to_sponsor rows that
     // came in through the new upload flow. Client renders the photo
     // large and `body` as translation caption below.
@@ -437,6 +471,10 @@ async function postHandler(
         direction: 'sponsor_to_kid',
         status: inserted[0].status,
         deliveredAt: null,
+      }),
+      stage: stageFor({
+        direction: 'sponsor_to_kid',
+        status: inserted[0].status,
       }),
       // A newly-sent sponsor note never carries a reply photo.
       imageUrl: null,
