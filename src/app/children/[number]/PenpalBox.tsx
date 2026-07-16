@@ -186,7 +186,13 @@ export function PenpalBox({
     // Asenath, Amarorwot are female). Matches ReassignReveal's
     // pronoun handling. No per-kid gender lookup here because this
     // heading renders for anon visitors who haven't claimed yet.
-    heading = `Sponsor ${firstName}. Meet them for real.`;
+    //   (non-breaking space) glues "for real." so no line break
+    // can ever orphan the word "real." on its own line — Kevin caught
+    // exactly that widow on Naume's page (2026-07-16). text-balance
+    // on the rendering <p> does the aesthetic work in modern
+    // browsers (splits roughly "Sponsor Naume." / "Meet them for
+    // real."); the nbsp is the guarantee everywhere else.
+    heading = `Sponsor ${firstName}. Meet them for real.`;
   }
 
   // Anon-only href. Holder + signed_in_visitor use the client CTA
@@ -264,7 +270,7 @@ export function PenpalBox({
               One letter, one reply &middot; done
             </p>
             <p
-              className="text-2xl md:text-[26px] text-[#0d0d0d] mb-4 leading-tight"
+              className="text-2xl md:text-[26px] text-[#0d0d0d] mb-4 leading-tight text-balance"
               style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
             >
               {heading}
@@ -358,7 +364,7 @@ export function PenpalBox({
         <div className="relative bg-white/85 backdrop-blur-[2px]">
           <div className="max-w-md w-full mx-auto text-center px-6 py-10 md:py-12">
             <p
-              className="text-2xl md:text-[26px] text-[#0d0d0d] mb-3 leading-tight"
+              className="text-2xl md:text-[26px] text-[#0d0d0d] mb-3 leading-tight text-balance"
               style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
             >
               {heading}
