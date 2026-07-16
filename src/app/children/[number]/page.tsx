@@ -1642,11 +1642,19 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
                       claimers take the number. Sponsorship itself is
                       session-gated (non-negotiable #4), so this IS the
                       sponsor path. */}
+                  {/* Label is neutral 'Sign in' (Kevin, 2026-07-16):
+                      the pitch text to the left makes the $25/mo
+                      case, but the button is the door for monthly
+                      sponsors, holders with an included letter to
+                      write, and undecided buyers alike. 'Sign in to
+                      sponsor' read as a payment commitment to the
+                      shirt-holder the insert promised a free
+                      letter. */}
                   <Link
                     href={`/signin?n=${number}`}
                     className="inline-block whitespace-nowrap bg-[#D4A843] text-[#0d0d0d] hover:bg-[#c49a3a] font-bold uppercase tracking-wider text-xs py-2.5 px-4 transition-colors"
                   >
-                    Sign in to sponsor &rarr;
+                    Sign in &rarr;
                   </Link>
                   {/* Secondary — genuinely cold visitors (shared link,
                       no shirt). A NEW shirt carries its own Number and

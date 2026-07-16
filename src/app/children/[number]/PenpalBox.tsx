@@ -201,8 +201,18 @@ export function PenpalBox({
   // takes over from there. /shirts is the secondary for genuinely
   // cold visitors — with honest copy: a NEW shirt carries its own
   // Number and its own kid, it does not carry {firstName}'s.
+  //
+  // The label says WRITE, not sponsor (Kevin, same day): the heading
+  // and pitch above already make the $25/mo case, but the button is
+  // the door for three different people — the monthly sponsor whose
+  // view comes back, the shirt-holder whose included letter is
+  // waiting, and the buyer who hasn't decided anything yet. 'Sign in
+  // to sponsor' read as a payment commitment to the exact person the
+  // shirt insert just promised a free letter. The letter is also the
+  // stronger hook: it's what the physical insert told them to come
+  // here and do.
   const anonCtaHref = `/signin?n=${shirtNumber}`;
-  const anonCtaLabel = `Sign in to sponsor ${firstName}`;
+  const anonCtaLabel = `Sign in to write ${firstName}`;
 
   // Holder who has already used their included letter cycle AND has
   // a real thread (their sent letter + kid's reply): show the real
@@ -404,9 +414,10 @@ export function PenpalBox({
                 </Link>
                 <p className="text-xs text-[#888] leading-relaxed max-w-xs text-center">
                   Got the shirt with #{shirtNumber}? Signing in makes
-                  this page yours. Already sponsoring monthly? Your
-                  view comes right back &mdash; nothing new gets
-                  charged.
+                  this page yours &mdash; and the letter included with
+                  your shirt is ready to send. Already sponsoring
+                  monthly? Your view comes right back, nothing new
+                  gets charged.
                 </p>
                 <p className="text-xs uppercase tracking-[0.15em] text-[#888] font-bold mt-2">
                   no shirt yet?
