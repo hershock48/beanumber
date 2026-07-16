@@ -91,6 +91,26 @@ function HomePageInner({ initialChildren }: { initialChildren: Child[] }) {
   // /api/children.
   const childrenWithPhotos = initialChildren.filter(c => !!c.photo_url);
 
+  // Featured kid — the singularity effect, applied (2026-07-16
+  // conversion audit). The research is unambiguous: people give more
+  // to ONE named child than to a crowd — donors literally gave less
+  // to help two children than one (Slovic), and a wall of fifty is
+  // statistics wearing name tags. So the section leads with a single
+  // kid at full emotional weight, and the carousel demotes to
+  // proof-of-realness below. Selection: first kid in the (hourly
+  // server-shuffled) roster with a substantive story line, so the
+  // featured face rotates with each ISR regeneration. Falls back to
+  // any kid with a photo; the block hides if the roster is empty.
+  // Deliberately passive like the carousel cards — no link into the
+  // kid's bio. The funnel is shirt → reveal → kid, never pick-a-kid.
+  const featuredKid =
+    childrenWithPhotos.find(c => (c.fun_fact?.trim().length ?? 0) >= 60) ??
+    childrenWithPhotos[0] ??
+    null;
+  const carouselKids = featuredKid
+    ? childrenWithPhotos.filter(c => c.id !== featuredKid.id)
+    : childrenWithPhotos;
+
   // Welcome state: user just signed in via magic link and an OLDER
   // email link redirected them to /?welcome=1&n=N (new links deep-
   // link straight to the kid page; this handles the 24h tail of
@@ -278,12 +298,20 @@ function HomePageInner({ initialChildren }: { initialChildren: Child[] }) {
             </button>
           </form>
 
-          <p className="text-sm text-[#FFF8F0]/40 mt-8">
-            {"Don't have a Number yet? "}
-            <Link href="/shirts" className="text-[#D4A843]/80 underline underline-offset-2 hover:text-[#D4A843]">
+          {/* Second door (audit finding #5): every visitor the SEO
+              work brings in arrives WITHOUT a number, and their path
+              was a barely-visible text link at 40% opacity. Find
+              stays primary — it's the product's magic — but the cold
+              visitor now gets a real button, not a whisper. */}
+          <div className="mt-7">
+            <p className="text-sm text-[#FFF8F0]/50 mb-3">No Number yet?</p>
+            <Link
+              href="/shirts"
+              className="inline-block px-8 py-3.5 border border-[#D4A843]/70 text-[#D4A843] font-bold uppercase tracking-wider text-sm hover:bg-[#D4A843] hover:text-[#0d0d0d] transition-colors"
+            >
               Get a Shirt
             </Link>
-          </p>
+          </div>
         </div>
 
         <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-10">
@@ -317,13 +345,92 @@ function HomePageInner({ initialChildren }: { initialChildren: Child[] }) {
           >
             They have names and stories.
           </h2>
+          {/* Story, not inventory (audit finding #6): the feature
+              list (letters, photos, report card, newsletter) already
+              lives in How It Works III — repeating it here made the
+              kids read like a product spec. Two sentences, then the
+              faces. */}
           <p className="text-[#777] max-w-lg mx-auto leading-relaxed text-lg">
-            Every Number on every Shirt belongs to a Child like the ones below. Your Shirt starts their year
-            at the campus. Stay with them for $25/month to finish it &mdash; write to your Kid and see their
-            handwritten replies, photos of your Kid through the year, a year-end report card, and the monthly
-            campus newsletter.
+            Every Number on every Shirt belongs to a real kid at a small school
+            in Northern Uganda. You don&rsquo;t choose them &mdash; the Number
+            on your shirt decides who you meet.
           </p>
         </div>
+
+        {/* ── Featured kid ─────────────────────────────────────────
+            One face at full weight before the crowd. Identifiable-
+            victim research: a single named child out-earns any group
+            — the crowd below stays as proof-of-realness, this is the
+            one to fall for. Rotates hourly with the ISR shuffle.
+            PASSIVE by design (same rule as the carousel cards): no
+            link into her bio, no number badge, nothing that reads as
+            "sponsor THIS kid." People cannot choose a kid — the
+            Number on the shirt decides. The only door is /shirts. */}
+        {featuredKid && (
+          <div className="max-w-4xl mx-auto mb-14 md:mb-20">
+            <div className="bg-white border border-[#e8e0d4] md:flex shadow-[0_2px_16px_rgba(184,150,66,0.08)]">
+              <div className="md:w-[44%] shrink-0">
+                <div className="aspect-[4/5] bg-[#f5f0e8] overflow-hidden relative h-full w-full">
+                  <img
+                    src={featuredKid.photo_url as string}
+                    alt={featuredKid.display_name || featuredKid.first_name}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              </div>
+              <div className="p-8 md:p-12 flex flex-col justify-center text-left">
+                <p className="text-xs font-bold text-[#D4A843] uppercase tracking-[0.3em] mb-4">
+                  Meet one of them
+                </p>
+                <h3
+                  className="text-3xl md:text-4xl text-[#0d0d0d] mb-2"
+                  style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
+                >
+                  {featuredKid.display_name || featuredKid.first_name}
+                </h3>
+                <p className="text-sm text-[#999] mb-5">
+                  {[
+                    featuredKid.age ? `Age ${featuredKid.age}` : null,
+                    featuredKid.grade_class
+                      ? isGradeCode(featuredKid.grade_class)
+                        ? gradeLabelForSponsor(featuredKid.grade_class as GradeCode)
+                        : featuredKid.grade_class
+                      : null,
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')}
+                </p>
+                {featuredKid.fun_fact && (
+                  <p
+                    className="text-lg md:text-xl text-[#333] leading-relaxed italic mb-6 text-balance"
+                    style={{ fontFamily: 'var(--font-lora), serif' }}
+                  >
+                    &ldquo;{featuredKid.fun_fact}&rdquo;
+                  </p>
+                )}
+                <p className="text-sm text-[#777] leading-relaxed mb-6">
+                  You can&rsquo;t pick {featuredKid.first_name}. But a kid just
+                  as real is on the other end of every shirt.
+                </p>
+                <div>
+                  <Link
+                    href="/shirts"
+                    className="inline-block px-8 py-3.5 bg-[#D4A843] text-[#0d0d0d] font-bold uppercase tracking-wider text-sm hover:bg-[#c49a3a] transition-colors"
+                  >
+                    Get a Shirt &mdash; meet yours
+                  </Link>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Roster kicker — the crowd is demoted to evidence. */}
+        {featuredKid && carouselKids.length > 0 && (
+          <p className="text-center text-sm text-[#999] mb-6">
+            &hellip;and {carouselKids.length} more at the campus
+          </p>
+        )}
 
         {childrenWithPhotos.length === 0 ? (
           <div className="text-center py-16 bg-white border border-[#e8e0d4] max-w-md mx-auto">
@@ -369,7 +476,7 @@ function HomePageInner({ initialChildren }: { initialChildren: Child[] }) {
               ref={carouselRef}
               className="flex gap-6 overflow-x-auto snap-x snap-mandatory scroll-smooth pb-6 -mx-5 px-5 md:mx-0 md:px-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
             >
-              {childrenWithPhotos.map(child => {
+              {carouselKids.map(child => {
                 const displayName = child.display_name || child.first_name;
                 const photoUrl = child.photo_url as string;
                 return (
