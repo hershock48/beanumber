@@ -192,14 +192,31 @@ export async function POST(request: NextRequest) {
             </body>
           </html>
         `;
-        await sendEmail({
+        const sendResult = await sendEmail({
           to: { email, name: '' },
           from: { email: fromEmail, name: 'Be A Number' },
           subject: `Your sign-in link`,
           html,
         });
+        // sendEmailViaGmail returns { success:false, error } instead
+        // of throwing when the API rejects — Gmail refresh-token expiry
+        // (invalid_grant) is the classic silent-failure mode here.
+        // Historically the endpoint awaited this call without inspecting
+        // the return value, so a dead OAuth token meant zero users got
+        // magic links while the endpoint kept responding {success:true}.
+        // Log loudly so it shows up in Vercel logs, and prefix with a
+        // greppable ATTENTION tag so the failure isn&rsquo;t buried in
+        // routine chatter.
+        if (!sendResult.success) {
+          console.error(
+            `[Recovery] ATTENTION email-only send FAILED for ${email}: ${sendResult.error}`
+          );
+        }
       } catch (err) {
-        console.error('[Recovery] Email-only path failed to send', err);
+        console.error(
+          `[Recovery] ATTENTION email-only path threw for ${email}:`,
+          err
+        );
       }
       return NextResponse.json(responseShape);
     }
@@ -346,8 +363,13 @@ export async function POST(request: NextRequest) {
       subject,
       html,
     });
+    // Same greppable ATTENTION tag as the email-only branch above so
+    // Kevin can filter Vercel logs on one string to catch every
+    // silent-failure send.
     if (!result.success) {
-      console.error('[Recovery] Failed to send link email:', result.error);
+      console.error(
+        `[Recovery] ATTENTION claim-path send FAILED for ${email} on #${shirtNumber}: ${result.error}`
+      );
     }
 
     return NextResponse.json(responseShape);
