@@ -615,7 +615,12 @@ export async function getSponsorshipWithChildBySponsorCode(sponsorCode: string) 
       sponsorCode: sponsorships.sponsorCode,
       status: sponsorships.status,
       childRevealedAt: sponsorships.childRevealedAt,
-      childShirtNumber: sql<number | null>`coalesce(${children.shirtNumber}, child_legacy.shirt_number)`,
+      // The row's OWN claimed number wins (migration 0017): cycle-
+      // number rows have no children row to join, and the reveal
+      // beacon's number-match check read NULL here — which meant
+      // ChildRevealedAt never stamped for cycle holders and the
+      // letter path 403'd forever downstream.
+      childShirtNumber: sql<number | null>`coalesce(${sponsorships.claimedShirtNumber}, ${children.shirtNumber}, child_legacy.shirt_number)`,
       childRecordId: sql<string | null>`coalesce(${children.id}, child_legacy.id)`,
     })
     .from(sponsorships)

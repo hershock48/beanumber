@@ -40,6 +40,8 @@ import { db } from '@/lib/db/client';
 import { kidMessages, sponsorships, children } from '@/lib/db/schema';
 import { sendKevinNoteAlert } from '@/lib/email';
 import { SESSION } from '@/lib/constants';
+import { CANONICAL_ROSTER_MAX } from '@/lib/roster-config';
+import { resolveShirtNumberForClaim } from '@/lib/claim-resolve';
 
 const MIN_BODY = 10;
 const MAX_BODY = 1000;
@@ -227,6 +229,32 @@ export async function POST(request: NextRequest) {
       .limit(1);
     childRow = r[0];
   }
+  // Cycle-number fallback: a synthetic per-number legacy id
+  // (HSP/BAN-0NN with NN past the canonical roster) has no children
+  // row — the kid page synthesizes those identities from Batches
+  // math. Resolve through the same math so a #70 holder's letter
+  // lands on the real kid behind #70. Without this branch every
+  // cycle-number holder got 404 "not on the campus roster" — while
+  // the letter template shipped in the bag promises they can upload
+  // a letter after signing in.
+  const cycleNumberFromLegacy = (() => {
+    const m = body.childIdLegacy?.match(/^HSP\/BAN-(\d{3,})$/);
+    const n = m ? parseInt(m[1], 10) : null;
+    return n && n > CANONICAL_ROSTER_MAX ? n : null;
+  })();
+  if (!childRow && cycleNumberFromLegacy) {
+    const identity = await resolveShirtNumberForClaim(cycleNumberFromLegacy);
+    if (identity) {
+      const c = identity.canonicalRow;
+      childRow = {
+        id: c.id,
+        firstName: c.firstName,
+        displayName: c.displayName,
+        shirtNumber: c.shirtNumber,
+        childId: c.childId,
+      };
+    }
+  }
   if (!childRow) {
     return NextResponse.json(
       { error: 'That kid is not on the campus roster.' },
@@ -277,6 +305,18 @@ export async function POST(request: NextRequest) {
           // false-positive surface if a bad row ever slipped in.
           childRow.childId
             ? eq(sponsorships.childIdLegacy, childRow.childId)
+            : sql`false`,
+          // Cycle-number identities: the viewer's sponsorship row
+          // carries the synthetic per-number legacy id (HSP/BAN-070)
+          // and/or claimed_shirt_number — NOT the canonical kid's
+          // ids. Without these branches a cycle-number holder or
+          // sponsor 403'd on the letter the shirt insert promised
+          // them.
+          cycleNumberFromLegacy && body.childIdLegacy
+            ? eq(sponsorships.childIdLegacy, body.childIdLegacy)
+            : sql`false`,
+          cycleNumberFromLegacy
+            ? eq(sponsorships.claimedShirtNumber, cycleNumberFromLegacy)
             : sql`false`
         ),
         // Include both 'Active' and 'Holder' statuses. Fresh shirt

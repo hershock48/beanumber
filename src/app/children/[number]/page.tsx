@@ -283,13 +283,38 @@ const getViewerEmail = cache(async (): Promise<string | null> => {
  */
 async function findSponsorshipByEmailForChild(
   email: string,
-  childId: string
+  childId: string,
+  opts?: {
+    /** The page's shirt number — rows that CLAIMED this number match
+     *  regardless of how their child link is keyed. */
+    shirtNumber?: number;
+    /** Canonical kid behind a cycle page. Only consulted when the
+     *  viewer OWNS this number (claimed_shirt_number match exists) —
+     *  a #70 owner who converted to monthly gets their canonical-
+     *  linked Active row recognized on /70, without leaking the
+     *  canonical kid's OTHER sponsors onto every cycle shirt. */
+    canonicalUuid?: string | null;
+    canonicalLegacyId?: string | null;
+  }
 ): Promise<AirtableSponsorshipRecord['fields'] | null> {
   if (!email || !childId) return null;
   try {
     // Find the child row (UUID + legacy ChildID) so we can dual-match.
     const child = await getChildByChildId(childId);
     const childUuid = child?.id;
+
+    const n = opts?.shirtNumber;
+    // "This email owns this number" — the gate for canonical-row
+    // recognition on cycle pages.
+    const ownsNumberExists =
+      typeof n === 'number'
+        ? drizzleSql`exists (
+            select 1 from sponsorships s2
+            where lower(s2.sponsor_email) = lower(${email})
+              and s2.claimed_shirt_number = ${n}
+              and s2.status in ('Active', 'Holder')
+          )`
+        : drizzleSql`false`;
 
     const rows = await db
       .select()
@@ -303,9 +328,31 @@ async function findSponsorshipByEmailForChild(
           ),
           or(
             childUuid ? eq(sponsorshipsTable.childId, childUuid) : drizzleSql`false`,
-            eq(sponsorshipsTable.childIdLegacy, childId)
+            eq(sponsorshipsTable.childIdLegacy, childId),
+            typeof n === 'number'
+              ? eq(sponsorshipsTable.claimedShirtNumber, n)
+              : drizzleSql`false`,
+            opts?.canonicalUuid
+              ? and(
+                  ownsNumberExists,
+                  eq(sponsorshipsTable.childId, opts.canonicalUuid)
+                )
+              : drizzleSql`false`,
+            opts?.canonicalLegacyId
+              ? and(
+                  ownsNumberExists,
+                  eq(sponsorshipsTable.childIdLegacy, opts.canonicalLegacyId)
+                )
+              : drizzleSql`false`
           )
         )
+      )
+      // Active-with-monthly first: when the viewer has both a $0
+      // Holder row (the claim) and an Active monthly row (the
+      // conversion), the monthly row decides their view.
+      .orderBy(
+        drizzleSql`case when ${sponsorshipsTable.status} = 'Active' then 0 else 1 end`,
+        drizzleSql`${sponsorshipsTable.monthlyAmount} desc nulls last`
       )
       .limit(1);
     if (!rows[0]) return null;
@@ -635,6 +682,18 @@ const getChildByShirtNumber = cache(async function getChildByShirtNumber(shirtNu
     // the canonical kid's sponsor onto every cycle shirt).
     let isSynthesizedCycleRow = false;
 
+    // The canonical children row behind a synthesized cycle row.
+    // RECOGNITION stays per-number (the synthesized identity above),
+    // but CORRESPONDENCE — notes, the one-letter cycle, personal
+    // updates, awards — flows to the real kid. The letter template we
+    // ship in every bag promises "sign in with your email → upload
+    // the photo," and every shirt going out today carries a cycle
+    // number, so the composer has to work here. kid_messages rows are
+    // scoped by (sponsor email, child) so two holders of different
+    // numbers mapping to the same kid keep separate threads.
+    let cycleCanonicalRow: Awaited<ReturnType<typeof getChildByChildId>> | null =
+      null;
+
     // Cycle-math fallback: if no Children row carries this shirt
     // number, resolve via the Batches table&rsquo;s locked roster
     // snapshot (cycle.ts). The Batches model is the source of
@@ -685,6 +744,7 @@ const getChildByShirtNumber = cache(async function getChildByShirtNumber(shirtNu
           childId: `HSP/BAN-${String(shirtNumber).padStart(3, '0')}`,
         };
         isSynthesizedCycleRow = true;
+        cycleCanonicalRow = canonical;
       }
     }
 
@@ -750,6 +810,8 @@ const getChildByShirtNumber = cache(async function getChildByShirtNumber(shirtNu
       return {
         reserved: true as const,
         child_id: childId || `RESERVED-${shirtNumber}`,
+        correspondence_record_id: '',
+        correspondence_child_id: '',
         display_name: '',
         first_name: undefined,
         age: undefined,
@@ -811,7 +873,12 @@ const getChildByShirtNumber = cache(async function getChildByShirtNumber(shirtNu
     if (viewerEmail) {
       emailMatchedSponsorship = await findSponsorshipByEmailForChild(
         viewerEmail,
-        childId || ''
+        childId || '',
+        {
+          shirtNumber,
+          canonicalUuid: cycleCanonicalRow?.id ?? null,
+          canonicalLegacyId: cycleCanonicalRow?.childId ?? null,
+        }
       );
     }
 
@@ -952,6 +1019,18 @@ const getChildByShirtNumber = cache(async function getChildByShirtNumber(shirtNu
       reserved: false as const,
       record_id: recordId,
       child_id: childId || `CHILD-${shirtNumber}`,
+      // CORRESPONDENCE identity — where notes, the one-letter cycle,
+      // personal updates, and awards actually live. For canonical
+      // numbers this IS the page identity; for synthesized cycle rows
+      // it's the real kid behind the number. Recognition (who owns
+      // this page) keeps using record_id/child_id above; the
+      // per-email scoping on threads keeps different numbers' holders
+      // separate even though they correspond with the same kid.
+      correspondence_record_id: recordId || cycleCanonicalRow?.id || '',
+      correspondence_child_id:
+        (isSynthesizedCycleRow ? cycleCanonicalRow?.childId : childId) ??
+        childId ??
+        '',
       display_name: child.DisplayName || `${child.FirstName || 'Child'} ${child.LastInitial || ''}`.trim(),
       first_name: child.FirstName,
       age,
@@ -1318,8 +1397,22 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
     noteThread,
     viewerWriteStatus,
   ] = await Promise.all([
-      resolveBuyerBundle(child.viewer_is_sponsor, child.record_id),
-      resolvePortalData(child),
+      // correspondence_record_id: on cycle pages record_id is '' and
+      // the old guard silently killed the ClaimMatchCard for Shirt +
+      // Stay buyers whose shirt carries a cycle number — which is
+      // every shirt in the active batch. The id is only used as a
+      // resolved-kid guard here.
+      resolveBuyerBundle(child.viewer_is_sponsor, child.correspondence_record_id),
+      // Portal data (personal updates) belongs to the REAL kid — on
+      // cycle pages that's the canonical kid behind the number, not
+      // the synthesized identity. correspondence_* is identical to
+      // record_id/child_id on canonical pages, so this is a no-op
+      // there.
+      resolvePortalData({
+        viewer_is_sponsor: child.viewer_is_sponsor,
+        record_id: child.correspondence_record_id,
+        child_id: child.correspondence_child_id,
+      }),
       child.departed_at
         ? Promise.resolve<CampusNewsletterEntry[]>([])
         : getRecentCampusNewsletters(),
@@ -1327,22 +1420,24 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
       // viewer will actually see it. Zero-cost path for cold visitors
       // AND for departed kids (whose timeline isn't rendered — the
       // relationship has a different frame there). Kept in sync with
-      // the same-shape newsletter gate two lines above.
+      // the same-shape newsletter gate two lines above. Awards belong
+      // to the real kid → correspondence identity.
       !child.departed_at &&
       (child.viewer_is_sponsor || child.viewer_is_holder) &&
-      child.record_id
-        ? getSotmHistoryForChild(child.record_id)
+      child.correspondence_record_id
+        ? getSotmHistoryForChild(child.correspondence_record_id)
         : Promise.resolve<SotmHistoryEntry[]>([]),
       // Note thread — same gate as awards. Only pulls messages sent
       // BY THIS viewer's email, so a sponsor doesn't see another
-      // sponsor's thread with the same kid.
+      // sponsor's thread with the same kid — including the holder of
+      // a DIFFERENT number that maps to the same canonical kid.
       !child.departed_at &&
       (child.viewer_is_sponsor || child.viewer_is_holder) &&
-      child.record_id &&
+      child.correspondence_record_id &&
       viewerEmailForThread
         ? getNoteThreadForSponsorAndChild({
             sponsorEmail: viewerEmailForThread,
-            childRecordId: child.record_id,
+            childRecordId: child.correspondence_record_id,
           })
         : Promise.resolve<NoteThreadEntry[]>([]),
       // One-letter-included cycle status for shirt-holders. The kid
@@ -1356,11 +1451,14 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
       // dropped downstream if the viewer isn't a holder.
       !child.departed_at &&
       child.viewer_is_holder &&
-      child.record_id &&
+      child.correspondence_record_id &&
       viewerEmailForThread
         ? getViewerWriteStatus({
             sponsorEmail: viewerEmailForThread,
-            childRecordId: child.record_id,
+            // Canonical kid for the message-history check; the PAGE
+            // identity (cycle legacy id) for the sponsorship match,
+            // so a #70 holder's row (HSP/BAN-070) is found.
+            childRecordId: child.correspondence_record_id,
             childIdLegacy: child.child_id ?? null,
           })
         : Promise.resolve<ViewerWriteStatus>('none'),
@@ -1960,7 +2058,13 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
                   ? noteThread
                   : undefined
               }
-              childRecordId={child.record_id}
+              // Correspondence flows to the REAL kid: on cycle pages
+              // record_id is '' (synthesized identity) and the
+              // composer/thread need the canonical row. The legacy id
+              // stays the PAGE identity (HSP/BAN-0NN for cycle
+              // numbers) — the notes API uses it to match the
+              // holder's sponsorship row.
+              childRecordId={child.correspondence_record_id}
               childIdLegacy={child.child_id ?? null}
               childId={child.child_id ?? null}
               childDisplayName={displayName}
@@ -2164,7 +2268,9 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
             them, not a directory. */}
         {!child.departed_at && (
           <OtherKidsAtCampus
-            currentRecordId={child.record_id}
+            // Canonical id so the kid behind a cycle number excludes
+            // THEMSELF from their own "other kids" carousel.
+            currentRecordId={child.correspondence_record_id}
             currentShirtNumber={Number(number)}
             currentFirstName={firstName}
           />
