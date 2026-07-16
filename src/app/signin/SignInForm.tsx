@@ -78,10 +78,21 @@ export function SignInForm() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(n ? { email, shirtNumber: n } : { email }),
       });
+      const data = await res.json().catch(() => null);
       if (!res.ok) {
-        const data = await res.json().catch(() => null);
         setState('error');
         setErrorMessage(data?.error || 'Could not send link. Try again.');
+        return;
+      }
+      // The one non-silent branch: this number is already linked to a
+      // different email. Telling the user beats sending them to watch
+      // an inbox where nothing will ever arrive — the most common
+      // cause is a typo'd purchase email or a spouse's address.
+      if (data?.code === 'number_claimed') {
+        setState('error');
+        setErrorMessage(
+          `#${n} is already linked to a different email. If that could be you, try the email you used when you got the shirt. Stuck? Email Kevin@beanumber.org and I'll sort it out.`
+        );
         return;
       }
       setState('sent');
@@ -133,8 +144,8 @@ export function SignInForm() {
           Link sent to {email}.
         </h1>
         <p className="text-[#555] text-base leading-relaxed mb-2">
-          Open the email and tap the button. You&rsquo;ll be signed in
-          on this device for 30 days. Link is good for 24 hours.
+          Open the email and tap the button. This device will remember
+          you from then on. Link is good for 24 hours.
         </p>
         {/* Escape hatch for typo&rsquo;d emails. Without this a user who
             mistyped had to refresh to get back to the form. */}

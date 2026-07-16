@@ -105,10 +105,19 @@ export function SignInModal({
           n ? { email, shirtNumber: n } : { email }
         ),
       });
+      const data = await res.json().catch(() => null);
       if (!res.ok) {
-        const data = await res.json().catch(() => null);
         setState('error');
         setErrorMessage(data?.error || 'Could not send link. Try again.');
+        return;
+      }
+      // Number already claimed by a different email — say so instead
+      // of pointing the user at an inbox that will stay empty.
+      if (data?.code === 'number_claimed') {
+        setState('error');
+        setErrorMessage(
+          `#${n} is already linked to a different email. If that could be you, try the email you used when you got the shirt. Stuck? Email Kevin@beanumber.org and I'll sort it out.`
+        );
         return;
       }
       setState('sent');
@@ -176,8 +185,8 @@ export function SignInModal({
               Link sent.
             </p>
             <p className="text-[#d8cfc1] text-sm md:text-base leading-relaxed">
-              Open the email and tap the button. You&rsquo;ll be signed in
-              on this device for 30 days. Link is good for 24 hours.
+              Open the email and tap the button. This device will
+              remember you from then on. Link is good for 24 hours.
             </p>
             <p className="text-xs text-[#a89e8d] mt-5 leading-relaxed">
               Not showing up? Email{' '}
