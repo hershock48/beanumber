@@ -44,8 +44,16 @@ export function campusNow(now: Date = new Date()): CampusMoment {
   const day = shifted.getUTCDay();
 
   const h12 = hour % 12 === 0 ? 12 : hour % 12;
+  // Hours 0–4 are "at night", not "in the morning" — "12:54 in the
+  // morning" is technically correct and humanly wrong.
   const daypart =
-    hour < 12 ? 'in the morning' : hour < 17 ? 'in the afternoon' : 'at night';
+    hour < 5
+      ? 'at night'
+      : hour < 12
+        ? 'in the morning'
+        : hour < 17
+          ? 'in the afternoon'
+          : 'at night';
   const clock = `${h12}:${String(minute).padStart(2, '0')} ${daypart}`;
 
   return {
