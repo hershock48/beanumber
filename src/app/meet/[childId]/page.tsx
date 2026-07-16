@@ -154,6 +154,40 @@ function computeAge(dob?: string): string | undefined {
   return years >= 0 ? String(years) : undefined;
 }
 
+/**
+ * /meet pages are the SEO- and share-safe kid surfaces: public,
+ * individually shareable, full bio in the server HTML, and no number
+ * to spoil. They were shipping the site-wide default title ("Be A
+ * Number | Every Number Is a Child") on every kid — indistinguishable
+ * in search results, link previews, and browser tabs. Name the kid.
+ * First name only (no surname in metadata), matching the sharing
+ * posture of the page itself.
+ */
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ childId: string }>;
+}) {
+  const { childId } = await params;
+  const child = await fetchChild(childId);
+  const firstName =
+    child?.fields?.FirstName ||
+    child?.fields?.DisplayName?.split(' ')[0] ||
+    null;
+  if (!firstName) return { title: 'Meet a kid at the campus' };
+  return {
+    title: `Meet ${firstName}`,
+    description: `${firstName} is a real kid at a small school campus in Northern Uganda. Read their story — and if it moves you, be the one who keeps them in school.`,
+    openGraph: {
+      title: `Meet ${firstName} | Be A Number`,
+      description: `${firstName} is a real kid at a small school campus in Northern Uganda.`,
+      ...(child?.fields?.ProfilePhoto?.[0]?.url
+        ? { images: [child.fields.ProfilePhoto[0].url] }
+        : {}),
+    },
+  };
+}
+
 export default async function MeetKidPage({
   params,
   searchParams,
