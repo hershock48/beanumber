@@ -57,7 +57,7 @@ export const revalidate = 0;
  * Per-kid /meet/[id] pages remain indexable on their own merits.
  */
 export const metadata: Metadata = {
-  title: 'Campus | Be A Number',
+  title: 'Campus',
   robots: { index: false, follow: false },
 };
 

@@ -3,7 +3,7 @@ import Link from 'next/link';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: "Contact Us - Be A Number",
+  title: "Contact Us",
   description: "Get in touch with Be A Number, International. We're here to help with sponsorship questions, donation inquiries, and partnership opportunities.",
   openGraph: {
     title: "Contact Us | Be A Number",

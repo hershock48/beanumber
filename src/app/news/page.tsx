@@ -26,7 +26,7 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 export const metadata: Metadata = {
-  title: 'Campus news | Be A Number',
+  title: 'Campus news',
   description:
     'Monthly updates from the campus in Omoro District, Northern Uganda — what the school, clinic, and kids are doing this month.',
   openGraph: {

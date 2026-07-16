@@ -4,7 +4,7 @@ import { BANNavigation } from '@/components/BANNavigation';
 import { BANFooter } from '@/components/BANFooter';
 
 export const metadata: Metadata = {
-  title: "Our Story | Be A Number",
+  title: "Our Story",
   description: "When the war in Northern Uganda ended, most organizations left. Kevin and Simon stayed. This is the story of how they built something that lasts.",
   openGraph: {
     title: "Our Story | Be A Number",

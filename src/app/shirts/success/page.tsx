@@ -4,7 +4,7 @@ import { BANFooter } from '@/components/BANFooter';
 import { ShirtSuccessClient } from './ShirtSuccessClient';
 
 export const metadata = {
-  title: 'Order Confirmed | Be A Number',
+  title: 'Order Confirmed',
   description: 'Your shirt is on its way. Meet the child who wears your number.',
 };
 

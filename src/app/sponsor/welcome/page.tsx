@@ -5,7 +5,7 @@ import { ConfettiBurst } from '@/components/ConfettiBurst';
 import { ShareButton } from './ShareButton';
 
 export const metadata: Metadata = {
-  title: "Welcome, sponsor | Be A Number",
+  title: "Welcome, sponsor",
   description: "Your monthly sponsorship is active. Watch your inbox.",
 };
 

@@ -4,7 +4,7 @@ import { BANFooter } from '@/components/BANFooter';
 import { DonationSection } from '@/components/DonationSection';
 
 export const metadata: Metadata = {
-  title: 'Donate | Be A Number',
+  title: 'Donate',
   description:
     'Your gift supports schools, clinics, vocational training, and trauma recovery in Northern Uganda.',
   openGraph: {

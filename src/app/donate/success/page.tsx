@@ -5,7 +5,7 @@ import { ConfettiBurst } from '@/components/ConfettiBurst';
 import { ShareButton } from './ShareButton';
 
 export const metadata: Metadata = {
-  title: "Thank you | Be A Number",
+  title: "Thank you",
   description: "Your donation goes straight to the ground in Northern Uganda.",
 };
 

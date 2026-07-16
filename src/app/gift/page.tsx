@@ -4,7 +4,7 @@ import { BANNavigation } from '@/components/BANNavigation';
 import { BANFooter } from '@/components/BANFooter';
 
 export const metadata: Metadata = {
-  title: 'Gift a Sponsorship | Be A Number',
+  title: 'Gift a Sponsorship',
   description:
     'Sponsor a child in someone else’s honor. They meet a real kid at the campus in Northern Uganda — a name, a face, a story. No pressure to continue, just an invitation.',
 };

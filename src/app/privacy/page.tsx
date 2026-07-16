@@ -3,7 +3,7 @@ import { BANNavigation } from '@/components/BANNavigation';
 import { BANFooter } from '@/components/BANFooter';
 
 export const metadata: Metadata = {
-  title: 'Privacy Policy | Be A Number',
+  title: 'Privacy Policy',
   description:
     "How Be A Number, International collects, uses, and protects your personal information. We are a 501(c)(3) nonprofit and we don't sell or rent your data.",
   openGraph: {

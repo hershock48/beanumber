@@ -1,7 +1,7 @@
 'use client';
 
-import { Suspense, useState, useEffect, useRef } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
 import { BANNavigationClient as BANNavigation } from '@/components/BANNavigationClient';
@@ -62,36 +62,44 @@ interface Child {
   shirt_number_end?: number;
 }
 
-/**
- * Inner content — needs Suspense around it because useSearchParams
- * triggers a CSR bailout in Next 16 unless wrapped.
- */
 function HomePageInner() {
   const [searchNumber, setSearchNumber] = useState('');
   const [children, setChildren] = useState<Child[]>([]);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
-  const searchParams = useSearchParams();
   const searchInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Welcome state: user just signed in via magic link, the callback
-  // redirected them to /?welcome=1&n=N. We prefill the Number input
-  // with their Number, focus it, show a "Welcome back" treatment,
-  // and forward just_signed_in=1 when they submit — so the kid
-  // page&rsquo;s ClaimGate &ldquo;first sign-in&rdquo; branch still fires.
-  const welcomeFlow = searchParams.get('welcome') === '1';
-  const welcomePrefill = searchParams.get('n') || '';
+  // Welcome state: user just signed in via magic link and an OLDER
+  // email link redirected them to /?welcome=1&n=N (new links deep-
+  // link straight to the kid page; this handles the 24h tail of
+  // already-sent emails plus any future flow that wants the ritual).
+  // We prefill the Number input, focus it, show a "Welcome back"
+  // treatment, and forward just_signed_in=1 when they submit.
+  //
+  // Read from window.location in an effect instead of
+  // useSearchParams(): in Next 16 that hook forces a CSR bailout to
+  // the nearest Suspense boundary during SSR, and with a null
+  // fallback THE ENTIRE HOMEPAGE shipped as blank HTML until the JS
+  // bundle loaded — the worst possible first paint for the buyer
+  // typing beanumber.org off the shirt insert. The welcome chip is
+  // per-visitor personalization; rendering it a frame after hydration
+  // is correct, and it keeps the hero + number input in the server
+  // HTML.
+  const [welcomeFlow, setWelcomeFlow] = useState(false);
 
   useEffect(() => {
-    if (!welcomeFlow) return;
-    if (welcomePrefill) setSearchNumber(welcomePrefill);
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('welcome') !== '1') return;
+    setWelcomeFlow(true);
+    const n = params.get('n') || '';
+    if (/^\d+$/.test(n)) setSearchNumber(n);
     // Microtask delay so the input mounts before we try to focus it.
     const id = window.setTimeout(() => {
       searchInputRef.current?.focus();
       searchInputRef.current?.select();
     }, 50);
     return () => window.clearTimeout(id);
-  }, [welcomeFlow, welcomePrefill]);
+  }, []);
 
   // Ref + helper for the children carousel. Kids without profile photos are
   // filtered out — a face is the whole point of the section — and the
@@ -245,7 +253,13 @@ function HomePageInner() {
               ref={searchInputRef}
               type="text"
               value={searchNumber}
-              onChange={e => setSearchNumber(e.target.value)}
+              onChange={e => setSearchNumber(e.target.value.replace(/[^0-9]/g, ''))}
+              // Numeric keypad on phones — this is the single most
+              // important input on the site and it was popping the
+              // full alpha keyboard on iOS/Android.
+              inputMode="numeric"
+              pattern="[0-9]*"
+              autoComplete="off"
               placeholder="Your Shirt Number"
               className="relative z-10 flex-1 px-6 py-4 text-base text-[#0d0d0d] bg-white placeholder-[#999] focus:outline-none"
             />
@@ -551,19 +565,16 @@ function HomePageInner() {
 }
 
 /**
- * Public export. Wraps the inner component in Suspense so
- * useSearchParams (read inside HomePageInner for the welcome-flow
- * handoff) doesn&rsquo;t bail out of static rendering on the rest of
- * the tree. Fallback is null because the page&rsquo;s above-the-fold
- * hero is server-irrelevant content; the Suspense boundary just
- * exists to satisfy Next 16&rsquo;s search-params rules.
+ * Public export. The Suspense wrapper (and its null fallback) is
+ * gone: HomePageInner no longer calls useSearchParams, so nothing
+ * bails out of server rendering and the hero + number input arrive
+ * in the initial HTML. The old wrapper's comment claimed the
+ * above-the-fold hero was "server-irrelevant content" — it was the
+ * opposite: the null fallback made the entire homepage render blank
+ * until hydration.
  */
 export function HomePageContent() {
-  return (
-    <Suspense fallback={null}>
-      <HomePageInner />
-    </Suspense>
-  );
+  return <HomePageInner />;
 }
 
 // ---------------------------------------------------------------------------

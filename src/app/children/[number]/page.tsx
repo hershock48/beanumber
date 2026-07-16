@@ -1136,7 +1136,9 @@ export async function generateMetadata({ params }: ChildPageProps) {
   // to spoil the reveal. The child's name and photo only appear in the page
   // body itself — by then the viewer has already chosen to meet them.
   return {
-    title: 'Be A Number · Meet your child',
+    // Layout template appends '| Be A Number' — the old literal
+    // rendered 'Be A Number · Meet your child | Be A Number'.
+    title: 'Meet your child',
     description:
       'A real Child at the campus in Northern Uganda. Enter your Shirt Number to meet them and keep their story going for $25/month.',
     openGraph: {

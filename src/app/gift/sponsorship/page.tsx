@@ -5,7 +5,7 @@ import { BANFooter } from '@/components/BANFooter';
 import { GiftSponsorshipForm } from './GiftSponsorshipForm';
 
 export const metadata: Metadata = {
-  title: 'Gift a Sponsorship | Be A Number',
+  title: 'Gift a Sponsorship',
   description:
     'Sponsor a child in someone’s honor. They meet a real kid at the campus, $25 starts the year, continuation is their choice.',
 };

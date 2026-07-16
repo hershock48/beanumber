@@ -4,7 +4,7 @@ import { BANNavigation } from '@/components/BANNavigation';
 import { BANFooter } from '@/components/BANFooter';
 
 export const metadata: Metadata = {
-  title: 'Gift sent | Be A Number',
+  title: 'Gift sent',
 };
 
 export default function GiftSuccessPage() {

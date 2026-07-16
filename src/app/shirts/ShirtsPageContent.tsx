@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useSearchParams } from 'next/navigation';
+
 import { BANNavigationClient as BANNavigation } from '@/components/BANNavigationClient';
 import { BANFooter } from '@/components/BANFooter';
 import { Logo } from '@/components/Logo';
@@ -645,14 +645,20 @@ function ShirtCard({ shirt, reversed }: { shirt: Shirt; reversed: boolean }) {
 
 /* ── Page content ────────────────────────────────────────────── */
 
-/** Captures ?ref= from the URL and stores it in CartContext for checkout. */
+/** Captures ?ref= from the URL and stores it in CartContext for checkout.
+ *
+ * Reads window.location in an effect instead of useSearchParams():
+ * the hook forces a CSR bailout during SSR in Next 16, and through
+ * the page's null Suspense fallback it was shipping /shirts — the
+ * primary conversion surface — as completely blank HTML until the
+ * JS bundle loaded. A mount-time read is exactly equivalent for a
+ * capture-once param. */
 function RefCapture() {
-  const searchParams = useSearchParams();
   const { setRefCode } = useCart();
   useEffect(() => {
-    const ref = searchParams.get('ref');
+    const ref = new URLSearchParams(window.location.search).get('ref');
     if (ref) setRefCode(ref);
-  }, [searchParams, setRefCode]);
+  }, [setRefCode]);
   return null;
 }
 
@@ -664,12 +670,12 @@ function RefCapture() {
  * check runs inside the cart context against the current cart shape.
  */
 function PromoCapture() {
-  const searchParams = useSearchParams();
   const { setPromoCode } = useCart();
   useEffect(() => {
-    const code = searchParams.get('code');
+    // window.location read — same SSR-bailout avoidance as RefCapture.
+    const code = new URLSearchParams(window.location.search).get('code');
     if (code) setPromoCode(code);
-  }, [searchParams, setPromoCode]);
+  }, [setPromoCode]);
   return null;
 }
 

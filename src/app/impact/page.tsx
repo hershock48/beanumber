@@ -5,7 +5,7 @@ import { BANNavigation } from '@/components/BANNavigation';
 import { BANFooter } from '@/components/BANFooter';
 
 export const metadata: Metadata = {
-  title: '2025 Impact | Be A Number',
+  title: '2025 Impact',
   description:
     'What happened on six acres in Northern Uganda in 2025. 700+ patients treated, 68 adults trained, 30 local jobs, school capacity for 380.',
   openGraph: {
