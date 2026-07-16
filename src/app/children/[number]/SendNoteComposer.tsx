@@ -23,6 +23,7 @@
  */
 
 import { useState, useCallback } from 'react';
+import { composerPresenceLine } from '@/lib/campus-time';
 
 const MIN_BODY = 10;
 const MAX_BODY = 1000;
@@ -579,6 +580,15 @@ export function SendNoteComposer({
                 className="w-full px-3 py-2.5 bg-white border border-[#e8e0d4] focus:outline-none focus:border-[#D4A843] focus:ring-1 focus:ring-[#D4A843] text-base leading-relaxed resize-y"
                 style={{ fontFamily: 'Georgia, serif' }}
               />
+              {/* Presence — where this note is headed, right now.
+                  The night variant ("your note will be waiting when
+                  the campus wakes up") turns the seven-hour time
+                  difference from friction into warmth. Client
+                  component, so the clock is the sponsor's moment of
+                  writing, not the server render. */}
+              <p className="mt-1.5 text-xs text-[#999] italic">
+                {composerPresenceLine(firstName)}
+              </p>
             </>
           ) : (
             /* Handwrite mode — primary letter photo picker. Reuses the

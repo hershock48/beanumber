@@ -30,6 +30,7 @@ import { OtherKidsAtCampus } from './OtherKidsAtCampus';
 import { ClaimThisNumberCard } from './ClaimThisNumberCard';
 import { ClaimGate } from './ClaimGate';
 import { LocationBlock } from './LocationBlock';
+import { kidPresenceLine } from '@/lib/campus-time';
 import { YourKidsStrip } from '@/components/YourKidsStrip';
 // AlreadySponsoringBanner deprecated 2026-07-08 — Kevin consolidated
 // the top black banner into the slim strip that already lived below
@@ -1903,6 +1904,25 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
                 ClaimGate. Collapsed pill → click expands to map + Uganda
                 context. */}
             <LocationBlock />
+
+            {/* Presence — Omoro is UTC+3, and this line knows what
+                time it is there right now. "It's 2:40 in the
+                afternoon in Omoro — Sunday is probably on the pitch
+                about now." A photo says the kid exists; this says
+                the kid is existing at this exact moment, seven time
+                zones away. The page is force-dynamic, so the line is
+                computed fresh per request and reads differently
+                morning vs night, weekday vs Sunday (letter day).
+                Skipped for departed kids — the memorial frame is
+                past tense. */}
+            {!child.departed_at && (
+              <p
+                className="mt-4 text-sm text-[#888] italic leading-snug max-w-md"
+                style={{ fontFamily: 'var(--font-lora), serif' }}
+              >
+                {kidPresenceLine(firstName)}
+              </p>
+            )}
 
           </div>
         </div>

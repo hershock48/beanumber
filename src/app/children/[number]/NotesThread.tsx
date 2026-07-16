@@ -19,6 +19,7 @@
 
 import type { NoteThreadEntry } from '@/lib/db/queries';
 import { attachmentKind, attachmentTypeLabel } from '@/lib/attachments';
+import { LetterJourney, journeyStageForStatus } from './LetterJourney';
 
 export function NotesThread({
   firstName,
@@ -28,6 +29,20 @@ export function NotesThread({
   thread: NoteThreadEntry[];
 }) {
   if (thread.length === 0) return null;
+
+  // The letter journey rides on the NEWEST sponsor note only, and only
+  // while it's still in flight (sent/reviewed/translated — not yet in
+  // the kid's hands). One moving letter at a time: thread is
+  // newest-first here, so the first sponsor_to_kid entry is the one.
+  // Once that note is delivered, the stepper disappears and the card
+  // goes back to its plain dateline — the payoff at that point is the
+  // reply, not the tracker.
+  const newestSponsorNote = thread.find(e => e.direction === 'sponsor_to_kid');
+  const journeyStage = newestSponsorNote
+    ? journeyStageForStatus(newestSponsorNote.status)
+    : null;
+  const journeyNoteId =
+    journeyStage !== null ? (newestSponsorNote?.id ?? null) : null;
 
   // Server returns newest-first; render oldest-first so the sponsor
   // reads the arc top-down (their first note → any reply → their
@@ -323,6 +338,12 @@ export function NotesThread({
                     {entry.bodyOriginal}
                   </p>
                 </details>
+              )}
+              {/* The letter journey — only on the newest in-flight
+                  sponsor note. See the journeyNoteId computation at
+                  the top of the component. */}
+              {entry.id === journeyNoteId && journeyStage !== null && (
+                <LetterJourney stage={journeyStage} firstName={firstName} />
               )}
             </li>
           );
