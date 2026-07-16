@@ -489,6 +489,65 @@ export async function createSponsorship(input: CreateSponsorshipInput) {
 }
 
 /**
+ * Bind an existing CHILDLESS sponsorship to the kid the buyer just
+ * claimed. This is the claim event for buyers whose sponsorship row
+ * was created at checkout with a blank child link (cart+monthly,
+ * Shirt + Stay). Instead of minting a duplicate Holder row, we point
+ * their real row — status, monthly amount, and Stripe sub intact —
+ * at the kid whose number is on their shirt.
+ *
+ * ChildRevealedAt is stamped now: the buyer is looking at the kid at
+ * the moment they claim, same contract as the claim-match endpoint.
+ *
+ * Caller is responsible for verifying the number isn't already
+ * claimed by another email (isChildClaimedByOtherEmail) BEFORE
+ * calling this. This helper only refuses to clobber an existing
+ * child link on the row itself.
+ */
+export async function bindSponsorshipToChild(input: {
+  sponsorshipId: string;
+  childId: string;
+  childIdLegacy?: string | null;
+  childDisplayName?: string | null;
+  actorType?: AuditActorType;
+}) {
+  const beforeRows = await db
+    .select()
+    .from(sponsorships)
+    .where(eq(sponsorships.id, input.sponsorshipId))
+    .limit(1);
+  const before = beforeRows[0];
+  if (!before) {
+    throw new Error(`bindSponsorshipToChild: sponsorship ${input.sponsorshipId} not found`);
+  }
+  if (before.childId || (before.childIdLegacy && before.childIdLegacy !== '')) {
+    throw new Error(
+      `bindSponsorshipToChild: sponsorship ${input.sponsorshipId} already has a child link`
+    );
+  }
+  const updated = await db
+    .update(sponsorships)
+    .set({
+      childId: input.childId,
+      childIdLegacy: input.childIdLegacy ?? null,
+      childDisplayName: input.childDisplayName ?? null,
+      childRevealedAt: new Date(),
+      updatedAt: new Date(),
+    })
+    .where(eq(sponsorships.id, input.sponsorshipId))
+    .returning();
+  await audit({
+    table: 'sponsorships',
+    recordId: input.sponsorshipId,
+    action: 'UPDATE',
+    actorType: input.actorType ?? 'sponsor',
+    before: before as Record<string, unknown>,
+    after: updated[0] as Record<string, unknown>,
+  });
+  return updated[0];
+}
+
+/**
  * Ensure a Holder sponsorship row exists for every fulfillment on the
  * given buyer email. Idempotent by design: skips any fulfillment whose
  * child (or, when the shirt is un-reconciled, whose email) already

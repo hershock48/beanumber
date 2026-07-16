@@ -432,6 +432,52 @@ export async function getMostRecentSponsorshipForEmail(viewerEmail: string) {
 }
 
 /**
+ * Find this email's most recent CHILDLESS sponsorship — a row with no
+ * child linked on either join key (UUID FK or legacy ChildID text).
+ *
+ * Why this exists: cart+monthly and Shirt + Stay buyers get an Active
+ * sponsorship row created at checkout with the child link deliberately
+ * blank (core_model.md §0 — no matching; the buyer claims). When that
+ * buyer later claims their number through /signin, the claim path used
+ * to miss this row (the lookup was per-child) and minted a SECOND row
+ * with Status=Holder and $0/mo. Result: a paying sponsor rendered as a
+ * Holder on their own kid — composer locked, updates locked, and a
+ * "convert to $25/mo" upsell shown to someone already paying. The
+ * claim path now calls this first and BINDS the existing row to the
+ * kid instead of creating a duplicate.
+ *
+ * Active rows sort before Holder rows so a paying subscription always
+ * wins the bind. Newest first within the same status.
+ */
+export async function findChildlessSponsorshipForEmail(viewerEmail: string) {
+  if (!viewerEmail) return null;
+  const emailLower = viewerEmail.trim().toLowerCase();
+  const rows = await db
+    .select()
+    .from(sponsorships)
+    .where(
+      and(
+        sql`lower(${sponsorships.sponsorEmail}) = ${emailLower}`,
+        or(
+          eq(sponsorships.status, 'Active'),
+          eq(sponsorships.status, 'Holder')
+        ),
+        sql`${sponsorships.childId} is null`,
+        or(
+          sql`${sponsorships.childIdLegacy} is null`,
+          sql`${sponsorships.childIdLegacy} = ''`
+        )
+      )
+    )
+    .orderBy(
+      sql`case when ${sponsorships.status} = 'Active' then 0 else 1 end`,
+      desc(sponsorships.createdAt)
+    )
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+/**
  * Resolve the email tied to a sponsorCode (only when the row is an
  * Active or Holder row, the two states the magic-link callback should
  * trust). Used by the recover callback to populate the sponsor_session

@@ -17,13 +17,23 @@
  *      then send them the same one-tap link. From that moment they
  *      own this number — same as if they'd been there from day one.
  *
- *      If someone else has already claimed this number, the response
- *      is identical (privacy + no info leak); the claim attempt is
- *      logged for admin review.
+ *      If the email already has a CHILDLESS sponsorship (created at
+ *      checkout by the cart+monthly / Shirt + Stay flows with the
+ *      child link deliberately blank), the claim BINDS that row to
+ *      this kid instead of creating a duplicate Holder — the buyer's
+ *      status, monthly amount, and Stripe sub stay on one row.
  *
- * Privacy: the endpoint always returns `{ success: true }` regardless
- * of which branch fired (sign-in vs claim vs blocked). That keeps it
- * from being usable as an email-enumeration or claim-status oracle.
+ *      If someone else has already claimed this number, the response
+ *      carries `code: 'number_claimed'` so the UI can say so instead
+ *      of promising an email that will never arrive. The claim
+ *      attempt is logged for admin review.
+ *
+ * Privacy: the endpoint returns `{ success: true }` for every branch
+ * that involves an EMAIL lookup (sign-in, claim, no-account), so it
+ * can't be used as an email-enumeration oracle. The one deliberate
+ * exception is `number_claimed` above — it reveals only that a shirt
+ * number is taken (something the person holding the shirt can already
+ * infer) and leaks no email, name, or account detail.
  *
  * Rate limiting: not implemented yet. Volume is low enough that any
  * abuse will surface in Vercel logs; add real rate limiting once we
@@ -36,14 +46,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { sendEmail } from '@/lib/email';
+import { getEmailConfig } from '@/lib/env';
 import { makeRecoveryToken } from '@/lib/recovery-tokens';
 import {
+  findChildlessSponsorshipForEmail,
   findSponsorshipForEmailAndChild,
   getChildByShirtNumber,
   getMostRecentSponsorshipForEmail,
   isChildClaimedByOtherEmail,
 } from '@/lib/db/queries';
 import {
+  bindSponsorshipToChild,
   createSponsorship,
   materializeHolderSponsorshipsForBuyer,
 } from '@/lib/db/mutations';
@@ -187,10 +200,13 @@ export async function POST(request: NextRequest) {
         // after Ashley + Randi reported never receiving links while
         // the same account was successfully sending Thank You emails
         // to the same recipients hours apart.
-        const fromEmail =
-          process.env.GMAIL_FROM_EMAIL ||
-          process.env.SENDGRID_FROM_EMAIL ||
-          'Kevin@beanumber.org';
+        //
+        // getEmailConfig().fromEmail IS that working chain
+        // (GMAIL_FROM_EMAIL || SENDGRID_FROM_EMAIL || 'info@beanumber.org').
+        // Reading it from one place instead of re-deriving the env
+        // chain here means this endpoint can never drift from the
+        // paths that are known to deliver.
+        const fromEmail = getEmailConfig().fromEmail;
         console.log(
           `[Recovery] email-only send: to=${email} from=${fromEmail}`
         );
@@ -224,9 +240,9 @@ export async function POST(request: NextRequest) {
                 </a>
               </p>
               <p style="color: #888; font-size: 13px;">
-                This device will remember you for 30 days &mdash; no
-                need to use this link again unless you change devices
-                or clear cookies. Link is good for 24 hours.
+                This device will remember you &mdash; no need to use
+                this link again unless you change devices or clear
+                cookies. Link is good for 24 hours.
               </p>
               <hr style="border: none; border-top: 1px solid #e8e0d4; margin: 24px 0;">
               <p style="font-size: 12px; color: #999; line-height: 1.5;">
@@ -282,17 +298,69 @@ export async function POST(request: NextRequest) {
     let sponsorCode = existing?.sponsorCode ?? null;
     let isFreshClaim = false;
 
-    // 3. FIRST-TIME CLAIM PATH: no existing row. Make sure nobody else
-    //    has claimed this number first, then create a Holder row.
+    // 3. FIRST-TIME CLAIM PATH: no existing row for this email + kid.
+    //    Order matters here:
+    //      3a. Blocked — someone ELSE already claimed this number.
+    //      3b. Bind — this email has a childless sponsorship from a
+    //          cart+monthly / Shirt + Stay checkout; point it at the
+    //          kid instead of minting a duplicate row.
+    //      3c. Create — brand-new claimer, mint a Holder row.
     if (!sponsorCode) {
       const alreadyTaken = await isChildClaimedByOtherEmail(childContext, email);
       if (alreadyTaken) {
+        // 3a. Deliberately NOT the silent privacy response. A shirt
+        // number is printed on a physical object — the person typing
+        // it is holding the shirt, and "check your email" followed by
+        // an email that never comes was our single worst dead end
+        // (typo'd purchase email, spouse's email, gift shirts). The
+        // enumeration surface this opens is "is number N claimed,"
+        // which the claimer can already infer, and it leaks no email
+        // or name. Logged for admin review either way.
         console.log(
           `[Recovery] #${shirtNumber} is already claimed by someone else; ` +
-            `silent block on claim attempt by ${email}.`
+            `blocked claim attempt by ${email} (surfaced to user).`
         );
-        return NextResponse.json(responseShape);
+        return NextResponse.json({ success: true, code: 'number_claimed' });
       }
+
+      // 3b. BIND PATH. Checkout creates cart+monthly / Shirt + Stay
+      // sponsorships with a blank child link (core_model.md §0 — the
+      // buyer claims, nobody matches). If this email has one of those
+      // rows, THIS claim is the moment it gets its kid. Binding keeps
+      // status, monthly amount, and the Stripe sub on one row —
+      // creating a Holder row here instead is how paying sponsors
+      // were ending up rendered as $0 Holders on their own kid.
+      try {
+        const childless = await findChildlessSponsorshipForEmail(email);
+        if (childless) {
+          const bound = await bindSponsorshipToChild({
+            sponsorshipId: childless.id,
+            childId: child.id,
+            childIdLegacy: child.childId,
+            childDisplayName: displayName,
+            actorType: 'sponsor',
+          });
+          sponsorCode = bound.sponsorCode;
+          isFreshClaim = true;
+          console.log(
+            `[Recovery] Bound childless ${childless.status} sponsorship`,
+            bound.sponsorCode,
+            `to #${shirtNumber} for`,
+            email
+          );
+        }
+      } catch (err) {
+        // Bind failed (row raced away, concurrent claim, DB error).
+        // Fall through to the Holder-create path — a duplicate row is
+        // recoverable by hand; a user with no way in is not.
+        console.error(
+          `[Recovery] Childless-bind failed for ${email} on #${shirtNumber}, falling back to Holder create:`,
+          err
+        );
+      }
+    }
+
+    if (!sponsorCode) {
       try {
         const created = await createSponsorship({
           sponsorCode: await generateUniqueSponsorCode(),
@@ -359,13 +427,10 @@ export async function POST(request: NextRequest) {
     }
     const callbackUrl = `${SITE_URL}/api/sponsor/recover/callback?t=${encodeURIComponent(token)}`;
 
-    // Same GMAIL_FROM_EMAIL alignment as the email-only branch above.
-    // Hardcoded 'Kevin@beanumber.org' fallback was the silent-drop
-    // cause when Gmail Workspace's Send-As identity didn't match.
-    const fromEmail =
-      process.env.GMAIL_FROM_EMAIL ||
-      process.env.SENDGRID_FROM_EMAIL ||
-      'Kevin@beanumber.org';
+    // Same FROM alignment as the email-only branch above — one source
+    // of truth via getEmailConfig(), matching the transactional paths
+    // that are known to deliver.
+    const fromEmail = getEmailConfig().fromEmail;
     console.log(
       `[Recovery] claim-path send: to=${email} #${shirtNumber} from=${fromEmail}`
     );
@@ -380,13 +445,13 @@ export async function POST(request: NextRequest) {
           <a href="https://www.beanumber.org" style="color: #D4A843; font-weight: bold;">beanumber.org</a>.
           The kid behind that number is ${firstName}. Tap the button
           below to open their page. You&rsquo;ll be signed in, and
-          this device will remember you for 30 days.</p>`
+          this device will remember you.</p>`
       : `<p>Tap the button below to sign in and open
           ${firstName}&rsquo;s page on
           <a href="https://www.beanumber.org" style="color: #D4A843; font-weight: bold;">beanumber.org</a>.
-          This device will remember you for 30 days &mdash; you
-          won&rsquo;t need the link again unless you change devices
-          or clear your cookies.</p>`;
+          This device will remember you &mdash; you won&rsquo;t need
+          the link again unless you change devices or clear your
+          cookies.</p>`;
 
     const html = `
       <!DOCTYPE html>
