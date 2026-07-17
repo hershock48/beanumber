@@ -15,7 +15,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAdminAuth } from '@/lib/auth';
 import { db } from '@/lib/db/client';
 import { fulfillments } from '@/lib/db/schema';
-import { and, eq } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 
 // Average shirt weight in ounces (6 oz cotton tee + vinyl + poly mailer)
 const SHIRT_WEIGHT_OZ = 8;
@@ -40,9 +40,17 @@ export async function GET(request: NextRequest) {
   const status = request.nextUrl.searchParams.get('status') || 'ready';
 
   // Apply the status filter directly in Postgres.
+  //
+  // 'ready' = Not Shipped, full stop. It USED to also require
+  // Production='Done', which made sense when every shirt was pressed
+  // to order — but under the stockpile model (May 2026 forward) shirts
+  // ship from pre-printed stock and nothing ever flips Production to
+  // Done. Result: the CSV exported zero rows for every real order and
+  // Kevin went back to hand-copying addresses out of the Stripe
+  // dashboard (2026-07-17). Unshipped IS ready now.
   const where =
     status === 'ready'
-      ? and(eq(fulfillments.production, 'Done'), eq(fulfillments.shipping, 'Not Shipped'))
+      ? eq(fulfillments.shipping, 'Not Shipped')
       : status === 'pending'
         ? eq(fulfillments.production, 'Pending')
         : undefined;

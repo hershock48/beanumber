@@ -204,6 +204,18 @@ export default function FulfillmentDashboard() {
 
           {activeTab === 'queue' && queueOrders.length > 0 && (
             <div className="flex items-center gap-3">
+              {/* PirateShip batch: downloads every unshipped order as
+                  the import-ready CSV (one row per ADDRESS — multiple
+                  shirts to one person share a label). Upload it on
+                  pirateship.com → Import Spreadsheet, pay, print.
+                  This button is the replacement for hand-copying
+                  addresses out of the Stripe dashboard. */}
+              <a
+                href="/api/admin/fulfillment-csv?status=ready"
+                className="px-3 py-1.5 text-sm bg-[#D4A843] text-gray-900 rounded-md hover:bg-[#c49a3a] font-semibold"
+              >
+                ⬇ PirateShip CSV
+              </a>
               <button
                 onClick={() => window.print()}
                 className="px-3 py-1.5 text-sm border border-gray-300 rounded-md hover:bg-gray-50 font-medium"

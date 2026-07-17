@@ -135,12 +135,11 @@ function HomePageInner({ initialChildren }: { initialChildren: Child[] }) {
     setWelcomeFlow(true);
     const n = params.get('n') || '';
     if (/^\d+$/.test(n)) setSearchNumber(n);
-    // Microtask delay so the input mounts before we try to focus it.
-    const id = window.setTimeout(() => {
-      searchInputRef.current?.focus();
-      searchInputRef.current?.select();
-    }, 50);
-    return () => window.clearTimeout(id);
+    // Deliberately NO auto-focus. Focusing the input made the browser
+    // scroll it into view on load — the page "slid down" to the number
+    // bar instead of opening at the top (Kevin, 2026-07-17). The
+    // welcome chip + prefilled Number communicate everything focus
+    // did; anyone entering a number can tap the input themselves.
   }, []);
 
   // Ref + helper for the children carousel. Kids without profile photos are
