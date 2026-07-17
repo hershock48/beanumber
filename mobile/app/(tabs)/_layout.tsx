@@ -179,7 +179,9 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="explore"
         options={{
-          title: 'Explore',
+          // Kevin calls this "the campus tab" — so does everyone.
+          // 'Explore' was app-convention naming; the tab is the place.
+          title: 'Campus',
           tabBarIcon: props => <ExploreIcon {...props} />,
         }}
       />

@@ -14,6 +14,7 @@ import { Text } from '../../components/design/Text';
 import { KidCard } from '../../components/kids/KidCard';
 import { Skeleton } from '../../components/design/Skeleton';
 import { getExploreKids, MyKidRow } from '../../lib/api';
+import { campusPresenceLine } from '../../lib/campusTime';
 
 const CARD_GAP = SPACING.m;
 
@@ -56,11 +57,28 @@ export default function ExploreTab() {
           The campus
         </Text>
         <Text
+          variant="caption"
+          color="umber"
+          style={{ marginTop: SPACING.xs }}
+        >
+          Hope Bridge Primary · Omoro District, Uganda
+        </Text>
+        <Text
           variant="body"
           color="umber"
           style={{ marginTop: SPACING.s }}
         >
           Meet the rest of the kids at Hope Bridge.
+        </Text>
+        {/* Presence — same heartbeat as Home and the kid pages. A
+            directory of faces is a yearbook; a campus where it's
+            currently Friday afternoon is a place. */}
+        <Text
+          variant="bodySmall"
+          color="umber"
+          style={{ marginTop: SPACING.s }}
+        >
+          {campusPresenceLine()}
         </Text>
 
         {/* Toggle */}
