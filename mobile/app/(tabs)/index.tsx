@@ -26,10 +26,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { COLORS, SPACING, TEXT_STYLES, RADIUS } from '../../lib/theme';
 import { Text } from '../../components/design/Text';
 import { Skeleton } from '../../components/design/Skeleton';
+import { Enter } from '../../components/design/Enter';
 import { KidCard } from '../../components/kids/KidCard';
 import { FeedCard } from '../../components/home/FeedCard';
 import { NewsletterCard } from '../../components/home/NewsletterCard';
 import { EnterNumberSheet } from '../../components/home/EnterNumberSheet';
+import { NumberDoor } from '../../components/home/NumberDoor';
 import { LinkEmailSheet } from '../../components/account/LinkEmailSheet';
 import { campusPresenceLine } from '../../lib/campusTime';
 import {
@@ -39,6 +41,7 @@ import {
   getLatestNewsletter,
   getExploreKids,
   MyKidRow,
+  ExploreKidRow,
   CampusFeedItem,
   LatestNewsletter,
 } from '../../lib/api';
@@ -48,7 +51,7 @@ export default function SponsorHome() {
   const [kids, setKids] = useState<MyKidRow[]>([]);
   const [feed, setFeed] = useState<CampusFeedItem[]>([]);
   const [newsletter, setNewsletter] = useState<LatestNewsletter | null>(null);
-  const [explore, setExplore] = useState<MyKidRow[]>([]);
+  const [explore, setExplore] = useState<ExploreKidRow[]>([]);
   const [firstName, setFirstName] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -113,108 +116,114 @@ export default function SponsorHome() {
           />
         }
       >
-        {/* Greeting */}
-        <View style={{ paddingHorizontal: SPACING.l, marginTop: SPACING.l }}>
-          <Text variant="h1" color="ink">
-            {firstName ? `Hey ${firstName}.` : 'Hey there.'}
-          </Text>
-        </View>
+        {/* Masthead — brand overline, time-aware greeting, and the
+            presence line directly under it. The first three lines of
+            the app say: this is Be A Number, we know you, and the
+            campus is a real place where it's a real time of day. */}
+        <Enter index={0}>
+          <View style={{ paddingHorizontal: SPACING.l, marginTop: SPACING.l }}>
+            <Text
+              color="gold"
+              style={{
+                fontFamily: TEXT_STYLES.overline.fontFamily,
+                fontSize: 11,
+                letterSpacing: 3,
+                textTransform: 'uppercase',
+              }}
+            >
+              Be A Number
+            </Text>
+            <Text variant="h1" color="ink" style={{ marginTop: SPACING.s }}>
+              {greetingLine(firstName)}
+            </Text>
+            <Text
+              variant="bodySmall"
+              color="umber"
+              style={{ marginTop: SPACING.s }}
+            >
+              {campusPresenceLine()}
+            </Text>
+          </View>
+        </Enter>
 
         {/* Your kids */}
         <View style={{ marginTop: SPACING.section }}>
-          <SectionHeader>Your kids</SectionHeader>
           {loading && kids.length === 0 ? (
-            <YourKidsSkeleton />
+            <>
+              <SectionHeader>Your kids</SectionHeader>
+              <YourKidsSkeleton />
+            </>
           ) : kids.length === 0 ? (
-            <View style={{ paddingHorizontal: SPACING.l }}>
-              <Text variant="body" color="ink">
-                Holding a shirt? The kid on the other end of that Number
-                is waiting to meet you.
-              </Text>
-              <Pressable
-                onPress={() => setNumberSheetOpen(true)}
-                accessibilityRole="button"
-                style={{
-                  marginTop: SPACING.m,
-                  backgroundColor: COLORS.gold,
-                  paddingVertical: SPACING.m,
-                  borderRadius: RADIUS.pill,
-                  alignItems: 'center',
+            <Enter index={1}>
+              <View style={{ paddingHorizontal: SPACING.l }}>
+                <NumberDoor onPress={() => setNumberSheetOpen(true)} />
+                <Pressable
+                  onPress={() => setLinkSheetOpen(true)}
+                  accessibilityRole="button"
+                  style={{ marginTop: SPACING.l, alignSelf: 'center' }}
+                >
+                  <Text
+                    color="ink"
+                    style={{
+                      fontFamily: TEXT_STYLES.textLink.fontFamily,
+                      fontSize: TEXT_STYLES.textLink.fontSize,
+                      textDecorationLine: 'underline',
+                    }}
+                  >
+                    Already claimed yours on the website? Connect that email
+                  </Text>
+                </Pressable>
+              </View>
+            </Enter>
+          ) : (
+            <Enter index={1}>
+              <SectionHeader>Your kids</SectionHeader>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{
+                  paddingHorizontal: SPACING.l,
+                  paddingRight: SPACING.section,
                 }}
               >
-                <Text
-                  color="ink"
-                  style={{
-                    fontFamily: TEXT_STYLES.h3.fontFamily,
-                    fontSize: 15,
-                  }}
-                >
-                  Enter your Number
-                </Text>
-              </Pressable>
-              <Pressable
-                onPress={() => setLinkSheetOpen(true)}
-                accessibilityRole="button"
-                style={{ marginTop: SPACING.m, alignSelf: 'center' }}
+                {kids.map((k, i) => (
+                  <View
+                    key={k.id}
+                    style={{
+                      marginRight: i === kids.length - 1 ? 0 : SPACING.m,
+                    }}
+                  >
+                    <KidCard
+                      firstName={k.firstName}
+                      shirtNumber={k.shirtNumber}
+                      photoUrl={k.photoUrl || undefined}
+                      hasUnread={k.unreadUpdatesCount > 0}
+                      onPress={() => router.push(`/children/${k.shirtNumber}`)}
+                    />
+                  </View>
+                ))}
+              </ScrollView>
+              {/* The door stays open even with kids — there is always
+                  another shirt. Compact so it reads as an invitation,
+                  not a demand. */}
+              <View
+                style={{
+                  paddingHorizontal: SPACING.l,
+                  marginTop: SPACING.l,
+                }}
               >
-                <Text
-                  color="ink"
-                  style={{
-                    fontFamily: TEXT_STYLES.textLink.fontFamily,
-                    fontSize: TEXT_STYLES.textLink.fontSize,
-                    textDecorationLine: 'underline',
-                  }}
-                >
-                  Already claimed yours on the website? Connect that email
-                </Text>
-              </Pressable>
-            </View>
-          ) : (
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{
-                paddingHorizontal: SPACING.l,
-                paddingRight: SPACING.section,
-              }}
-            >
-              {kids.map((k, i) => (
-                <View
-                  key={k.id}
-                  style={{
-                    marginRight: i === kids.length - 1 ? 0 : SPACING.m,
-                  }}
-                >
-                  <KidCard
-                    firstName={k.firstName}
-                    shirtNumber={k.shirtNumber}
-                    photoUrl={k.photoUrl || undefined}
-                    hasUnread={k.unreadUpdatesCount > 0}
-                    onPress={() => router.push(`/children/${k.shirtNumber}`)}
-                  />
-                </View>
-              ))}
-            </ScrollView>
+                <NumberDoor
+                  compact
+                  onPress={() => setNumberSheetOpen(true)}
+                />
+              </View>
+            </Enter>
           )}
         </View>
 
         {/* From the campus */}
-        <View style={{ marginTop: SPACING.section }}>
+        <Enter index={2} style={{ marginTop: SPACING.section }}>
           <SectionHeader>From the campus</SectionHeader>
-          {/* Presence — Omoro is UTC+3 and this line knows it. The
-              campus stops being a photo archive and becomes a place
-              where it's currently Tuesday afternoon. */}
-          <View
-            style={{
-              paddingHorizontal: SPACING.l,
-              marginTop: -SPACING.s,
-              marginBottom: SPACING.m,
-            }}
-          >
-            <Text variant="bodySmall" color="umber">
-              {campusPresenceLine()}
-            </Text>
-          </View>
           <View style={{ paddingHorizontal: SPACING.l }}>
             {loading && feed.length === 0 ? (
               <FeedSkeleton />
@@ -257,11 +266,11 @@ export default function SponsorHome() {
               ))
             )}
           </View>
-        </View>
+        </Enter>
 
         {/* The latest letter */}
         {newsletter ? (
-          <View style={{ marginTop: SPACING.section }}>
+          <Enter index={3} style={{ marginTop: SPACING.section }}>
             <SectionHeader>The latest letter</SectionHeader>
             <View style={{ paddingHorizontal: SPACING.l }}>
               <NewsletterCard
@@ -271,12 +280,12 @@ export default function SponsorHome() {
                 onPress={() => router.push(`/newsletter/${newsletter.id}`)}
               />
             </View>
-          </View>
+          </Enter>
         ) : null}
 
         {/* Meet more of the campus */}
         {explore.length > 0 ? (
-          <View style={{ marginTop: SPACING.section }}>
+          <Enter index={4} style={{ marginTop: SPACING.section }}>
             <SectionHeader>Meet more of the campus</SectionHeader>
             <View
               style={{
@@ -342,7 +351,7 @@ export default function SponsorHome() {
                 See everyone at the campus →
               </Text>
             </Pressable>
-          </View>
+          </Enter>
         ) : null}
       </ScrollView>
 
@@ -356,6 +365,19 @@ export default function SponsorHome() {
       />
     </SafeAreaView>
   );
+}
+
+/**
+ * "Morning, Kevin." — the greeting knows what time it is where the
+ * USER is (device local), the presence line under it knows what time
+ * it is in Omoro. Two clocks, one sentence apart: that contrast is
+ * the whole world-getting-smaller move.
+ */
+function greetingLine(firstName: string | null): string {
+  const h = new Date().getHours();
+  const part =
+    h < 5 ? 'Up late' : h < 12 ? 'Morning' : h < 17 ? 'Afternoon' : 'Evening';
+  return firstName ? `${part}, ${firstName}.` : `${part}.`;
 }
 
 function SectionHeader({ children }: { children: string }) {

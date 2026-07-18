@@ -1761,6 +1761,7 @@ export interface MobileExploreKidRow {
   profilePhotoUrl: string | null;
   gradeClass: string | null;
   dateOfBirth: Date | null;
+  loves: string | null;
 }
 
 export async function getExploreKids(args: {
@@ -1792,6 +1793,7 @@ export async function getExploreKids(args: {
       profilePhotoUrl: children.profilePhotoUrl,
       gradeClass: children.gradeClass,
       dateOfBirth: children.dateOfBirth,
+      loves: children.loves,
     })
     .from(children)
     .where(and(...conditions))
@@ -1804,6 +1806,7 @@ export async function getExploreKids(args: {
     profilePhotoUrl: r.profilePhotoUrl,
     gradeClass: r.gradeClass,
     dateOfBirth: r.dateOfBirth ? new Date(r.dateOfBirth) : null,
+    loves: r.loves,
   }));
 }
 

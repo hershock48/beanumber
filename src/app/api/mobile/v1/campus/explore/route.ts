@@ -35,6 +35,26 @@ export interface MobileExploreItem {
   photoUrl: string | null;
   ageYears: number | null;
   gradeLabel: string | null;
+  /**
+   * Tile-ready "Loves football" phrase, or null. Same shaping rule as
+   * the website's /campus tiles: first clause only, ≤28 chars, "Loves"
+   * prefixed — free-form sentences get dropped rather than truncated
+   * mid-thought.
+   */
+  lovesPhrase: string | null;
+}
+
+/** Mirror of the website /campus lovesPhrase() — keep the two in step. */
+function lovesPhraseFor(loves: string | null): string | null {
+  if (!loves) return null;
+  const trimmed = loves.trim();
+  if (!trimmed) return null;
+  const firstClause = trimmed.split(/[.,;]/)[0].trim();
+  if (firstClause.length === 0 || firstClause.length > 28) return null;
+  const lower = firstClause.toLowerCase();
+  return lower.startsWith('loves ')
+    ? firstClause.charAt(0).toUpperCase() + firstClause.slice(1)
+    : `Loves ${lower}`;
 }
 
 export interface MobileExploreResponse {
@@ -76,6 +96,7 @@ async function handler(request: NextRequest): Promise<NextResponse> {
     photoUrl: r.profilePhotoUrl ?? null,
     ageYears: ageYearsFromDob(r.dateOfBirth),
     gradeLabel: sponsorGradeLabel(r.gradeClass),
+    lovesPhrase: lovesPhraseFor(r.loves),
   }));
 
   logger.apiResponse(method, path, 200);

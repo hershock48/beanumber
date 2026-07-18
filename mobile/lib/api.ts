@@ -419,14 +419,25 @@ export async function getCampusFeed(
   return authJson<CampusFeedResponse>(`/api/mobile/v1/campus/feed${suffix}`);
 }
 
+export interface ExploreKidRow {
+  id: string;
+  firstName: string;
+  shirtNumber: number;
+  photoUrl?: string | null;
+  ageYears?: number | null;
+  gradeLabel?: string | null;
+  /** Tile-ready "Loves football" line from the server, or null. */
+  lovesPhrase?: string | null;
+}
+
 export async function getExploreKids(
   opts: { limit?: number; excludeMine?: boolean } = { excludeMine: true }
-): Promise<MyKidRow[]> {
+): Promise<ExploreKidRow[]> {
   const params = new URLSearchParams();
   if (opts.limit) params.set('limit', String(opts.limit));
   if (opts.excludeMine !== undefined)
     params.set('excludeMine', String(opts.excludeMine));
-  const data = await authJson<{ kids: MyKidRow[] }>(
+  const data = await authJson<{ kids: ExploreKidRow[] }>(
     `/api/mobile/v1/campus/explore?${params}`
   );
   return data.kids ?? [];
