@@ -36,7 +36,7 @@ import * as AppleAuthentication from 'expo-apple-authentication';
 import { router } from 'expo-router';
 import * as Linking from 'expo-linking';
 import { Text } from '../../components/design/Text';
-import { COLORS, RADIUS, SPACING } from '../../lib/theme';
+import { COLORS, RADIUS, SPACING, TEXT_STYLES } from '../../lib/theme';
 import { useAuth } from '../../hooks/useAuth';
 import {
   extractMeetShirtNumber,
@@ -148,6 +148,20 @@ export default function SignInScreen() {
     <SafeAreaView style={styles.screen}>
       <View style={styles.content}>
         <View style={styles.header}>
+          {/* The brand mark — the № IS the logo of the experience.
+              One big gold glyph, then the promise. */}
+          <Text
+            color="gold"
+            align="center"
+            style={{
+              fontFamily: TEXT_STYLES.h1.fontFamily,
+              fontSize: 64,
+              lineHeight: 72,
+              marginBottom: SPACING.l,
+            }}
+          >
+            №
+          </Text>
           <Text variant="h1" align="center" style={styles.headline}>
             {headline}
           </Text>

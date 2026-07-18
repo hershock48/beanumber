@@ -27,6 +27,8 @@ import { COLORS, RADIUS, SPACING, TEXT_STYLES } from '../../lib/theme';
 import { Text } from '../../components/design/Text';
 import { Card } from '../../components/design/Card';
 import { Skeleton } from '../../components/design/Skeleton';
+import { Enter } from '../../components/design/Enter';
+import { sundayBatchLine } from '../../lib/campusTime';
 import { getMyKids, MyKidRow } from '../../lib/api';
 import { LinkEmailSheet } from '../../components/account/LinkEmailSheet';
 
@@ -68,11 +70,33 @@ export default function NotesTab() {
           />
         }
       >
-        <View style={{ paddingHorizontal: SPACING.l, marginTop: SPACING.l }}>
-          <Text variant="h1" color="ink">
-            Penpal
-          </Text>
-        </View>
+        <Enter index={0}>
+          <View style={{ paddingHorizontal: SPACING.l, marginTop: SPACING.l }}>
+            <Text
+              color="gold"
+              style={{
+                fontFamily: TEXT_STYLES.overline.fontFamily,
+                fontSize: 11,
+                letterSpacing: 3,
+                textTransform: 'uppercase',
+              }}
+            >
+              Letters
+            </Text>
+            <Text variant="h1" color="ink" style={{ marginTop: SPACING.s }}>
+              Penpal
+            </Text>
+            {/* The postal heartbeat — letters move on Sundays, and the
+                tab counts down to it. Anticipation is the product. */}
+            <Text
+              variant="bodySmall"
+              color="umber"
+              style={{ marginTop: SPACING.s }}
+            >
+              {sundayBatchLine()}
+            </Text>
+          </View>
+        </Enter>
 
         {loading && kids.length === 0 ? (
           <View style={{ padding: SPACING.l }}>
@@ -111,17 +135,21 @@ export default function NotesTab() {
               gap: SPACING.l,
             }}
           >
-            {kids.map(k =>
-              k.roleForViewer === 'monthly' ? (
-                <MonthlyRow key={k.id} kid={k} onPress={() => router.push(`/children/${k.shirtNumber}`)} />
-              ) : (
-                <HolderRow
-                  key={k.id}
-                  kid={k}
-                  onPress={() => router.push(`/children/${k.shirtNumber}`)}
-                />
-              )
-            )}
+            {kids.map((k, i) => (
+              <Enter key={k.id} index={Math.min(i + 1, 6)}>
+                {k.roleForViewer === 'monthly' ? (
+                  <MonthlyRow
+                    kid={k}
+                    onPress={() => router.push(`/children/${k.shirtNumber}`)}
+                  />
+                ) : (
+                  <HolderRow
+                    kid={k}
+                    onPress={() => router.push(`/children/${k.shirtNumber}`)}
+                  />
+                )}
+              </Enter>
+            ))}
           </View>
         )}
       </ScrollView>

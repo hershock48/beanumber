@@ -119,6 +119,23 @@ export function kidPresenceLine(
 }
 
 /**
+ * The Sunday-batch countdown — Penpal tab masthead. Letters travel
+ * in the Sunday batch; counting down to it turns a static inbox into
+ * a postal schedule with a heartbeat.
+ */
+export function sundayBatchLine(now: Date = new Date()): string {
+  const m = campusNow(now);
+  const daysToSunday = (7 - m.day) % 7;
+  if (daysToSunday === 0) {
+    return 'The Sunday batch goes out today.';
+  }
+  if (daysToSunday === 1) {
+    return 'The next Sunday batch leaves tomorrow.';
+  }
+  return `The next Sunday batch leaves in ${daysToSunday} days.`;
+}
+
+/**
  * The composer variant — frames what happens to a note sent at this
  * moment. Night sends get the best line in the app.
  */
