@@ -30,10 +30,11 @@ import { Enter } from '../../components/design/Enter';
 import { KidCard } from '../../components/kids/KidCard';
 import { FeedCard } from '../../components/home/FeedCard';
 import { NewsletterCard } from '../../components/home/NewsletterCard';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { EnterNumberSheet } from '../../components/home/EnterNumberSheet';
 import { NumberDoor } from '../../components/home/NumberDoor';
+import { HomeHero } from '../../components/home/HomeHero';
 import { LinkEmailSheet } from '../../components/account/LinkEmailSheet';
-import { campusPresenceLine } from '../../lib/campusTime';
 import {
   getMe,
   getMyKids,
@@ -57,6 +58,7 @@ export default function SponsorHome() {
   const [refreshing, setRefreshing] = useState(false);
   const [numberSheetOpen, setNumberSheetOpen] = useState(false);
   const [linkSheetOpen, setLinkSheetOpen] = useState(false);
+  const [deltaLine, setDeltaLine] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const [k, f, n, e, m] = await Promise.allSettled([
@@ -73,6 +75,34 @@ export default function SponsorHome() {
     // Real name from the server (donor record / checkout name) — never
     // derived from the email local-part. Null greets namelessly.
     if (m.status === 'fulfilled') setFirstName(m.value.firstName ?? null);
+
+    // "Since you were last here" — the return-visit delta. Compare
+    // feed timestamps against the stored last-visit mark, then move
+    // the mark. Ethical variable reward: the news is real; we just
+    // put it in the first line instead of making the user hunt.
+    if (f.status === 'fulfilled') {
+      try {
+        const KEY = 'home_last_seen_at';
+        const lastSeen = await AsyncStorage.getItem(KEY);
+        if (lastSeen) {
+          const cutoff = new Date(lastSeen).getTime();
+          const fresh = f.value.items.filter(
+            it => new Date(it.publishedAt).getTime() > cutoff
+          );
+          if (fresh.length > 0) {
+            const photos = fresh.filter(it => it.photoUrl).length;
+            const what =
+              photos > 0
+                ? `${photos} new photo${photos === 1 ? '' : 's'} from the campus`
+                : `${fresh.length} new update${fresh.length === 1 ? '' : 's'} from the campus`;
+            setDeltaLine(`Since you were last here: ${what}.`);
+          }
+        }
+        await AsyncStorage.setItem(KEY, new Date().toISOString());
+      } catch {
+        // Delta line is a garnish — never let storage break Home.
+      }
+    }
   }, []);
 
   useEffect(() => {
@@ -100,10 +130,18 @@ export default function SponsorHome() {
     setRefreshing(false);
   }, [load]);
 
+  // Hero photo priority: your first kid → newsletter hero → latest
+  // feed photo. The realest face available leads the app.
+  const heroPhoto =
+    kids.find(k => k.photoUrl)?.photoUrl ||
+    newsletter?.heroPhotoUrl ||
+    feed.find(f => f.photoUrl)?.photoUrl ||
+    null;
+
   return (
     <SafeAreaView
       style={{ flex: 1, backgroundColor: COLORS.cream }}
-      edges={['top']}
+      edges={[]}
     >
       <ScrollView
         contentContainerStyle={{ paddingBottom: SPACING.section }}
@@ -116,35 +154,13 @@ export default function SponsorHome() {
           />
         }
       >
-        {/* Masthead — brand overline, time-aware greeting, and the
-            presence line directly under it. The first three lines of
-            the app say: this is Be A Number, we know you, and the
-            campus is a real place where it's a real time of day. */}
-        <Enter index={0}>
-          <View style={{ paddingHorizontal: SPACING.l, marginTop: SPACING.l }}>
-            <Text
-              color="gold"
-              style={{
-                fontFamily: TEXT_STYLES.overline.fontFamily,
-                fontSize: 11,
-                letterSpacing: 3,
-                textTransform: 'uppercase',
-              }}
-            >
-              Be A Number
-            </Text>
-            <Text variant="h1" color="ink" style={{ marginTop: SPACING.s }}>
-              {greetingLine(firstName)}
-            </Text>
-            <Text
-              variant="bodySmall"
-              color="umber"
-              style={{ marginTop: SPACING.s }}
-            >
-              {campusPresenceLine()}
-            </Text>
-          </View>
-        </Enter>
+        {/* Full-bleed photographic masthead — photo under the status
+            bar, type on the scrim. See HomeHero for the reasoning. */}
+        <HomeHero
+          greeting={greetingLine(firstName)}
+          photoUrl={heroPhoto}
+          deltaLine={deltaLine}
+        />
 
         {/* Your kids */}
         <View style={{ marginTop: SPACING.section }}>
@@ -352,6 +368,38 @@ export default function SponsorHome() {
               </Text>
             </Pressable>
           </Enter>
+        ) : null}
+
+        {/* Peak-end: sessions are remembered by their peak and their
+            ending. Don't let Home end by scrolling into nothing —
+            end it on a warm, finished note. */}
+        {!loading ? (
+          <View
+            style={{
+              marginTop: SPACING.section,
+              paddingHorizontal: SPACING.l,
+              alignItems: 'center',
+            }}
+          >
+            <Text
+              color="gold"
+              style={{
+                fontFamily: TEXT_STYLES.h1.fontFamily,
+                fontSize: 22,
+              }}
+            >
+              №
+            </Text>
+            <Text
+              variant="bodySmall"
+              color="umber"
+              align="center"
+              style={{ marginTop: SPACING.s }}
+            >
+              That's everything from Omoro today.{'\n'}New photos land most
+              weeks.
+            </Text>
+          </View>
         ) : null}
       </ScrollView>
 

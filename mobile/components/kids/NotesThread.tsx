@@ -15,7 +15,7 @@
  * thread when a reply is in flight. Never styled as a system status.
  */
 import React from 'react';
-import { View, Pressable } from 'react-native';
+import { View, Pressable, Image as RNImage } from 'react-native';
 import { COLORS, RADIUS, SPACING, TEXT_STYLES } from '../../lib/theme';
 import { Text } from '../design/Text';
 import { Card } from '../design/Card';
@@ -218,8 +218,29 @@ function MessageBubble({
           paddingHorizontal: SPACING.l,
           borderWidth: fromSponsor ? 0 : 1,
           borderColor: fromSponsor ? undefined : COLORS.charcoal,
+          overflow: 'hidden',
         }}
       >
+        {/* Kid replies get paper grain — they started life as real
+            paper in a kid's hands. Sponsor bubbles stay clean gold. */}
+        {!fromSponsor ? (
+          <View
+            pointerEvents="none"
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+            }}
+          >
+            <RNImage
+              source={require('../../assets/paper-grain.png')}
+              resizeMode="repeat"
+              style={{ flex: 1, width: undefined, height: undefined }}
+            />
+          </View>
+        ) : null}
         <Text variant="body" color="ink">
           {message.body}
         </Text>

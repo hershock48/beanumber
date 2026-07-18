@@ -174,10 +174,19 @@ export default function KidPage() {
     );
   }
 
+  // Milestone framing: time-together is the realest number the
+  // relationship has. "7 months with Desmond" beats "since March" —
+  // a duration is something you've built; a start date is a fact.
+  // Under 2 months we keep the since-date (calling it "1 month
+  // together" too early feels inflated).
   const sponsoredSinceLabel = kid.bio.sponsoredSince
-    ? `You've been ${kid.firstName}'s sponsor since ${formatMonthYear(
-        kid.bio.sponsoredSince
-      )}.`
+    ? monthsTogether(kid.bio.sponsoredSince) >= 2
+      ? `${monthsTogether(kid.bio.sponsoredSince)} months with ${
+          kid.firstName
+        } — since ${formatMonthYear(kid.bio.sponsoredSince)}.`
+      : `You've been ${kid.firstName}'s sponsor since ${formatMonthYear(
+          kid.bio.sponsoredSince
+        )}.`
     : null;
 
   const showSponsoredSince = kid.viewer.roleForKid === 'monthly';
@@ -514,6 +523,18 @@ export default function KidPage() {
       />
     </View>
   );
+}
+
+/** Whole months between the sponsorship start and now (floor, ≥0). */
+function monthsTogether(iso: string): number {
+  const start = new Date(iso);
+  if (isNaN(start.getTime())) return 0;
+  const now = new Date();
+  let months =
+    (now.getFullYear() - start.getFullYear()) * 12 +
+    (now.getMonth() - start.getMonth());
+  if (now.getDate() < start.getDate()) months -= 1;
+  return Math.max(0, months);
 }
 
 function formatMonthYear(iso: string) {

@@ -60,7 +60,8 @@ export type PushEventKind =
   | 'kidUpdate'
   | 'kidSotm'
   | 'newsletterPublished'
-  | 'kevinShare';
+  | 'kevinShare'
+  | 'sundayBatch';
 
 export const EVENT_KINDS: readonly PushEventKind[] = [
   'kidReplied',
@@ -68,6 +69,7 @@ export const EVENT_KINDS: readonly PushEventKind[] = [
   'kidSotm',
   'newsletterPublished',
   'kevinShare',
+  'sundayBatch',
 ];
 
 // Discriminated union — each event carries exactly what the send
@@ -103,6 +105,22 @@ export type PushEvent =
       recipientUserId: string;
       deepLink: string;
       shareId?: string;
+    }
+  | {
+      /**
+       * The weekly ritual ping — Sunday morning, one question:
+       * "Anything for Desmond before the batch goes?" Letters
+       * physically travel in the Sunday batch, so this is a real
+       * postal deadline, not manufactured urgency. Sent by
+       * /api/cron/sunday-batch to users with at least one monthly
+       * kid; the standard window/cap machinery applies on top.
+       */
+      kind: 'sundayBatch';
+      recipientUserId: string;
+      kidFirstName: string;
+      kidShirtNumber: number;
+      /** ISO date of the Sunday, for the threadId / idempotency. */
+      batchDate: string;
     };
 
 // Public result — every call gets one, even queued-for-later sends,
@@ -504,6 +522,26 @@ function buildPayload(
     };
   }
 
+  if (event.kind === 'sundayBatch') {
+    const threadId = `sunday-batch:${event.batchDate}`;
+    return {
+      threadId,
+      payload: {
+        to: '',
+        title: 'The Sunday batch leaves today.',
+        body: `Anything for ${event.kidFirstName} before it goes?`,
+        data: {
+          kind: 'sundayBatch',
+          deepLink: `/children/${event.kidShirtNumber}#thread`,
+          threadId,
+        },
+        threadId,
+        badge: 0,
+        sound: 'default',
+      },
+    };
+  }
+
   if (event.kind === 'kevinShare') {
     const threadId = `kevin-share:${event.shareId ?? Date.now()}`;
     return {
@@ -530,6 +568,7 @@ function buildPayload(
 function resolveRecipientIds(event: PushEvent): string[] {
   if (event.kind === 'kidReplied') return [event.sponsorUserId];
   if (event.kind === 'kevinShare') return [event.recipientUserId];
+  if (event.kind === 'sundayBatch') return [event.recipientUserId];
   const ids =
     (event as { recipientUserIds?: string[] }).recipientUserIds ?? [];
   // De-duplicate — a single user appearing twice in the input list

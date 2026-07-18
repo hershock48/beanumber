@@ -74,6 +74,24 @@ export default function CampusTab() {
 
   const myIds = new Set(myKids.map(k => k.id));
 
+  // Bento rhythm: the roster breathes instead of checkerboarding.
+  // Pattern per 5 kids: one full-width 3:2 tile, then two pair rows.
+  // Virtualization preserved — each FlatList item is one ROW.
+  type BentoRow =
+    | { key: string; type: 'full'; kid: ExploreKidRow }
+    | { key: string; type: 'pair'; kids: ExploreKidRow[] };
+  const rows: BentoRow[] = [];
+  for (let i = 0; i < kids.length; ) {
+    if (i % 5 === 0) {
+      rows.push({ key: kids[i].id, type: 'full', kid: kids[i] });
+      i += 1;
+    } else {
+      const pair = kids.slice(i, i + 2);
+      rows.push({ key: pair[0].id, type: 'pair', kids: pair });
+      i += pair.length;
+    }
+  }
+
   const header = (
     <View
       style={{
@@ -203,15 +221,10 @@ export default function CampusTab() {
         </View>
       ) : (
         <FlatList
-          data={kids}
-          keyExtractor={k => k.id}
-          numColumns={2}
+          data={rows}
+          keyExtractor={r => r.key}
           ListHeaderComponent={header}
           ListFooterComponent={footer}
-          columnWrapperStyle={{
-            paddingHorizontal: SPACING.l,
-            gap: SPACING.m,
-          }}
           showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl
@@ -223,13 +236,38 @@ export default function CampusTab() {
           renderItem={({ item, index }) => (
             <Enter
               index={Math.min(index, 6)}
-              style={{ flex: 1, marginBottom: SPACING.l }}
+              style={{
+                paddingHorizontal: SPACING.l,
+                marginBottom: SPACING.l,
+              }}
             >
-              <CampusTile
-                kid={item}
-                mine={myIds.has(item.id)}
-                onPress={() => router.push(`/children/${item.shirtNumber}`)}
-              />
+              {item.type === 'full' ? (
+                <CampusTile
+                  kid={item.kid}
+                  mine={myIds.has(item.kid.id)}
+                  wide
+                  onPress={() =>
+                    router.push(`/children/${item.kid.shirtNumber}`)
+                  }
+                />
+              ) : (
+                <View style={{ flexDirection: 'row', gap: SPACING.m }}>
+                  {item.kids.map(k => (
+                    <View key={k.id} style={{ flex: 1 }}>
+                      <CampusTile
+                        kid={k}
+                        mine={myIds.has(k.id)}
+                        onPress={() =>
+                          router.push(`/children/${k.shirtNumber}`)
+                        }
+                      />
+                    </View>
+                  ))}
+                  {item.kids.length === 1 ? (
+                    <View style={{ flex: 1 }} />
+                  ) : null}
+                </View>
+              )}
             </Enter>
           )}
           ListEmptyComponent={
@@ -264,10 +302,13 @@ function headline(myKids: MyKidRow[]): string {
 function CampusTile({
   kid,
   mine,
+  wide = false,
   onPress,
 }: {
   kid: ExploreKidRow;
   mine: boolean;
+  /** Full-width bento tile — landscape 3:2 instead of portrait 4:5. */
+  wide?: boolean;
   onPress: () => void;
 }) {
   const subLine = [
@@ -285,7 +326,7 @@ function CampusTile({
     >
       <View
         style={{
-          aspectRatio: 4 / 5,
+          aspectRatio: wide ? 3 / 2 : 4 / 5,
           borderRadius: RADIUS.cardLarge,
           overflow: 'hidden',
           backgroundColor: COLORS.sand,

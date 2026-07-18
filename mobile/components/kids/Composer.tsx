@@ -12,7 +12,7 @@
  * killing the app doesn't lose the writing.
  */
 import React, { useEffect, useState } from 'react';
-import { Alert, Pressable, View } from 'react-native';
+import { Alert, Image, Pressable, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { COLORS, SPACING, TEXT_STYLES } from '../../lib/theme';
 import { Text } from '../design/Text';
@@ -169,14 +169,37 @@ export function Composer({
           {composerPresenceLine(kidFirstName)}
         </Text>
 
-        {/* Text area */}
-        <Input
-          variant="writingSurface"
-          value={body}
-          onChangeText={setBody}
-          placeholder={`Tell ${kidFirstName} what you're up to. Your penpal writes back.`}
-          maxLength={SOFT_LIMIT * 2} // hard clamp, soft indicator only
-        />
+        {/* Text area — with paper grain. This note physically becomes
+            paper in Omoro; the surface it's written on should whisper
+            that. Grain is a 128px tile at 2-5% alpha, overlaid and
+            non-interactive. */}
+        <View style={{ position: 'relative' }}>
+          <Input
+            variant="writingSurface"
+            value={body}
+            onChangeText={setBody}
+            placeholder={`Tell ${kidFirstName} what you're up to. Your penpal writes back.`}
+            maxLength={SOFT_LIMIT * 2} // hard clamp, soft indicator only
+          />
+          <View
+            pointerEvents="none"
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              borderRadius: 12,
+              overflow: 'hidden',
+            }}
+          >
+            <Image
+              source={require('../../assets/paper-grain.png')}
+              resizeMode="repeat"
+              style={{ flex: 1, width: undefined, height: undefined }}
+            />
+          </View>
+        </View>
 
         {/* Character counter — only when close to soft limit */}
         {showCounter ? (
