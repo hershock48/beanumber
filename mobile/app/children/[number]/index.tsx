@@ -326,6 +326,36 @@ export default function KidPage() {
           </Text>
         </View>
 
+        {/* The kid's own words, when we have a real sentence of them.
+            A bio table row labeled "Wants to be" buries the single
+            most human artifact on the page; a pull-quote honors it.
+            Short phrase-length values ("pilot") stay in the bio table
+            where the label gives them grammar. */}
+        {kid.bio.wantsToBe && kid.bio.wantsToBe.trim().length > 15 ? (
+          <View
+            style={{ paddingHorizontal: SPACING.l, marginTop: SPACING.l }}
+          >
+            <Text
+              color="ink"
+              style={{
+                fontFamily: TEXT_STYLES.h2.fontFamily,
+                fontSize: 20,
+                lineHeight: 28,
+                fontStyle: 'italic',
+              }}
+            >
+              “{kid.bio.wantsToBe.trim().replace(/^["“]|["”]$/g, '')}”
+            </Text>
+            <Text
+              variant="caption"
+              color="umber"
+              style={{ marginTop: SPACING.xs }}
+            >
+              — {kid.firstName}
+            </Text>
+          </View>
+        ) : null}
+
         {kid.intro ? (
           <View
             style={{
@@ -364,6 +394,7 @@ export default function KidPage() {
           <View style={{ marginTop: SPACING.section }}>
             <NotesThread
               kidFirstName={kid.firstName}
+              postmarkNumber={kid.shirtNumber}
               messages={thread.messages}
               kidIsWritingBack={thread.kidIsWritingBack}
               lockedForHolder={threadLockedForHolder}

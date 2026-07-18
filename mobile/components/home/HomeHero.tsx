@@ -65,18 +65,23 @@ export function HomeHero({ greeting, photoUrl, deltaLine }: Props) {
         justifyContent: 'flex-end',
       }}
     >
-      {photoUrl ? (
-        <Animated.View
-          style={[{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }, driftStyle]}
-        >
-          <Image
-            source={{ uri: photoUrl }}
-            style={{ width: '100%', height: '100%' }}
-            contentFit="cover"
-            transition={400}
-          />
-        </Animated.View>
-      ) : null}
+      {/* Never black: with no live photo (fresh install, empty feed,
+          no kids yet) the bundled campus photograph carries the hero.
+          Kevin hit the ink-only fallback and read it as broken — an
+          intentional-looking dark panel and a bug are indistinguishable
+          to a user, so the photo is now unconditional. */}
+      <Animated.View
+        style={[{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }, driftStyle]}
+      >
+        <Image
+          source={
+            photoUrl ? { uri: photoUrl } : require('../../assets/campus-hero.jpg')
+          }
+          style={{ width: '100%', height: '100%' }}
+          contentFit="cover"
+          transition={400}
+        />
+      </Animated.View>
 
       {/* Scrim — type must win over any photo. */}
       <LinearGradient

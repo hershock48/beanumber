@@ -20,6 +20,7 @@ import { COLORS, RADIUS, SPACING, TEXT_STYLES } from '../../lib/theme';
 import { Text } from '../design/Text';
 import { Card } from '../design/Card';
 import { LetterJourney } from './LetterJourney';
+import { Postmark } from './Postmark';
 
 export interface ThreadMessage {
   id: string;
@@ -33,6 +34,8 @@ export interface ThreadMessage {
 
 interface Props {
   kidFirstName: string;
+  /** Renders the postal roundel in the header when provided. */
+  postmarkNumber?: number | null;
   messages: ThreadMessage[];
   kidIsWritingBack?: boolean;
   onWriteFirstNote?: () => void; // empty state CTA
@@ -46,6 +49,7 @@ interface Props {
 
 export function NotesThread({
   kidFirstName,
+  postmarkNumber = null,
   messages,
   kidIsWritingBack = false,
   onWriteFirstNote,
@@ -56,9 +60,20 @@ export function NotesThread({
 }: Props) {
   return (
     <View style={{ paddingHorizontal: SPACING.l }}>
-      <Text variant="h2" color="ink">
-        You and {kidFirstName} — penpal
-      </Text>
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+        }}
+      >
+        <Text variant="h2" color="ink" style={{ flex: 1, paddingRight: 8 }}>
+          You and {kidFirstName} — penpal
+        </Text>
+        {postmarkNumber != null ? (
+          <Postmark shirtNumber={postmarkNumber} />
+        ) : null}
+      </View>
 
       {lockedForHolder ? (
         <Card variant="large" style={{ marginTop: SPACING.m }}>
