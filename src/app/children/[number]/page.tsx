@@ -649,7 +649,10 @@ function canonicalShirtNumber(n: number): number | null {
   // map any integer N to a real kid, so /children/1000000 would
   // render someone's profile. Anything above the bound returns null
   // and the page falls through to the 'we don't have a #X yet' view.
-  // Bump this when Kevin opens Batch 4.
+  // Do NOT bump past 300: the era formulas below only describe
+  // Batches 1-3. Batch 4+ (opened 2026-07-18, #301-450) has its own
+  // snapshot order and resolves via the Batches table ONLY - if the
+  // table read fails, failing closed beats revealing the wrong kid.
   if (!Number.isFinite(n) || n < 1 || n > 300) return null;
   if (n <= 53) return null;
   if (n <= 150) return ((n - 54) % 52) + 2;

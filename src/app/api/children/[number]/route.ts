@@ -41,8 +41,9 @@ export const revalidate = 0;
  */
 function canonicalShirtNumber(n: number): number | null {
   // Upper bound at 300 (end of Batch 3) — without this the modulo
-  // math would happily map arbitrarily large N to a real kid. Bump
-  // when Kevin opens Batch 4.
+  // math would happily map arbitrarily large N to a real kid. Do NOT
+  // bump past 300: the era formulas only describe Batches 1-3. Batch 4+
+  // (#301-450, opened 2026-07-18) resolves via the Batches table ONLY.
   if (!Number.isFinite(n) || n < 1 || n > 300) return null;
   if (n <= 53) return null;
   if (n <= 150) return ((n - 54) % 52) + 2;
