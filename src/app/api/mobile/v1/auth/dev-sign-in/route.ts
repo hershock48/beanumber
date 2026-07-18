@@ -43,6 +43,20 @@ export async function POST(request: NextRequest) {
 
   const email = parsed.data.email.toLowerCase().trim();
 
+  // Allowlist gate. MOBILE_DEV_AUTH_EMAILS is a comma-separated list
+  // of emails permitted to use the bypass. While the flag is on in
+  // production for Expo Go test drives, this keeps the door from
+  // being an any-account backdoor: without the allowlist, anyone who
+  // found the endpoint could mint a session for any sponsor's email.
+  // Unset/empty → nobody gets in (fail closed, same 404 as disabled).
+  const allowed = (process.env.MOBILE_DEV_AUTH_EMAILS || '')
+    .split(',')
+    .map(e => e.trim().toLowerCase())
+    .filter(Boolean);
+  if (!allowed.includes(email)) {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  }
+
   // Fabricate a stable-per-email 'apple_sub' so re-signing in with the
   // same email lands on the same mobile_users row. Prefix so it can't
   // collide with a real Apple sub (which are 44 chars).
