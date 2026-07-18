@@ -13,6 +13,7 @@ import {
   ScrollView,
   RefreshControl,
   Alert,
+  Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { COLORS, RADIUS, SPACING } from '../../lib/theme';
@@ -265,16 +266,18 @@ export default function MeTab() {
                   }
                   showChevron
                   onPress={() => {
-                    // TODO: open Stripe billing portal via in-app browser
+                    void Linking.openURL(
+                      `mailto:kevin@beanumber.org?subject=${encodeURIComponent(
+                        'Update my card on file'
+                      )}&body=${encodeURIComponent(
+                        `Hi Kevin — I'd like to update the card on my sponsorship. My account email is ${me.email}.`
+                      )}`
+                    );
                   }}
                 />
                 <ListItem
                   title="Receipts go to"
                   trailing={me.billing.receiptsEmail || me.email}
-                  showChevron
-                  onPress={() => {
-                    // TODO: change email flow
-                  }}
                 />
                 <ListItem
                   title="Connect a purchase email"
@@ -285,7 +288,13 @@ export default function MeTab() {
                   title="Cancel a sponsorship"
                   showChevron
                   onPress={() => {
-                    // TODO: cancel picker
+                    void Linking.openURL(
+                      `mailto:kevin@beanumber.org?subject=${encodeURIComponent(
+                        'Cancel my sponsorship'
+                      )}&body=${encodeURIComponent(
+                        `Hi Kevin — I need to cancel a sponsorship. My account email is ${me.email}.`
+                      )}`
+                    );
                   }}
                   last
                 />

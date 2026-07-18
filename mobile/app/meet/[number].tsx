@@ -33,6 +33,7 @@ import { Text } from '../../components/design/Text';
 import { HoldButton } from '../../components/reveal/HoldButton';
 import { AmbientGlow } from '../../components/reveal/AmbientGlow';
 import { KidReveal } from '../../components/reveal/KidReveal';
+import { BackChip } from '../../components/design/BackChip';
 import {
   claimNumber,
   getMobileKid,
@@ -202,6 +203,14 @@ export default function MeetScreen() {
       style={{ flex: 1, backgroundColor: COLORS.cream }}
       edges={['top', 'bottom']}
     >
+      {/* Escape hatch — visible until the reveal starts. A mistyped
+          number or a broken fetch must never trap anyone on the
+          ceremony screen (swipe-back is disabled here on purpose,
+          so this chip is the ONLY way out). Hidden during the
+          reveal itself: at that point the ceremony owns the screen
+          and its own CTAs handle where you go next. */}
+      {!showReveal ? <BackChip /> : null}
+
       {/* Button layer — pre-hold + holding + failed */}
       <Animated.View
         pointerEvents={showReveal ? 'none' : 'auto'}

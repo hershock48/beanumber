@@ -145,9 +145,11 @@ export default function RootLayout() {
             <Stack.Screen
               name="children/[number]"
               options={{
-                title: '',
-                headerBackTitle: 'Back',
-                headerTransparent: true,
+                // The kid page owns its chrome: BackChip over the
+                // photo + the sticky mini-nav on scroll. The native
+                // transparent header was a SECOND, ghostier back
+                // control fighting the custom one — gone.
+                headerShown: false,
                 animation: 'fade',
               }}
             />

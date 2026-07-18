@@ -29,6 +29,7 @@ import Animated, {
 import { COLORS, SPACING, TEXT_STYLES, ELEVATION, RADIUS } from '../../../lib/theme';
 import { Text } from '../../../components/design/Text';
 import { Skeleton } from '../../../components/design/Skeleton';
+import { BackChip } from '../../../components/design/BackChip';
 import { HeroSection } from '../../../components/kids/HeroSection';
 import { LatestUpdateSection } from '../../../components/kids/LatestUpdateSection';
 import { NotesThread } from '../../../components/kids/NotesThread';
@@ -65,6 +66,17 @@ export default function KidPage() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [composerOpen, setComposerOpen] = useState(false);
+  const [threadExpanded, setThreadExpanded] = useState(false);
+
+  // Back must never dead-end: deep links (push, QR, /meet handoff)
+  // land here with an empty stack — fall back to Home.
+  const goBackSafe = useCallback(() => {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace('/(tabs)');
+    }
+  }, [router]);
 
   const load = useCallback(async () => {
     if (!Number.isFinite(shirtNumber)) return;
@@ -154,6 +166,9 @@ export default function KidPage() {
         style={{ flex: 1, backgroundColor: COLORS.cream }}
         edges={['top', 'bottom']}
       >
+        {/* Even the skeleton gets a way out — a slow or failed load
+            must never trap anyone. */}
+        <BackChip />
         <View style={{ padding: SPACING.l }}>
           <Skeleton height={520} radius={RADIUS.cardLarge} />
           <Skeleton
@@ -226,7 +241,7 @@ export default function KidPage() {
         ]}
       >
         <Pressable
-          onPress={() => router.back()}
+          onPress={goBackSafe}
           hitSlop={16}
           accessibilityRole="button"
           accessibilityLabel="Back"
@@ -287,38 +302,9 @@ export default function KidPage() {
           />
         }
       >
-        {/* Back button — top-left, over-photo (before sticky nav kicks in). */}
-        <View
-          style={{
-            position: 'absolute',
-            top: insets.top + SPACING.s,
-            left: SPACING.l,
-            zIndex: 10,
-          }}
-        >
-          <Pressable
-            onPress={() => router.back()}
-            hitSlop={20}
-            accessibilityRole="button"
-            accessibilityLabel="Back"
-            style={{
-              width: 36,
-              height: 36,
-              borderRadius: 18,
-              backgroundColor: 'rgba(255,255,255,0.72)',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <Text
-              variant="h3"
-              color="ink"
-              style={{ fontSize: 20, lineHeight: 20 }}
-            >
-              ‹
-            </Text>
-          </Pressable>
-        </View>
+        {/* Back — the one nav chip, fallback-safe (deep links land
+            here with an empty stack; back must never dead-end). */}
+        <BackChip onPress={goBackSafe} />
 
         <HeroSection
           firstName={kid.firstName}
@@ -382,9 +368,11 @@ export default function KidPage() {
               kidIsWritingBack={thread.kidIsWritingBack}
               lockedForHolder={threadLockedForHolder}
               onWriteFirstNote={() => setComposerOpen(true)}
-              onConvertPress={() => {
-                /* TODO conversion route */
-              }}
+              onConvertPress={() =>
+                router.push(`/keep-going/${kid.shirtNumber}`)
+              }
+              collapseAfterPairs={threadExpanded ? 999 : 3}
+              onSeeFullPress={() => setThreadExpanded(true)}
             />
           </View>
         ) : null}

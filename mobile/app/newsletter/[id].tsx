@@ -34,15 +34,25 @@ export default function NewsletterView() {
   const load = useCallback(async () => {
     if (!id) return;
     try {
-      // For v1, we reuse the latest endpoint if this is the latest;
-      // otherwise a per-id endpoint would be added. For now, fetch the
-      // latest and rely on id matching for consistency.
-      const data = await authJson<{ newsletter: LatestNewsletter }>(
-        '/api/mobile/v1/newsletter/latest'
+      // By-id endpoint — this screen used to fetch /latest no matter
+      // which issue was tapped, which was only right by coincidence.
+      const data = await authJson<LatestNewsletter & { id: string | null }>(
+        `/api/mobile/v1/newsletter/${id}`
       );
-      setN(data.newsletter ?? null);
+      setN(data && data.id ? data : null);
     } catch (err) {
-      if (!(err instanceof ApiError && err.status === 404)) {
+      if (err instanceof ApiError && err.status === 404) {
+        // Stale id (old push, unpublished issue) — fall back to the
+        // latest rather than showing a dead screen.
+        try {
+          const data = await authJson<LatestNewsletter & { id: string | null }>(
+            '/api/mobile/v1/newsletter/latest'
+          );
+          setN(data && data.id ? data : null);
+        } catch {
+          /* empty state renders */
+        }
+      } else {
         // eslint-disable-next-line no-console
         console.warn('Newsletter fetch failed', err);
       }

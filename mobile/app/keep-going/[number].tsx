@@ -16,6 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { COLORS, SPACING } from '../../lib/theme';
 import { Text } from '../../components/design/Text';
 import { Button } from '../../components/design/Button';
+import { BackChip } from '../../components/design/BackChip';
 import { getMobileKid, MobileKidDetail, API_BASE_URL } from '../../lib/api';
 
 export default function KeepGoingScreen() {
@@ -61,6 +62,9 @@ export default function KeepGoingScreen() {
       }}
       edges={['top', 'bottom']}
     >
+      {/* Close → the kid page. "Not now" at the bottom does the same;
+          the chip is for people whose thumb goes to the corner. */}
+      <BackChip close onPress={goKidPage} />
       <View
         style={{
           flex: 1,
