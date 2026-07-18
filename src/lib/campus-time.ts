@@ -29,7 +29,7 @@ const CAMPUS_UTC_OFFSET_HOURS = 3;
 interface CampusMoment {
   hour: number;
   day: number; // 0 = Sunday … 6 = Saturday, at the campus
-  clock: string; // "7:05 in the morning"
+  clock: string; // "7:05am"
   isNight: boolean;
   isSunday: boolean;
 }
@@ -43,17 +43,12 @@ function campusNow(now: Date = new Date()): CampusMoment {
   const day = shifted.getUTCDay();
 
   const h12 = hour % 12 === 0 ? 12 : hour % 12;
-  // Hours 0–4 are "at night", not "in the morning" — "12:54 in the
-  // morning" is technically correct and humanly wrong.
-  const daypart =
-    hour < 5
-      ? 'at night'
-      : hour < 12
-        ? 'in the morning'
-        : hour < 17
-          ? 'in the afternoon'
-          : 'at night';
-  const clock = `${h12}:${String(minute).padStart(2, '0')} ${daypart}`;
+  // Plain am/pm — "8:47pm" (Kevin 2026-07-18: the spelled-out
+  // daypart read as a time with no am/pm). The standalone daypart
+  // sentences ("It's evening in Omoro") keep their words.
+  const clock = `${h12}:${String(minute).padStart(2, '0')}${
+    hour < 12 ? 'am' : 'pm'
+  }`;
 
   return {
     hour,
