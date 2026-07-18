@@ -8,7 +8,11 @@
  * States:
  *   - full thread (monthly sponsor of this kid)
  *   - empty state ("Say hi. Ismail loves hearing from you.")
- *   - locked state (holder — warm invitation card, "Keep going with Ismail")
+ *   - free-letter state (holder, included letter unsent — "The letter
+ *     that came with your shirt is ready to send")
+ *   - spent state (holder, included letter used — thread renders,
+ *     conversion card rides below it)
+ *   - locked state (holder pre-claim edge cases — warm invitation card)
  *   - hidden entirely (non-holder, unrelated sponsor, anonymous)
  *
  * The "Ismail is writing back" pending card appears at the bottom of a
@@ -42,6 +46,16 @@ interface Props {
   /** When rendered, shows the holder locked card. */
   lockedForHolder?: boolean;
   onConvertPress?: () => void; // holder CTA
+  /**
+   * Holder with the included letter still unsent — the empty state
+   * becomes "the letter that came with your shirt is ready to send."
+   */
+  freeLetterAvailable?: boolean;
+  /**
+   * Holder whose included letter is used — the thread renders and a
+   * conversion card rides below it.
+   */
+  holderSpent?: boolean;
   /** Collapsed after this many pairs. */
   collapseAfterPairs?: number;
   onSeeFullPress?: () => void;
@@ -55,6 +69,8 @@ export function NotesThread({
   onWriteFirstNote,
   lockedForHolder = false,
   onConvertPress,
+  freeLetterAvailable = false,
+  holderSpent = false,
   collapseAfterPairs = 3,
   onSeeFullPress,
 }: Props) {
@@ -109,9 +125,26 @@ export function NotesThread({
         </Card>
       ) : messages.length === 0 ? (
         <Card variant="large" style={{ marginTop: SPACING.m }}>
-          <Text variant="body" color="ink">
-            Say hi. Your penpal loves hearing from you.
-          </Text>
+          {freeLetterAvailable ? (
+            <>
+              <Text variant="body" color="ink">
+                Your shirt came with a letter to {kidFirstName} — and a
+                letter back. It's ready to send, on us.
+              </Text>
+              <Text
+                variant="bodySmall"
+                color="umber"
+                style={{ marginTop: SPACING.s }}
+              >
+                {kidFirstName} reads it in their own language — the
+                campus team translates — and writes back to you.
+              </Text>
+            </>
+          ) : (
+            <Text variant="body" color="ink">
+              Say hi. Your penpal loves hearing from you.
+            </Text>
+          )}
           {onWriteFirstNote ? (
             <Pressable
               onPress={onWriteFirstNote}
@@ -125,7 +158,9 @@ export function NotesThread({
                   fontSize: TEXT_STYLES.textLink.fontSize,
                 }}
               >
-                Write your first penpal note →
+                {freeLetterAvailable
+                  ? `Write your letter to ${kidFirstName} →`
+                  : 'Write your first penpal note →'}
               </Text>
             </Pressable>
           ) : null}
@@ -173,6 +208,37 @@ export function NotesThread({
               <Text variant="body" color="ink">
                 {kidFirstName} is writing back. Should arrive within 2 weeks.
               </Text>
+            </Card>
+          ) : null}
+
+          {/* Spent-holder conversion — the included letter is used;
+              the thread above proves the connection is real. This is
+              the highest-intent conversion moment in the app. */}
+          {holderSpent ? (
+            <Card variant="large" style={{ marginTop: SPACING.l }}>
+              <Text variant="body" color="ink">
+                That was the letter that came with your shirt. Keep
+                writing to {kidFirstName} — a penpal who writes back,
+                monthly photos, report cards, campus updates. $25/month.
+                Cancel anytime.
+              </Text>
+              {onConvertPress ? (
+                <Pressable
+                  onPress={onConvertPress}
+                  style={{ marginTop: SPACING.l, alignSelf: 'flex-start' }}
+                  accessibilityRole="button"
+                >
+                  <Text
+                    color="ink"
+                    style={{
+                      fontFamily: TEXT_STYLES.textLink.fontFamily,
+                      fontSize: TEXT_STYLES.textLink.fontSize,
+                    }}
+                  >
+                    Keep going with {kidFirstName} →
+                  </Text>
+                </Pressable>
+              ) : null}
             </Card>
           ) : null}
         </View>

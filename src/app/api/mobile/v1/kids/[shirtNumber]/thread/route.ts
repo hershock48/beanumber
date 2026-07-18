@@ -12,7 +12,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { and, eq, inArray, or, sql } from 'drizzle-orm';
+import { and, eq, inArray, ne, or, sql } from 'drizzle-orm';
 import { logger } from '@/lib/logger';
 import {
   createSuccessResponse,
@@ -79,6 +79,14 @@ export interface MobileThreadMessage {
 export interface MobileThreadResponse {
   messages: MobileThreadMessage[];
   kidIsWritingBack: boolean;
+  /** 'monthly' writes freely; 'holder' gets the one included letter. */
+  viewerRole: 'monthly' | 'holder';
+  /**
+   * Holder only: true while the letter that came with the shirt is
+   * still unsent. Monthly viewers always get false (the concept
+   * doesn't apply — they write freely).
+   */
+  freeLetterAvailable: boolean;
 }
 
 export interface MobileThreadLockedResponse {
@@ -93,25 +101,40 @@ interface MonthlySponsorshipMatch {
 }
 
 /**
- * Resolve the kid + verify the viewer has an ACTIVE MONTHLY
- * sponsorship of them, matching across the viewer's whole EMAIL SET
- * (provider + linked purchase email). The child match covers three
- * row shapes: UUID FK, real legacy ChildID (canonical numbers), and
- * the synthetic per-number legacy id + claimed_shirt_number pair
- * (cycle numbers — those rows never carry the canonical kid's ids).
+ * Resolve the kid + verify the viewer can be in this thread at all,
+ * matching across the viewer's whole EMAIL SET (provider + linked
+ * purchase email). The child match covers three row shapes: UUID FK,
+ * real legacy ChildID (canonical numbers), and the synthetic
+ * per-number legacy id + claimed_shirt_number pair (cycle numbers —
+ * those rows never carry the canonical kid's ids).
  *
- * Returns the resolved child + the sponsorship match (with
- * `childRevealedAt` — colors the Kevin alert email — and
- * `sponsorEmail` — the identity the note is filed under, so web and
- * mobile see one thread). Returns `{ locked: true }` when the viewer
- * is not eligible; caller renders a 403 with the locked-card payload.
+ * TWO writer tiers, mirroring /api/sponsor/notes on the web:
+ *   monthly — Active sponsorship with monthly_amount > 0. Writes
+ *             freely.
+ *   holder  — claimed the number (childRevealedAt set) but never
+ *             converted. Gets exactly ONE letter: the one that came
+ *             with the shirt ("a letter to them, and a letter back"
+ *             — the printed insert's promise). freeLetterAvailable
+ *             says whether it's still unsent; the spent check reads
+ *             kid_messages directly (any non-declined sponsor_to_kid
+ *             row from any of the viewer's emails counts), same
+ *             source of truth as the web gate.
+ *
+ * Returns `{ locked: true }` only for viewers with NO relationship
+ * to this kid; caller renders a 403 with the locked-card payload.
  */
 async function resolveMonthlyOrLocked(args: {
   shirtNumber: number;
   viewerEmails: string[];
 }): Promise<
   | { locked: true; kidFirstName: string | null }
-  | { locked: false; child: Child; monthly: MonthlySponsorshipMatch }
+  | {
+      locked: false;
+      child: Child;
+      writerRole: 'monthly' | 'holder';
+      freeLetterAvailable: boolean;
+      monthly: MonthlySponsorshipMatch;
+    }
 > {
   const identity = await resolveShirtNumberForClaim(args.shirtNumber);
   if (!identity) {
@@ -153,21 +176,56 @@ async function resolveMonthlyOrLocked(args: {
       and(
         inArray(sql`lower(${sponsorships.sponsorEmail})`, emails),
         or(...childMatches),
-        eq(sponsorships.status, 'Active')
+        // 'Holder' rows carry the free-letter right; the web gate at
+        // /api/sponsor/notes filters the same pair.
+        inArray(sponsorships.status, ['Active', 'Holder'])
       )
     )
     .limit(5);
-  const monthly = rows.find(r => Number(r.monthlyAmount ?? 0) > 0);
-  if (!monthly) {
+  const monthly = rows.find(
+    r => r.status === 'Active' && Number(r.monthlyAmount ?? 0) > 0
+  );
+  if (monthly) {
+    return {
+      locked: false,
+      child,
+      writerRole: 'monthly',
+      freeLetterAvailable: false,
+      monthly: {
+        id: monthly.id,
+        sponsorEmail: monthly.sponsorEmail,
+        childRevealedAt: monthly.childRevealedAt,
+      },
+    };
+  }
+
+  // Holder tier — claimed the number, never converted. The included
+  // letter is theirs to send once.
+  const holder = rows.find(r => !!r.childRevealedAt);
+  if (!holder) {
     return { locked: true, kidFirstName: child.firstName ?? null };
   }
+  const prior = await db
+    .select({ id: kidMessages.id })
+    .from(kidMessages)
+    .where(
+      and(
+        inArray(sql`lower(${kidMessages.sponsorEmail})`, emails),
+        eq(kidMessages.childId, child.id),
+        eq(kidMessages.direction, 'sponsor_to_kid'),
+        ne(kidMessages.status, 'declined')
+      )
+    )
+    .limit(1);
   return {
     locked: false,
     child,
+    writerRole: 'holder',
+    freeLetterAvailable: prior.length === 0,
     monthly: {
-      id: monthly.id,
-      sponsorEmail: monthly.sponsorEmail,
-      childRevealedAt: monthly.childRevealedAt,
+      id: holder.id,
+      sponsorEmail: holder.sponsorEmail,
+      childRevealedAt: holder.childRevealedAt,
     },
   };
 }
@@ -328,7 +386,12 @@ async function getHandler(
   );
 
   logger.apiResponse(method, path, 200);
-  const body: MobileThreadResponse = { messages, kidIsWritingBack };
+  const body: MobileThreadResponse = {
+    messages,
+    kidIsWritingBack,
+    viewerRole: resolved.writerRole,
+    freeLetterAvailable: resolved.freeLetterAvailable,
+  };
   return createSuccessResponse(body);
 }
 
@@ -380,6 +443,19 @@ async function postHandler(
     };
     logger.apiResponse(method, path, 403);
     return NextResponse.json(locked, { status: 403 });
+  }
+  // Holder whose included letter is already spent: reading is open,
+  // writing is the conversion moment. Same copy shape the web uses.
+  if (resolved.writerRole === 'holder' && !resolved.freeLetterAvailable) {
+    const name = resolved.child.firstName ?? 'this kid';
+    logger.apiResponse(method, path, 403);
+    return NextResponse.json(
+      {
+        locked: true,
+        unlockCopy: `You've already sent the letter that came with your shirt. Sponsor ${name} at $25/month to keep writing — your penpal writes back.`,
+      } satisfies MobileThreadLockedResponse,
+      { status: 403 }
+    );
   }
   const { child, monthly } = resolved;
   // File the note under the email that OWNS the monthly sponsorship —

@@ -209,6 +209,15 @@ export default function KidPage() {
   const canReadUpdates = kid.viewer.canReadUpdates;
   const threadLockedForHolder =
     kid.viewer.roleForKid === 'holder' && !kid.viewer.canReadNotes;
+  // Holder letter states — the shirt insert's promise ("a letter to
+  // them, and a letter back") made visible. Available → the empty
+  // state becomes the included-letter invitation; spent → the thread
+  // renders with the conversion card below it.
+  const freeLetterAvailable =
+    kid.viewer.roleForKid === 'holder' &&
+    kid.viewer.freeLetter === 'available';
+  const holderSpent =
+    kid.viewer.roleForKid === 'holder' && kid.viewer.freeLetter === 'spent';
 
   const bioForSection = {
     ...kid.bio,
@@ -398,6 +407,8 @@ export default function KidPage() {
               messages={thread.messages}
               kidIsWritingBack={thread.kidIsWritingBack}
               lockedForHolder={threadLockedForHolder}
+              freeLetterAvailable={freeLetterAvailable}
+              holderSpent={holderSpent}
               onWriteFirstNote={() => setComposerOpen(true)}
               onConvertPress={() =>
                 router.push(`/keep-going/${kid.shirtNumber}`)

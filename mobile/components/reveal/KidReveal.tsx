@@ -57,6 +57,13 @@ interface Props {
   /** Primary CTA copy — switches based on viewer role. */
   primaryLabel: string;
   onPrimaryPress: () => void;
+  /**
+   * One quiet line under the primary button saying what pressing it
+   * unlocks (e.g. the claim CTA's "then the letter that came with
+   * your shirt is ready to send"). Optional — most roles don't need
+   * it.
+   */
+  primaryCaption?: string;
   secondaryLabel: string;
   onSecondaryPress: () => void;
   reducedMotion?: boolean;
@@ -66,6 +73,7 @@ export function KidReveal({
   kid,
   primaryLabel,
   onPrimaryPress,
+  primaryCaption,
   secondaryLabel,
   onSecondaryPress,
   reducedMotion = false,
@@ -289,6 +297,16 @@ export function KidReveal({
           <Button variant="primary" onPress={onPrimaryPress} fullWidth>
             {primaryLabel}
           </Button>
+          {primaryCaption ? (
+            <Text
+              variant="caption"
+              color="umber"
+              align="center"
+              style={{ marginTop: SPACING.s }}
+            >
+              {primaryCaption}
+            </Text>
+          ) : null}
         </Animated.View>
 
         <Animated.View

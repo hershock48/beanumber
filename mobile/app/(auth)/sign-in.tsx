@@ -140,9 +140,16 @@ export default function SignInScreen() {
     }
   };
 
+  // The promise, in order: meet them → the number becomes YOURS →
+  // the letter that came with the shirt is ready to send. Kevin's
+  // test-drive note (2026-07-18): it wasn't clear that signing in IS
+  // the claim, or that it unlocks the penpal letter. Now it says so.
   const headline = meetNumber
     ? `#${meetNumber} is a kid. Sign in to meet them.`
     : 'Sign in to meet your kid.';
+  const subhead = meetNumber
+    ? `Meet them, make #${meetNumber} yours, and send the letter that came with your shirt. Your penpal writes back.`
+    : 'Every Be A Number shirt has a kid on the other end. Sign in and the number reveals who — then it’s yours, and the letter that came with your shirt is ready to send.';
 
   return (
     <SafeAreaView style={styles.screen}>
@@ -171,8 +178,7 @@ export default function SignInScreen() {
             align="center"
             style={styles.subhead}
           >
-            Every Be A Number shirt has a kid on the other end. Sign in
-            and the number reveals who.
+            {subhead}
           </Text>
         </View>
 

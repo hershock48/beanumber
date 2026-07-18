@@ -222,6 +222,9 @@ export interface MobileKidViewer {
   /** True when nobody holds this number yet and the viewer may claim
    *  it. Drives the reveal screen's "Keep #N" CTA. */
   canClaim?: boolean;
+  /** Holder only: whether the letter that came with the shirt is
+   *  still unsent ('available'), used ('spent'), or n/a (null). */
+  freeLetter?: 'available' | 'spent' | null;
 }
 
 export interface MobileKidDetail {
@@ -342,6 +345,10 @@ export interface ThreadResponse {
   kidIsWritingBack: boolean;
   locked?: boolean;
   unlockCopy?: string;
+  /** 'monthly' writes freely; 'holder' gets the one included letter. */
+  viewerRole?: 'monthly' | 'holder';
+  /** Holder only: included letter still unsent. */
+  freeLetterAvailable?: boolean;
 }
 
 export async function getThread(shirtNumber: number): Promise<ThreadResponse> {

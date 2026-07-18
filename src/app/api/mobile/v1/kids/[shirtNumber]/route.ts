@@ -36,6 +36,9 @@ import {
   findSponsorshipForEmailAndClaimedNumber,
   getViewerSponsorshipForChild,
 } from '@/lib/db/queries';
+import { and, eq, inArray, ne, sql } from 'drizzle-orm';
+import { db } from '@/lib/db/client';
+import { kidMessages } from '@/lib/db/schema';
 import { getViewerEmails } from '@/lib/mobile-viewer';
 import { resolveShirtNumberForClaim } from '@/lib/claim-resolve';
 import { sponsorGradeLabel, ageYearsFromDob } from '@/lib/mobile/format';
@@ -69,6 +72,14 @@ export interface MobileKidViewer {
    *  (including them) holds it yet. Drives the reveal screen's
    *  "Keep #N" CTA. */
   canClaim: boolean;
+  /**
+   * Holder only: whether the letter that came with the shirt is
+   * still unsent ('available'), already used ('spent'), or not
+   * applicable (null — monthly sponsors write freely, strangers
+   * don't write at all). Drives the "your included letter is ready
+   * to send" moments in the client.
+   */
+  freeLetter: 'available' | 'spent' | null;
 }
 
 export interface MobileKidResponse {
@@ -145,6 +156,7 @@ async function handler(
         canWriteNotes: false,
         canReadUpdates: false,
         canClaim: false,
+        freeLetter: null,
       },
     } satisfies MobileKidResponse);
   }
@@ -208,8 +220,37 @@ async function handler(
     }
   }
 
-  const canReadNotes = roleForKid === 'monthly';
-  const canWriteNotes = roleForKid === 'monthly';
+  // Holder free letter — the printed shirt insert promises "a letter
+  // to them, and a letter back." A holder who claimed this number gets
+  // exactly one letter; spent-ness reads kid_messages directly (any
+  // non-declined sponsor_to_kid row from any of the viewer's emails),
+  // same source of truth as the thread route and the web notes gate.
+  let freeLetter: 'available' | 'spent' | null = null;
+  if (roleForKid === 'holder') {
+    try {
+      const prior = await db
+        .select({ id: kidMessages.id })
+        .from(kidMessages)
+        .where(
+          and(
+            inArray(sql`lower(${kidMessages.sponsorEmail})`, emails),
+            eq(kidMessages.childId, child.id),
+            eq(kidMessages.direction, 'sponsor_to_kid'),
+            ne(kidMessages.status, 'declined')
+          )
+        )
+        .limit(1);
+      freeLetter = prior.length === 0 ? 'available' : 'spent';
+    } catch {
+      // Fail closed on the WRITE right (no accidental extra letters),
+      // open on the read.
+      freeLetter = 'spent';
+    }
+  }
+
+  const canReadNotes = roleForKid === 'monthly' || roleForKid === 'holder';
+  const canWriteNotes =
+    roleForKid === 'monthly' || freeLetter === 'available';
   const canReadUpdates = roleForKid === 'monthly' || roleForKid === 'holder';
 
   const ageYears = ageYearsFromDob(child.dateOfBirth);
@@ -254,6 +295,7 @@ async function handler(
       canWriteNotes,
       canReadUpdates,
       canClaim,
+      freeLetter,
     },
   };
 

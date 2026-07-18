@@ -153,8 +153,12 @@ export default function MeetScreen() {
                 roleForKid: result.role,
                 canClaim: false,
                 canReadUpdates: true,
-                canReadNotes: result.role === 'monthly',
-                canWriteNotes: result.role === 'monthly',
+                // Fresh holders can read their (empty) thread and
+                // write the included letter — server grants the same.
+                canReadNotes: true,
+                canWriteNotes: true,
+                freeLetter:
+                  result.role === 'monthly' ? null : 'available',
               },
             }
           : prev
@@ -320,6 +324,15 @@ export default function MeetScreen() {
                 : kid.viewer.canWriteNotes
                   ? `Send ${kid.firstName} a note`
                   : `Yes, sponsor ${kid.firstName}`
+            }
+            // The claim CTA says what claiming UNLOCKS — Kevin's
+            // test-drive note: "sign in to claim" and "then you get
+            // the penpal thing" were invisible. One quiet caption
+            // fixes both.
+            primaryCaption={
+              kid.viewer.canClaim
+                ? `Claiming makes this Number yours — and the letter that came with your shirt is ready to send. ${kid.firstName} writes back.`
+                : undefined
             }
             onPrimaryPress={() => {
               if (kid.viewer.canClaim) {
