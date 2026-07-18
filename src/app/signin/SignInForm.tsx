@@ -212,9 +212,27 @@ export function SignInForm() {
   // Headline + body adapt to context. /me bounces here for unsigned
   // users → make it obvious why they're here. Magic-link callback
   // failures → acknowledge the failure.
+  //
+  // The ?n= arrival gets CLAIM language, not sign-in language. The
+  // realistic person landing here with a number is a shirt holder who
+  // has never given us anything — a farmers-market cash buyer has no
+  // account, no purchase email on file, nothing. To them "Sign in"
+  // reads as "members only" and bounces exactly the person the page
+  // exists for. There is no separate sign-up on Be A Number: one
+  // door, and your first walk through it creates you. So the copy
+  // names the action (claim the Number) and says out loud that
+  // first-timers are expected.
+  const arrivedWithNumber = /^\d+$/.test(params.get('n') || '');
+
   let headline = 'Sign in.';
   let body =
-    'Enter your email. We send a one-tap link — no password to remember, no account to create. This is how sign-in works on Be A Number.';
+    'Enter your email. We send a one-tap link — no password to remember, no account to create. First time here? Same door: your first sign-in is your sign-up.';
+
+  if (arrivedWithNumber) {
+    headline = 'Make your Number yours.';
+    body =
+      "Enter your email and we'll send a one-tap link — that's the whole thing. No password, no account to create. If you've never been here before, this is how you start; if you have, it signs you back in.";
+  }
 
   if (reason === 'your-kids') {
     headline = 'Sign in to see your kids.';
@@ -233,7 +251,7 @@ export function SignInForm() {
   return (
     <div className="bg-white border border-[#e8e0d4] p-7 md:p-9">
       <p className="text-xs font-bold uppercase tracking-[0.25em] text-[#D4A843] mb-2">
-        Sign in
+        {arrivedWithNumber ? 'Claim your Number' : 'Sign in'}
       </p>
       <h1
         className="text-3xl md:text-4xl text-[#0d0d0d] mb-3 leading-tight"

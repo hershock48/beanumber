@@ -217,8 +217,12 @@ export function PenpalBox({
   // shirt insert just promised a free letter. The letter is also the
   // stronger hook: it's what the physical insert told them to come
   // here and do.
+  // 2026-07-18: 'Sign in to write' → 'Claim … to write'. Same
+  // reasoning as the anon strip: 'sign in' is membership language
+  // and the realistic reader has never signed up for anything —
+  // claiming the Number IS their first act here.
   const anonCtaHref = `/signin?n=${shirtNumber}`;
-  const anonCtaLabel = `Sign in to write ${firstName}`;
+  const anonCtaLabel = `Claim #${shirtNumber} to write ${firstName}`;
 
   // Holder who has already used their included letter cycle AND has
   // a real thread (their sent letter + kid's reply): show the real

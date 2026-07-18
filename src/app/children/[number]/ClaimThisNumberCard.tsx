@@ -119,8 +119,8 @@ export function ClaimThisNumberCard({
         </p>
         <p className="text-[#d8cfc1] text-sm md:text-base leading-relaxed mb-5">
           {viewerLooksLikeBuyer
-            ? `Sign in to lock #${shirtNumber} in as yours. Every update from ${firstName}'s campus comes back to this page — no payment, no password.`
-            : `If you got a Shirt with this Number on the back, sign in and #${shirtNumber} is yours. We'll remember you on this device. No payment, no password.`}
+            ? `Enter your email to lock #${shirtNumber} in as yours. Every update from ${firstName}'s campus comes back to this page — no payment, no password, no account to set up.`
+            : `If you got a Shirt with this Number on the back, enter your email and #${shirtNumber} is yours. We'll remember you on this device. No payment, no password, no account to set up.`}
         </p>
         <div className="flex flex-col sm:flex-row sm:items-center gap-3">
           <Link
