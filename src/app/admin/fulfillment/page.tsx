@@ -359,7 +359,14 @@ export default function FulfillmentDashboard() {
                 <tbody className="divide-y divide-gray-100">
                   {shippedOrders.map(order => (
                     <tr key={order.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-2 font-bold text-gray-900">#{order.orderNum}</td>
+                      <td className="px-4 py-2 font-bold text-gray-900">
+                        #{order.orderNum}
+                        {order.shipping === 'Handed in Person' && (
+                          <span className="ml-2 inline-block px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 text-[10px] font-semibold uppercase tracking-wide align-middle">
+                            In person
+                          </span>
+                        )}
+                      </td>
                       <td className="px-4 py-2">
                         <p className="text-gray-900">{order.buyer}</p>
                         <p className="text-xs text-gray-400">{order.email}</p>

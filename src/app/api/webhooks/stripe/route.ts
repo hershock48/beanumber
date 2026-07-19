@@ -223,6 +223,17 @@ async function createFulfillmentRecord(opts: {
   // callers (backfill scripts) can omit and get the old behavior.
   stripeSessionId?: string;
   itemIndex?: number;
+  /**
+   * Market-booth sale (session.metadata.sold_in_person). The buyer
+   * walked away with the shirt in hand, so the row lands as
+   * 'Handed in Person' instead of 'Not Shipped' — it never enters
+   * the admin To Ship queue (which filters shipping = 'Not Shipped')
+   * and shows under the Shipped tab with an "In person" tag instead.
+   * Discovered 2026-07-19: farmers-market sales were entering the
+   * queue identically to online orders, so Kevin couldn't tell which
+   * buyers already had their shirts.
+   */
+  soldInPerson?: boolean;
 }): Promise<void> {
   const vinylFront = vinylColorForShirt(opts.shirtColor);
   const vinylBack = vinylColorForShirt(opts.shirtColor);
@@ -275,7 +286,7 @@ async function createFulfillmentRecord(opts: {
       shipState: opts.address?.state || null,
       shipZip: opts.address?.postal_code || null,
       production: 'Pending',
-      shipping: 'Not Shipped',
+      shipping: opts.soldInPerson ? 'Handed in Person' : 'Not Shipped',
       childName: opts.childName || null,
       orderDate: opts.orderDate,
       notes: opts.notes || null,
@@ -379,6 +390,11 @@ async function createFulfillmentRecord(opts: {
     'fldUakXkAhW2hYLxL': opts.buyerEmail,         // Email
     'fldnXiHlwBtEWP3io': opts.orderDate,          // Order Date
     'fldbBZtOLYVVDS28X': 'Pending',               // Production
+    // Airtable Shipping stays 'Not Shipped' even for market sales —
+    // 'Handed in Person' isn't a singleSelect option there and adding
+    // one mid-sunset isn't worth a 422 risk. Postgres (which the admin
+    // queue reads) carries the real value; Airtable rows get the
+    // market marker via the Notes text instead.
     'fldJ6ehpDkpindHtO': 'Not Shipped',            // Shipping
   };
 
@@ -2337,11 +2353,12 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
             buyerEmail: email,
             address: address || null,
             orderDate: donationDate,
-            notes: a.continueMonthly ? 'Cart item with monthly opt-in — match pending shipment' : 'Cart item — match pending shipment',
+            notes: `${session.metadata?.sold_in_person === 'true' ? '[Market — handed at booth] ' : ''}${a.continueMonthly ? 'Cart item with monthly opt-in — match pending shipment' : 'Cart item — match pending shipment'}`,
             // Idempotency: session + line-item index. Prevents Stripe
             // webhook retries from double-inserting the same cart row.
             stripeSessionId: session.id,
             itemIndex: i,
+            soldInPerson: session.metadata?.sold_in_person === 'true',
           });
         } catch (err: any) {
           console.error('[WH] Cart fulfillment record failed:', String(err?.message || err).slice(0, 200));
@@ -2806,9 +2823,10 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
           buyerEmail: email,
           address: address || null,
           orderDate: donationDate,
-          notes: 'Shirt + Monthly — match pending shipment',
+          notes: `${session.metadata?.sold_in_person === 'true' ? '[Market — handed at booth] ' : ''}Shirt + Monthly — match pending shipment`,
           stripeSessionId: session.id,
           itemIndex: 0,
+          soldInPerson: session.metadata?.sold_in_person === 'true',
         });
       } catch (err: any) {
         console.error('[WH] Fulfillment record failed (shirt+monthly):', String(err?.message || err).slice(0, 200));
@@ -2967,8 +2985,10 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
           buyerEmail: email,
           address: address || null,
           orderDate: donationDate,
+          notes: session.metadata?.sold_in_person === 'true' ? '[Market — handed at booth]' : undefined,
           stripeSessionId: session.id,
           itemIndex: 0,
+          soldInPerson: session.metadata?.sold_in_person === 'true',
         });
       } catch (err: any) {
         console.error('[WH] Fulfillment record failed (shirt-only):', String(err?.message || err).slice(0, 200));

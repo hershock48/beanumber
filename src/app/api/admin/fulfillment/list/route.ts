@@ -36,7 +36,11 @@ export async function GET(request: NextRequest) {
     status === 'unshipped'
       ? eq(fulfillments.shipping, 'Not Shipped')
       : status === 'shipped'
-        ? eq(fulfillments.shipping, 'Shipped')
+        ? // 'Handed in Person' = market-booth sales (2026-07-19). The
+          // buyer left with the shirt, so they belong with fulfilled
+          // orders, never in the To Ship queue. The dashboard tags
+          // them "In person" so they read distinctly from mailed ones.
+          inArray(fulfillments.shipping, ['Shipped', 'Handed in Person'])
         : undefined;
 
   const rows = where
