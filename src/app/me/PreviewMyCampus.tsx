@@ -83,18 +83,22 @@ export function PreviewMyCampus({
           shop if you don't). */}
       <section className="bg-[#f5efe4] border border-[#e8e0d4] px-6 md:px-8 py-6 md:py-7 mb-12 md:mb-14 flex flex-col md:flex-row md:items-center md:justify-between gap-5">
         <div>
+          {/* "Sign in" alone implies an account was created somewhere —
+              but a shirt buyer never signed up for anything. Same fix
+              as the kid page: name what actually happens. The email
+              they bought with IS the account; first time counts. */}
           <p className="text-xs font-bold uppercase tracking-[0.25em] text-[#0d0d0d] mb-1">
-            Not signed in yet
+            Have a shirt already?
           </p>
           <p className="text-[#555] leading-relaxed">
-            Already own a Number?{' '}
+            The email you bought with is your key — no password, no
+            account to create.{' '}
             <Link
               href="/signin"
               className="font-bold text-[#0d0d0d] hover:text-[#D4A843] underline underline-offset-4"
             >
-              Sign in
-            </Link>{' '}
-            to see your kids.
+              Open your campus &rarr;
+            </Link>
           </p>
         </div>
         <Link
