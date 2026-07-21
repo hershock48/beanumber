@@ -401,7 +401,7 @@ export async function sendNote(
 export interface CampusFeedItem {
   id: string;
   publishedAt: string;
-  kind: 'update' | 'sotm' | 'milestone' | 'campusPost';
+  kind: 'update' | 'sotm' | 'milestone' | 'campusPost' | 'newsletter';
   title: string;
   body?: string;
   photoUrl?: string;

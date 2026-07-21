@@ -18,6 +18,7 @@ import { requireMobileAuth } from '@/lib/auth';
 import {
   getCampusFeedUpdates,
   getCampusFeedSotm,
+  getRecentCampusNewsletters,
 } from '@/lib/db/queries';
 import { gradeLabelForSponsor, isGradeCode } from '@/lib/grades';
 
@@ -31,7 +32,8 @@ export type MobileCampusFeedKind =
   | 'update'
   | 'sotm'
   | 'milestone'
-  | 'campusPost';
+  | 'campusPost'
+  | 'newsletter';
 
 export interface MobileCampusFeedItem {
   id: string;
@@ -53,7 +55,20 @@ async function handler(request: NextRequest): Promise<NextResponse> {
   const path = '/api/mobile/v1/campus/feed';
   logger.apiRequest(method, path);
 
-  await requireMobileAuth(request);
+  // Auth is OPTIONAL. The feed must never be blank — a first-open
+  // Home that says "nothing here yet" is the app apologizing on
+  // arrival. Signed-in viewers get the full mix; anonymous viewers
+  // get only the public-safe kinds (newsletters + SOTM — both
+  // already public on the website). Per-kid personal updates stay
+  // behind sign-in: those are sponsor-facing content about minors
+  // and don't belong on an unauthenticated endpoint.
+  let signedIn = false;
+  try {
+    await requireMobileAuth(request);
+    signedIn = true;
+  } catch {
+    signedIn = false;
+  }
 
   const url = new URL(request.url);
   const rawLimit = parseInt(url.searchParams.get('limit') ?? '', 10);
@@ -68,15 +83,41 @@ async function handler(request: NextRequest): Promise<NextResponse> {
     if (!isNaN(d.getTime())) before = d;
   }
 
-  // Pull `limit` from each source, then merge-sort in memory. Because
-  // both streams are already ordered desc, the merge is O(limit) and
+  // Pull `limit` from each source, then merge-sort in memory. All
+  // streams are already ordered desc, so the merge is O(limit) and
   // the paginate-boundary reasoning stays clean.
-  const [updates, sotms] = await Promise.all([
-    getCampusFeedUpdates({ limit, before }),
+  //
+  // Newsletters are the floor of this feed: BAN has published issues
+  // from day one, so even a brand-new viewer with no kid updates or
+  // SOTM awards in the window sees a real, warm feed — never the
+  // empty state. They're filtered by the `before` cursor in memory
+  // (the query has no cursor param; the volume is a handful of rows).
+  const [updates, sotms, newsletters] = await Promise.all([
+    signedIn
+      ? getCampusFeedUpdates({ limit, before })
+      : Promise.resolve([]),
     getCampusFeedSotm({ limit, before }),
+    getRecentCampusNewsletters(limit),
   ]);
 
   const items: MobileCampusFeedItem[] = [];
+  for (const n of newsletters) {
+    if (!n.publishedAt) continue;
+    const publishedAt = new Date(n.publishedAt);
+    if (isNaN(publishedAt.getTime())) continue;
+    if (before && publishedAt >= before) continue;
+    items.push({
+      id: `newsletter:${n.id}`,
+      publishedAt: publishedAt.toISOString(),
+      kind: 'newsletter',
+      title: n.title || 'A letter from the campus',
+      // The subject line doubles as the teaser — it's written to make
+      // someone open the issue, which is exactly this card's job.
+      body: n.subject || '',
+      photoUrl: n.heroPhotoUrl ?? null,
+      kidRef: null,
+    });
+  }
   for (const u of updates) {
     const photos = u.photoUrls ?? [];
     const title =

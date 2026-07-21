@@ -71,6 +71,14 @@ export default function SponsorHome() {
     if (k.status === 'fulfilled') setKids(k.value);
     if (f.status === 'fulfilled') setFeed(f.value.items);
     if (n.status === 'fulfilled') setNewsletter(n.value);
+    // The newest newsletter gets its own "The latest letter" section
+    // below — drop it from the feed so it doesn't appear twice on
+    // one screen. Older issues stay in the feed.
+    if (f.status === 'fulfilled' && n.status === 'fulfilled' && n.value) {
+      setFeed(
+        f.value.items.filter(it => it.id !== `newsletter:${n.value!.id}`)
+      );
+    }
     if (e.status === 'fulfilled') setExplore(e.value);
     // Real name from the server (donor record / checkout name) — never
     // derived from the email local-part. Null greets namelessly.
@@ -244,8 +252,11 @@ export default function SponsorHome() {
             {loading && feed.length === 0 ? (
               <FeedSkeleton />
             ) : feed.length === 0 ? (
+              // With newsletters folded into the feed this state
+              // should be near-unreachable — but if it ever renders,
+              // point at something real instead of apologizing.
               <Text variant="bodySmall" color="umber">
-                Nothing from the campus yet. New updates land here.
+                The latest letter from the campus is just below.
               </Text>
             ) : (
               feed.map((item, i) => (
@@ -270,12 +281,20 @@ export default function SponsorHome() {
                       })
                     }
                     onCardPress={
-                      item.kidRef
+                      item.kind === 'newsletter'
                         ? () =>
                             router.push(
-                              `/children/${item.kidRef!.shirtNumber}`
+                              `/newsletter/${item.id.replace(
+                                'newsletter:',
+                                ''
+                              )}`
                             )
-                        : undefined
+                        : item.kidRef
+                          ? () =>
+                              router.push(
+                                `/children/${item.kidRef!.shirtNumber}`
+                              )
+                          : undefined
                     }
                   />
                 </View>

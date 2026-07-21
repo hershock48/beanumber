@@ -48,12 +48,18 @@ export async function POST(request: NextRequest) {
   // production for Expo Go test drives, this keeps the door from
   // being an any-account backdoor: without the allowlist, anyone who
   // found the endpoint could mint a session for any sponsor's email.
-  // Unset/empty → nobody gets in (fail closed, same 404 as disabled).
+  // The founder's email is always allowed (so a mis-set env var can't
+  // lock Kevin out of his own test drive); beyond that, unset/empty →
+  // nobody gets in (fail closed, same 404 as disabled).
   const allowed = (process.env.MOBILE_DEV_AUTH_EMAILS || '')
     .split(',')
     .map(e => e.trim().toLowerCase())
     .filter(Boolean);
+  allowed.push('kevin@beanumber.org');
   if (!allowed.includes(email)) {
+    logger.warn('[mobile-auth/dev] dev sign-in refused (not allowlisted)', {
+      email,
+    });
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
 
