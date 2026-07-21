@@ -46,10 +46,18 @@ export function FeedCard({
             source={{ uri: photoUrl }}
             style={{
               width: '100%',
-              aspectRatio: 16 / 9,
+              // 4:3, not 16:9 — most campus photos are portrait kid
+              // shots, and a 16:9 crop guillotines them at the
+              // eyebrows. 4:3 keeps head and shoulders; landscape
+              // shots lose a little off the sides instead, which
+              // nobody notices.
+              aspectRatio: 4 / 3,
               backgroundColor: COLORS.sand,
             }}
             contentFit="cover"
+            // Faces live in the top third of a photo. When the crop
+            // has to throw something away, throw away the bottom.
+            contentPosition="top"
             transition={200}
           />
         </Pressable>

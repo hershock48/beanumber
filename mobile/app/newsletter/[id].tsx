@@ -101,6 +101,7 @@ export default function NewsletterView() {
                   backgroundColor: COLORS.sand,
                 }}
                 contentFit="cover"
+                contentPosition="top"
                 transition={300}
               />
             ) : null}
@@ -211,6 +212,7 @@ function BodyHtmlBlocks({ html }: { html: string }) {
               marginVertical: SPACING.m,
             }}
             contentFit="cover"
+            contentPosition="top"
             transition={200}
           />
         );

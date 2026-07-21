@@ -195,6 +195,7 @@ function MonthlyRow({
             source={{ uri: kid.photoUrl }}
             style={{ width: '100%', height: '100%' }}
             contentFit="cover"
+          contentPosition="top"
           />
         ) : null}
       </View>
@@ -265,6 +266,7 @@ function HolderRow({
               source={{ uri: kid.photoUrl }}
               style={{ width: '100%', height: '100%' }}
               contentFit="cover"
+            contentPosition="top"
             />
           ) : null}
         </View>

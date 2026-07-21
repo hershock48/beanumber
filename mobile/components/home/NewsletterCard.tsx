@@ -39,6 +39,7 @@ export function NewsletterCard({ title, teaser, heroPhotoUrl, onPress }: Props) 
             backgroundColor: COLORS.sand,
           }}
           contentFit="cover"
+          contentPosition="top"
           transition={300}
         />
       ) : null}

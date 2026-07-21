@@ -83,6 +83,7 @@ export function LatestUpdateSection({
                     backgroundColor: COLORS.sand,
                   }}
                   contentFit="cover"
+                  contentPosition="top"
                   transition={200}
                 />
               </Pressable>

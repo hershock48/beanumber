@@ -79,6 +79,7 @@ export function KidCard({
             source={{ uri: photoUrl }}
             style={{ width: '100%', height: '100%' }}
             contentFit="cover"
+            contentPosition="top"
             transition={200}
           />
         ) : null}

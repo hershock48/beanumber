@@ -126,6 +126,7 @@ function UpdateCard({ update }: { update: KidUpdate }) {
               backgroundColor: COLORS.sand,
             }}
             contentFit="cover"
+            contentPosition="top"
             transition={200}
             onError={() => {}}
           />
