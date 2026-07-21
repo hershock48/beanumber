@@ -15,7 +15,10 @@
  *   Continue with Google → cream + ink outline, per the design
  *                          system.
  *
- * "No passwords. Nothing to remember." at the bottom.
+ * The slogan at the bottom — "Every Number is a child." The footer of
+ * the first screen anyone sees is brand real estate, not a place for
+ * password mechanics (the Apple/Google buttons already say
+ * passwordless without saying it).
  *
  * On success, `useAuth` state updates → the tabs guard sees
  * isSignedIn === true → sign-in screen unmounts and the user lands
@@ -250,7 +253,7 @@ export default function SignInScreen() {
           align="center"
           style={styles.footer}
         >
-          No passwords. Nothing to remember.
+          Every Number is a child.
         </Text>
       </View>
     </SafeAreaView>
