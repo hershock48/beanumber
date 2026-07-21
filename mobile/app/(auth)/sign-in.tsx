@@ -15,7 +15,7 @@
  *   Continue with Google → cream + ink outline, per the design
  *                          system.
  *
- * The slogan at the bottom — "Every Number is a child." The footer of
+ * The slogan at the bottom — "Every Number is a Child." The footer of
  * the first screen anyone sees is brand real estate, not a place for
  * password mechanics (the Apple/Google buttons already say
  * passwordless without saying it).
@@ -253,7 +253,7 @@ export default function SignInScreen() {
           align="center"
           style={styles.footer}
         >
-          Every Number is a child.
+          Every Number is a Child.
         </Text>
       </View>
     </SafeAreaView>
