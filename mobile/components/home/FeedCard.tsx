@@ -12,6 +12,8 @@ import { COLORS, SPACING } from '../../lib/theme';
 import { Text } from '../design/Text';
 import { Card } from '../design/Card';
 import { formatRelative } from '../kids/LatestUpdateSection';
+import { isVideoUrl } from '../../lib/media';
+import { FeedVideo } from './FeedVideo';
 
 interface Props {
   publishedAt: string;
@@ -37,7 +39,11 @@ export function FeedCard({
       onPress={onCardPress}
       style={{ overflow: 'hidden' }}
     >
-      {photoUrl ? (
+      {photoUrl && isVideoUrl(photoUrl) ? (
+        // Campus video — autoplays muted, tap for sound. FeedVideo
+        // owns the tap, so no photo-viewer navigation on videos.
+        <FeedVideo uri={photoUrl} />
+      ) : photoUrl ? (
         <Pressable
           onPress={() => photoUrl && onPhotoPress?.(photoUrl)}
           accessibilityRole="image"

@@ -39,6 +39,7 @@ import {
 } from '@expo-google-fonts/inter';
 import { COLORS, TEXT_STYLES } from '../lib/theme';
 import { AuthProvider } from '../hooks/useAuth';
+import { AppErrorBoundary } from '../components/design/ErrorBoundary';
 import { usePushDeepLinks } from '../hooks/usePushDeepLinks';
 import { useWebDeepLinks } from '../hooks/useWebDeepLinks';
 import { useDeferredLink } from '../hooks/useDeferredLink';
@@ -101,6 +102,7 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
+        <AppErrorBoundary>
         <AuthProvider>
           <PushDeepLinkBridge />
           <WebDeepLinkBridge />
@@ -174,6 +176,7 @@ export default function RootLayout() {
             />
           </Stack>
         </AuthProvider>
+        </AppErrorBoundary>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

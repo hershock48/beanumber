@@ -15,6 +15,8 @@ import { Text } from '../../../components/design/Text';
 import { Card } from '../../../components/design/Card';
 import { Skeleton } from '../../../components/design/Skeleton';
 import { formatRelative } from '../../../components/kids/LatestUpdateSection';
+import { isVideoUrl } from '../../../lib/media';
+import { FeedVideo } from '../../../components/home/FeedVideo';
 import {
   getKidUpdates,
   getMobileKid,
@@ -112,7 +114,9 @@ function UpdateCard({ update }: { update: KidUpdate }) {
   };
   return (
     <Card variant="large" padded={false} style={{ overflow: 'hidden' }}>
-      {update.photoUrl ? (
+      {update.photoUrl && isVideoUrl(update.photoUrl) ? (
+        <FeedVideo uri={update.photoUrl} aspectRatio={3 / 2} />
+      ) : update.photoUrl ? (
         <Pressable
           onPress={openPhoto}
           accessibilityRole="image"

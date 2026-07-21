@@ -36,23 +36,73 @@
           "action": "VIEW",
           "autoVerify": true,
           "data": [
-            { "scheme": "https", "host": "beanumber.org", "pathPrefix": "/meet" },
-            { "scheme": "https", "host": "beanumber.org", "pathPrefix": "/children" },
-            { "scheme": "https", "host": "beanumber.org", "pathPrefix": "/newsletter" },
-            { "scheme": "https", "host": "beanumber.org", "pathPrefix": "/campus" },
-            { "scheme": "https", "host": "beanumber.org", "pathPrefix": "/me" },
-            { "scheme": "https", "host": "www.beanumber.org", "pathPrefix": "/meet" },
-            { "scheme": "https", "host": "www.beanumber.org", "pathPrefix": "/children" },
-            { "scheme": "https", "host": "www.beanumber.org", "pathPrefix": "/newsletter" },
-            { "scheme": "https", "host": "www.beanumber.org", "pathPrefix": "/campus" },
-            { "scheme": "https", "host": "www.beanumber.org", "pathPrefix": "/me" }
+            {
+              "scheme": "https",
+              "host": "beanumber.org",
+              "pathPrefix": "/meet"
+            },
+            {
+              "scheme": "https",
+              "host": "beanumber.org",
+              "pathPrefix": "/children"
+            },
+            {
+              "scheme": "https",
+              "host": "beanumber.org",
+              "pathPrefix": "/newsletter"
+            },
+            {
+              "scheme": "https",
+              "host": "beanumber.org",
+              "pathPrefix": "/campus"
+            },
+            {
+              "scheme": "https",
+              "host": "beanumber.org",
+              "pathPrefix": "/me"
+            },
+            {
+              "scheme": "https",
+              "host": "www.beanumber.org",
+              "pathPrefix": "/meet"
+            },
+            {
+              "scheme": "https",
+              "host": "www.beanumber.org",
+              "pathPrefix": "/children"
+            },
+            {
+              "scheme": "https",
+              "host": "www.beanumber.org",
+              "pathPrefix": "/newsletter"
+            },
+            {
+              "scheme": "https",
+              "host": "www.beanumber.org",
+              "pathPrefix": "/campus"
+            },
+            {
+              "scheme": "https",
+              "host": "www.beanumber.org",
+              "pathPrefix": "/me"
+            }
           ],
-          "category": ["BROWSABLE", "DEFAULT"]
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
         },
         {
           "action": "VIEW",
-          "data": [{ "scheme": "beanumber" }],
-          "category": ["BROWSABLE", "DEFAULT"]
+          "data": [
+            {
+              "scheme": "beanumber"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
         }
       ]
     },
@@ -79,7 +129,8 @@
           "icon": "./assets/notification-icon.png",
           "color": "#D4A843"
         }
-      ]
+      ],
+      "expo-video"
     ]
   }
 }

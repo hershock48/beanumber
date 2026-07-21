@@ -207,10 +207,10 @@ export interface MobileKidBio {
   fullName?: string;
   ageYears?: number | null;
   gradeLabel?: string;
-  favoriteClass?: string;
-  wantsToBe?: string;
+  loves?: string | null;
   family?: string;
   homeVillage?: string;
+  nameMeaning?: string | null;
   sponsoredSince?: string;
 }
 
@@ -238,6 +238,10 @@ export interface MobileKidDetail {
   gradeLabel?: string | null;
   intro?: string | null;
   bio: MobileKidBio;
+  /** The kid's own words — rendered as a pull-quote. */
+  childQuote?: string | null;
+  /** The teacher's line about this kid, with attribution. */
+  teacherQuote?: { text: string; name: string | null } | null;
   viewer: MobileKidViewer;
   location?: string;
   coSponsors?: string[]; // first names only

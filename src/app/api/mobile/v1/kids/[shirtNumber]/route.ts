@@ -50,10 +50,12 @@ export interface MobileKidBio {
   fullName: string;
   ageYears: number | null;
   gradeLabel: string | null;
-  favoriteClass: string | null;
-  wantsToBe: string | null;
+  /** What the kid loves — rendered as its own labeled row. */
+  loves: string | null;
   family: string | null;
   homeVillage: string | null;
+  /** e.g. "Ojok means 'born with God's blessing'". Story, not trivia. */
+  nameMeaning: string | null;
   sponsoredSince: string | null;
 }
 
@@ -95,6 +97,10 @@ export interface MobileKidResponse {
    *  "loves" field. Null when we don't have one. */
   intro: string | null;
   bio: MobileKidBio;
+  /** The kid's own words — pull-quote treatment on the client. */
+  childQuote: string | null;
+  /** The teacher's line about this kid, with attribution. */
+  teacherQuote: { text: string; name: string | null } | null;
   viewer: MobileKidViewer;
 }
 
@@ -144,12 +150,14 @@ async function handler(
         fullName: '',
         ageYears: null,
         gradeLabel: null,
-        favoriteClass: null,
-        wantsToBe: null,
+        loves: null,
         family: null,
         homeVillage: null,
+        nameMeaning: null,
         sponsoredSince: null,
       },
+      childQuote: null,
+      teacherQuote: null,
       viewer: {
         roleForKid: 'anonymous',
         canReadNotes: false,
@@ -262,15 +270,10 @@ async function handler(
       `${child.firstName ?? 'Child'} ${child.lastInitial ?? ''}`.trim(),
     ageYears,
     gradeLabel,
-    // The current schema doesn't carry "favorite class" or "wants to be"
-    // as their own columns — the loves + childQuote fields cover that
-    // territory. We surface loves as favoriteClass and childQuote as
-    // wantsToBe so the mobile UI has predictable slots to render; when
-    // dedicated columns land they slot in cleanly.
-    favoriteClass: child.loves ?? null,
-    wantsToBe: child.childQuote ?? null,
+    loves: child.loves ?? null,
     family: child.familyContext ?? null,
     homeVillage: child.homeVillage ?? null,
+    nameMeaning: child.nameMeaning ?? null,
     sponsoredSince: sponsoredSince
       ? new Date(sponsoredSince).toISOString()
       : null,
@@ -289,6 +292,18 @@ async function handler(
     gradeLabel,
     intro: introFor(identity.firstName, child.loves ?? null),
     bio,
+    // The kid's own words + the teacher's — the strongest narrative
+    // assets in the database, previously mislabeled into bio rows
+    // ("Wants to be: <a quote>"). Now first-class so the client can
+    // give them pull-quote treatment. Null-safe: most kids don't have
+    // them yet, and empty is correct, not broken.
+    childQuote: child.childQuote?.trim() || null,
+    teacherQuote: child.teacherQuote?.trim()
+      ? {
+          text: child.teacherQuote.trim(),
+          name: child.teacherName?.trim() || null,
+        }
+      : null,
     viewer: {
       roleForKid,
       canReadNotes,

@@ -14,10 +14,10 @@ export interface BioData {
   fullName?: string;
   ageYears?: number | null;
   gradeLabel?: string;
-  favoriteClass?: string;
-  wantsToBe?: string;
+  loves?: string | null;
   family?: string;
   homeVillage?: string;
+  nameMeaning?: string | null;
   sponsoredSince?: string; // ISO date
 }
 
@@ -29,10 +29,10 @@ const LABELS: Record<keyof BioData, string> = {
   fullName: 'Full name',
   ageYears: 'Age',
   gradeLabel: 'Grade',
-  favoriteClass: 'Favorite class',
-  wantsToBe: 'Wants to be',
+  loves: 'Loves',
   family: 'Family',
   homeVillage: 'Home village',
+  nameMeaning: 'Their name means',
   sponsoredSince: 'Since',
 };
 
@@ -40,10 +40,10 @@ const ORDER: (keyof BioData)[] = [
   'fullName',
   'ageYears',
   'gradeLabel',
-  'favoriteClass',
-  'wantsToBe',
+  'loves',
   'family',
   'homeVillage',
+  'nameMeaning',
   'sponsoredSince',
 ];
 

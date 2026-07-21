@@ -335,12 +335,10 @@ export default function KidPage() {
           </Text>
         </View>
 
-        {/* The kid's own words, when we have a real sentence of them.
-            A bio table row labeled "Wants to be" buries the single
-            most human artifact on the page; a pull-quote honors it.
-            Short phrase-length values ("pilot") stay in the bio table
-            where the label gives them grammar. */}
-        {kid.bio.wantsToBe && kid.bio.wantsToBe.trim().length > 15 ? (
+        {/* The kid's own words. The single most human artifact on the
+            page — the API now sends it as a first-class childQuote
+            (it used to hide in the bio table as "Wants to be"). */}
+        {kid.childQuote ? (
           <View
             style={{ paddingHorizontal: SPACING.l, marginTop: SPACING.l }}
           >
@@ -353,7 +351,7 @@ export default function KidPage() {
                 fontStyle: 'italic',
               }}
             >
-              “{kid.bio.wantsToBe.trim().replace(/^["“]|["”]$/g, '')}”
+              “{kid.childQuote.replace(/^["“]|["”]$/g, '')}”
             </Text>
             <Text
               variant="caption"
@@ -361,6 +359,31 @@ export default function KidPage() {
               style={{ marginTop: SPACING.xs }}
             >
               — {kid.firstName}
+            </Text>
+          </View>
+        ) : null}
+
+        {/* The teacher's line — the adult in the room who actually
+            knows this kid, on the record. Smaller than the kid's own
+            quote; attribution carries the credibility. */}
+        {kid.teacherQuote?.text ? (
+          <View
+            style={{ paddingHorizontal: SPACING.l, marginTop: SPACING.l }}
+          >
+            <Text
+              variant="body"
+              color="ink"
+              style={{ fontStyle: 'italic' }}
+            >
+              “{kid.teacherQuote.text.replace(/^["“]|["”]$/g, '')}”
+            </Text>
+            <Text
+              variant="caption"
+              color="umber"
+              style={{ marginTop: SPACING.xs }}
+            >
+              — {kid.teacherQuote.name || 'Their teacher'}
+              {kid.teacherQuote.name ? ', their teacher' : ''}
             </Text>
           </View>
         ) : null}

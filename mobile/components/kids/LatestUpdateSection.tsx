@@ -14,6 +14,8 @@ import { Image } from 'expo-image';
 import { COLORS, RADIUS, SPACING, TEXT_STYLES } from '../../lib/theme';
 import { Text } from '../design/Text';
 import { Card } from '../design/Card';
+import { isVideoUrl } from '../../lib/media';
+import { FeedVideo } from '../home/FeedVideo';
 
 interface UpdateShape {
   publishedAt: string; // ISO
@@ -67,7 +69,9 @@ export function LatestUpdateSection({
             padded={false}
             style={{ marginTop: SPACING.m, overflow: 'hidden' }}
           >
-            {update.photoUrl ? (
+            {update.photoUrl && isVideoUrl(update.photoUrl) ? (
+              <FeedVideo uri={update.photoUrl} aspectRatio={3 / 2} />
+            ) : update.photoUrl ? (
               <Pressable
                 onPress={() =>
                   update.photoUrl && onPhotoPress?.(update.photoUrl)
