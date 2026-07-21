@@ -19,6 +19,7 @@ import {
   getCampusFeedUpdates,
   getCampusFeedSotm,
   getRecentCampusNewsletters,
+  getRecentlyJoinedChildren,
 } from '@/lib/db/queries';
 import { gradeLabelForSponsor, isGradeCode } from '@/lib/grades';
 
@@ -27,6 +28,17 @@ export const revalidate = 0;
 
 const DEFAULT_LIMIT = 10;
 const MAX_LIMIT = 40;
+
+/**
+ * "{Name} just joined the campus" cards only fire for kids created
+ * AFTER this date. The 2026-06-22 Postgres migration stamped the whole
+ * pre-existing roster with one created_at; without this cutoff, day
+ * one of the feed would announce 50 simultaneous arrivals.
+ */
+const JOINED_CUTOFF = new Date('2026-07-01T00:00:00Z');
+
+/** A new kid stays "new" in the feed this long. */
+const JOINED_WINDOW_DAYS = 45;
 
 export type MobileCampusFeedKind =
   | 'update'
@@ -92,12 +104,25 @@ async function handler(request: NextRequest): Promise<NextResponse> {
   // SOTM awards in the window sees a real, warm feed — never the
   // empty state. They're filtered by the `before` cursor in memory
   // (the query has no cursor param; the volume is a handful of rows).
-  const [updates, sotms, newsletters] = await Promise.all([
+  // New-arrival window: newer than the migration cutoff AND within
+  // the last 45 days, so a kid added in August isn't still "new" at
+  // Christmas.
+  const windowStart = new Date(
+    Date.now() - JOINED_WINDOW_DAYS * 24 * 3600 * 1000
+  );
+  const joinedAfter = windowStart > JOINED_CUTOFF ? windowStart : JOINED_CUTOFF;
+
+  const [updates, sotms, newsletters, arrivals] = await Promise.all([
     signedIn
       ? getCampusFeedUpdates({ limit, before })
       : Promise.resolve([]),
     getCampusFeedSotm({ limit, before }),
     getRecentCampusNewsletters(limit),
+    // Public-safe (same standard as SOTM — name + photo are already
+    // on the website's /meet pages), so anonymous viewers get these
+    // too. A new arrival is the warmest thing a first-open feed can
+    // show.
+    getRecentlyJoinedChildren({ joinedAfter, limit, before }),
   ]);
 
   const items: MobileCampusFeedItem[] = [];
@@ -145,6 +170,27 @@ async function handler(request: NextRequest): Promise<NextResponse> {
               shirtNumber: u.childShirtNumber,
             }
           : null,
+    });
+  }
+  for (const a of arrivals) {
+    const first =
+      a.firstName || a.displayName?.split(' ')[0] || null;
+    if (!first || typeof a.shirtNumber !== 'number') continue;
+    // Body leads with something true and specific about the kid —
+    // never a generic welcome. Loves first, village second.
+    const detail = a.loves
+      ? `${first} loves ${a.loves.replace(/^loves\s+/i, '').replace(/\.$/, '')}.`
+      : a.homeVillage
+        ? `${first} comes from ${a.homeVillage}.`
+        : `Say hi when you get a chance.`;
+    items.push({
+      id: `joined:${a.id}`,
+      publishedAt: new Date(a.createdAt).toISOString(),
+      kind: 'milestone',
+      title: `${first} just joined the campus`,
+      body: detail,
+      photoUrl: a.profilePhotoUrl ?? null,
+      kidRef: { firstName: first, shirtNumber: a.shirtNumber },
     });
   }
   for (const s of sotms) {

@@ -79,6 +79,59 @@ export async function getChildByChildId(childIdLegacy: string) {
  * with a profile photo (homepage carousel only shows photo-having
  * kids; /me digest does too).
  */
+/**
+ * Kids who recently arrived at the campus — the mobile feed's
+ * "{Name} just joined" moment (Fahlo's new-animal-tagged play, but
+ * ours is a real arrival).
+ *
+ * `joinedAfter` exists because the 2026-06-22 Postgres migration
+ * stamped every pre-existing kid with the same created_at; without a
+ * post-migration cutoff the whole roster would read as "just joined."
+ * Callers pass a cutoff after that date and the stream stays empty
+ * until a genuinely new kid is added — then the card appears on its
+ * own, no admin step.
+ *
+ * Public-safe by the same standard as SOTM: name + photo are already
+ * public on the website's /meet pages. Only visible, photographed,
+ * non-reserved kids qualify — a faceless "say hi" card defeats the
+ * point.
+ */
+export async function getRecentlyJoinedChildren(opts: {
+  joinedAfter: Date;
+  limit: number;
+  before?: Date | null;
+}) {
+  const conditions = [
+    or(
+      eq(children.status, 'Active'),
+      eq(children.status, 'active'),
+      eq(children.status, 'New')
+    ),
+    sql`${children.departedAt} IS NULL`,
+    sql`${children.reservedForAuction} IS NOT TRUE`,
+    isNotNull(children.profilePhotoUrl),
+    sql`${children.createdAt} > ${opts.joinedAfter}`,
+  ];
+  if (opts.before) {
+    conditions.push(sql`${children.createdAt} < ${opts.before}`);
+  }
+  return db
+    .select({
+      id: children.id,
+      firstName: children.firstName,
+      displayName: children.displayName,
+      shirtNumber: children.shirtNumber,
+      profilePhotoUrl: children.profilePhotoUrl,
+      loves: children.loves,
+      homeVillage: children.homeVillage,
+      createdAt: children.createdAt,
+    })
+    .from(children)
+    .where(and(...conditions))
+    .orderBy(desc(children.createdAt))
+    .limit(opts.limit);
+}
+
 export async function listAllChildren(
   opts: { onlyWithPhoto?: boolean } = {}
 ) {
