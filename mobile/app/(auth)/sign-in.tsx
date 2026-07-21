@@ -143,6 +143,30 @@ export default function SignInScreen() {
     }
   };
 
+  // Blank test account — a viewer with NO sponsorships and NO claims,
+  // for testing the brand-new-user experience (empty Home, first
+  // claim, first letter). The email is date-stamped so each new day
+  // starts clean, while re-taps within a day land on the same account
+  // (so a claim made at 10am is still there at 2pm when testing the
+  // next step of the flow). Server-side, dev-*@beanumber.org matches
+  // the dev allowlist pattern.
+  const handleDevBlank = async () => {
+    setBusyProvider('dev');
+    try {
+      const d = new Date();
+      const stamp = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(
+        2,
+        '0'
+      )}${String(d.getDate()).padStart(2, '0')}`;
+      await signInAsDev(`dev-${stamp}@beanumber.org`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Dev sign-in failed.';
+      Alert.alert('Dev sign-in failed', msg);
+    } finally {
+      setBusyProvider(null);
+    }
+  };
+
   // The promise, in order: meet them → the number becomes YOURS →
   // the letter that came with the shirt is ready to send. Kevin's
   // test-drive note (2026-07-18): it wasn't clear that signing in IS
@@ -243,6 +267,26 @@ export default function SignInScreen() {
                   Dev sign-in ({DEV_AUTH_EMAIL})
                 </Text>
               )}
+            </Pressable>
+          ) : null}
+
+          {DEV_AUTH_ENABLED ? (
+            <Pressable
+              onPress={handleDevBlank}
+              disabled={isLoading || busyProvider !== null}
+              style={({ pressed }) => [
+                styles.devButton,
+                pressed && { opacity: 0.6 },
+                (isLoading || busyProvider !== null) && { opacity: 0.4 },
+              ]}
+            >
+              <Text
+                variant="caption"
+                color="umber"
+                style={{ fontFamily: 'Inter_500Medium' }}
+              >
+                Dev sign-in (blank account — no kids yet)
+              </Text>
             </Pressable>
           ) : null}
         </View>

@@ -56,7 +56,13 @@ export async function POST(request: NextRequest) {
     .map(e => e.trim().toLowerCase())
     .filter(Boolean);
   allowed.push('kevin@beanumber.org');
-  if (!allowed.includes(email)) {
+  // dev-*@beanumber.org — the blank test accounts the sign-in
+  // screen's "blank account" button mints (date-stamped, e.g.
+  // dev-20260721@). Own-domain only, so this can never resolve to a
+  // real sponsor's identity; the whole dev route still vanishes with
+  // MOBILE_DEV_AUTH before App Store submission.
+  const isBlankTestAccount = /^dev-[a-z0-9.-]+@beanumber\.org$/.test(email);
+  if (!allowed.includes(email) && !isBlankTestAccount) {
     logger.warn('[mobile-auth/dev] dev sign-in refused (not allowlisted)', {
       email,
     });
