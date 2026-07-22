@@ -159,8 +159,22 @@
     <text x="46" y="84" font-family="Helvetica Neue, Arial, sans-serif" font-size="8.8" fill="#000000" text-anchor="middle" dominant-baseline="central" font-weight="800">E</text>
     <text x="84" y="84" font-family="Helvetica Neue, Arial, sans-serif" font-size="8.8" fill="#000000" text-anchor="middle" dominant-baseline="central" font-weight="800">R</text>
   </g>
-  <text x="315.0" y="566" text-anchor="middle"
+  <text x="205" y="566" text-anchor="middle"
         font-family="'Helvetica Neue', Arial, sans-serif"
-        font-weight="500" font-size="42" letter-spacing="14"
-        fill="#000000">ORDER <tspan font-family="'DejaVu Sans Mono', 'Liberation Mono', 'Courier New', monospace" font-weight="700">#</tspan></text>
+        font-weight="500" font-size="42" fill="#000000">O</text>
+  <text x="249" y="566" text-anchor="middle"
+        font-family="'Helvetica Neue', Arial, sans-serif"
+        font-weight="500" font-size="42" fill="#000000">R</text>
+  <text x="293" y="566" text-anchor="middle"
+        font-family="'Helvetica Neue', Arial, sans-serif"
+        font-weight="500" font-size="42" fill="#000000">D</text>
+  <text x="337" y="566" text-anchor="middle"
+        font-family="'Helvetica Neue', Arial, sans-serif"
+        font-weight="500" font-size="42" fill="#000000">E</text>
+  <text x="381" y="566" text-anchor="middle"
+        font-family="'Helvetica Neue', Arial, sans-serif"
+        font-weight="500" font-size="42" fill="#000000">R</text>
+  <text x="425" y="566" text-anchor="middle"
+        font-family="'Helvetica Neue', Arial, sans-serif"
+        font-weight="700" font-size="42" fill="#000000">#</text>
 </svg>
