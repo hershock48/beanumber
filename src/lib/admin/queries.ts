@@ -109,21 +109,17 @@ export interface ShirtsToShipCard {
 
 export async function getShirtsToShipCard(): Promise<ShirtsToShipCard> {
   try {
-    // Anything with no tracking number AND not yet shipped is fair
-    // game for the queue — same inclusive rule as the Airtable
-    // formula `AND({Tracking}="", {Shipping}!="Shipped")`.
+    // Same rule as the fulfillment queue (/api/admin/fulfillment/list
+    // status=unshipped): only 'Not Shipped' rows. The card's older
+    // "no tracking and not Shipped" rule silently swept in market-
+    // booth sales ('Handed in Person', 2026-07-19) — those have no
+    // tracking number because the buyer walked away with the shirt,
+    // and the dashboard said "11 to ship" while the queue correctly
+    // showed 2. One rule, one truth.
     const rows = await db
       .select({ id: fulfillments.id })
       .from(fulfillments)
-      .where(
-        and(
-          or(isNull(fulfillments.tracking), eq(fulfillments.tracking, '')),
-          or(
-            isNull(fulfillments.shipping),
-            sql`${fulfillments.shipping} <> 'Shipped'`
-          )
-        )
-      )
+      .where(eq(fulfillments.shipping, 'Not Shipped'))
       .limit(500);
     return { ok: true, count: rows.length };
   } catch (err) {
