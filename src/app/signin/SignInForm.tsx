@@ -37,6 +37,13 @@ export function SignInForm() {
   // pass error=expired or error=unavailable.
   const reason = params.get('reason') || undefined;
   const errorParam = params.get('error') || undefined;
+  // ?intent=sponsor — the visitor tapped "Sponsor {kid} — $25/month"
+  // on a kid page while anonymous. The magic-link round trip carries
+  // the intent so the callback can land them back on the kid page
+  // with checkout starting, not just signed in and hunting for the
+  // button they already pressed. This is the main conversion funnel
+  // (Kevin, 2026-08-02).
+  const sponsorIntent = params.get('intent') === 'sponsor';
 
   // Pre-fill shirt number from ?n= if the page was opened from /[N].
   useEffect(() => {
@@ -76,7 +83,11 @@ export function SignInForm() {
       const res = await fetch('/api/sponsor/recover/send-link', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(n ? { email, shirtNumber: n } : { email }),
+        body: JSON.stringify({
+          email,
+          ...(n ? { shirtNumber: n } : {}),
+          ...(sponsorIntent ? { intent: 'sponsor' } : {}),
+        }),
       });
       const data = await res.json().catch(() => null);
       if (!res.ok) {
@@ -122,7 +133,11 @@ export function SignInForm() {
       await fetch('/api/sponsor/recover/send-link', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(n ? { email, shirtNumber: n } : { email }),
+        body: JSON.stringify({
+          email,
+          ...(n ? { shirtNumber: n } : {}),
+          ...(sponsorIntent ? { intent: 'sponsor' } : {}),
+        }),
       });
     } catch {
       // Silent — the cooldown UI is the only thing that needs to
@@ -232,6 +247,15 @@ export function SignInForm() {
     headline = 'Make your Number yours.';
     body =
       "Enter your email and we'll send a one-tap link — that's the whole thing. No password, no account to create. If you've never been here before, this is how you start; if you have, it signs you back in.";
+  }
+
+  // Sponsor intent: they pressed the $25/mo button on the kid page.
+  // Same one-tap mechanic, but the copy promises the destination —
+  // tap the link, land at checkout. No detours described, none taken.
+  if (sponsorIntent && arrivedWithNumber) {
+    headline = 'One tap, then checkout.';
+    body =
+      "Enter your email and we'll send a one-tap link. Tapping it connects your Number to your email and takes you straight to the $25/month checkout. No password, no account to create.";
   }
 
   if (reason === 'your-kids') {

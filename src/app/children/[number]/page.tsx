@@ -35,6 +35,7 @@ import { ClaimThisNumberCard } from './ClaimThisNumberCard';
 // above the campus newsfeed: $25/mo ask for signed-in non-sponsors,
 // quiet "you're already in this" acknowledgment for sponsors.
 import { RelationshipCard } from './RelationshipCard';
+import { SponsorIntentRunner } from './SponsorIntentRunner';
 import { ClaimGate } from './ClaimGate';
 import { LocationBlock } from './LocationBlock';
 import { kidPresenceLine } from '@/lib/campus-time';
@@ -1563,6 +1564,27 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
           </svg>
           {backTarget.label}
         </Link>
+
+        {/* ── Sponsor-intent runner ───────────────────────────────
+            Completes the anon "$25/mo button → magic link → Stripe"
+            funnel: when the URL carries ?intent=sponsor (appended by
+            the recover callback), this client component auto-POSTs
+            create-sponsor-checkout and redirects. Mounted only for
+            signed-in viewers who are NOT already this kid's sponsor;
+            renders nothing without the intent param. */}
+        {!child.departed_at &&
+          child.viewer_signed_in &&
+          !child.viewer_is_sponsor &&
+          child.correspondence_record_id &&
+          child.child_id && (
+            <SponsorIntentRunner
+              firstName={firstName}
+              shirtNumber={Number(number)}
+              childRecordId={child.correspondence_record_id}
+              childId={child.child_id}
+              childDisplayName={displayName}
+            />
+          )}
 
         {/* ── Viewer-state strip ──────────────────────────────────
             Kevin's 2026-07-08 placement: this used to live below the

@@ -73,6 +73,14 @@ const schema = z.object({
   // frictionless for returning sponsors who don't have their shirt
   // number handy on a new device.
   shirtNumber: z.number().int().positive().optional(),
+  // 'sponsor' when the visitor pressed the $25/mo button on a kid
+  // page while anonymous. Carried onto the callback URL (as a plain
+  // query param — it's routing sugar, not an entitlement; the
+  // checkout API still enforces its own session gate) so the click
+  // lands them back on the kid page with checkout auto-starting
+  // instead of signed in and hunting for the button they already
+  // pressed. Main conversion funnel (Kevin, 2026-08-02).
+  intent: z.enum(['sponsor']).optional(),
 });
 
 // In-memory throttle: one link per (lowercased email) per 20 seconds.
@@ -127,6 +135,10 @@ export async function POST(request: NextRequest) {
     // an email with a trailing space is a different SMTP address.
     const email = parsed.data.email.trim();
     const shirtNumber = parsed.data.shirtNumber;
+    // Appended to callback URLs below; '' when absent so template
+    // strings stay clean.
+    const intentSuffix =
+      parsed.data.intent === 'sponsor' ? '&intent=sponsor' : '';
     console.log(
       `[Recovery] request: email=<${email}> shirtNumber=${shirtNumber ?? 'none'}`
     );
@@ -201,7 +213,7 @@ export async function POST(request: NextRequest) {
       try {
         // token is now guaranteed set above; keeping try/catch below
         // for the send + HTML build.
-        const callbackUrl = `${SITE_URL}/api/sponsor/recover/callback?t=${encodeURIComponent(token)}`;
+        const callbackUrl = `${SITE_URL}/api/sponsor/recover/callback?t=${encodeURIComponent(token)}${intentSuffix}`;
         // Use the same FROM address the working transactional emails
         // (shirt-order confirmations, sponsor welcome, etc.) use. The
         // previous hardcoded fallback of 'Kevin@beanumber.org' meant
@@ -472,7 +484,7 @@ export async function POST(request: NextRequest) {
       );
       return NextResponse.json(responseShape);
     }
-    const callbackUrl = `${SITE_URL}/api/sponsor/recover/callback?t=${encodeURIComponent(token)}`;
+    const callbackUrl = `${SITE_URL}/api/sponsor/recover/callback?t=${encodeURIComponent(token)}${intentSuffix}`;
 
     // Same FROM alignment as the email-only branch above — one source
     // of truth via getEmailConfig(), matching the transactional paths

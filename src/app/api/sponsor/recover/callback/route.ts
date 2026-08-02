@@ -83,7 +83,16 @@ export async function GET(request: NextRequest) {
   if (!shirtNumber || shirtNumber <= 0) {
     return NextResponse.redirect(`${SITE_URL}/me?welcome=1`);
   }
+  // ?intent=sponsor rode the magic link from the kid page's "$25/mo"
+  // button (send-link appends it to the callback URL). Pass it
+  // through so the kid page auto-starts checkout — the person
+  // pressed a sponsor button, opened an email, and tapped; the next
+  // thing they should see is Stripe, not a page to re-navigate.
+  // Plain routing sugar: checkout still enforces its own session
+  // gate, and a forged intent param can't charge anyone anything.
+  const intent = request.nextUrl.searchParams.get('intent');
+  const intentSuffix = intent === 'sponsor' ? '&intent=sponsor' : '';
   return NextResponse.redirect(
-    `${SITE_URL}/children/${shirtNumber}?just_signed_in=1`
+    `${SITE_URL}/children/${shirtNumber}?just_signed_in=1${intentSuffix}`
   );
 }

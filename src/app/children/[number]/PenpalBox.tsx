@@ -432,41 +432,58 @@ export function PenpalBox({
               </p>
             )}
             {viewerState === 'anon' ? (
-              /* Anon variant, rebuilt 2026-07-16 per Kevin. The old
-                 secondary CTA said "Sponsor {firstName} — $25/month →
-                 we'll ship you a shirt with {firstName}'s number on
-                 the back," which is backwards: a new shirt carries
-                 whatever Number is next in the batch, not this kid's
-                 — this kid's Number is on the shirt the visitor is
-                 probably already holding. The realistic anon visitor
-                 bought a shirt, typed the number off the back, and
-                 landed here for the first time. So:
-                   - Primary: sign in to sponsor. Sign-in is the gate
-                     for everyone — it tells us whether they're a
-                     monthly sponsor (view comes back), a holder
-                     (one-tap upgrade takes over), or new (claim).
-                   - Secondary: /shirts for genuinely cold visitors,
-                     with honest copy about what a new shirt is. */
+              /* Anon variant, rebuilt again 2026-08-02 per Kevin:
+                 "i just searched my number — not signed in. and i
+                 dont see anywhere to sponsor my child. it is really
+                 our main conversion funnel." The 07-16 version led
+                 with "Sign in to write" — the free-letter door —
+                 which buried the $25/mo action the heading and pitch
+                 spend all their ink making the case for. Now:
+                   - PRIMARY: "Sponsor {kid} — $25/month" →
+                     /signin?n=N&intent=sponsor. Sign-in is still the
+                     mechanical gate (checkout is session-bound), but
+                     the button names the destination and the intent
+                     rides the magic link all the way to auto-started
+                     checkout (SponsorIntentRunner on return).
+                   - SECONDARY: "Sign in to write {kid}" — the
+                     free-letter door the shirt insert promised, kept
+                     for the holder who isn't deciding money today.
+                   - TERTIARY: /shirts for genuinely cold visitors,
+                     honest copy about what a new shirt is. */
               <div className="flex flex-col gap-3 items-center">
                 <Link
-                  href={anonCtaHref}
+                  href={`/signin?n=${shirtNumber}&intent=sponsor`}
                   className="inline-block w-full max-w-xs text-center bg-[#D4A843] text-[#0d0d0d] font-bold uppercase tracking-wider py-4 px-8 hover:bg-[#c49a3a] transition-colors"
+                >
+                  Sponsor {firstName} &mdash; $25/month
+                </Link>
+                <p className="text-xs text-[#888] leading-relaxed max-w-xs text-center">
+                  One tap: enter your email, open the link, land at
+                  checkout. Already sponsoring monthly? Same button
+                  signs you back in &mdash; nothing new gets charged.
+                </p>
+                <Link
+                  href={anonCtaHref}
+                  className="inline-block w-full max-w-xs text-center bg-white border-2 border-[#0d0d0d] text-[#0d0d0d] font-bold uppercase tracking-wider py-4 px-8 hover:bg-[#0d0d0d] hover:text-white transition-colors"
                 >
                   {anonCtaLabel}
                 </Link>
                 <p className="text-xs text-[#888] leading-relaxed max-w-xs text-center">
                   Got the shirt with #{shirtNumber}? Signing in makes
                   this page yours &mdash; and the letter included with
-                  your shirt is ready to send. Already sponsoring
-                  monthly? Your view comes right back, nothing new
-                  gets charged.
+                  your shirt is ready to send, sponsoring or not.
                 </p>
                 <p className="text-xs uppercase tracking-[0.15em] text-[#888] font-bold mt-2">
                   no shirt yet?
                 </p>
+                {/* Tertiary — plain link, not a third button. With
+                    the sponsor button gold and the write button
+                    outlined, a third boxed CTA read as a three-way
+                    tie; the cold-visitor path is real but least
+                    likely on a number page. */}
                 <Link
                   href="/shirts"
-                  className="inline-block w-full max-w-xs text-center bg-white border-2 border-[#0d0d0d] text-[#0d0d0d] font-bold uppercase tracking-wider py-4 px-8 hover:bg-[#0d0d0d] hover:text-white transition-colors"
+                  className="text-sm font-bold text-[#0d0d0d] underline underline-offset-4 hover:text-[#D4A843] transition-colors"
                 >
                   Start with a shirt
                 </Link>
