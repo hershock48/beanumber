@@ -153,6 +153,38 @@ export function PenpalBox({
           {sponsorPortal && viewerState === 'sponsor' ? (
             <div className="mt-10">{sponsorPortal}</div>
           ) : null}
+
+          {/* Holder using their included letter: the sponsorship ask
+              rides directly under the composer. Kevin's 2026-08-02
+              audit caught that this state — the single most
+              conversion-ready person on the site, signed in, at their
+              kid's page, free letter in hand — saw NO sponsor option
+              anywhere: this branch returned early and every ask lived
+              in the frosted preview it never reached. The composer
+              stays first (deliver the promised letter, don't gate it);
+              the ask sits right below, quiet but unmissable. */}
+          {isHolderFirstLetter && childRecordId && childId && childDisplayName ? (
+            <div className="mt-10 border-t border-[#e8d9c0] pt-8 text-center">
+              <p
+                className="text-xl md:text-2xl text-[#0d0d0d] mb-3 leading-tight"
+                style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
+              >
+                Make it monthly. You and {firstName} keep writing.
+              </p>
+              <p className="text-[15px] text-[#333] leading-relaxed mb-5 max-w-md mx-auto">
+                {VALUE_PROP}{' '}
+                <span className="font-bold text-[#0d0d0d]">$25/month.</span>{' '}
+                Cancel anytime.
+              </p>
+              <PenpalBoxSponsorCta
+                firstName={firstName}
+                childRecordId={childRecordId}
+                childId={childId}
+                childDisplayName={childDisplayName}
+                variant="holder"
+              />
+            </div>
+          ) : null}
         </div>
       </div>
     );

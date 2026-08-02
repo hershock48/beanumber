@@ -28,6 +28,13 @@ import {
 // into the viewer-state strip + /signin. File kept for reference.
 import { OtherKidsAtCampus } from './OtherKidsAtCampus';
 import { ClaimThisNumberCard } from './ClaimThisNumberCard';
+// RelationshipCard reinstated 2026-08-02 — the component was authored
+// as "the only ask the page makes" but fell out of the render tree in
+// the 2026-07-08 restructure, leaving signed-in holders with NO
+// sponsorship option anywhere on the page (Kevin's audit). It renders
+// above the campus newsfeed: $25/mo ask for signed-in non-sponsors,
+// quiet "you're already in this" acknowledgment for sponsors.
+import { RelationshipCard } from './RelationshipCard';
 import { ClaimGate } from './ClaimGate';
 import { LocationBlock } from './LocationBlock';
 import { kidPresenceLine } from '@/lib/campus-time';
@@ -2288,13 +2295,34 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
                   </div>
                 )} */}
 
-        {/* ── Public campus newsfeed ───────────────────────────────
-            Visible to anyone — sponsor or not. The ask block above
-            (right-column CTA: 'Stay with X' for non-sponsors,
-            'You're the sponsor' for sponsors) is the only ask the
-            page makes; the newsfeed stands on its own without a
-            second redundant card above it. Departed kids skip the
-            feed — their page is a memorial. */}
+        {/* ── Relationship card + public campus newsfeed ──────────
+            The card frames the read for signed-in viewers: sponsors
+            get the quiet "you're already in this with {firstName}"
+            acknowledgment (no CTA); signed-in non-sponsors — holders
+            and sponsors of other kids — get the page's direct $25/mo
+            ask with the Stripe button. Anon visitors skip the card
+            entirely: sponsorship is session-gated (non-negotiable #4)
+            and their path runs sign-in-first through the PenpalBox
+            and claim card. Departed kids skip both — memorial pages
+            make no asks. */}
+        {!child.departed_at &&
+          child.viewer_signed_in &&
+          child.correspondence_record_id &&
+          child.child_id && (
+            <div className="mt-12 md:mt-16">
+              <RelationshipCard
+                firstName={firstName}
+                shirtNumber={Number(number)}
+                viewerIsSponsor={!!child.viewer_is_sponsor}
+                childRecordId={child.correspondence_record_id}
+                childId={child.child_id}
+                displayName={displayName}
+                existingCustomerId={buyerHint?.customerId ?? undefined}
+                buyerEmail={buyerHint?.email ?? undefined}
+                viewerLooksLikeBuyer={viewerLooksLikeBuyer}
+              />
+            </div>
+          )}
         {!child.departed_at && recentNewsletters.length > 0 && (
           <div className="mt-12 md:mt-16">
             <CampusNewsfeed
@@ -2331,8 +2359,14 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
             personal-relationship-specific and reads better below.
             Departed kids skip: the relationship has a different
             frame there. */}
+        {/* Sponsors only (2026-08-02, Kevin): for an unconverted
+            holder, the ONLY purchase button on their kid's page was
+            "order another shirt" while sponsorship had no presence —
+            exactly backwards. Holders now get the sponsor ask (the
+            RelationshipCard above + PenpalBox upsell); the shirt
+            reorder is a perk that appears once they're monthly. */}
         {!child.departed_at &&
-          (child.viewer_is_sponsor || child.viewer_is_holder) &&
+          child.viewer_is_sponsor &&
           child.sponsor_code && (
             <ReorderShirtCard
               firstName={firstName}
