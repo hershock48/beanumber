@@ -4,6 +4,7 @@ import type Stripe from 'stripe';
 import { z } from 'zod';
 import { SESSION } from '@/lib/constants';
 import { getViewerEmail } from '@/lib/sponsor-relationship';
+import { resolveShirtNumberForClaim } from '@/lib/claim-resolve';
 
 /**
  * Gate per the Number-is-identity model: every sponsorship must
@@ -132,6 +133,32 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // When a shirtNumber rides the request, the SERVER resolves which
+    // kid it belongs to and overrides whatever the client sent —
+    // found in the 2026-08-02 double check: a hand-crafted POST with
+    // a fabricated childRecordId + any number produced a real Stripe
+    // session for a kid that doesn't exist. On the money path the
+    // browser doesn't get a vote on identity. This also upgrades
+    // cycle-number rows: the resolver hands back the canonical kid's
+    // real ids, so the webhook binds the sponsorship to the actual
+    // child row instead of a synthetic legacy id.
+    let effChildRecordId = childRecordId;
+    let effChildId = childId;
+    let effChildDisplayName = childDisplayName;
+    if (shirtNumber) {
+      const identity = await resolveShirtNumberForClaim(shirtNumber);
+      if (!identity || identity.reservedForAuction) {
+        return NextResponse.json(
+          { error: 'That Number isn’t in circulation.' },
+          { status: 400 }
+        );
+      }
+      effChildRecordId = identity.canonicalRow.id;
+      effChildId = identity.canonicalRow.childId ?? identity.childIdLegacy;
+      effChildDisplayName =
+        identity.displayName || identity.firstName || childDisplayName;
+    }
+
     // Attribution breadcrumb. When a sponsor arrives via the shirt success
     // page, we thread the original shirt checkout session id here so the
     // retention dashboard can tie the subscription back to the exact shirt
@@ -155,8 +182,8 @@ export async function POST(request: NextRequest) {
           price_data: {
             currency: 'usd',
             product_data: {
-              name: `Sponsor ${childDisplayName || 'a child'} / Be A Number`,
-              description: `Monthly sponsorship of ${childDisplayName || 'a child in Northern Uganda'}. Supports school, meals, medical care, and mentorship at the campus. Cancel anytime.`,
+              name: `Sponsor ${effChildDisplayName || 'a child'} / Be A Number`,
+              description: `Monthly sponsorship of ${effChildDisplayName || 'a child in Northern Uganda'}. Supports school, meals, medical care, and mentorship at the campus. Cancel anytime.`,
             },
             unit_amount: SPONSORSHIP_AMOUNT * 100,
             recurring: { interval: 'month' },
@@ -206,9 +233,9 @@ export async function POST(request: NextRequest) {
       ],
       metadata: {
         order_type: 'sponsorship',
-        child_record_id: childRecordId,
-        child_id: childId || '',
-        child_display_name: childDisplayName || '',
+        child_record_id: effChildRecordId,
+        child_id: effChildId || '',
+        child_display_name: effChildDisplayName || '',
         sponsor_name: name || '',
         donation_type: 'monthly',
         referring_shirt_session_id: shirtSessionRef,
@@ -219,9 +246,9 @@ export async function POST(request: NextRequest) {
       subscription_data: {
         metadata: {
           order_type: 'sponsorship',
-          child_record_id: childRecordId,
-          child_id: childId || '',
-          child_display_name: childDisplayName || '',
+          child_record_id: effChildRecordId,
+          child_id: effChildId || '',
+          child_display_name: effChildDisplayName || '',
           donation_type: 'monthly',
           amount: SPONSORSHIP_AMOUNT.toString(),
           referring_shirt_session_id: shirtSessionRef,
