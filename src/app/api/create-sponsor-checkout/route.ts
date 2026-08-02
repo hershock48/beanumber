@@ -3,6 +3,7 @@ import { cookies } from 'next/headers';
 import type Stripe from 'stripe';
 import { z } from 'zod';
 import { SESSION } from '@/lib/constants';
+import { getViewerEmail } from '@/lib/sponsor-relationship';
 
 /**
  * Gate per the Number-is-identity model: every sponsorship must
@@ -78,6 +79,21 @@ export async function POST(request: NextRequest) {
         .max(200)
         .regex(/^\/[^/\s][^\s]*$|^\/$/, 'returnPath must be an absolute same-origin path')
         .optional(),
+      // The shirt number of the /children/[N] page the sponsor button
+      // was pressed on. Two jobs (Kevin, 2026-08-02 — "cant we take
+      // them to the payment page and use the email they enter to
+      // claim the number?"):
+      //   1. AUTH: presence of a number-page context satisfies the
+      //      shirt-first rule for anonymous checkout — the visitor is
+      //      standing on a Number, which is the thing sponsorships
+      //      must trace to. Cold-direct (no session, no number) still
+      //      401s to /shirts.
+      //   2. CLAIM: rides checkout metadata; the Stripe webhook uses
+      //      the email the payer enters at checkout to claim this
+      //      number (guarded server-side against numbers already
+      //      claimed by a different email — those payers become
+      //      co-sponsors of the kid, and the number stays exclusive).
+      shirtNumber: z.number().int().positive().optional(),
     });
 
     const parsed = sponsorSchema.safeParse(await request.json());
@@ -87,29 +103,33 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-    const { childRecordId, childId, childDisplayName, email, name, referringShirtSessionId, existingCustomerId, buyerEmail, returnPath } = parsed.data;
+    const { childRecordId, childId, childDisplayName, email, name, referringShirtSessionId, existingCustomerId, buyerEmail, returnPath, shirtNumber } = parsed.data;
 
-    // Number-is-identity gate. Reject any sponsor-checkout request
-    // that doesn&rsquo;t come from a signed-in sponsor OR a fresh shirt
-    // buyer carrying the §2 one-tap conversion context. UI gating
-    // already steers the cold path to /shirts (see /meet/[id] cold
-    // branch), this is the API-level belt-and-suspenders so a
-    // hand-crafted POST can&rsquo;t create an orphan Sponsorship.
+    // Number-is-identity gate. A sponsor-checkout request must carry
+    // one of three proofs it traces to a Number:
+    //   (a) a signed-in sponsor session,
+    //   (b) the §2 one-tap shirt-buyer context, or
+    //   (c) a shirtNumber — the caller is a kid page /children/[N],
+    //       and the webhook will claim that number with the payer's
+    //       checkout email (Kevin's 2026-08-02 direct-pay funnel; the
+    //       page IS the number, so the trace-to-a-Number rule holds).
+    // Cold-direct with none of the three still 401s to /shirts.
     const oneTapContext =
       Boolean(existingCustomerId && existingCustomerId.startsWith('cus_')) &&
       Boolean(buyerEmail && buyerEmail.length > 0);
-    if (!oneTapContext) {
-      const signedIn = await hasSponsorSession();
-      if (!signedIn) {
-        return NextResponse.json(
-          {
-            error:
-              'Sponsorships must be attached to a Number. Get a Shirt or sign in with the email tied to your Number first.',
-            redirect: '/shirts',
-          },
-          { status: 401 }
-        );
-      }
+    // Signed-in viewer's email — also used below to lock Stripe's
+    // email field to the session identity, so the webhook files the
+    // sponsorship under the same email the site knows them by.
+    const sessionEmail = await getViewerEmail();
+    if (!oneTapContext && !sessionEmail && !shirtNumber) {
+      return NextResponse.json(
+        {
+          error:
+            'Sponsorships must be attached to a Number. Get a Shirt or sign in with the email tied to your Number first.',
+          redirect: '/shirts',
+        },
+        { status: 401 }
+      );
     }
 
     // Attribution breadcrumb. When a sponsor arrives via the shirt success
@@ -153,7 +173,16 @@ export async function POST(request: NextRequest) {
       cancel_url: `${origin}${returnPath || '/shirts'}`,
       ...(hasExistingCustomer
         ? { customer: existingCustomerId as string }
-        : { customer_email: email || buyerEmail || undefined }),
+        : {
+            // Signed-in viewers get their session email locked into
+            // Stripe (customer_email renders read-only) so the
+            // webhook can't file the sponsorship under a second
+            // identity. Anonymous number-page payers enter their
+            // email at Stripe — that entry IS their identity, and
+            // the webhook claims the number with it.
+            customer_email:
+              email || buyerEmail || sessionEmail || undefined,
+          }),
       billing_address_collection: 'required',
       custom_fields: [
         {
@@ -183,6 +212,9 @@ export async function POST(request: NextRequest) {
         sponsor_name: name || '',
         donation_type: 'monthly',
         referring_shirt_session_id: shirtSessionRef,
+        // Webhook claims this number with the payer's email (guarded
+        // against numbers already claimed by another email).
+        claim_shirt_number: shirtNumber ? String(shirtNumber) : '',
       },
       subscription_data: {
         metadata: {

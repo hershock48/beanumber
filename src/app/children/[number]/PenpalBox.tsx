@@ -451,16 +451,35 @@ export function PenpalBox({
                    - TERTIARY: /shirts for genuinely cold visitors,
                      honest copy about what a new shirt is. */
               <div className="flex flex-col gap-3 items-center">
-                <Link
-                  href={`/signin?n=${shirtNumber}&intent=sponsor`}
-                  className="inline-block w-full max-w-xs text-center bg-[#D4A843] text-[#0d0d0d] font-bold uppercase tracking-wider py-4 px-8 hover:bg-[#c49a3a] transition-colors"
-                >
-                  Sponsor {firstName} &mdash; $25/month
-                </Link>
+                {/* Direct to Stripe (Kevin, 2026-08-02): no sign-in
+                    before payment. The email entered at checkout
+                    becomes the claiming identity — the webhook stamps
+                    the number (or files a co-sponsor if the number's
+                    already held by a different email). */}
+                {childRecordId && childId && childDisplayName ? (
+                  <div className="w-full max-w-xs">
+                    <PenpalBoxSponsorCta
+                      firstName={firstName}
+                      childRecordId={childRecordId}
+                      childId={childId}
+                      childDisplayName={childDisplayName}
+                      variant="anon"
+                      shirtNumber={shirtNumber}
+                    />
+                  </div>
+                ) : (
+                  <Link
+                    href={`/signin?n=${shirtNumber}&intent=sponsor`}
+                    className="inline-block w-full max-w-xs text-center bg-[#D4A843] text-[#0d0d0d] font-bold uppercase tracking-wider py-4 px-8 hover:bg-[#c49a3a] transition-colors"
+                  >
+                    Sponsor {firstName} &mdash; $25/month
+                  </Link>
+                )}
                 <p className="text-xs text-[#888] leading-relaxed max-w-xs text-center">
-                  One tap: enter your email, open the link, land at
-                  checkout. Already sponsoring monthly? Same button
-                  signs you back in &mdash; nothing new gets charged.
+                  Straight to checkout &mdash; the email you enter
+                  there connects #{shirtNumber} to you. Already
+                  sponsoring monthly? Sign in below instead; nothing
+                  new gets charged.
                 </p>
                 <Link
                   href={anonCtaHref}

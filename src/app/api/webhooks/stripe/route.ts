@@ -16,6 +16,9 @@ import { db } from '@/lib/db/client';
 import { fulfillments } from '@/lib/db/schema';
 import { and, eq } from 'drizzle-orm';
 import { generateUniqueSponsorCode } from '@/lib/sponsor-codes';
+import { isNumberClaimedByOtherEmail } from '@/lib/db/queries';
+import { legacyIdForShirtNumber } from '@/lib/claim-resolve';
+import { CANONICAL_ROSTER_MAX } from '@/lib/roster-config';
 
 // Allow up to 60 seconds for the webhook handler. The default 10s on
 // Hobby plans is too tight — a shirt order does 8+ Airtable API calls,
@@ -1627,6 +1630,11 @@ async function createSponsorshipRecord(data: {
   // opened the shirt yet, and the reveal is supposed to be gated on
   // the physical moment.
   alreadyRevealed?: boolean;
+  // Direct-pay claim: stamp claimed_shirt_number on the new row. The
+  // caller has already verified the number isn't claimed by a
+  // different email. Null/undefined → no number claim (co-sponsor or
+  // legacy flows).
+  claimShirtNumber?: number | null;
 }): Promise<{ recordId: string; sponsorCode: string }> {
   const sponsorCode = await generateUniqueSponsorCode();
   const today = new Date().toISOString().split('T')[0];
@@ -1647,6 +1655,7 @@ async function createSponsorshipRecord(data: {
         stripeSubscriptionId: data.subscriptionId ?? null,
         sponsorshipStartDate: today,
         revealedNow: !!data.alreadyRevealed,
+        claimShirtNumber: data.claimShirtNumber ?? null,
       })
   );
   console.log('[WH] sponsorship mirrored to Postgres:', sponsorCode);
@@ -2673,6 +2682,47 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
         childRecordId: childRecordId || undefined,
       });
 
+      // Direct-pay claim (Kevin, 2026-08-02): when the checkout was
+      // started from a /children/[N] page by an anonymous visitor,
+      // claim_shirt_number rides the metadata and the email the payer
+      // entered at Stripe becomes the claiming identity — no sign-in
+      // round-trip before payment. Guard: a number already claimed by
+      // a DIFFERENT email is never stolen; the payer still becomes a
+      // full co-sponsor of the kid (numbers are exclusive,
+      // sponsorships are not). Cycle numbers (>53) pass their
+      // synthetic legacy id so co-sponsors of the canonical kid can't
+      // false-block the claim.
+      let claimShirtNumber: number | null = null;
+      const claimNumRaw = parseInt(
+        session.metadata?.claim_shirt_number || '',
+        10
+      );
+      if (Number.isFinite(claimNumRaw) && claimNumRaw > 0 && email) {
+        try {
+          const cycleLegacyId =
+            claimNumRaw > CANONICAL_ROSTER_MAX
+              ? legacyIdForShirtNumber(claimNumRaw)
+              : null;
+          const claimedByOther = await isNumberClaimedByOtherEmail(
+            claimNumRaw,
+            cycleLegacyId,
+            email
+          );
+          if (!claimedByOther) {
+            claimShirtNumber = claimNumRaw;
+          } else {
+            console.log(
+              `[WH] S3-claim: #${claimNumRaw} already claimed by another email — ${email} becomes co-sponsor, number untouched`
+            );
+          }
+        } catch (err) {
+          // Claim is best-effort — a lookup failure must never block
+          // the sponsorship itself. The number can be claimed later
+          // via the normal sign-in flow.
+          console.error('[WH] S3-claim guard failed (non-fatal):', err);
+        }
+      }
+
       // Step 3c: Create Sponsorship record (bidirectionally linked to Child)
       let sponsorCode = '';
       let sponsorshipRecordId = '';
@@ -2682,6 +2732,7 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
             childRecordId,
             childId: childId || '',
             childDisplayName,
+            claimShirtNumber,
             childAge: childFields.DateOfBirth ? undefined : childFields.GradeClass,
             childLocation,
             childPhoto,
@@ -2714,7 +2765,11 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
             childDisplayName,
             sponsorCode,
             amount,
-            shirtNumber: childShirtNumber,
+            // The number the sponsor actually holds: a cycle-number
+            // claim (#70) trumps the canonical kid's own number
+            // (#48) — the welcome email should name the number on
+            // their shirt, not the kid's roster number.
+            shirtNumber: claimShirtNumber ?? childShirtNumber,
           });
         }
       } catch (err) {

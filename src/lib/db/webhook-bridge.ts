@@ -176,6 +176,11 @@ export interface MirrorSponsorshipArgs {
   // the buyer already saw the kid on the page. Lockbox flow sets
   // false so the front-end can render the unboxing animation.
   revealedNow?: boolean;
+  // Direct-pay claim (2026-08-02): the shirt number this sponsorship
+  // claims, pre-verified by the caller as not claimed by another
+  // email. Stamped into claimed_shirt_number so per-number
+  // recognition works from the first page load after checkout.
+  claimShirtNumber?: number | null;
 }
 
 /**
@@ -241,6 +246,7 @@ export async function mirrorSponsorship(args: MirrorSponsorshipArgs) {
       stripeSubscriptionId: args.stripeSubscriptionId ?? null,
       sponsorshipStartDate: args.sponsorshipStartDate ?? null,
       childRevealedAt: args.revealedNow ? new Date() : null,
+      claimedShirtNumber: args.claimShirtNumber ?? null,
     });
   }
 
@@ -256,6 +262,7 @@ export async function mirrorSponsorship(args: MirrorSponsorshipArgs) {
     stripeSubscriptionId: args.stripeSubscriptionId ?? null,
     sponsorshipStartDate: args.sponsorshipStartDate ?? null,
     childRevealedAt: args.revealedNow ? new Date() : null,
+    claimedShirtNumber: args.claimShirtNumber ?? null,
   });
 }
 

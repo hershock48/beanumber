@@ -27,7 +27,15 @@ export interface PenpalBoxSponsorCtaProps {
   childId: string;
   childDisplayName: string;
   /** Copy variant. Determines the "too" suffix on the button label. */
-  variant: 'holder' | 'signed_in_visitor';
+  variant: 'holder' | 'signed_in_visitor' | 'anon';
+  /**
+   * The page's shirt number. When set, rides the checkout POST so an
+   * ANONYMOUS payer can start checkout (number-page context satisfies
+   * the shirt-first gate server-side) and the Stripe webhook claims
+   * this number with the email they enter at payment — Kevin's
+   * 2026-08-02 direct-pay funnel: no sign-in round-trip before money.
+   */
+  shirtNumber?: number;
 }
 
 export function PenpalBoxSponsorCta({
@@ -36,6 +44,7 @@ export function PenpalBoxSponsorCta({
   childId,
   childDisplayName,
   variant,
+  shirtNumber,
 }: PenpalBoxSponsorCtaProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -72,6 +81,12 @@ export function PenpalBoxSponsorCta({
           childRecordId,
           childId,
           childDisplayName,
+          ...(shirtNumber
+            ? {
+                shirtNumber,
+                returnPath: `/children/${shirtNumber}`,
+              }
+            : {}),
         }),
       });
       const data = await response.json().catch(() => ({}));
@@ -108,7 +123,9 @@ export function PenpalBoxSponsorCta({
         type="button"
         onClick={handleClick}
         disabled={loading}
-        className="inline-block bg-[#D4A843] text-[#0d0d0d] font-bold uppercase tracking-wider py-4 px-8 hover:bg-[#c49a3a] transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
+        className={`inline-block bg-[#D4A843] text-[#0d0d0d] font-bold uppercase tracking-wider py-4 px-8 hover:bg-[#c49a3a] transition-colors disabled:opacity-70 disabled:cursor-not-allowed${
+          variant === 'anon' ? ' w-full text-center' : ''
+        }`}
       >
         {label}
       </button>
