@@ -157,7 +157,12 @@ async function postAuth(
   }
   if (!res.ok) {
     const msg = json?.error || `Auth request failed (${res.status})`;
-    throw new Error(msg);
+    // Carry the HTTP status so callers can tell "server rejected the
+    // token" (sign the user out) from "network hiccup / 500" (keep
+    // the session and let the next attempt retry).
+    const err = new Error(msg) as Error & { status?: number };
+    err.status = res.status;
+    throw err;
   }
   return json;
 }
@@ -291,22 +296,44 @@ export async function signOut(): Promise<void> {
  * the current session is too far gone to refresh — in which case the
  * caller should surface a sign-in prompt.
  */
+// Single-flight guard. The kid page fires four requests in parallel
+// (kid, updates, timeline, thread); when the token has just expired
+// all four 401 at once and all four used to call refresh
+// concurrently — four redundant network calls, and worse: any ONE of
+// them failing transiently called clearSession() and nuked the
+// session a sibling call had just successfully refreshed, signing
+// the user out mid-scroll for no reason. Now the first caller does
+// the work and the other three await the same promise.
+let refreshInFlight: Promise<boolean> | null = null;
+
 export async function refreshToken(): Promise<boolean> {
-  const token = currentState.token;
-  if (!token) return false;
-  try {
-    const result = await postAuth(
-      '/api/mobile/v1/auth/refresh',
-      {},
-      { Authorization: `Bearer ${token}` }
-    );
-    await persistSession(result.accessToken, result.user);
-    return true;
-  } catch {
-    // Refresh failed — treat as signed out.
-    await clearSession();
-    return false;
-  }
+  if (refreshInFlight) return refreshInFlight;
+  refreshInFlight = (async () => {
+    const token = currentState.token;
+    if (!token) return false;
+    try {
+      const result = await postAuth(
+        '/api/mobile/v1/auth/refresh',
+        {},
+        { Authorization: `Bearer ${token}` }
+      );
+      await persistSession(result.accessToken, result.user);
+      return true;
+    } catch (err) {
+      // Only sign out when the SERVER rejected the token (401/403 —
+      // revoked, malformed, or past the refresh window). A network
+      // failure or a 5xx is not a verdict on the session: keep it,
+      // fail this request, and let the next attempt retry.
+      const status = (err as Error & { status?: number })?.status;
+      if (status === 401 || status === 403) {
+        await clearSession();
+      }
+      return false;
+    } finally {
+      refreshInFlight = null;
+    }
+  })();
+  return refreshInFlight;
 }
 
 // ─── Dev sign-in (Expo Go preview only) ───────────────────────────

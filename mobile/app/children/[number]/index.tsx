@@ -78,6 +78,8 @@ export default function KidPage() {
     }
   }, [router]);
 
+  const [loadFailed, setLoadFailed] = useState(false);
+
   const load = useCallback(async () => {
     if (!Number.isFinite(shirtNumber)) return;
     const [k, u, t, th] = await Promise.allSettled([
@@ -90,6 +92,11 @@ export default function KidPage() {
     if (u.status === 'fulfilled') setUpdates(u.value);
     if (t.status === 'fulfilled') setTimeline(t.value);
     if (th.status === 'fulfilled') setThread(th.value);
+    // The kid payload is the page — if it failed and we have nothing
+    // cached from a previous load, surface a retry instead of the
+    // skeleton-forever the old code showed on a dead connection.
+    // (Sections are individually optional; only the kid is fatal.)
+    setLoadFailed(k.status === 'rejected');
   }, [shirtNumber]);
 
   useEffect(() => {
@@ -159,6 +166,59 @@ export default function KidPage() {
     },
     [shirtNumber, kid?.firstName]
   );
+
+  if (!loading && !kid && loadFailed) {
+    // Dead connection or server error with nothing cached. The old
+    // behavior was skeleton-forever — a page pretending to load for
+    // the rest of time. Say what happened, offer one tap to retry.
+    return (
+      <SafeAreaView
+        style={{ flex: 1, backgroundColor: COLORS.cream }}
+        edges={['top', 'bottom']}
+      >
+        <BackChip onPress={goBackSafe} />
+        <View style={{ padding: SPACING.l, marginTop: SPACING.section }}>
+          <Text variant="h2" color="ink">
+            Couldn&rsquo;t reach the campus.
+          </Text>
+          <Text
+            variant="body"
+            color="umber"
+            style={{ marginTop: SPACING.s }}
+          >
+            Check your connection and try again — everything&rsquo;s
+            still there.
+          </Text>
+          <Pressable
+            onPress={() => {
+              setLoadFailed(false);
+              setLoading(true);
+              load().finally(() => setLoading(false));
+            }}
+            accessibilityRole="button"
+            style={{
+              marginTop: SPACING.l,
+              alignSelf: 'flex-start',
+              backgroundColor: COLORS.gold,
+              paddingVertical: SPACING.m,
+              paddingHorizontal: SPACING.xl,
+              borderRadius: RADIUS.pill,
+            }}
+          >
+            <Text
+              color="ink"
+              style={{
+                fontFamily: TEXT_STYLES.h3.fontFamily,
+                fontSize: 15,
+              }}
+            >
+              Try again
+            </Text>
+          </Pressable>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   if (loading || !kid) {
     return (
