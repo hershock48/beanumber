@@ -164,6 +164,47 @@ export function NotesThread({
               </Text>
             </Pressable>
           ) : null}
+
+          {/* The monthly ask, riding under the free-letter invitation.
+              Kevin's web audit (2026-08-02) found the holder with
+              their included letter — the most conversion-ready person
+              on the product — saw zero sponsor asks; the same gap
+              lived here. The letter invitation stays the star (the
+              shirt promised it; deliver before asking); the ask sits
+              below it, quiet but present. Mirrors the web kid page's
+              composer + "Make it monthly" ordering. */}
+          {freeLetterAvailable && onConvertPress ? (
+            <View
+              style={{
+                marginTop: SPACING.l,
+                borderTopWidth: 1,
+                borderTopColor: COLORS.divider,
+                paddingTop: SPACING.m,
+              }}
+            >
+              <Text variant="bodySmall" color="umber">
+                Want more than one letter? Monthly sponsors keep
+                writing — a penpal who writes back, monthly photos,
+                report cards, campus updates. $25/month. Cancel
+                anytime.
+              </Text>
+              <Pressable
+                onPress={onConvertPress}
+                style={{ marginTop: SPACING.m, alignSelf: 'flex-start' }}
+                accessibilityRole="button"
+              >
+                <Text
+                  color="ink"
+                  style={{
+                    fontFamily: TEXT_STYLES.textLink.fontFamily,
+                    fontSize: TEXT_STYLES.textLink.fontSize,
+                  }}
+                >
+                  Keep going with {kidFirstName} →
+                </Text>
+              </Pressable>
+            </View>
+          ) : null}
         </Card>
       ) : (
         <View style={{ marginTop: SPACING.m }}>
