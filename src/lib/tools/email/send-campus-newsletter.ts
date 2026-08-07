@@ -446,10 +446,16 @@ export async function sendCampusNewsletterTool(
   );
   const legacyMap = new Map<string, string>(); // legacy ChildID → UUID
   if (legacyToResolve.length > 0) {
+    // inArray, not `= ANY(${arr}::text[])` — drizzle's sql template
+    // expands a JS array into a parenthesized row constructor (a
+    // Postgres RECORD), and `record::text[]` is an invalid cast. This
+    // was the "cannot cast type record to text[]" 500 that killed
+    // every newsletter send (found 2026-08-07 debugging Kevin's
+    // failing test send).
     const rows = await db
       .select({ id: childrenTable.id, childId: childrenTable.childId })
       .from(childrenTable)
-      .where(sql`${childrenTable.childId} = ANY(${legacyToResolve}::text[])`);
+      .where(inArray(childrenTable.childId, legacyToResolve));
     for (const r of rows) {
       if (r.childId) legacyMap.set(r.childId, r.id);
     }
