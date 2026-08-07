@@ -400,6 +400,7 @@ export async function sendCampusNewsletterTool(
     sponsorCode: string;
     childId: string | null;
     childIdLegacy: string | null;
+    claimedShirtNumber: number | null;
   }>;
   try {
     sponsorRows = await db
@@ -410,6 +411,7 @@ export async function sendCampusNewsletterTool(
         sponsorCode: sponsorshipsTable.sponsorCode,
         childId: sponsorshipsTable.childId,
         childIdLegacy: sponsorshipsTable.childIdLegacy,
+        claimedShirtNumber: sponsorshipsTable.claimedShirtNumber,
       })
       .from(sponsorshipsTable)
       .where(
@@ -464,7 +466,19 @@ export async function sendCampusNewsletterTool(
   // Deduplicate by lowercased email AND collect every (sponsorCode,
   // child record UUID) pair each sponsor has — every link in the email
   // needs its kid-specific SponsorCode embedded.
-  type KidPair = { sponsorCode: string; childRecordId: string };
+  //
+  // claimedShirtNumber rides along because the email link MUST use the
+  // number the sponsor claimed (the one printed on their shirt), not
+  // the kid's canonical roster number. Cycle numbers (>53) resolve via
+  // Batches to a canonical kid whose roster shirt_number is DIFFERENT —
+  // linking by child.shirtNumber would send a #119 sponsor to
+  // /children/15, another holder's page (found 2026-08-07, Kevin
+  // caught it before the July send went out).
+  type KidPair = {
+    sponsorCode: string;
+    childRecordId: string;
+    claimedShirtNumber: number | null;
+  };
   type GroupedRecipient = {
     email: string;
     name: string;
@@ -481,17 +495,24 @@ export async function sendCampusNewsletterTool(
       (s.childIdLegacy ? legacyMap.get(s.childIdLegacy) : undefined) ||
       '';
     if (!childRecordId) continue;
-    const pair: KidPair = { sponsorCode, childRecordId };
+    const pair: KidPair = {
+      sponsorCode,
+      childRecordId,
+      claimedShirtNumber: s.claimedShirtNumber ?? null,
+    };
     const existing = byEmail.get(email);
     if (existing) {
-      if (
-        !existing.kidPairs.some(
-          q =>
-            q.childRecordId === pair.childRecordId &&
-            q.sponsorCode === pair.sponsorCode
-        )
-      ) {
+      const dup = existing.kidPairs.find(
+        q =>
+          q.childRecordId === pair.childRecordId &&
+          q.sponsorCode === pair.sponsorCode
+      );
+      if (!dup) {
         existing.kidPairs.push(pair);
+      } else if (dup.claimedShirtNumber == null && pair.claimedShirtNumber != null) {
+        // Same (code, kid) seen twice — keep the row that knows the
+        // claimed number.
+        dup.claimedShirtNumber = pair.claimedShirtNumber;
       }
     } else {
       byEmail.set(email, {
@@ -594,10 +615,13 @@ export async function sendCampusNewsletterTool(
       ? sponsorTemplate.kidPairs
           .map(p => {
             const child = childMap.get(p.childRecordId);
-            if (!child || typeof child.shirtNumber !== 'number') return null;
+            const linkNumber = p.claimedShirtNumber ?? child?.shirtNumber;
+            if (!child || typeof linkNumber !== 'number') return null;
             return {
               firstName: child.firstName,
-              shirtNumber: child.shirtNumber as number,
+              // The sponsor's claimed number (their shirt), falling
+              // back to the roster number for pre-claim-column rows.
+              shirtNumber: linkNumber,
               sponsorCode: p.sponsorCode,
             };
           })
@@ -719,10 +743,13 @@ export async function sendCampusNewsletterTool(
     const kids = r.kidPairs
       .map(p => {
         const child = childMap.get(p.childRecordId);
-        if (!child || typeof child.shirtNumber !== 'number') return null;
+        const linkNumber = p.claimedShirtNumber ?? child?.shirtNumber;
+        if (!child || typeof linkNumber !== 'number') return null;
         return {
           firstName: child.firstName,
-          shirtNumber: child.shirtNumber as number,
+          // The sponsor's claimed number (their shirt), falling back
+          // to the roster number for pre-claim-column rows.
+          shirtNumber: linkNumber,
           sponsorCode: p.sponsorCode,
         };
       })
