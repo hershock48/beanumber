@@ -522,6 +522,34 @@ export async function sendCampusNewsletterTool(
       });
     }
   }
+  // One link per relationship. A sponsor can hold several rows for
+  // the SAME kid — the $0 claim row (which knows claimed_shirt_number)
+  // plus one or more $25/mo conversion rows keyed by child link only.
+  // Without this pass those render as multiple links with two
+  // different numbers for one kid (e.g. /119 from the claim row and
+  // /15 from the conversion row — the canonical number, which belongs
+  // to a different holder's shirt). Rule: for each kid, claimed-number
+  // pairs win; claimed-null pairs only survive when the kid has no
+  // claimed pair at all; identical (kid, number) pairs collapse to one
+  // link. Distinct claimed numbers for one kid (two shirts, same
+  // canonical kid) each keep their link.
+  for (const rec of byEmail.values()) {
+    const kidsWithClaim = new Set(
+      rec.kidPairs
+        .filter(p => p.claimedShirtNumber != null)
+        .map(p => p.childRecordId)
+    );
+    const seen = new Set<string>();
+    rec.kidPairs = rec.kidPairs.filter(p => {
+      if (p.claimedShirtNumber == null && kidsWithClaim.has(p.childRecordId)) {
+        return false;
+      }
+      const key = `${p.childRecordId}|${p.claimedShirtNumber ?? 'canonical'}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }
   const candidateRecipients = Array.from(byEmail.values());
 
   // 3b. Opt-out gate. Intentionally a no-op today, matching the
