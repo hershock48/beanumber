@@ -102,6 +102,21 @@ const nextConfig: NextConfig = {
     // Modern formats first; Next.js will fall back to the original
     // if the browser doesn't accept these.
     formats: ['image/avif', 'image/webp'],
+    // Hold optimized variants for a year instead of the 60-second
+    // default. Without this the optimizer re-fetches the ORIGINAL
+    // from Supabase Storage every minute per (image, width, format)
+    // combination — 55 roster photos at ~550KB across several device
+    // widths and two formats is thousands of full-size origin pulls a
+    // day for traffic that should cost one pull per photo. That
+    // amplification is what exhausted the 5GB cached-egress quota on
+    // 2026-08-07 and returned 402 for every photo on the site, the
+    // app, and the admin panel.
+    //
+    // Safe because every storage path is immutable by construction:
+    // uploadAttachment writes `<kind>/<scope>/<timestamp>-<file>`, so
+    // replacing a kid's photo produces a NEW URL rather than new bytes
+    // at an old one. Nothing can go stale at a path we reuse.
+    minimumCacheTTL: 31536000,
   },
   poweredByHeader: false,
 };

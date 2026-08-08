@@ -77,6 +77,17 @@ export async function uploadAttachment(
   const { error } = await client.storage.from(bucket).upload(path, buffer, {
     contentType: input.contentType,
     upsert: false,
+    // Supabase defaults uploads to max-age=3600, so every browser,
+    // CDN node, and React Native image cache re-pulls the full-size
+    // original once an hour, forever. With ~55 roster photos served
+    // to a mobile grid that renders all of them, that default is what
+    // burned through the 5GB cached-egress quota and took every photo
+    // on the site down with a 402 (2026-08-07).
+    //
+    // A year + immutable is correct here rather than merely tolerable:
+    // the path carries a timestamp, so these exact bytes never change.
+    // A replacement photo is a new path and a new URL.
+    cacheControl: '31536000, immutable',
   });
   if (error) {
     throw new Error(`Storage upload failed: ${error.message}`);
