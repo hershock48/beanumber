@@ -23,6 +23,7 @@ import {
   KidUpdate,
   MobileKidDetail,
 } from '../../../lib/api';
+import { sizedImage, IMG } from '../../../lib/images';
 
 export default function KidUpdatesList() {
   const params = useLocalSearchParams<{ number: string }>();
@@ -123,7 +124,7 @@ function UpdateCard({ update }: { update: KidUpdate }) {
           accessibilityLabel="Open photo"
         >
           <Image
-            source={{ uri: update.photoUrl }}
+            source={{ uri: sizedImage(update.photoUrl, IMG.feed) }}
             style={{
               width: '100%',
               aspectRatio: 3 / 2,

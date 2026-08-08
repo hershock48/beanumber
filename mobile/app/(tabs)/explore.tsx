@@ -40,6 +40,7 @@ import {
   MyKidRow,
   LatestNewsletter,
 } from '../../lib/api';
+import { sizedImage, IMG } from '../../lib/images';
 
 export default function CampusTab() {
   const router = useRouter();
@@ -334,7 +335,7 @@ function CampusTile({
       >
         {kid.photoUrl ? (
           <Image
-            source={{ uri: kid.photoUrl }}
+            source={{ uri: sizedImage(kid.photoUrl, IMG.card) }}
             style={{ width: '100%', height: '100%' }}
             contentFit="cover"
             transition={250}

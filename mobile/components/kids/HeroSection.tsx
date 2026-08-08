@@ -10,6 +10,7 @@ import { View, useWindowDimensions } from 'react-native';
 import { Image } from 'expo-image';
 import { COLORS, RADIUS, SPACING, TEXT_STYLES } from '../../lib/theme';
 import { Text } from '../design/Text';
+import { sizedImage, IMG } from '../../lib/images';
 
 interface Props {
   firstName: string;
@@ -46,7 +47,7 @@ export function HeroSection({
       >
         {photoUrl ? (
           <Image
-            source={{ uri: photoUrl }}
+            source={{ uri: sizedImage(photoUrl, IMG.hero) }}
             style={{ width: '100%', height: '100%' }}
             contentFit="cover"
             transition={300}

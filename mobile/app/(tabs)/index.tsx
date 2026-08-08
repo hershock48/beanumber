@@ -46,6 +46,7 @@ import {
   CampusFeedItem,
   LatestNewsletter,
 } from '../../lib/api';
+import { sizedImage, IMG } from '../../lib/images';
 
 export default function SponsorHome() {
   const router = useRouter();
@@ -350,7 +351,7 @@ export default function SponsorHome() {
                   >
                     {k.photoUrl ? (
                       <Image
-                        source={{ uri: k.photoUrl }}
+                        source={{ uri: sizedImage(k.photoUrl, IMG.portraitSmall) }}
                         style={{ width: '100%', height: '100%' }}
                         contentFit="cover"
                         contentPosition="top"

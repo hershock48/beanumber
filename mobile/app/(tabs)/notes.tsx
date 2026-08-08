@@ -31,6 +31,7 @@ import { Enter } from '../../components/design/Enter';
 import { sundayBatchLine } from '../../lib/campusTime';
 import { getMyKids, MyKidRow } from '../../lib/api';
 import { LinkEmailSheet } from '../../components/account/LinkEmailSheet';
+import { sizedImage, IMG } from '../../lib/images';
 
 export default function NotesTab() {
   const router = useRouter();
@@ -192,7 +193,7 @@ function MonthlyRow({
       >
         {kid.photoUrl ? (
           <Image
-            source={{ uri: kid.photoUrl }}
+            source={{ uri: sizedImage(kid.photoUrl, IMG.avatar) }}
             style={{ width: '100%', height: '100%' }}
             contentFit="cover"
           contentPosition="top"
@@ -263,7 +264,7 @@ function HolderRow({
         >
           {kid.photoUrl ? (
             <Image
-              source={{ uri: kid.photoUrl }}
+              source={{ uri: sizedImage(kid.photoUrl, IMG.avatar) }}
               style={{ width: '100%', height: '100%' }}
               contentFit="cover"
             contentPosition="top"

@@ -18,6 +18,7 @@ import { Text } from '../../components/design/Text';
 import { Button } from '../../components/design/Button';
 import { BackChip } from '../../components/design/BackChip';
 import { getMobileKid, MobileKidDetail, API_BASE_URL } from '../../lib/api';
+import { sizedImage, IMG } from '../../lib/images';
 
 export default function KeepGoingScreen() {
   const { number } = useLocalSearchParams<{ number: string }>();
@@ -85,7 +86,7 @@ export default function KeepGoingScreen() {
         >
           {kid?.photoUrl ? (
             <Image
-              source={{ uri: kid.photoUrl }}
+              source={{ uri: sizedImage(kid.photoUrl, IMG.portraitSmall) }}
               style={{ width: '100%', height: '100%' }}
               contentFit="cover"
               contentPosition="top"

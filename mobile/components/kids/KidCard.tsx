@@ -20,6 +20,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { COLORS, DOT_SIZE, ELEVATION, RADIUS, SPACING, TEXT_STYLES } from '../../lib/theme';
 import { Text } from '../design/Text';
+import { sizedImage, IMG } from '../../lib/images';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -76,7 +77,7 @@ export function KidCard({
       >
         {photoUrl ? (
           <Image
-            source={{ uri: photoUrl }}
+            source={{ uri: sizedImage(photoUrl, IMG.card) }}
             style={{ width: '100%', height: '100%' }}
             contentFit="cover"
             contentPosition="top"

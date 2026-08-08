@@ -16,6 +16,7 @@ import { Text } from '../design/Text';
 import { Card } from '../design/Card';
 import { isVideoUrl } from '../../lib/media';
 import { FeedVideo } from '../home/FeedVideo';
+import { sizedImage, IMG } from '../../lib/images';
 
 interface UpdateShape {
   publishedAt: string; // ISO
@@ -80,7 +81,7 @@ export function LatestUpdateSection({
                 accessibilityLabel={`Photo of ${kidFirstName}`}
               >
                 <Image
-                  source={{ uri: update.photoUrl }}
+                  source={{ uri: sizedImage(update.photoUrl, IMG.feed) }}
                   style={{
                     width: '100%',
                     aspectRatio: 3 / 2,

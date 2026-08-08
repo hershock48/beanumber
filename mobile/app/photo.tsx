@@ -36,6 +36,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { COLORS, SPACING } from '../lib/theme';
 import { Text } from '../components/design/Text';
+import { sizedImage, IMG } from '../lib/images';
 
 const MAX_SCALE = 4;
 const MIN_SCALE = 1;
@@ -203,7 +204,7 @@ export default function PhotoViewer() {
           ]}
         >
           <Image
-            source={{ uri: url }}
+            source={{ uri: sizedImage(url, IMG.zoomable) }}
             style={{ width: '100%', height: '100%' }}
             contentFit="contain"
             transition={200}

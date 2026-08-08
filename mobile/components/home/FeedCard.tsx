@@ -14,6 +14,7 @@ import { Card } from '../design/Card';
 import { formatRelative } from '../kids/LatestUpdateSection';
 import { isVideoUrl } from '../../lib/media';
 import { FeedVideo } from './FeedVideo';
+import { sizedImage, IMG } from '../../lib/images';
 
 interface Props {
   publishedAt: string;
@@ -49,7 +50,7 @@ export function FeedCard({
           accessibilityRole="image"
         >
           <Image
-            source={{ uri: photoUrl }}
+            source={{ uri: sizedImage(photoUrl, IMG.feed) }}
             style={{
               width: '100%',
               // 4:3, not 16:9 — most campus photos are portrait kid

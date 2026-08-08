@@ -38,6 +38,7 @@ import { COLORS, RADIUS, SPACING, TEXT_STYLES } from '../../lib/theme';
 import { Text } from '../design/Text';
 import { Button } from '../design/Button';
 import { Confetti } from './Confetti';
+import { sizedImage, IMG } from '../../lib/images';
 
 const SPRING = { damping: 22, mass: 1, stiffness: 180 } as const;
 
@@ -190,7 +191,7 @@ export function KidReveal({
       >
         {kid.photoUrl ? (
           <Image
-            source={{ uri: kid.photoUrl }}
+            source={{ uri: sizedImage(kid.photoUrl, IMG.hero) }}
             style={{ width: '100%', height: '100%' }}
             contentFit="cover"
             transition={200}

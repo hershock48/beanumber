@@ -23,6 +23,7 @@ import {
   LatestNewsletter,
   ApiError,
 } from '../../lib/api';
+import { sizedImage, IMG } from '../../lib/images';
 
 export default function NewsletterView() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -94,7 +95,7 @@ export default function NewsletterView() {
           <>
             {n.heroPhotoUrl ? (
               <Image
-                source={{ uri: n.heroPhotoUrl }}
+                source={{ uri: sizedImage(n.heroPhotoUrl, IMG.hero) }}
                 style={{
                   width: '100%',
                   aspectRatio: 16 / 9,
@@ -203,7 +204,7 @@ function BodyHtmlBlocks({ html }: { html: string }) {
         return (
           <Image
             key={i}
-            source={{ uri: el.src }}
+            source={{ uri: sizedImage(el.src, IMG.hero) }}
             style={{
               width: '100%',
               aspectRatio: 16 / 9,

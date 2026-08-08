@@ -13,6 +13,7 @@ import { Image } from 'expo-image';
 import { COLORS, SPACING, TEXT_STYLES } from '../../lib/theme';
 import { Text } from '../design/Text';
 import { Card } from '../design/Card';
+import { sizedImage, IMG } from '../../lib/images';
 
 interface Props {
   title: string;
@@ -32,7 +33,7 @@ export function NewsletterCard({ title, teaser, heroPhotoUrl, onPress }: Props) 
     >
       {heroPhotoUrl ? (
         <Image
-          source={{ uri: heroPhotoUrl }}
+          source={{ uri: sizedImage(heroPhotoUrl, IMG.cover) }}
           style={{
             width: '100%',
             aspectRatio: 16 / 9,
