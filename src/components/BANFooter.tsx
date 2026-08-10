@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { Logo } from '@/components/Logo';
 import { TextSizeToggle } from '@/components/TextSizeToggle';
-import GlazedCredit from '@/components/GlazedCredit';
+import GlazedPlate from '@/components/GlazedPlate';
 
 export function BANFooter() {
   return (
@@ -65,10 +65,12 @@ export function BANFooter() {
             <Link href="/privacy" className="hover:text-[#D4A843] transition-colors">Privacy</Link>
             <Link href="/terms" className="hover:text-[#D4A843] transition-colors">Terms</Link>
             <span>501(c)(3) &middot; EIN: 93-1948872</span>
-            <GlazedCredit line="Double Dipped by" />
           </div>
         </div>
       </div>
+
+      {/* Glazed Web signs off below the client's footer, not inside it. */}
+      <GlazedPlate line="Double Dipped by" />
     </footer>
   );
 }

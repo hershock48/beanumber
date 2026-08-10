@@ -2,7 +2,7 @@ import { Logo } from '@/components/Logo';
 import Link from 'next/link';
 import Image from 'next/image';
 import type { Metadata } from 'next';
-import GlazedCredit from '@/components/GlazedCredit';
+import GlazedPlate from '@/components/GlazedPlate';
 
 export const metadata: Metadata = {
   alternates: { canonical: '/governance' },
@@ -137,11 +137,12 @@ export default function Governance() {
       </main>
 
       {/* Footer */}
-      <footer className="py-16 px-6 bg-gray-50 border-t border-gray-200 mt-24">
-        <div className="max-w-6xl mx-auto flex flex-col items-center gap-3 text-center text-sm text-gray-500">
+      <footer className="bg-gray-50 border-t border-gray-200 mt-24">
+        <div className="max-w-6xl mx-auto px-6 pt-16 pb-10 text-center text-sm text-gray-500">
           <p>© {new Date().getFullYear()} Be A Number, International. All rights reserved.</p>
-          <GlazedCredit line="Double Dipped by" />
         </div>
+        {/* Glazed Web signs off below the page's footer, not inside it. */}
+        <GlazedPlate line="Double Dipped by" className="gw-plate--on-light" />
       </footer>
     </div>
   );
