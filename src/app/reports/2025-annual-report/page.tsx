@@ -131,7 +131,7 @@ export default function AnnualReport() {
       <footer className="py-16 px-6 bg-gray-50 border-t border-gray-200 mt-24">
         <div className="max-w-6xl mx-auto flex flex-col items-center gap-3 text-center text-sm text-gray-500">
           <p>© {new Date().getFullYear()} Be A Number, International. All rights reserved.</p>
-          <GlazedCredit line="Double dipped by" />
+          <GlazedCredit line="Double Dipped by" />
         </div>
       </footer>
     </div>

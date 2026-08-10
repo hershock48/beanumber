@@ -65,7 +65,7 @@ export function BANFooter() {
             <Link href="/privacy" className="hover:text-[#D4A843] transition-colors">Privacy</Link>
             <Link href="/terms" className="hover:text-[#D4A843] transition-colors">Terms</Link>
             <span>501(c)(3) &middot; EIN: 93-1948872</span>
-            <GlazedCredit line="Double dipped by" />
+            <GlazedCredit line="Double Dipped by" />
           </div>
         </div>
       </div>
