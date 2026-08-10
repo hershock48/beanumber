@@ -1,6 +1,7 @@
 import { Logo } from '@/components/Logo';
 import Link from 'next/link';
 import type { Metadata } from 'next';
+import GlazedCredit from '@/components/GlazedCredit';
 
 export const metadata: Metadata = {
   alternates: { canonical: '/contact' },
@@ -120,8 +121,9 @@ export default function Contact() {
 
       {/* Footer */}
       <footer className="py-16 px-6 bg-gray-50 border-t border-gray-200 mt-24">
-        <div className="max-w-6xl mx-auto text-center text-sm text-gray-500">
+        <div className="max-w-6xl mx-auto flex flex-col items-center gap-3 text-center text-sm text-gray-500">
           <p>© {new Date().getFullYear()} Be A Number, International. All rights reserved.</p>
+          <GlazedCredit line="Double dipped by" />
         </div>
       </footer>
     </div>

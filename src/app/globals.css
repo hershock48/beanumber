@@ -139,3 +139,60 @@ summary::marker {
   height: auto;
   margin: 1.25rem 0;
 }
+
+/* ───────────────────────────────────────────────────────────────────────────
+   Glazed Web studio credit — pairs with components/GlazedCredit.
+   Everything is scoped to .gw-credit. The words inherit the footer's own colour
+   and size; the mark carries Glazed's own palette, because it is a logo and a
+   logo does not take on the host's colours.
+   ─────────────────────────────────────────────────────────────────────────── */
+.gw-credit {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45em;
+  /* A credit that sets its own colour is a credit that stops matching the day
+     the footer changes. */
+  color: inherit;
+  text-decoration: none;
+}
+.gw-credit-name {
+  font-weight: 600;
+}
+.gw-credit:hover .gw-credit-name,
+.gw-credit:focus-visible .gw-credit-name {
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+.gw-credit-mark {
+  /* Sized in em so it tracks the text beside it rather than needing a number per
+     client. 2.15em against a 12px footer line is ~26px, which is where his real
+     mark reads: the hole lands at 4.7px and the disc at 19px. At 22px the hole
+     closes to 3px and it starts reading as a lollipop; at 30px+ it dominates the
+     bar. Measured across all five footers, not guessed. */
+  height: 2.15em;
+  width: auto;
+  flex: none;
+  /* This has to be here rather than only as the SVG attribute: the UA stylesheet
+     sets overflow:hidden on an outermost <svg>, and that beats a presentation
+     attribute. Without it the hover extension is clipped at the viewBox edge. */
+  overflow: visible;
+}
+.gw-credit-drips {
+  transform-box: fill-box;
+  /* Top centre of the drip group — where the glaze leaves the donut. Scaling from
+     anywhere else slides the drips off the donut instead of running them down. */
+  transform-origin: 50% 0%;
+  /* Resting is 1: the default state is his drawing at his lengths. */
+  transform: scaleY(1);
+  transition: transform 340ms cubic-bezier(0.34, 1.32, 0.5, 1);
+}
+.gw-credit:hover .gw-credit-drips,
+.gw-credit:focus-visible .gw-credit-drips {
+  transform: scaleY(1.22);
+}
+@media (prefers-reduced-motion: reduce) {
+  /* Nothing to suppress — there is no autoplay. The hover just stops easing. */
+  .gw-credit-drips {
+    transition-duration: 0s;
+  }
+}
