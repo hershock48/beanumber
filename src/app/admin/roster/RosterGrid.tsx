@@ -141,8 +141,12 @@ export function RosterGrid({ kids, role, initialFilter }: RosterGridProps) {
     return {
       sorted: [...incomplete, ...complete],
       incompleteCount: incomplete.length,
-      noReportCardCount: kids.filter(k => !k.hasReportCards).length,
-      noLetterCount: kids.filter(k => !k.hasLetters).length,
+      // Departed kids can never clear these, so they don't count as
+      // waiting and don't appear in the document filters. Kept in sync
+      // with the deadline-banner counts in page.tsx.
+      noReportCardCount: kids.filter(k => !k.hasReportCards && !k.departedAt)
+        .length,
+      noLetterCount: kids.filter(k => !k.hasLetters && !k.departedAt).length,
     };
   }, [kids]);
 
@@ -154,9 +158,9 @@ export function RosterGrid({ kids, role, initialFilter }: RosterGridProps) {
     filterToUse === 'needs'
       ? sorted.filter(k => !isComplete(k))
       : filterToUse === 'report-cards'
-        ? sorted.filter(k => !k.hasReportCards)
+        ? sorted.filter(k => !k.hasReportCards && !k.departedAt)
         : filterToUse === 'letters'
-          ? sorted.filter(k => !k.hasLetters)
+          ? sorted.filter(k => !k.hasLetters && !k.departedAt)
           : sorted;
 
   // Deep-link the tiles straight to the upload section when the person

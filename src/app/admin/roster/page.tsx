@@ -60,8 +60,13 @@ export default async function AdminRosterPage({
     k => k.hasPendingIntake || !!k.lastEditedBySimon
   ).length;
   // Counts that drive the top-of-page deadlines banner.
-  const reportCardsPending = kids.filter(k => !k.hasReportCards).length;
-  const lettersPending = kids.filter(k => !k.hasLetters).length;
+  // Departed kids are excluded: no new report card or letter is coming
+  // for a kid who has left the campus, so counting them would nag Simon
+  // with work he can never clear. They stay reachable under "All".
+  const reportCardsPending = kids.filter(
+    k => !k.hasReportCards && !k.departedAt
+  ).length;
+  const lettersPending = kids.filter(k => !k.hasLetters && !k.departedAt).length;
 
   return (
     <AdminShell activeTab="roster" role={role}>
