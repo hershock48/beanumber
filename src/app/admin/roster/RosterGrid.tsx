@@ -35,7 +35,17 @@ import { AddKidButton } from './AddKidButton';
 interface RosterGridProps {
   kids: RosterKid[];
   role: 'admin' | 'simon';
+  /**
+   * Filter to open with, set from `?missing=` on the roster URL. The
+   * "Due now" deadline cards link here so tapping "Q3 report cards"
+   * lands on exactly the kids still waiting for one. A URL filter
+   * beats the remembered localStorage choice — the person arrived by
+   * asking for a specific list, so give them that list.
+   */
+  initialFilter?: RosterFilter;
 }
+
+export type RosterFilter = 'all' | 'needs' | 'report-cards' | 'letters';
 
 const FILTER_STORAGE_KEY = 'ban-roster-filter-v1';
 
@@ -77,14 +87,22 @@ function missingLabels(kid: RosterKid): string[] {
   );
 }
 
-export function RosterGrid({ kids, role }: RosterGridProps) {
+export function RosterGrid({ kids, role, initialFilter }: RosterGridProps) {
   // Filter state. 'all' shows the full grid; 'needs' shows only
-  // incompletes. Read from localStorage on first mount so the choice
-  // sticks per device.
-  const [filter, setFilter] = useState<'all' | 'needs'>('all');
+  // incompletes; the two document filters show kids still missing a
+  // report card or a letter. Read from localStorage on first mount so
+  // the choice sticks per device — unless the URL asked for a
+  // specific filter, which always wins.
+  const [filter, setFilter] = useState<RosterFilter>(initialFilter ?? 'all');
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    if (initialFilter) {
+      // Arrived from a deadline card. Honour the URL and don't let a
+      // stale remembered filter hijack the list they asked for.
+      setMounted(true);
+      return;
+    }
     try {
       const saved = window.localStorage.getItem(FILTER_STORAGE_KEY);
       if (saved === 'all' || saved === 'needs') setFilter(saved);
@@ -92,12 +110,17 @@ export function RosterGrid({ kids, role }: RosterGridProps) {
       // localStorage disabled (private mode) — stay with 'all'
     }
     setMounted(true);
-  }, []);
+  }, [initialFilter]);
 
-  function setFilterPersistent(next: 'all' | 'needs') {
+  function setFilterPersistent(next: RosterFilter) {
     setFilter(next);
     try {
-      window.localStorage.setItem(FILTER_STORAGE_KEY, next);
+      // Only the two durable views are worth remembering. Persisting a
+      // document filter would strand Simon on a near-empty grid weeks
+      // later with no idea why kids are missing.
+      if (next === 'all' || next === 'needs') {
+        window.localStorage.setItem(FILTER_STORAGE_KEY, next);
+      }
     } catch {
       // ignore
     }
@@ -105,7 +128,8 @@ export function RosterGrid({ kids, role }: RosterGridProps) {
 
   // Sort: incompletes first (alphabetical within), then completes
   // (alphabetical within). Filter applied after sort.
-  const { sorted, incompleteCount } = useMemo(() => {
+  const { sorted, incompleteCount, noReportCardCount, noLetterCount } =
+    useMemo(() => {
     const incomplete: RosterKid[] = [];
     const complete: RosterKid[] = [];
     for (const kid of kids) {
@@ -117,15 +141,33 @@ export function RosterGrid({ kids, role }: RosterGridProps) {
     return {
       sorted: [...incomplete, ...complete],
       incompleteCount: incomplete.length,
+      noReportCardCount: kids.filter(k => !k.hasReportCards).length,
+      noLetterCount: kids.filter(k => !k.hasLetters).length,
     };
   }, [kids]);
 
   // Server + client render should match on first paint. Use the SSR
   // default ('all') until localStorage has been consulted, then let
   // client updates take over.
-  const filterToUse = mounted ? filter : 'all';
+  const filterToUse = mounted ? filter : (initialFilter ?? 'all');
   const visibleFinal =
-    filterToUse === 'needs' ? sorted.filter(k => !isComplete(k)) : sorted;
+    filterToUse === 'needs'
+      ? sorted.filter(k => !isComplete(k))
+      : filterToUse === 'report-cards'
+        ? sorted.filter(k => !k.hasReportCards)
+        : filterToUse === 'letters'
+          ? sorted.filter(k => !k.hasLetters)
+          : sorted;
+
+  // Deep-link the tiles straight to the upload section when the person
+  // is here to upload documents. Saves scrolling past every field on
+  // the kid page to reach the control at the bottom.
+  const cardHash =
+    filterToUse === 'report-cards'
+      ? '#report-cards'
+      : filterToUse === 'letters'
+        ? '#letters'
+        : undefined;
 
   return (
     <>
@@ -142,11 +184,35 @@ export function RosterGrid({ kids, role }: RosterGridProps) {
           onClick={() => setFilterPersistent('needs')}
           highlighted={incompleteCount > 0}
         />
+        {/* Document filters. Shown only while something is actually
+            outstanding — once every kid has a report card on file the
+            chip would just be a permanent zero taking up thumb space. */}
+        {noReportCardCount > 0 && (
+          <FilterButton
+            active={filterToUse === 'report-cards'}
+            label={`No report card (${noReportCardCount})`}
+            onClick={() => setFilterPersistent('report-cards')}
+            highlighted={filterToUse === 'report-cards'}
+          />
+        )}
+        {noLetterCount > 0 && (
+          <FilterButton
+            active={filterToUse === 'letters'}
+            label={`No letter (${noLetterCount})`}
+            onClick={() => setFilterPersistent('letters')}
+            highlighted={filterToUse === 'letters'}
+          />
+        )}
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         {visibleFinal.map(kid => (
-          <RosterCard key={kid.recordId} kid={kid} role={role} />
+          <RosterCard
+            key={kid.recordId}
+            kid={kid}
+            role={role}
+            hash={cardHash}
+          />
         ))}
         {/* Always show the add tile — a newly-added kid starts with
             zero fields filled so they land in the needs-finishing
@@ -187,7 +253,16 @@ function FilterButton({
   );
 }
 
-function RosterCard({ kid, role }: { kid: RosterKid; role: 'admin' | 'simon' }) {
+function RosterCard({
+  kid,
+  role,
+  hash,
+}: {
+  kid: RosterKid;
+  role: 'admin' | 'simon';
+  /** Optional `#report-cards` / `#letters` anchor on the kid page. */
+  hash?: string;
+}) {
   const complete = isComplete(kid);
   const missing = missingLabels(kid);
 
@@ -208,7 +283,7 @@ function RosterCard({ kid, role }: { kid: RosterKid; role: 'admin' | 'simon' }) 
 
   return (
     <Link
-      href={`/admin/roster/${kid.shirtNumber}`}
+      href={`/admin/roster/${kid.shirtNumber}${hash ?? ''}`}
       className={`block bg-white border ${borderClass} hover:border-[#D4A843] transition-colors overflow-hidden relative`}
     >
       <div className="aspect-[4/5] bg-[#f5f0e8] relative">

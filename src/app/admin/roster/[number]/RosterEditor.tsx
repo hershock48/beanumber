@@ -783,7 +783,10 @@ function UploadSection({
   }
 
   return (
-    <div>
+    // The id is the landing target for `/admin/roster?missing=…` tiles.
+    // scroll-mt clears the sticky admin header so the heading isn't
+    // hidden under it after the jump.
+    <div id={kind === 'report_card' ? 'report-cards' : 'letters'} className="scroll-mt-24">
       <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#D4A843] mb-1">
         {label}
       </p>

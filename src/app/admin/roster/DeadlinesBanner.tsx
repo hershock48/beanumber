@@ -143,9 +143,10 @@ export async function DeadlinesBanner({
           due={`Due ${fmtDate(reportDue)} · ${reportDays} day${reportDays === 1 ? '' : 's'}`}
           detail={
             reportCardsPending > 0
-              ? `${reportCardsPending} kid${reportCardsPending === 1 ? '' : 's'} waiting`
+              ? `${reportCardsPending} kid${reportCardsPending === 1 ? '' : 's'} waiting — tap to upload`
               : 'All uploaded ✓'
           }
+          href="/admin/roster?missing=report-cards"
         />
         <DeadlineCard
           tone={letterTone}
@@ -153,9 +154,10 @@ export async function DeadlinesBanner({
           due={`Due ${fmtDate(letterDue)} · ${letterDays} day${letterDays === 1 ? '' : 's'}`}
           detail={
             lettersPending > 0
-              ? `${lettersPending} kid${lettersPending === 1 ? '' : 's'} waiting`
+              ? `${lettersPending} kid${lettersPending === 1 ? '' : 's'} waiting — tap to upload`
               : 'All uploaded ✓'
           }
+          href="/admin/roster?missing=letters"
         />
         <DeadlineCard
           tone={updateTone}
@@ -206,7 +208,10 @@ function DeadlineCard({
   );
   if (href) {
     return (
-      <a href={href} className="block hover:opacity-90 transition-opacity">
+      <a
+        href={href}
+        className="block cursor-pointer hover:opacity-90 hover:shadow-sm transition-all"
+      >
         {body}
       </a>
     );

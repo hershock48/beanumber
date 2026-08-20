@@ -17,12 +17,26 @@ import { AdminShell } from '../_components/AdminShell';
 import { getRoster } from '@/lib/admin/queries';
 import { getAdminRole } from '@/lib/admin-session';
 import { DeadlinesBanner } from './DeadlinesBanner';
-import { RosterGrid } from './RosterGrid';
+import { RosterGrid, type RosterFilter } from './RosterGrid';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-export default async function AdminRosterPage() {
+export default async function AdminRosterPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ missing?: string }>;
+}) {
+  // `?missing=report-cards` / `?missing=letters` — the "Due now"
+  // deadline cards link here so tapping one lands on exactly the kids
+  // still waiting, instead of dumping the whole roster.
+  const { missing } = await searchParams;
+  const initialFilter: RosterFilter | undefined =
+    missing === 'report-cards'
+      ? 'report-cards'
+      : missing === 'letters'
+        ? 'letters'
+        : undefined;
   const kids = await getRoster();
   const role = (await getAdminRole()) || 'admin';
   const totalKids = kids.length;
@@ -86,7 +100,7 @@ export default async function AdminRosterPage() {
         {/* Client-side wrapper: filter (All / Needs finishing), sort
             incompletes to the top, plain-language 'Missing' text on
             each incomplete card. See RosterGrid for the full logic. */}
-        <RosterGrid kids={kids} role={role} />
+        <RosterGrid kids={kids} role={role} initialFilter={initialFilter} />
       </div>
     </AdminShell>
   );
