@@ -247,8 +247,16 @@ async function notifySponsorsOfDocument(opts: {
     kid.firstName ||
     (kid.displayName ? kid.displayName.split(' ')[0] : null) ||
     `kid #${shirtNumber}`;
-  const childUrl = `${process.env.NEXT_PUBLIC_SITE_URL || 'https://www.beanumber.org'}/children/${shirtNumber}`;
+  const siteUrl =
+    process.env.NEXT_PUBLIC_SITE_URL || 'https://www.beanumber.org';
+  const childUrl = `${siteUrl}/children/${shirtNumber}`;
   const childUrlLabel = `beanumber.org/${shirtNumber}`;
+  // Report cards and letters only render for a RECOGNIZED viewer
+  // (sponsor or number-holder). A sponsor who clicks the bare kid
+  // link from a phone that has no sponsor_session cookie lands on
+  // the public view and sees nothing — which is exactly what this
+  // email is accused of doing. Give them the magic-link door too.
+  const signInUrl = `${siteUrl}/signin?n=${shirtNumber}&next=${encodeURIComponent(`/children/${shirtNumber}`)}`;
 
   const subject =
     kind === 'report_card'
@@ -266,8 +274,8 @@ async function notifySponsorsOfDocument(opts: {
 
     const bodyLine =
       kind === 'report_card'
-        ? `${childFirstName}'s year-end report card just came in from the campus. It's on their page now — log in with your usual link or visit <a href="${childUrl}" style="color: #D4A843;">${childUrlLabel}</a> to take a look.`
-        : `A handwritten letter from ${childFirstName} just came over from Omoro and is on their page. Visit <a href="${childUrl}" style="color: #D4A843;">${childUrlLabel}</a> to read it.`;
+        ? `${childFirstName}'s report card just came in from the campus. It's on their page now — <a href="${childUrl}" style="color: #D4A843;">${childUrlLabel}</a>. If the page doesn't know you yet, <a href="${signInUrl}" style="color: #D4A843;">sign in here</a> and it drops you straight on it.`
+        : `A handwritten letter from ${childFirstName} just came over from Omoro and is on their page — <a href="${childUrl}" style="color: #D4A843;">${childUrlLabel}</a>. If the page doesn't know you yet, <a href="${signInUrl}" style="color: #D4A843;">sign in here</a> and it drops you straight on it.`;
 
     try {
       const result = await sendEmail({

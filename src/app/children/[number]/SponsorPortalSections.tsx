@@ -16,8 +16,10 @@
  *
  * The campus newsletter used to render here too. It now lives in
  * the public CampusNewsfeed component below this section — visible
- * to anyone, not just sponsors. Report cards + letters stay sponsor-
- * only because they're individual to this kid.
+ * to anyone, not just sponsors. Report cards + letters are not here
+ * either: they render in ChildDocuments, above the Penpal box, for
+ * sponsors AND number-holders (both get the upload email), and stay
+ * off the page entirely for anyone who doesn't hold the number.
  *
  * Intentionally light. The portal historically had messaging,
  * milestones, request-update flows — we're rebuilding it around real

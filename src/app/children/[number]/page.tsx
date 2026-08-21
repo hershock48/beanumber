@@ -18,6 +18,7 @@ import { ReassignReveal } from './ReassignReveal';
 // (unchanged) for future reuse.
 import { ClaimMatchCard } from './ClaimMatchCard';
 import { SponsorPortalSections } from './SponsorPortalSections';
+import { ChildDocuments } from './ChildDocuments';
 import { CampusNewsfeed } from './CampusNewsfeed';
 import {
   getRecentCampusNewsletters,
@@ -104,6 +105,46 @@ export const revalidate = 0;
 // rewriting hundreds of lines of JSX, we project Postgres rows into
 // the same shape and hand the existing code untouched objects.
 
+type StoredAttachment = {
+  url: string;
+  filename: string;
+  size?: number;
+  type?: string;
+};
+
+/**
+ * Project the jsonb attachment arrays on `children` into the
+ * Airtable attachment shape the render code expects. Defensive about
+ * the column shape: rows written before the meta object existed can
+ * be bare URL strings, and a hand-edited row can be null.
+ */
+function attachmentsToAirtable(
+  raw: unknown,
+  prefix: string
+): NonNullable<AirtableChildRecord['fields']['ReportCards']> {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((entry, idx) => {
+      if (typeof entry === 'string') {
+        return {
+          id: `${prefix}-${idx}`,
+          url: entry,
+          filename: entry.split('/').pop() || `${prefix}-${idx + 1}`,
+        };
+      }
+      const a = entry as Partial<StoredAttachment> | null;
+      if (!a || typeof a.url !== 'string' || !a.url) return null;
+      return {
+        id: `${prefix}-${idx}`,
+        url: a.url,
+        filename: a.filename || a.url.split('/').pop() || `${prefix}-${idx + 1}`,
+        size: typeof a.size === 'number' ? a.size : undefined,
+        type: typeof a.type === 'string' ? a.type : undefined,
+      };
+    })
+    .filter((a): a is NonNullable<typeof a> => a !== null);
+}
+
 function childToAirtableFields(c: Child): AirtableChildRecord['fields'] {
   return {
     ChildID: c.childId ?? undefined,
@@ -139,11 +180,16 @@ function childToAirtableFields(c: Child): AirtableChildRecord['fields'] {
     StudentOfMonthReason: c.studentOfMonthReason ?? undefined,
     DepartedAt: c.departedAt ? new Date(c.departedAt).toISOString() : undefined,
     DepartureNote: c.departureNote ?? undefined,
-    // ReportCards and Letters aren't in the migrated schema (no
-    // Airtable attachment column was preserved). The render code
-    // tolerates empty arrays.
-    ReportCards: [],
-    Letters: [],
+    // Report cards + letters uploaded through /admin/roster/[number]
+    // land in children.report_card_urls / children.letter_urls as
+    // [{url, filename, size, type}]. They were stubbed to [] during
+    // the June 2026 Postgres migration and stayed empty for two
+    // months while the upload endpoint kept emailing sponsors
+    // "<kid>'s report card is up" — the file was on disk and nothing
+    // on the page ever read it. Synthesize an id per attachment so
+    // the render code has a stable React key.
+    ReportCards: attachmentsToAirtable(c.reportCardUrls, 'report-card'),
+    Letters: attachmentsToAirtable(c.letterUrls, 'letter'),
   };
 }
 
@@ -1116,6 +1162,14 @@ const getChildByShirtNumber = cache(async function getChildByShirtNumber(shirtNu
       student_of_month_reason: child.StudentOfMonthReason,
       departed_at: child.DepartedAt,
       departure_note: child.DepartureNote,
+      // Sponsor/holder-only documents. Gated HERE rather than in the
+      // JSX so the URLs never reach the payload for a viewer who
+      // isn't entitled to them — the Supabase Storage URLs are
+      // public-by-URL, so shipping them to an anon visitor would be
+      // the leak, not the render.
+      report_cards:
+        viewerIsSponsor || viewerIsHolder ? (child.ReportCards ?? []) : [],
+      letters: viewerIsSponsor || viewerIsHolder ? (child.Letters ?? []) : [],
       needs_reassign_reveal: needsReassignReveal,
       previous_kid_name: previousKidName,
     };
@@ -2110,6 +2164,18 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
               </div>
             )}
           </div>
+
+          {/* ── Report cards + letters ───────────────────────────
+              Sponsor / number-holder only. page.tsx already emptied
+              these arrays for anyone else, so the presence check
+              doubles as the entitlement check. Sits directly above
+              the Penpal box: it's the same "documents from your kid"
+              surface, and the upload email points here. */}
+          <ChildDocuments
+            firstName={firstName}
+            reportCards={child.report_cards ?? []}
+            letters={child.letters ?? []}
+          />
 
           {/* ── Penpal box (INSIDE the ClaimGate reading column) ──
               Kevin's 2026-07-08 restructure: Penpal is the primary
