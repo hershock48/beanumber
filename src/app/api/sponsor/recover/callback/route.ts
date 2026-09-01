@@ -60,8 +60,11 @@ export async function GET(request: NextRequest) {
   );
 
   // Re-stage the donor's drip pipeline now that they've engaged.
-  // Fire-and-forget — never block the redirect on the mutation.
-  advanceDripOnClaim(email).catch(err => {
+  // Awaited: on Vercel the lambda freezes the moment the redirect is
+  // returned, so a fire-and-forget here never runs and the drip
+  // pipeline never re-stages. The mutation is two Drizzle queries and
+  // swallows its own errors, so the redirect stays safe either way.
+  await advanceDripOnClaim(email).catch(err => {
     console.warn('[Recovery] advanceDripOnClaim threw:', err);
   });
 
