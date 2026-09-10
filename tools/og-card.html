@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>og card source</title>
+<!--
+  Source page for public/pitch/beanumber/og.jpg. Rendered rather than assembled
+  in an image editor, so the card uses the studio's own palette and the real
+  mark and cannot drift from them. Screenshot at 1200x630, 1x.
+
+  Everything that must be read sits inside the centre 630x630 band, x 285 to
+  x 915, drawn below as .safe. Newer iOS crops link previews toward square and
+  the outer 285px on each side can simply vanish.
+-->
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 1200px; height: 630px; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: #FDF6EC; color: #2B1E16;
+    display: flex; align-items: center; justify-content: center;
+    position: relative; overflow: hidden;
+  }
+  /* Wide-crop decoration only. Nothing here is load-bearing. */
+  .wash {
+    position: absolute; inset: 0;
+    background:
+      radial-gradient(circle at 8% 22%, rgba(191,224,122,0.30), transparent 42%),
+      radial-gradient(circle at 94% 84%, rgba(232,77,138,0.20), transparent 46%);
+  }
+  .safe {
+    position: relative; z-index: 2;
+    width: 630px; height: 630px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    text-align: center; padding: 0 8px 54px;
+  }
+  .mark { margin-bottom: 26px; }
+  .kicker {
+    font-size: 29px; font-weight: 700; letter-spacing: .22em; text-transform: uppercase;
+    color: #467C3D; margin-bottom: 22px;
+  }
+  h1 {
+    /* 74px ran the first line edge to edge in the 630 square crop, which is the
+       exact failure link-cards.md warns about. 66px leaves a margin on both
+       sides of the crop. */
+    font-size: 54px; font-weight: 800; letter-spacing: -2.4px; line-height: 1.04;
+  }
+  /* --raspberry-deep is 4.45 on cream, a fail for normal-weight text and the
+     reason --raspberry-ink exists. This is 66px display type, so the 3:1
+     large-text threshold applies and it clears. Do not reuse this colour for
+     the small lines below. */
+  h1 em { font-style: normal; color: #CE3672; }
+  .sig {
+    margin-top: 30px; font-size: 30px; font-weight: 600; color: #6B5747; line-height: 1.35;
+  }
+  .sig b { color: #2B1E16; font-weight: 800; }
+  .drip { position: absolute; left: 0; right: 0; bottom: -1px; width: 1200px; height: 54px; z-index: 3; display: block; }
+</style>
+</head>
+<body>
+<div class="wash"></div>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <radialGradient id="pinkGrad" cx="40%" cy="34%" r="75%">
+      <stop offset="0%" stop-color="#F887B2"/><stop offset="55%" stop-color="#E84D8A"/><stop offset="100%" stop-color="#CE3672"/>
+    </radialGradient>
+    <linearGradient id="lgGrad" x1="0" y1="92" x2="0" y2="215" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#D9EDA0"/><stop offset="55%" stop-color="#BFE07A"/><stop offset="100%" stop-color="#A3CE55"/>
+    </linearGradient>
+    <linearGradient id="creepGrad" x1="0" y1="90" x2="0" y2="124" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#E3F2B0"/><stop offset="100%" stop-color="#C3E181"/>
+    </linearGradient>
+    <linearGradient id="dgGrad" x1="0" y1="92" x2="0" y2="165" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#5FA850"/><stop offset="100%" stop-color="#43813A"/>
+    </linearGradient>
+  </defs>
+  <symbol id="mark" viewBox="46 16 110 186" overflow="visible">
+    <g fill="url(#dgGrad)">
+      <ellipse cx="100" cy="110" rx="38" ry="15"/>
+      <path d="M 86 100 C 86 116, 87 130, 88 142 C 88 148, 91 149, 92 142 C 93 130, 92 114, 92 100 Z"/>
+      <path d="M 114 100 C 114 112, 115 124, 116 134 C 116 140, 119 141, 120 134 C 121 124, 120 110, 120 100 Z"/>
+    </g>
+    <g fill="url(#lgGrad)">
+      <path d="M 64 100 C 63 120, 65 138, 66 152 C 66 164, 68 172, 74 173 C 80 172, 83 165, 82 154 C 84 136, 85 116, 86 100 Z"/>
+      <path d="M 92 100 C 91 128, 93 152, 94 172 C 94 188, 97 199, 104 200 C 111 199, 114 190, 112 174 C 113 150, 114 124, 114 100 Z"/>
+      <path d="M 120 100 C 119 116, 120 130, 121 142 C 121 152, 123 159, 129 160 C 134 159, 137 153, 135 144 C 136 130, 137 114, 137 100 Z"/>
+    </g>
+    <circle cx="100" cy="70" r="52" fill="url(#pinkGrad)"/>
+    <path d="M 56 98 A 52 52 0 0 0 144 98 C 142 94, 138 92, 134 94 C 130 97, 129 102, 125 104 C 119 106, 116 98, 110 96 C 104 94, 103 102, 98 105 C 93 107, 90 100, 84 97 C 78 95, 76 100, 71 102 C 66 103, 62 100, 56 98 Z" fill="url(#creepGrad)"/>
+    <path d="M 68 106 A 42 42 0 0 0 84 116" fill="none" stroke="#F1F8DC" stroke-width="4" stroke-linecap="round" opacity="0.85"/>
+    <path d="M 97 144 Q 103 151 109 144" fill="none" stroke="#55974A" stroke-width="4" stroke-linecap="round"/>
+    <g stroke="#F1F8DC" fill="none" stroke-linecap="round">
+      <path d="M 97 128 C 96 148, 97 166, 100 182" stroke-width="4.5" opacity="0.85"/>
+      <path d="M 69 118 C 68 132, 70 146, 71 156" stroke-width="3.5" opacity="0.8"/>
+      <path d="M 124 114 C 123 124, 125 138, 126 148" stroke-width="3.5" opacity="0.8"/>
+    </g>
+    <circle cx="100" cy="192" r="2.5" fill="#F1F8DC" opacity="0.9"/>
+    <circle cx="100" cy="72" r="13" fill="#FDF6EC"/>
+    <circle cx="100" cy="72" r="13" fill="none" stroke="#C22F6B" stroke-width="3" opacity="0.3"/>
+    <path d="M 62 46 A 44 44 0 0 1 82 28" fill="none" stroke="#FFFFFF" stroke-width="8" stroke-linecap="round" opacity="0.75"/>
+    <circle cx="92" cy="26" r="3.5" fill="#FFFFFF" opacity="0.75"/>
+  </symbol>
+</svg>
+
+<div class="safe">
+    <div class="mark">
+      <svg width="118" height="148" viewBox="46 16 110 186" overflow="visible" aria-hidden="true"><use href="#mark"/></svg>
+    </div>
+    <p class="kicker">A proposal, after the fact</p>
+    <h1>Every number is a child. This is the site that <em>carries them.</em></h1>
+    <p class="sig">for <b>Be A Number</b></p>
+  </div>
+
+<svg class="drip" viewBox="0 0 1440 60" preserveAspectRatio="none" aria-hidden="true">
+  <path fill="#CE3672" d="M0,0 H1440 V16 C1408 16 1400 44 1378 44 C1356 44 1362 16 1332 16 H1180 C1160 16 1156 52 1132 52 C1110 52 1116 16 1088 16 H880 C862 16 860 38 842 38 C824 38 828 16 802 16 H590 C574 16 572 48 550 48 C528 48 532 16 506 16 H300 C284 16 282 36 264 36 C246 36 250 16 224 16 H0 Z"/>
+</svg>
+</body>
+</html>

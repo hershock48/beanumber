@@ -1,0 +1,851 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Every number is a child. This is the site that carries them. A proposal for Be A Number</title>
+<meta name="description" content="What beanumber.org is, what it runs on, and what it costs to keep. A retroactive proposal from glazedweb for Be A Number.">
+<meta name="robots" content="noindex, nofollow">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Glazed Web">
+<meta property="og:title" content="Every number is a child. This is the site that carries them.">
+<meta property="og:description" content="What beanumber.org is, what it runs on, and what it costs to keep. A proposal from glazedweb for Be A Number.">
+<meta property="og:url" content="https://beanumber.glazedweb.com/">
+<meta property="og:image" content="https://beanumber.glazedweb.com/pitch/beanumber/og.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Every number is a child. This is the site that carries them. A proposal from glazedweb.">
+<meta name="twitter:card" content="summary_large_image">
+
+<!-- THE DONUT ON GLAZED'S DOCUMENTS, THE ANCHOR ON HERS.
+     This page and the logo presentation are Glazed's, so they carry Glazed's
+     icon, lifted from glazedweb's own public/ rather than redrawn. The demo is
+     hers and carries the anchor, which Next emits from app/icon.png and
+     app/favicon.ico.
+
+     A favicon is cached per ORIGIN, and on a pitch host the proposal, the logo
+     page and the whole demo share one, so the earlier version of this file made
+     everything the anchor to stop the donut sticking on her site. That was the
+     wrong fix. The sticking happens when a document declares nothing and the
+     browser falls back to the origin's /favicon.ico. Both sides declare
+     explicitly now, so neither falls back and neither can win the other's tab.
+
+     SVG first for the shape, .ico after it for Safari, which does not take an
+     SVG through rel=icon. Absolute paths, because /logo and / are rewrites and
+     a relative href would resolve against the pretty URL instead of this file. -->
+<link rel="icon" href="/pitch/beanumber/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/pitch/beanumber/favicon.ico" sizes="any">
+<link rel="apple-touch-icon" href="/pitch/beanumber/apple-touch-icon.png">
+
+<style>
+/* Palette and type lifted from glazedweb app/globals.css. Three pinks on
+   purpose: --raspberry is 3.34 as text on cream and 3.58 under white, so it is
+   accents only. --raspberry-deep (4.78) carries white text. --raspberry-ink
+   (4.63 on cream) is link text. Picking the wrong one reintroduces a fault
+   that took a full audit to find. */
+:root {
+  --raspberry: #E84D8A;
+  --raspberry-deep: #CE3672;
+  --raspberry-ink: #C9356F;
+  --slime: #BFE07A;
+  --slime-bright: #A9D65C;
+  --fern: #467C3D;
+  --chocolate: #2B1E16;
+  --chocolate-2: #201712;
+  --cream: #FDF6EC;
+  --cream-2: #FFFDF8;
+  --taupe: #7F6D5B;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background: var(--cream); color: var(--chocolate);
+  overflow-x: hidden;
+}
+::selection { background: var(--slime); color: var(--chocolate); }
+a { color: var(--raspberry-ink); }
+/* This document is full of long unbreakable tokens: domain names, upload paths,
+   "schulersrestaurant.com" in a 30px heading. At 320px they pushed the page 16px
+   wide. Fixed here, on the text elements, rather than on the one heading the
+   measurement named, because there are a dozen more of them in the findings. */
+h1, h2, h3, h4, p, li, span, a, b { overflow-wrap: break-word; }
+
+/* ============ header ============ */
+header {
+  position: sticky; top: 0; z-index: 50;
+  background: rgba(253, 246, 236, 0.85); backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(43,30,22,0.07);
+}
+.navwrap { max-width: 1100px; margin: 0 auto; padding: 14px 24px; display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--chocolate); }
+.brand .bw { font-weight: 800; font-size: 19px; letter-spacing: -0.6px; }
+.brand .bw span { font-weight: 350; color: var(--taupe); }
+.navfor { font-size: 13px; color: var(--taupe); font-weight: 600; text-align: right; }
+.navfor b { display: block; color: var(--chocolate); font-size: 14px; font-weight: 800; }
+
+.btn {
+  display: inline-block; background: var(--raspberry-deep); color: #fff !important;
+  font-weight: 700; border-radius: 999px; text-decoration: none;
+  padding: 10px 20px; font-size: 14px; border: none; cursor: pointer;
+  box-shadow: 0 6px 16px -6px rgba(232,77,138,0.55);
+  transition: transform .15s ease, box-shadow .15s ease;
+  white-space: nowrap;
+}
+.btn:hover { transform: translateY(-2px); box-shadow: 0 10px 22px -8px rgba(232,77,138,0.65); }
+.btn.big { padding: 15px 30px; font-size: 16px; }
+.btn.ghost { background: transparent; color: var(--chocolate) !important; box-shadow: none; border: 2px solid rgba(43,30,22,0.18); }
+.btn.ghost:hover { border-color: var(--raspberry-deep); color: var(--raspberry-deep) !important; }
+
+/* ============ hero ============ */
+.hero { max-width: 1100px; margin: 0 auto; padding: 64px 24px 78px; display: grid; grid-template-columns: 1.15fr 0.85fr; gap: 40px; align-items: center; }
+@media (max-width: 800px) { .hero { grid-template-columns: 1fr; text-align: center; } .hero .mark { order: -1; margin: 0 auto; } }
+.kicker { font-size: 12px; letter-spacing: 0.3em; text-transform: uppercase; color: var(--fern); font-weight: 700; margin-bottom: 18px; }
+h1 { font-size: clamp(36px, 5.2vw, 58px); font-weight: 800; letter-spacing: -2px; line-height: 1.04; }
+h1 em { font-style: normal; color: var(--raspberry); }
+.hero p.sub { margin-top: 22px; font-size: 18px; color: #6B5747; line-height: 1.6; max-width: 500px; }
+.hero .ctas { margin-top: 30px; display: flex; gap: 14px; flex-wrap: wrap; }
+@media (max-width: 800px) { .hero .ctas, .hero p.sub { justify-content: center; margin-left: auto; margin-right: auto; } }
+.hero .proof { margin-top: 26px; font-size: 13px; color: var(--taupe); line-height: 1.6; }
+.hero .proof b { color: var(--chocolate); }
+
+/* logo animations, lifted from globals.css */
+.goo { transform-box: fill-box; transform-origin: 50% 0%; animation: breathe 6s ease-in-out infinite; }
+@keyframes breathe { 0%,100% { transform: scaleY(1); } 50% { transform: scaleY(1.02); } }
+.wob1, .wob2, .wob3, .wobB { transform-box: fill-box; transform-origin: 50% 0%; }
+.wob1 { animation: sagg 3.8s ease-in-out infinite -0.6s; }
+.wob2 { animation: sagg 4.9s ease-in-out infinite -2.1s; }
+.wob3 { animation: sagg 4.3s ease-in-out infinite -1.3s; }
+.wobB { animation: sagg 5.6s ease-in-out infinite -3s; }
+@keyframes sagg { 0%,100% { transform: scaleY(1) scaleX(1); } 50% { transform: scaleY(1.07) scaleX(0.98); } }
+.string { transform-box: fill-box; transform-origin: 50% 0%; animation: stringy 3.4s cubic-bezier(.55,.1,.8,.5) infinite; }
+@keyframes stringy {
+  0% { transform: scaleY(0.1); opacity: 0; } 25% { transform: scaleY(0.8); opacity: 1; }
+  60% { transform: scaleY(1.7); opacity: .85; } 80% { transform: scaleY(2.4); opacity: 0; } 100% { transform: scaleY(0.1); opacity: 0; }
+}
+.droplet { transform-box: fill-box; transform-origin: center; animation: fall 3.4s cubic-bezier(.5,.08,.85,.6) infinite; }
+@keyframes fall {
+  0% { transform: translateY(-16px) scaleY(1.5) scaleX(.7); opacity: 0; }
+  22% { transform: translateY(-8px) scaleY(1.2) scaleX(.85); opacity: 1; }
+  60% { transform: translateY(10px) scale(1); opacity: 1; }
+  100% { transform: translateY(38px) scaleY(1.15) scaleX(.9); opacity: 0; }
+}
+.droplet2 { transform-box: fill-box; transform-origin: center; animation: fall2 5.1s cubic-bezier(.5,.08,.85,.6) infinite -2.4s; }
+@keyframes fall2 {
+  0% { transform: translateY(-10px) scaleY(1.4) scaleX(.75); opacity: 0; }
+  25% { transform: translateY(-4px) scale(1); opacity: 1; }
+  65% { transform: translateY(8px) scale(1); opacity: 1; }
+  100% { transform: translateY(26px) scale(1); opacity: 0; }
+}
+.sheen { animation: shimmer 6s ease-in-out infinite; }
+@keyframes shimmer { 0%,100% { opacity: .55; } 50% { opacity: .95; } }
+
+/* ============ ticker ============ */
+.ticker { background: var(--slime); overflow: hidden; padding: 13px 0; border-top: 2px solid var(--chocolate); border-bottom: 2px solid var(--chocolate); }
+.ticker-inner { display: flex; gap: 0; width: max-content; animation: scroll 34s linear infinite; }
+.ticker span { font-weight: 800; font-size: 14px; letter-spacing: .18em; text-transform: uppercase; color: var(--chocolate); padding: 0 18px; white-space: nowrap; }
+@keyframes scroll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+
+/* ============ sections ============ */
+section .inner { max-width: 1100px; margin: 0 auto; padding: 84px 24px; }
+.sec-kicker { font-size: 12px; letter-spacing: .3em; text-transform: uppercase; font-weight: 700; margin-bottom: 14px; color: var(--fern); }
+h2.sec-title { font-size: clamp(30px, 4vw, 42px); font-weight: 800; letter-spacing: -1.4px; line-height: 1.1; }
+.sec-sub { margin-top: 14px; font-size: 16.5px; color: #6B5747; max-width: 620px; line-height: 1.6; }
+
+/* ============ findings ============ */
+#found { background: var(--cream-2); }
+.find-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px; margin-top: 44px; }
+@media (max-width: 800px) { .find-grid { grid-template-columns: 1fr; } }
+.fcard {
+  background: #fff; border: 2px solid rgba(43,30,22,0.1); border-radius: 20px; padding: 26px 24px;
+  position: relative;
+}
+.fcard.urgent { border-color: var(--raspberry); box-shadow: 0 18px 40px -18px rgba(232,77,138,.35); grid-column: 1 / -1; }
+.fcard .tag { position: absolute; top: -13px; left: 24px; background: var(--raspberry-deep); color: #fff; font-size: 11px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; border-radius: 999px; padding: 5px 12px; }
+.fcard h3 { font-size: 19px; font-weight: 800; letter-spacing: -0.5px; line-height: 1.25; }
+.fcard p { font-size: 14.5px; color: #5A4A3A; line-height: 1.6; margin-top: 10px; }
+.fcard .proof { display: block; margin-top: 14px; font-size: 12.5px; font-weight: 700; color: var(--raspberry-ink); text-transform: uppercase; letter-spacing: .08em; word-break: break-word; }
+.fcard .proof a { color: var(--raspberry-ink); }
+.split { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 16px; }
+@media (max-width: 560px) { .split { grid-template-columns: 1fr; } }
+.split > div { background: var(--cream); border-radius: 12px; padding: 13px 15px; border: 1px solid rgba(43,30,22,0.09); }
+.split b { display: block; font-size: 12px; text-transform: uppercase; letter-spacing: .1em; color: var(--fern); margin-bottom: 4px; }
+.split span { font-size: 14.5px; color: #5A4A3A; line-height: 1.45; }
+
+.honest { margin-top: 40px; background: var(--cream); border: 2px solid rgba(43,30,22,0.09); border-radius: 16px; padding: 20px 22px; }
+.honest b { display: block; font-size: 12.5px; text-transform: uppercase; letter-spacing: .1em; color: var(--fern); margin-bottom: 8px; }
+.honest p { font-size: 14.5px; color: #5A4A3A; line-height: 1.6; }
+.honest p + p { margin-top: 10px; }
+
+/* ============ the wedge ============ */
+#wedge { background: var(--chocolate-2); color: #F3EAE1; }
+#wedge .sec-kicker { color: var(--slime); }
+#wedge .sec-sub { color: #C3B2A2; }
+#wedge .lede { margin-top: 34px; font-size: 20px; line-height: 1.6; max-width: 720px; color: #F3EAE1; }
+#wedge .lede strong { color: var(--slime); }
+.wcards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin-top: 40px; }
+@media (max-width: 800px) { .wcards { grid-template-columns: 1fr; } }
+.wcard { background: rgba(243,234,225,0.05); border: 1px solid rgba(243,234,225,0.14); border-radius: 18px; padding: 24px 22px; }
+.wcard b { display: block; font-size: 12px; text-transform: uppercase; letter-spacing: .12em; color: var(--slime); margin-bottom: 10px; }
+.wcard p { font-size: 14.5px; color: #C3B2A2; line-height: 1.6; }
+.wcard p strong { color: #F3EAE1; }
+
+/* ============ demo bar ============ */
+.demobar {
+  display: flex; align-items: center; justify-content: space-between; gap: 22px; flex-wrap: wrap;
+  background: var(--chocolate-2); color: #F3EAE1; border-radius: 20px; padding: 26px 28px; margin-top: 34px;
+}
+.demobar b { display: block; font-size: 19px; letter-spacing: -0.4px; }
+.demobar span { display: block; font-size: 14.5px; color: #C3B2A2; margin-top: 6px; max-width: 52ch; line-height: 1.55; }
+.demobar .btn { background: var(--slime); color: var(--chocolate) !important; box-shadow: none; }
+.demobar .btn:hover { background: var(--slime-bright); }
+@media (max-width: 640px) { .demobar { padding: 20px 20px; } .demobar .btn { width: 100%; text-align: center; } }
+
+/* ============ build ============ */
+.blist { display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px; margin-top: 44px; }
+@media (max-width: 800px) { .blist { grid-template-columns: 1fr; } }
+.bitem { background: var(--cream-2); border: 2px solid rgba(43,30,22,0.09); border-radius: 18px; padding: 24px 22px; }
+/* The number glazes. Lifted from `.step .num` in glazedweb's app/globals.css
+   rather than re-derived: the radial, the two inset shadows, the highlight and
+   the sweep are his, and this is the same element doing the same job. Only the
+   selector changed.
+
+   `overflow: hidden` is what keeps the sweep inside the disc, and `position:
+   relative` is what the two pseudo-elements position against. Both were missing
+   here, which is why this had the glazed *look* and never actually glazed. */
+.bitem .num {
+  width: 42px; height: 42px; border-radius: 50%;
+  background: radial-gradient(circle at 32% 26%, #EAF7C6 0%, var(--slime) 48%, #9CCB4F 100%);
+  box-shadow: inset 0 2px 3px rgba(255,255,255,.7), inset 0 -3px 5px rgba(67,129,58,.35);
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 800; font-size: 17px; color: var(--chocolate); margin-bottom: 16px;
+  border: 2px solid var(--chocolate);
+  position: relative; overflow: hidden;
+}
+.bitem .num::before {
+  content: ""; position: absolute; top: 4px; left: 7px; width: 12px; height: 7px;
+  border-radius: 50%; background: rgba(255,255,255,.75);
+  transform: rotate(-18deg); filter: blur(.5px);
+}
+.bitem .num::after {
+  content: ""; position: absolute; top: -30%; left: 0; width: 40%; height: 160%;
+  background: linear-gradient(100deg, rgba(255,255,255,0), rgba(255,255,255,.9), rgba(255,255,255,0));
+  transform: translateX(-160%) skewX(-18deg); opacity: 0;
+}
+.bitem.glazed .num::after { animation: glazeSweep .9s ease-out both; }
+@keyframes glazeSweep {
+  0% { transform: translateX(-160%) skewX(-18deg); opacity: 0; }
+  12% { opacity: 1; }
+  100% { transform: translateX(340%) skewX(-18deg); opacity: 0; }
+}
+.bitem h4 { font-size: 17.5px; font-weight: 800; letter-spacing: -0.3px; }
+.bitem .sub { font-size: 12px; text-transform: uppercase; letter-spacing: .12em; color: var(--fern); font-weight: 700; margin: 4px 0 10px; }
+.bitem p { font-size: 14.5px; color: #5A4A3A; line-height: 1.6; }
+.later { margin-top: 28px; font-size: 14.5px; color: var(--taupe); line-height: 1.65; max-width: 700px; }
+.later b { color: var(--chocolate); }
+
+/* ============ price ============ */
+#price { background: var(--cream-2); }
+.pricewrap { display: grid; grid-template-columns: 0.9fr 1.1fr; gap: 26px; margin-top: 44px; align-items: start; }
+@media (max-width: 860px) { .pricewrap { grid-template-columns: 1fr; } }
+.pcard {
+  background: #fff; border: 2px solid var(--raspberry); border-radius: 20px; padding: 32px 28px;
+  box-shadow: 0 18px 40px -18px rgba(232,77,138,.35); position: relative;
+}
+.pcard .tag { position: absolute; top: -13px; left: 24px; background: var(--raspberry-deep); color: #fff; font-size: 11px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; border-radius: 999px; padding: 5px 12px; }
+.pcard h3 { font-size: 21px; font-weight: 800; letter-spacing: -0.5px; }
+.pcard .flavor { font-size: 12.5px; color: var(--fern); font-weight: 700; text-transform: uppercase; letter-spacing: .12em; margin-top: 4px; }
+.pcard .price { margin-top: 18px; font-size: 40px; font-weight: 800; letter-spacing: -1.8px; font-variant-numeric: tabular-nums; }
+.pcard .price small { font-size: 14px; color: var(--taupe); font-weight: 500; letter-spacing: 0; }
+/* The anchor above the price, and the number that melts down to ours. Lifted
+   from `.mcard .price .was` and the menu-price counter in glazedweb's own
+   app/globals.css and app/page.jsx. Same element, same job, one card instead
+   of three, so the left-to-right stagger is dropped and nothing else is.
+
+   `tabular-nums` is already on `.price` and is what stops the card twitching
+   sideways while five digits count down to four. */
+.pcard .price .was {
+  display: block; font-size: 12.5px; font-weight: 600; letter-spacing: .04em;
+  color: var(--taupe); text-transform: uppercase; margin-bottom: 2px;
+}
+.pcard .price .was s { text-decoration-color: var(--raspberry); text-decoration-thickness: 2px; }
+.pcard .anchor-note {
+  margin-top: 18px; font-size: 12.5px; color: var(--taupe); line-height: 1.55;
+}
+.pcard .anchor-note a { color: var(--raspberry-ink); }
+.pcard .mo { margin-top: 6px; font-size: 20px; font-weight: 800; letter-spacing: -0.6px; font-variant-numeric: tabular-nums; }
+.pcard .mo small { font-size: 13.5px; color: var(--taupe); font-weight: 500; letter-spacing: 0; }
+.pcard ul { list-style: none; margin: 22px 0 0; display: grid; gap: 10px; }
+.pcard li { font-size: 14.5px; color: #5A4A3A; padding-left: 24px; position: relative; line-height: 1.45; }
+.pcard li::before {
+  content: ""; position: absolute; left: 0; top: 4px; width: 12px; height: 12px;
+  border: 3.5px solid var(--raspberry); border-radius: 50%;
+}
+.terms { display: grid; gap: 14px; }
+.terms > div { background: #fff; border: 2px solid rgba(43,30,22,0.1); border-radius: 16px; padding: 20px 22px; }
+.terms b { display: block; font-size: 15.5px; margin-bottom: 6px; }
+.terms span { font-size: 14.5px; color: #5A4A3A; line-height: 1.6; display: block; }
+
+/* ============ cta band ============ */
+.ctaband { background: var(--raspberry-deep); color: #fff; }
+.ctaband .inner { padding: 86px 24px; text-align: center; }
+.ctaband h2 { font-size: clamp(28px, 4.2vw, 44px); font-weight: 800; letter-spacing: -1.6px; line-height: 1.08; }
+.ctaband p { margin: 16px auto 30px; font-size: 17px; max-width: 520px; line-height: 1.55; color: #fff; }
+.ctaband .btn { background: var(--chocolate); box-shadow: 0 10px 24px -10px rgba(0,0,0,.4); }
+/* Was #FBEFF4, a softened white, which measured 4.27 on --raspberry-deep and
+   failed the 4.5 that normal-weight text needs. Same fault and same fix as the
+   band's own paragraph in globals.css: the softness was costing the pass on its
+   own, so it comes off and hierarchy comes from size instead. Full white is
+   4.78 on this ground. */
+.ctaband .after { margin-top: 22px; font-size: 13.5px; color: #fff; }
+
+/* ============ footer ============ */
+footer { background: var(--chocolate-2); color: #A6907F; }
+footer .inner { max-width: 1100px; margin: 0 auto; padding: 56px 24px 36px; }
+.foot-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 30px; flex-wrap: wrap; }
+.foot-brand { display: flex; align-items: center; gap: 12px; }
+.foot-brand .bw { font-weight: 800; font-size: 22px; letter-spacing: -0.7px; color: #F3EAE1; }
+.foot-brand .bw span { font-weight: 350; color: #A6907F; }
+.foot-note { font-size: 14px; line-height: 1.6; max-width: 420px; }
+.foot-note a { color: #F3EAE1; font-weight: 700; text-decoration: none; }
+.foot-note a:hover { color: var(--slime); }
+.foot-bottom { margin-top: 40px; padding-top: 22px; border-top: 1px solid rgba(243,234,225,0.1); display: flex; justify-content: space-between; font-size: 12.5px; flex-wrap: wrap; gap: 10px; }
+
+/* drip dividers */
+.drip-divider { display: block; width: 100%; height: 54px; margin-bottom: -1px; }
+
+/* reveal on scroll. The un-animated state is the finished state: .reveal is
+   only added by JS, so a blocked script or reduced motion leaves a complete
+   page rather than an empty one. */
+.js .reveal { opacity: 0; transform: translateY(26px); transition: opacity .7s ease, transform .7s ease; }
+.js .reveal.in { opacity: 1; transform: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .js .reveal { opacity: 1; transform: none; transition: none; }
+  .goo, .wob1, .wob2, .wob3, .wobB, .string, .droplet, .droplet2, .sheen, .ticker-inner { animation: none; }
+  /* The disc keeps its glaze, it just stops sweeping. The un-animated state is
+     the finished state. */
+  .bitem.glazed .num::after { animation: none; opacity: 0; }
+  .string, .droplet, .droplet2 { opacity: 1; }
+  .btn:hover { transform: none; }
+}
+
+/* ============ mobile ============ */
+@media (max-width: 640px) {
+  /* THE TICKER WAS UNREADABLE ON A PHONE.
+     At 14px with .18em tracking the longest phrase measured 612px, which is
+     157% of a 390px viewport: it could never be on screen in one piece, so
+     there was nothing to read, and one phrase took 8.9 seconds to cross. The
+     type comes down, the tracking comes in, and the loop speeds up, which
+     together put a whole phrase on screen at once. */
+  .ticker { padding: 10px 0; }
+  .ticker span { font-size: 10px; letter-spacing: .08em; padding: 0 10px; }
+  .ticker-inner { animation-duration: 26s; }
+
+  .navwrap { padding: 11px 14px; }
+  .brand { gap: 7px; }
+  .brand .bw { font-size: 17px; }
+  .navfor { font-size: 12px; }
+  .navfor b { font-size: 13px; }
+  .hero { padding: 30px 20px 58px; gap: 22px; }
+  .hero .mark svg { width: 165px; height: 208px; }
+  .hero p.sub { font-size: 16px; }
+  .btn.big { padding: 13px 22px; font-size: 15px; }
+  section .inner { padding: 56px 20px; }
+  .ctaband .inner { padding: 60px 20px; }
+  .pcard .price { font-size: 34px; }
+  footer .inner { padding: 44px 20px 30px; }
+}
+@media (max-width: 390px) {
+  .brand .bw { font-size: 16px; }
+  .navfor { display: none; }
+}
+</style></head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <radialGradient id="pinkGrad" cx="40%" cy="34%" r="75%">
+      <stop offset="0%" stop-color="#F887B2"/><stop offset="55%" stop-color="#E84D8A"/><stop offset="100%" stop-color="#CE3672"/>
+    </radialGradient>
+    <linearGradient id="lgGrad" x1="0" y1="92" x2="0" y2="215" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#D9EDA0"/><stop offset="55%" stop-color="#BFE07A"/><stop offset="100%" stop-color="#A3CE55"/>
+    </linearGradient>
+    <linearGradient id="creepGrad" x1="0" y1="90" x2="0" y2="124" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#E3F2B0"/><stop offset="100%" stop-color="#C3E181"/>
+    </linearGradient>
+    <linearGradient id="dgGrad" x1="0" y1="92" x2="0" y2="165" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#5FA850"/><stop offset="100%" stop-color="#43813A"/>
+    </linearGradient>
+  </defs>
+  <!-- viewBox cropped to 46 16 110 186, the mark's real painted bounds. No
+       coordinate moves; the matting is gone so it reads at 26px. -->
+  <symbol id="mark" viewBox="46 16 110 186" overflow="visible">
+    <g fill="url(#dgGrad)">
+      <ellipse cx="100" cy="110" rx="38" ry="15"/>
+      <path d="M 86 100 C 86 116, 87 130, 88 142 C 88 148, 91 149, 92 142 C 93 130, 92 114, 92 100 Z"/>
+      <path d="M 114 100 C 114 112, 115 124, 116 134 C 116 140, 119 141, 120 134 C 121 124, 120 110, 120 100 Z"/>
+    </g>
+    <g fill="url(#lgGrad)">
+      <path d="M 64 100 C 63 120, 65 138, 66 152 C 66 164, 68 172, 74 173 C 80 172, 83 165, 82 154 C 84 136, 85 116, 86 100 Z"/>
+      <path d="M 92 100 C 91 128, 93 152, 94 172 C 94 188, 97 199, 104 200 C 111 199, 114 190, 112 174 C 113 150, 114 124, 114 100 Z"/>
+      <path d="M 120 100 C 119 116, 120 130, 121 142 C 121 152, 123 159, 129 160 C 134 159, 137 153, 135 144 C 136 130, 137 114, 137 100 Z"/>
+    </g>
+    <circle cx="100" cy="70" r="52" fill="url(#pinkGrad)"/>
+    <path d="M 56 98 A 52 52 0 0 0 144 98 C 142 94, 138 92, 134 94 C 130 97, 129 102, 125 104 C 119 106, 116 98, 110 96 C 104 94, 103 102, 98 105 C 93 107, 90 100, 84 97 C 78 95, 76 100, 71 102 C 66 103, 62 100, 56 98 Z" fill="url(#creepGrad)"/>
+    <path d="M 68 106 A 42 42 0 0 0 84 116" fill="none" stroke="#F1F8DC" stroke-width="4" stroke-linecap="round" opacity="0.85"/>
+    <path d="M 97 144 Q 103 151 109 144" fill="none" stroke="#55974A" stroke-width="4" stroke-linecap="round"/>
+    <g stroke="#F1F8DC" fill="none" stroke-linecap="round">
+      <path d="M 97 128 C 96 148, 97 166, 100 182" stroke-width="4.5" opacity="0.85"/>
+      <path d="M 69 118 C 68 132, 70 146, 71 156" stroke-width="3.5" opacity="0.8"/>
+      <path d="M 124 114 C 123 124, 125 138, 126 148" stroke-width="3.5" opacity="0.8"/>
+    </g>
+    <circle cx="100" cy="192" r="2.5" fill="#F1F8DC" opacity="0.9"/>
+    <circle cx="100" cy="72" r="13" fill="var(--hole, #FDF6EC)"/>
+    <circle cx="100" cy="72" r="13" fill="none" stroke="#C22F6B" stroke-width="3" opacity="0.3"/>
+    <path d="M 62 46 A 44 44 0 0 1 82 28" fill="none" stroke="#FFFFFF" stroke-width="8" stroke-linecap="round" opacity="0.75"/>
+    <circle cx="92" cy="26" r="3.5" fill="#FFFFFF" opacity="0.75"/>
+  </symbol>
+  <symbol id="dripEdge" viewBox="0 0 1440 60" preserveAspectRatio="none">
+    <path d="M0,0 H1440 V16 C1408 16 1400 44 1378 44 C1356 44 1362 16 1332 16 H1180 C1160 16 1156 52 1132 52 C1110 52 1116 16 1088 16 H880 C862 16 860 38 842 38 C824 38 828 16 802 16 H590 C574 16 572 48 550 48 C528 48 532 16 506 16 H300 C284 16 282 36 264 36 C246 36 250 16 224 16 H0 Z"/>
+  </symbol>
+</svg>
+
+<header>
+  <div class="navwrap">
+    <a class="brand" href="https://glazedweb.com">
+      <svg width="24" height="31" viewBox="46 16 110 186" overflow="visible" aria-hidden="true"><use href="#mark"/></svg>
+      <span class="bw">glazed<span>web</span></span>
+    </a>
+    <div class="navfor">
+      Prepared for
+      <b>Be A Number</b>
+    </div>
+    <!-- The one action, reachable from any scroll position (glaze/launch-page.md):
+         the build page, never a second pill for the agreement. -->
+    <a class="btn" href="https://www.glazedweb.com/build/beanumber" target="_blank" rel="noopener">Launch &#8599;</a>
+  </div>
+</header>
+
+<div class="hero">
+  <div>
+    <p class="kicker">A proposal, after the fact. September 2026</p>
+    <h1>Every number is a child. This is the site that <em>carries them.</em></h1>
+    <p class="sub">beanumber.org has been live since January. It has never been written down what it is, what it runs on, or what it costs to keep. This page does that, and puts the agreement behind it in writing.</p>
+    <div class="ctas">
+      <a class="btn big" href="https://www.beanumber.org" target="_blank" rel="noopener">Open the site</a>
+      <a class="btn big ghost" href="https://www.glazedweb.com/build/beanumber" target="_blank" rel="noopener">Launch &#8599;</a>
+    </div>
+    <p class="proof">Every line below was read from the repository and the live site on September 10, 2026, and links to the page that shows it. The admin is behind a password, so those lines link to its door.</p>
+  </div>
+  <div class="mark">
+    <!-- AnimatedMark, lifted verbatim. Hero only, one per page. -->
+    <svg width="230" height="290" viewBox="0 0 200 250" overflow="visible" aria-hidden="true">
+      <g class="goo">
+        <g fill="url(#dgGrad)">
+          <ellipse cx="100" cy="110" rx="38" ry="15"/>
+          <path class="wobB" d="M 86 100 C 86 116, 87 130, 88 142 C 88 148, 91 149, 92 142 C 93 130, 92 114, 92 100 Z"/>
+          <path d="M 114 100 C 114 112, 115 124, 116 134 C 116 140, 119 141, 120 134 C 121 124, 120 110, 120 100 Z"/>
+        </g>
+        <g fill="url(#lgGrad)">
+          <path class="wob1" d="M 64 100 C 63 120, 65 138, 66 152 C 66 164, 68 172, 74 173 C 80 172, 83 165, 82 154 C 84 136, 85 116, 86 100 Z"/>
+          <path class="wob2" d="M 92 100 C 91 128, 93 152, 94 172 C 94 188, 97 199, 104 200 C 111 199, 114 190, 112 174 C 113 150, 114 124, 114 100 Z"/>
+          <path class="wob3" d="M 120 100 C 119 116, 120 130, 121 142 C 121 152, 123 159, 129 160 C 134 159, 137 153, 135 144 C 136 130, 137 114, 137 100 Z"/>
+        </g>
+      </g>
+      <path class="string" d="M 104 199 L 104 209" stroke="#BFE07A" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+      <g class="droplet">
+        <circle cx="104" cy="213" r="7" fill="#BFE07A"/>
+        <circle cx="102" cy="211" r="2" fill="#F1F8DC" opacity="0.9"/>
+      </g>
+      <circle class="droplet2" cx="74" cy="186" r="4.5" fill="#BFE07A"/>
+      <circle cx="100" cy="70" r="52" fill="url(#pinkGrad)"/>
+      <path d="M 56 98 A 52 52 0 0 0 144 98 C 142 94, 138 92, 134 94 C 130 97, 129 102, 125 104 C 119 106, 116 98, 110 96 C 104 94, 103 102, 98 105 C 93 107, 90 100, 84 97 C 78 95, 76 100, 71 102 C 66 103, 62 100, 56 98 Z" fill="url(#creepGrad)"/>
+      <path d="M 68 106 A 42 42 0 0 0 84 116" fill="none" stroke="#F1F8DC" stroke-width="4" stroke-linecap="round" opacity="0.85"/>
+      <path d="M 97 144 Q 103 151 109 144" fill="none" stroke="#55974A" stroke-width="4" stroke-linecap="round"/>
+      <g stroke="#F1F8DC" fill="none" stroke-linecap="round">
+        <path d="M 97 128 C 96 148, 97 166, 100 182" stroke-width="4.5" opacity="0.85"/>
+        <path d="M 69 118 C 68 132, 70 146, 71 156" stroke-width="3.5" opacity="0.8"/>
+        <path d="M 124 114 C 123 124, 125 138, 126 148" stroke-width="3.5" opacity="0.8"/>
+      </g>
+      <circle cx="100" cy="192" r="2.5" fill="#F1F8DC" opacity="0.9"/>
+      <circle cx="100" cy="72" r="13" fill="#FDF6EC"/>
+      <circle cx="100" cy="72" r="13" fill="none" stroke="#C22F6B" stroke-width="3" opacity="0.3"/>
+      <path class="sheen" d="M 62 46 A 44 44 0 0 1 82 28" fill="none" stroke="#FFFFFF" stroke-width="8" stroke-linecap="round"/>
+      <circle class="sheen" cx="92" cy="26" r="3.5" fill="#FFFFFF"/>
+    </svg>
+  </div>
+</div>
+
+<div class="ticker" aria-hidden="true">
+  <div class="ticker-inner">
+    <span>one shirt</span><span>&bull;</span><span>one number</span><span>&bull;</span><span>one child</span><span>&bull;</span><span>$25 starts the year</span><span>&bull;</span><span>$25 a month finishes it</span><span>&bull;</span><span>nobody assigns a child to a buyer</span><span>&bull;</span><span>the buyer reads the number and holds the button</span><span>&bull;</span>
+    <span>one shirt</span><span>&bull;</span><span>one number</span><span>&bull;</span><span>one child</span><span>&bull;</span><span>$25 starts the year</span><span>&bull;</span><span>$25 a month finishes it</span><span>&bull;</span><span>nobody assigns a child to a buyer</span><span>&bull;</span><span>the buyer reads the number and holds the button</span><span>&bull;</span>
+  </div>
+</div>
+
+<section id="found">
+  <div class="inner">
+    <p class="sec-kicker reveal">What the site is</p>
+    <h2 class="sec-title reveal">Nine things, one codebase, 776 commits.</h2>
+    <p class="sec-sub reveal">Most of it is invisible from the homepage. That is the point of writing it down: a board should know what it owns, and what would stop if the monthly stopped.</p>
+
+    <div class="find-grid">
+
+      <div class="fcard urgent reveal">
+        <span class="tag">The mechanic</span>
+        <h3>The number is printed on the shirt. The site turns it into a name.</h3>
+        <p>One design, four colorways, $25. The buyer reads the number off the shirt, types it in, holds the button, and meets the child. Nobody on the admin side ever assigns a child to a buyer; the site refuses to. Numbers above 53 fold back onto the roster through a batch table, so a fourth run of shirts still lands on the same fifty-three children, and a sponsor of child 15 is not mistaken for the holder of every shirt that maps to 15.</p>
+        <span class="proof">See it: <a href="https://www.beanumber.org/shirts" target="_blank" rel="noopener">beanumber.org/shirts</a></span>
+      </div>
+
+      <div class="fcard reveal">
+        <h3>Sponsor accounts, with no passwords</h3>
+        <p>Sign in is an emailed link that lasts a day and a session that lasts a year. Inside: every child the sponsor knows, notes to the child with translation on the campus side, report cards and letters, the campus newsfeed and awards. Buying a shirt makes a holder; $25 a month makes a sponsor, and a child&rsquo;s personal updates are for sponsors.</p>
+        <span class="proof">The door: <a href="https://www.beanumber.org/signin" target="_blank" rel="noopener">beanumber.org/signin</a></span>
+      </div>
+
+      <div class="fcard reveal">
+        <h3>Payments, on Be A Number&rsquo;s own Stripe</h3>
+        <p>One-time and monthly gifts, the shirt with an optional $25 a month continuation that first charges on day thirty, the sponsorship itself, gift sponsorships, the farmers-market booth checkout on a phone, repeat shirts and numbered merch for sponsors, promo codes. One webhook records every order, mints the sponsor code, enrolls the buyer in the right drip, and sends the receipt.</p>
+        <span class="proof">See it: <a href="https://www.beanumber.org/donate" target="_blank" rel="noopener">beanumber.org/donate</a> &middot; <a href="https://www.beanumber.org/gift" target="_blank" rel="noopener">/gift</a></span>
+      </div>
+
+      <div class="fcard reveal">
+        <h3>Email that runs itself</h3>
+        <p>Sent through the charity&rsquo;s own Gmail with a fallback behind it. Six drip sequences, chosen by what the person did: bought a shirt online, bought one at the booth, became a sponsor, gave once, gave monthly. The campus newsletter has an editor, a schedule, a dry-run recipient count and one-click unsubscribe, and every issue becomes its own page for search.</p>
+        <span class="proof">The archive: <a href="https://www.beanumber.org/news" target="_blank" rel="noopener">beanumber.org/news</a></span>
+      </div>
+
+      <div class="fcard reveal">
+        <h3>The admin</h3>
+        <p>A roster where the campus enters children and Kevin approves the changes field by field. A penpal queue with translation and a print sheet. Fulfillment with a Pirate Ship import file and packing slips sorted by size. Donors, the sponsor reveal board, retention and monthly recurring revenue, Stripe sync, batches, student of the month, thermal bag labels.</p>
+        <span class="proof">The door: <a href="https://www.beanumber.org/admin/login" target="_blank" rel="noopener">beanumber.org/admin</a></span>
+      </div>
+
+      <div class="fcard reveal">
+        <h3>The public pages</h3>
+        <p>The founder story, the 2025 impact page, partnerships, governance with the 2025 financials, the annual report and the impact and financial summary, contact, privacy and terms. And the Youth Development Organisation&rsquo;s own pages under /ydo, with their own navigation, so the campus partner has a web presence without a second site to keep.</p>
+        <span class="proof">See it: <a href="https://www.beanumber.org/governance" target="_blank" rel="noopener">/governance</a> &middot; <a href="https://www.beanumber.org/reports/2025-annual-report" target="_blank" rel="noopener">/reports</a> &middot; <a href="https://www.beanumber.org/ydo" target="_blank" rel="noopener">/ydo</a></span>
+      </div>
+
+      <div class="fcard reveal">
+        <h3>The data, and the jobs</h3>
+        <p>A Postgres database of twenty-four tables with an audit log on every write, and photo and document storage beside it. Five jobs run every day and one on Sundays: overdue-update reminders, scheduled posts, the newsletter, the drips, push delivery, and the Sunday ping to sponsors before the letter batch leaves the campus.</p>
+        <span class="proof">Not a page. The schedule is in the repository&rsquo;s vercel.json.</span>
+      </div>
+
+      <div class="fcard reveal">
+        <h3>The mobile app&rsquo;s back end</h3>
+        <p>Twenty-four API routes for the app: sign in with Apple and Google, push notifications, claims, the child threads, the campus feed, deferred links, account deletion. Served from the same project as the site, so there is one database and one truth. The app itself waits on the developer accounts, which are the charity&rsquo;s to open.</p>
+        <span class="proof">The deep-link files: <a href="https://www.beanumber.org/.well-known/apple-app-site-association" target="_blank" rel="noopener">/.well-known/apple-app-site-association</a></span>
+      </div>
+
+      <div class="fcard urgent reveal">
+        <span class="tag">Also in the repository</span>
+        <h3>The print files, the videos, and the numbers behind the children.</h3>
+        <p>The shirt insert card, the bag labels, the booth banner and kit, the founder letters, the vinyl cut files, and the impact report and reel that render from code. None of it is a website, all of it is yours, and it travels with the repository the day you ask for it.</p>
+        <span class="proof">The story it serves: <a href="https://www.beanumber.org/founder" target="_blank" rel="noopener">beanumber.org/founder</a></span>
+      </div>
+
+    </div>
+
+    <div class="honest reveal">
+      <b>What is still owed to the site</b>
+      <p>Two things, both ours to do and both in the monthly. Airtable is no longer a data source, but the site still needs its keys to start and still calls it from the rep portal; that comes out. And beanumber.org is missing the two DNS records that stop mail from kevin@beanumber.org carrying an authentication warning in Gmail; that goes in the day we have the registrar login.</p>
+    </div>
+  </div>
+</section>
+
+<svg class="drip-divider" viewBox="0 0 1440 60" preserveAspectRatio="none" style="background:#FFFDF8" aria-hidden="true"><use href="#dripEdge" fill="#201712"/></svg>
+
+<section id="wedge">
+  <div class="inner">
+    <p class="sec-kicker reveal">The part that matters most</p>
+    <h2 class="sec-title reveal">Nothing stands between a gift and the campus.</h2>
+    <p class="lede reveal">A $25 gift on beanumber.org is charged on the charity&rsquo;s own Stripe account and settles to the charity&rsquo;s own bank. <strong>No platform takes a percentage on the way through</strong>, and nothing in the site is rented from anyone who could switch it off. That is not the normal way a small nonprofit&rsquo;s site is built, and it is worth saying out loud once.</p>
+
+    <div class="wcards">
+      <div class="wcard reveal">
+        <b>The accounts are the charity&rsquo;s</b>
+        <p>Stripe, the Gmail the receipts send from, the domain, the app store accounts. <strong>Glazed Web holds none of them.</strong> The hosting project and the database run under the studio&rsquo;s accounts today, paid for by the monthly, and transfer to accounts the charity names whenever it asks.</p>
+      </div>
+      <div class="wcard reveal">
+        <b>The records are the charity&rsquo;s</b>
+        <p>Every donor, sponsor, order and email, and every child&rsquo;s name, photo, number, report card and letter. <strong>The children&rsquo;s records are the most sensitive thing on the site</strong>, and the agreement says what we do with them: only this work, never copied out, never in our marketing, never in search.</p>
+      </div>
+      <div class="wcard reveal">
+        <b>The site is the charity&rsquo;s</b>
+        <p>Code, content, the repository, every login. There is no build fee to pay off first. <strong>If the monthly ever stopped, the site would keep running</strong> wherever the charity chose to host it, and we would help it move.</p>
+      </div>
+    </div>
+
+    <p class="lede reveal" style="font-size:17px;color:#C3B2A2">One thing the board should know rather than discover. Kevin founded Be A Number and owns Glazed Web, so he sits on both sides of this agreement. A charity paying a related party is ordinary, and it is done properly with a board vote recorded in the minutes and a signature from someone other than Kevin. The agreement page is built for that: whoever signs types their own name.</p>
+  </div>
+</section>
+
+<svg class="drip-divider" viewBox="0 0 1440 60" preserveAspectRatio="none" style="background:#201712" aria-hidden="true"><use href="#dripEdge" fill="#FDF6EC"/></svg>
+
+<section id="build">
+  <div class="inner">
+    <p class="sec-kicker reveal">What the monthly buys</p>
+    <h2 class="sec-title reveal">Care, not permission.</h2>
+    <p class="sec-sub reveal">The monthly is the part a client forgets it is buying. Here it is in four pieces, so nobody has to guess in month six.</p>
+
+    <div class="blist">
+      <div class="bitem reveal">
+        <div class="num">1</div>
+        <h4>Hosting and keeping it standing</h4>
+        <p class="sub">Every day, without being asked</p>
+        <p>The hosting, the SSL certificate, security and dependency updates as they come, backups, the database and the photo storage the site runs on, the six scheduled jobs, and the Stripe webhook kept working through every change Stripe makes. Domain renewal too, where we hold the domain.</p>
+      </div>
+      <div class="bitem reveal">
+        <div class="num">2</div>
+        <h4>Send a text, get an edit</h4>
+        <p class="sub">Up to an hour a month</p>
+        <p>A price, a page of copy, a photo, a redirect, a new report published. Children, sponsors, orders, newsletters and penpal notes are not edits; the admin exists so the charity does those itself, as often as it likes, without a ticket to anyone.</p>
+      </div>
+      <div class="bitem reveal">
+        <div class="num">3</div>
+        <h4>Airtable out</h4>
+        <p class="sub">Owed, and in the monthly</p>
+        <p>The boot requirement, the thousand-line library nothing imports, and the four routes that still call it. The rep portal moves onto the database with everything else, so the site depends on nothing the charity does not use.</p>
+      </div>
+      <div class="bitem reveal">
+        <div class="num">4</div>
+        <h4>Email that lands clean</h4>
+        <p class="sub">Owed, and in the monthly</p>
+        <p>The two DNS records on beanumber.org that Gmail and Proton look for before they trust a sender. Ten minutes once we have the registrar login, and every receipt and newsletter afterwards arrives without a warning above it.</p>
+      </div>
+    </div>
+
+    <p class="later reveal"><b>What is quoted separately, always in writing first.</b> New features, new pages beyond an edit, and anything beyond the hour, at $125 an hour, approved before it starts. Nothing lands on a bill unannounced. The mobile app&rsquo;s store submissions, photography and video production, and shirt printing are the charity&rsquo;s own costs and are not part of this.</p>
+  </div>
+</section>
+
+<section id="price">
+  <div class="inner">
+    <p class="sec-kicker reveal">What it costs</p>
+    <h2 class="sec-title reveal">Nothing to build. $50 a month to keep.</h2>
+    <p class="sec-sub reveal">The site was built at no charge, and the agreement records that in writing so nobody ever has to wonder. The monthly is the only number.</p>
+
+    <div class="pricewrap">
+      <div class="pcard reveal">
+        <span class="tag">Custom Order</span>
+        <h3>Be A Number</h3>
+        <p class="flavor">Be A Number, International</p>
+        <p class="price">
+          $<span class="price-num">0</span> <small>to build</small>
+        </p>
+        <p class="mo">$50 <small>a month, from the day it is started</small></p>
+        <ul>
+          <li>The whole site, the admin and the app&rsquo;s back end, as listed above</li>
+          <li>Hosting, security, backups, the database and storage, the jobs</li>
+          <li>An hour of edits a month</li>
+          <li>Airtable retired and the email records set, owed either way</li>
+          <li>The repository and every login handed over on request</li>
+          <li>No percentage on any gift, ever</li>
+        </ul>
+        <p class="anchor-note">For scale: a donation platform&rsquo;s published Pro plan is $150 a month plus 1.75% to 2% of every gift, and its free plan takes 2.95% to 3.95%. <a href="https://donorbox.org/pricing" target="_blank" rel="noopener">Donorbox&rsquo;s prices</a>, read on September 10, 2026. On beanumber.org the only percentage is Stripe&rsquo;s own.</p>
+      </div>
+
+      <div class="terms">
+        <div class="reveal">
+          <b>You own it</b>
+          <span>The code, the content and the accounts are the charity&rsquo;s now, with nothing to pay off. We hand over the repository and every login whenever asked. The domain stays in the charity&rsquo;s name and transfers free.</span>
+        </div>
+        <div class="reveal">
+          <b>Month to month, thirty days&rsquo; notice</b>
+          <span>No term, no auto-renewal, no penalty for leaving. If the charity goes, it takes the whole site with it and the site keeps working. The monthly buys care, not permission.</span>
+        </div>
+        <div class="reveal">
+          <b>Nothing rented underneath it</b>
+          <span>The sponsorship mechanic, the drips, the newsletter and the admin are written into the site rather than licensed from anyone. There is no per-donor, per-child or per-month platform fee under this that grows when the roster does.</span>
+        </div>
+        <div class="reveal">
+          <b>The numbers live in one place</b>
+          <span>The agreement, the build page and this letter all read the same two figures from the same file. If one ever changed, all three would change together, in writing, with thirty days&rsquo; notice.</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="ctaband">
+  <div class="inner">
+    <!-- ONE ACTION (glaze/launch-page.md): the letter closes on the build
+         page, where everything after yes lives. The agreement and Kevin's
+         email stay as plain links underneath; a second pill here would be a
+         second close. -->
+    <h2>Everything from here is on one page.</h2>
+    <p>Where things stand, what we still need from the board, what happens in what order, and where the charity&rsquo;s stuff is.</p>
+    <a class="btn big" href="https://www.glazedweb.com/build/beanumber" target="_blank" rel="noopener">Launch &#8599;</a>
+    <p class="after" style="margin-top:18px"><a href="https://www.glazedweb.com/agreement/beanumber" target="_blank" rel="noopener" style="color:#fff;font-weight:700">Ready to say yes? The agreement is digital and short enough to read</a>: the same plain-English terms published at glazedweb.com/agreement, with the inventory above, the two numbers, and the terms for donations, records and accounts attached. Whoever signs for the charity types their name, both sides get the signed record by email, and the monthly is started from the same page whenever the board chooses.</p>
+    <p class="after">Or <a href="mailto:kevin@glazedweb.com?subject=Be%20A%20Number%20agreement" style="color:#fff;font-weight:700">email Kevin</a>, or <a href="https://www.beanumber.org" target="_blank" rel="noopener" style="color:#fff;font-weight:700">open the site one more time</a>.</p>
+    <p class="after">glazedweb is one person in Marshall. The charity would be working with Kevin, as it has been since January.</p>
+  </div>
+</div>
+
+<footer>
+  <div class="inner">
+    <div class="foot-top">
+      <div class="foot-brand">
+        <svg width="30" height="38" viewBox="46 16 110 186" overflow="visible" style="--hole:#201712" aria-hidden="true"><use href="#mark"/></svg>
+        <span class="bw">glazed<span>web</span></span>
+      </div>
+      <p class="foot-note">Hand-built websites for small businesses in and around Marshall, Michigan. <a href="https://glazedweb.com">glazedweb.com</a></p>
+    </div>
+    <div class="foot-bottom">
+      <span>Prepared for Be A Number, September 2026.</span>
+      <span>Read from the repository and the live site on September 10, 2026.</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+/* The class is added by script, so with JavaScript off nothing is ever hidden
+   and the page is complete on arrival. */
+document.documentElement.classList.add('js');
+
+/* Each number glazes as the scroll reaches it, 1 first, then 2, 3, 4 as the
+   section moves through the viewport. Recrossing a threshold re-runs that
+   number's shine. Lifted from the process steps in glazedweb's app/page.jsx,
+   thresholds included, and written as plain JS because this page has no React.
+
+   Scroll-scrubbed rather than autoplayed on purpose: the visitor controls it,
+   which is the rule in glaze.md, and it means the fourth number does not shine
+   at somebody who never scrolled that far. */
+(function () {
+  var sec = document.getElementById('build');
+  if (!sec) return;
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  var steps = Array.prototype.slice.call(sec.querySelectorAll('.bitem'));
+  if (!steps.length) return;
+  var thresholds = [0.22, 0.38, 0.54, 0.7];
+  var raf = 0;
+  function update() {
+    raf = 0;
+    var r = sec.getBoundingClientRect();
+    var vh = window.innerHeight || 1;
+    var p = Math.min(1, Math.max(0, (vh - r.top) / (vh + r.height)));
+    steps.forEach(function (el, i) {
+      var t = thresholds[i] !== undefined ? thresholds[i] : 0.8;
+      if (p >= t) el.classList.add('glazed');
+      else if (p < t - 0.06) el.classList.remove('glazed');
+    });
+  }
+  function onScroll() { if (!raf) raf = requestAnimationFrame(update); }
+  update();
+  window.addEventListener('scroll', onScroll, { passive: true });
+  window.addEventListener('resize', onScroll, { passive: true });
+})();
+
+/* The price melts. You glimpse the market number as the card comes up, then it
+   counts down to ours as your eyes reach it, and scrolling back up re-arms it
+   for the next pass. Lifted from the menu-price counter in glazedweb's
+   app/page.jsx: the same 1100ms, the same cubic ease-out, the same three-state
+   idle/primed/counting machine. The thresholds are ours, for the reason in the
+   comment on `watch` below, and the left-to-right stagger is dropped because
+   there is one card here, not three.
+
+   THE RENDERED NUMBER IS ALREADY THE REAL ONE. `data-to` is what is in the
+   markup, so with JavaScript off, under reduced motion, or if this script never
+   runs, the card reads $3,500 and the struck-through anchor still sits above
+   it. Nothing here is load-bearing, which is the rule.
+
+   Never write the anchor into the DOM at load and count down from it. That way,
+   a reader whose scripts are blocked is looking at a price we are not charging,
+   and on this page of all pages that is the one unforgivable bug. */
+(function () {
+  var el = document.querySelector('#price .price-num');
+  if (!el) return;
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  /* WATCH THE PRICE LINE, NOT THE CARD.
+     This used to observe `.pcard` with glazedweb's own 0.45 progress
+     threshold, which is right for its menu cards and wrong here. Those are
+     short. This card is about 700px tall, and on a 900px screen 0.45 works out
+     to the card's top sitting 180px below the top of the viewport, meaning the
+     number melted when you had already scrolled past it and read it.
+
+     The price line is about 55px tall, so its own top is a straight answer to
+     "can they see this yet". Expressed as a fraction of the viewport rather
+     than as progress through an element, because that is the question being
+     asked and it does not change meaning when the card's height does. */
+  var watch = el.closest('.price') || el.closest('.pcard') || el;
+  var from = parseFloat(el.dataset.from);
+  var to = parseFloat(el.dataset.to);
+  if (!isFinite(from) || !isFinite(to)) return;
+  var fmt = function (v) { return Math.round(v).toLocaleString('en-US'); };
+  var status = 'idle', anim = 0, raf = 0;
+  function stop() { if (anim) cancelAnimationFrame(anim); anim = 0; }
+  /* PHONES GET A HEAD START AND A SHORTER RUN.
+     On a laptop you scroll in small increments and the line spends a while
+     crossing the middle of the screen, so starting at 85% and running 1100ms
+     lands the whole melt in view. A phone is a different machine: one thumb
+     swipe throws the line from below the fold to the top of the screen, and
+     the same numbers meant the count was still going when the price had gone.
+
+     So on a narrow viewport it primes at 1.4 screens away, off screen, and
+     starts the instant the line appears rather than waiting for it to climb.
+     The line arrives already reading $18,200 and already falling. 800ms
+     instead of 1100 so it finishes inside one swipe.
+
+     Read on every frame, not captured once, because a phone rotated to
+     landscape is a laptop by these numbers. */
+  function narrow() { return (window.innerWidth || 1) < 700; }
+  function count() {
+    var start;
+    var dur = narrow() ? 800 : 1100;
+    function tick(ts) {
+      if (start === undefined) start = ts;
+      var p = Math.min(1, (ts - start) / dur);
+      var ease = 1 - Math.pow(1 - p, 3);
+      el.textContent = fmt(from + (to - from) * ease);
+      if (p < 1) anim = requestAnimationFrame(tick);
+      else { anim = 0; status = 'done'; }
+    }
+    anim = requestAnimationFrame(tick);
+  }
+  function update() {
+    raf = 0;
+    var vh = window.innerHeight || 1;
+    var top = watch.getBoundingClientRect().top;
+    var startAt = narrow() ? 1 : 0.85;
+    var primeAt = narrow() ? 1.4 : 1;
+    if (top <= vh * startAt) {
+      if (status === 'idle' || status === 'primed') { status = 'counting'; count(); }
+    } else if (top <= vh * primeAt) {
+      /* Holding the market number, ready to melt. On a laptop that is a glimpse
+         at the bottom edge; on a phone it happens off screen. */
+      if (status !== 'primed') { stop(); el.textContent = fmt(from); status = 'primed'; }
+    } else {
+      /* Below the fold. Hold the real price, so anything that never scrolls
+         here, a screen reader included, reads what we actually charge. */
+      if (status !== 'idle') { stop(); el.textContent = fmt(to); status = 'idle'; }
+    }
+  }
+  function onScroll() { if (!raf) raf = requestAnimationFrame(update); }
+  update();
+  window.addEventListener('scroll', onScroll, { passive: true });
+  window.addEventListener('resize', onScroll, { passive: true });
+})();
+
+(function () {
+  var els = document.querySelectorAll('.reveal');
+  if (!('IntersectionObserver' in window) ||
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    for (var i = 0; i < els.length; i++) els[i].classList.add('in');
+    return;
+  }
+  var io = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); }
+    });
+  }, { rootMargin: '0px 0px -60px 0px' });
+  els.forEach(function (el) { io.observe(el); });
+})();
+</script>
+</body>
+</html>

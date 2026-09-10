@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-27 -16 254 254" width="254" height="254">
+  <!-- glazedweb favicon — simplified mark, transparent hole -->
+  <path d="M 78 100 C 74 130, 76 160, 82 184 C 84 198, 90 206, 98 206 C 106 206, 110 196, 108 182 C 112 152, 114 124, 116 100 Z" fill="#BFE07A"/>
+  <path fill-rule="evenodd" fill="#E84D8A"
+        d="M 100 12 A 54 54 0 1 0 100 120 A 54 54 0 1 0 100 12 Z
+           M 100 55 A 15 15 0 1 1 100 85 A 15 15 0 1 1 100 55 Z"/>
+  <path d="M 54 94 A 54 54 0 0 0 146 94 C 140 90, 136 96, 128 98 C 118 101, 114 92, 104 92 C 94 92, 92 101, 82 99 C 72 97, 68 90, 60 92 C 56 93, 55 93, 54 94 Z" fill="#C3E181"/>
+  <path d="M 66 40 A 46 46 0 0 1 84 22" fill="none" stroke="#FFFFFF" stroke-width="9" stroke-linecap="round" opacity="0.8"/>
+</svg>

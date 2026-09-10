@@ -44,12 +44,45 @@ const securityHeaders = [
   },
 ];
 
+/**
+ * THE PITCH HOST (glaze/proposal.md, "The host split").
+ *
+ * beanumber.org is live and has been for a long time, so this is the
+ * retroactive case: the proposal at glazedweb.com's subdomain describes the
+ * site that already exists, and its "see the site" button points at
+ * www.beanumber.org itself rather than at a /demo copy. Any glazedweb.com
+ * subdomain or vercel.app preview is a pitch host (the same pattern anchor
+ * uses; a glazedweb.com subdomain is never the client's own domain, so
+ * nothing this matches should serve the real homepage). The rewrite MUST be
+ * in `beforeFiles`, because app/page.tsx already answers "/" and an
+ * afterFiles rewrite would never fire.
+ *
+ * Every path on a pitch host is noindex, so a copy of the site on our
+ * address never competes with beanumber.org for its own name.
+ */
+const PITCH_HOSTS = '([a-z0-9-]+\\.glazedweb\\.com|[a-z0-9-]+\\.vercel\\.app)';
+const onPitchHost = [{ type: 'host' as const, value: PITCH_HOSTS }];
+
 const nextConfig: NextConfig = {
+  async rewrites() {
+    return {
+      beforeFiles: [
+        { source: '/', destination: '/pitch/beanumber/index.html', has: onPitchHost },
+      ],
+      afterFiles: [],
+      fallback: [],
+    };
+  },
   async headers() {
     return [
       {
         source: '/:path*',
         headers: securityHeaders,
+      },
+      {
+        source: '/:path*',
+        has: onPitchHost,
+        headers: [{ key: 'X-Robots-Tag', value: 'noindex, nofollow' }],
       },
     ];
   },
