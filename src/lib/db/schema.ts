@@ -844,6 +844,23 @@ export const fulfillments = pgTable(
     stripeSessionId: text('stripe_session_id'),
     itemIndex: integer('item_index'),
 
+    // Printful dropship line (2026-09-14, migration 0019). Catalog id
+    // from src/lib/products.ts; 'inhouse' rows are Kevin's queue,
+    // 'printful' rows are posted to Printful by
+    // src/lib/printful/orders.ts and closed by the Printful webhook.
+    productId: text('product_id'),
+    fulfillmentSource: text('fulfillment_source').notNull().default('inhouse'),
+    printfulOrderId: text('printful_order_id'),
+    // Printful order status: draft | pending | onhold | inprocess |
+    // fulfilled | canceled | failed, plus our own 'unsubmitted' before
+    // the first attempt.
+    printfulStatus: text('printful_status'),
+    trackingUrl: text('tracking_url'),
+    shippedAt: timestamp('shipped_at', { withTimezone: true }),
+    // Last submission error, so the admin queue can show why a row is
+    // stuck and the retry button has something to clear.
+    lastError: text('last_error'),
+
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .default(sql`now()`),
@@ -854,6 +871,10 @@ export const fulfillments = pgTable(
   table => ({
     orderNumberIdx: index('fulfillments_order_number_idx').on(
       table.orderNumber
+    ),
+    sourceIdx: index('fulfillments_source_idx').on(table.fulfillmentSource),
+    printfulOrderIdx: index('fulfillments_printful_order_idx').on(
+      table.printfulOrderId
     ),
     buyerEmailIdx: index('fulfillments_buyer_email_idx').on(
       sql`lower(${table.buyerEmail})`
@@ -1678,3 +1699,24 @@ export const cohortMembers = pgTable(
 
 export type CohortMember = typeof cohortMembers.$inferSelect;
 export type NewCohortMember = typeof cohortMembers.$inferInsert;
+
+// ─────────────────────────────────────────────────────────────────
+//  Stocked numbers (numbers printed on in-house tees)
+// ─────────────────────────────────────────────────────────────────
+//
+// Every number Kevin has ever pressed onto a tee in the pile. The
+// Printful assigner (src/lib/shirt-numbers.ts) never issues one of
+// these, so a dropshipped piece cannot collide with a tee that is
+// sitting in stock or was sold in person and not yet claimed. Rows are
+// never removed when a tee sells; the list is "printed", not "on hand".
+// Edited from the admin fulfillment page. Migration 0019.
+
+export const stockedNumbers = pgTable('stocked_numbers', {
+  shirtNumber: integer('shirt_number').primaryKey(),
+  note: text('note'),
+  createdAt: timestamp('created_at', { withTimezone: true })
+    .notNull()
+    .default(sql`now()`),
+});
+
+export type StockedNumber = typeof stockedNumbers.$inferSelect;

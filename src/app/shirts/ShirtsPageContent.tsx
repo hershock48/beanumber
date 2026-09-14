@@ -7,6 +7,7 @@ import { BANFooter } from '@/components/BANFooter';
 import { Logo } from '@/components/Logo';
 import { CartProvider, useCart } from '@/components/CartContext';
 import { CartDrawer, CartButton } from '@/components/CartDrawer';
+import { SeasonalDrop } from './SeasonalDrop';
 
 /* ── Color palette + per-color theme ────────────────────────── */
 
@@ -781,6 +782,10 @@ export default function ShirtsPageContent() {
           ))}
         </div>
       </section>
+
+      {/* Seasonal line, printed and shipped by Printful. Renders nothing
+          until a product in src/lib/products.ts is marked available. */}
+      <SeasonalDrop />
 
       {/* How the number works */}
       <section className="py-16 px-5 bg-white border-t border-[#e8e0d4]">

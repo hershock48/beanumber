@@ -2,11 +2,16 @@
  * Fulfillment List — JSON API for the admin fulfillment dashboard
  *
  * GET /api/admin/fulfillment/list
- *   ?status=unshipped (default) | shipped | all
+ *   ?status=unshipped (default) | shipped | printful | all
  *
  * Returns fulfillment rows as JSON with all fields needed for the
  * unified fulfillment page: shirt spec, address, buyer info, child
  * name, and drip status for shipped orders.
+ *
+ * 'unshipped' is Kevin's own queue: in-house rows only. Printful rows
+ * that have not shipped yet live under 'printful' (with their Printful
+ * status, the last error, and tracking once it exists) so they never
+ * get selected for a PirateShip label or a manual ship.
  *
  * Auth: cookie or X-Admin-Token.
  */
@@ -15,7 +20,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdminToken } from '@/lib/auth';
 import { db } from '@/lib/db/client';
 import { fulfillments, donors } from '@/lib/db/schema';
-import { eq, inArray, sql } from 'drizzle-orm';
+import { and, eq, inArray, ne, sql } from 'drizzle-orm';
 
 // Size sort order — Youth first (smallest bodies), then Adult small→big.
 // Keys MUST match what's actually stored in fulfillments.size: full
@@ -34,7 +39,9 @@ export async function GET(request: NextRequest) {
 
   const where =
     status === 'unshipped'
-      ? eq(fulfillments.shipping, 'Not Shipped')
+      ? and(eq(fulfillments.shipping, 'Not Shipped'), ne(fulfillments.fulfillmentSource, 'printful'))
+      : status === 'printful'
+        ? and(eq(fulfillments.shipping, 'Not Shipped'), eq(fulfillments.fulfillmentSource, 'printful'))
       : status === 'shipped'
         ? // 'Handed in Person' = market-booth sales (2026-07-19). The
           // buyer left with the shirt, so they belong with fulfilled
@@ -114,6 +121,14 @@ export async function GET(request: NextRequest) {
       orderDate: rec.orderDate || '',
       notes: rec.notes || '',
       hasAddress: !!(rec.shipStreet1 && rec.shipCity && rec.shipState),
+      source: rec.fulfillmentSource || 'inhouse',
+      productId: rec.productId || '',
+      printfulOrderId: rec.printfulOrderId || '',
+      printfulStatus: rec.printfulStatus || '',
+      tracking: rec.tracking || '',
+      trackingUrl: rec.trackingUrl || '',
+      lastError: rec.lastError || '',
+      shippedAt: rec.shippedAt ? new Date(rec.shippedAt).toISOString().slice(0, 10) : '',
     };
     if (dripByEmail[email]) out.drip = dripByEmail[email];
     return out;

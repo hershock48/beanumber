@@ -25,6 +25,8 @@ import {
 } from '@/lib/db/queries';
 import { legacyIdForShirtNumber } from '@/lib/claim-resolve';
 import { CANONICAL_ROSTER_MAX } from '@/lib/roster-config';
+import { getProduct } from '@/lib/products';
+import { submitPrintfulOrder } from '@/lib/printful/orders';
 
 // Allow up to 60 seconds for the webhook handler. The default 10s on
 // Hobby plans is too tight. A shirt order does several Postgres writes,
@@ -166,9 +168,18 @@ async function createFulfillmentRecord(opts: {
    * buyers already had their shirts.
    */
   soldInPerson?: boolean;
-}): Promise<void> {
+  /**
+   * Catalog id (src/lib/products.ts) and who makes it. 'printful' rows
+   * are handed to src/lib/printful/orders.ts right after the insert;
+   * 'inhouse' (the default) is Kevin's queue. Returns the row id so the
+   * caller can do that hand-off.
+   */
+  productId?: string;
+  fulfillmentSource?: 'inhouse' | 'printful';
+}): Promise<string | null> {
   const vinylFront = vinylColorForShirt(opts.shirtColor);
   const vinylBack = vinylColorForShirt(opts.shirtColor);
+  const source = opts.fulfillmentSource ?? 'inhouse';
 
   // Postgres is the source of truth; the admin shirts-to-ship queue
   // reads fulfillments.* here.
@@ -197,10 +208,10 @@ async function createFulfillmentRecord(opts: {
         console.log(
           `[WH] Fulfillment already exists for session=${opts.stripeSessionId} item=${opts.itemIndex} — skipping duplicate insert.`
         );
-        return;
+        return existing[0].id;
       }
     }
-    await db.insert(fulfillments).values({
+    const inserted = await db.insert(fulfillments).values({
       orderNumber: typeof opts.shirtNumber === 'number' && !Number.isNaN(opts.shirtNumber) ? opts.shirtNumber : null,
       design: opts.design,
       shirtColor: opts.shirtColor,
@@ -222,9 +233,13 @@ async function createFulfillmentRecord(opts: {
       notes: opts.notes || null,
       stripeSessionId: opts.stripeSessionId ?? null,
       itemIndex: typeof opts.itemIndex === 'number' ? opts.itemIndex : null,
-    });
+      productId: opts.productId ?? null,
+      fulfillmentSource: source,
+      printfulStatus: source === 'printful' ? 'unsubmitted' : null,
+    }).returning({ id: fulfillments.id });
     const numLabel = typeof opts.shirtNumber === 'number' ? `#${opts.shirtNumber}` : '#TBD';
-    console.log(`[WH] Fulfillment PG insert: ${numLabel} ${opts.design} / ${opts.shirtColor} / ${opts.shirtSize} / ${opts.buyerEmail}`);
+    console.log(`[WH] Fulfillment PG insert (${source}): ${numLabel} ${opts.design} / ${opts.shirtColor} / ${opts.shirtSize} / ${opts.buyerEmail}`);
+    return inserted[0]?.id ?? null;
   } catch (err: unknown) {
     // Concurrent-retry defense: if the pre-check missed a race window
     // and both retries reached INSERT, the partial unique index fires
@@ -238,7 +253,7 @@ async function createFulfillmentRecord(opts: {
       console.log(
         `[WH] Fulfillment already existed (unique-index caught retry) for session=${opts.stripeSessionId} item=${opts.itemIndex}.`
       );
-      return;
+      return null;
     }
     const message = err instanceof Error ? err.message : String(err);
     console.error('[WH] Fulfillment PG insert FAILED (queue will be missing this order):', message.slice(0, 300));
@@ -302,7 +317,7 @@ async function createFulfillmentRecord(opts: {
       );
     }
   }
-
+  return null;
 }
 
 // Find or create the donor row in Postgres. Dedupes by Stripe customer
@@ -1635,51 +1650,69 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
       // and shirtColor collapse to the same titlecase string. Kept as
       // separate downstream fields because email templates + admin
       // surfaces still render them as separate columns.
-      const SHIRT_NAMES: Record<string, string> = {
-        onyx: 'Onyx',
-        meadow: 'Meadow',
-        blossom: 'Blossom',
-        sky: 'Sky',
-      };
-
-      // Stockpile model (May 2026 forward): no per-item child assignment.
-      // Kevin pulls pre-printed shirts that match color+size from inventory
-      // and reconciles the shipped numbers into Fulfillment after shipping.
+      // Every cart line names a catalog product (src/lib/products.ts).
+      // The 2026 tees are one product per colorway, so name and color
+      // collapse to the same word; seasonal pieces carry the color in
+      // `c`. Unknown ids (a session minted before a product was
+      // retired) fall back to the raw id so the row still lands.
+      //
+      // Stockpile model (May 2026 forward) for in-house tees: no
+      // per-item child assignment; Kevin pulls pre-printed shirts from
+      // inventory. Printful pieces get their number at order time in
+      // submitPrintfulOrder.
       const assignments: Array<{
         itemIndex: number;
+        productId: string;
+        design: string;
         shirtName: string;
         shirtColor: string;
         shirtSize: string;
         continueMonthly: boolean;
-      }> = cartItems.map(item => ({
-        itemIndex: item.i,
-        shirtName: item.n ?? SHIRT_NAMES[item.s] ?? item.s,
-        shirtColor: item.c ?? SHIRT_NAMES[item.s] ?? item.s,
-        shirtSize: item.z,
-        continueMonthly: item.m === 1,
-      }));
+        source: 'inhouse' | 'printful';
+      }> = cartItems.map(item => {
+        const product = getProduct(item.s);
+        const singleColor = product && product.colors.length === 1 ? product.colors[0].name : null;
+        return {
+          itemIndex: item.i,
+          productId: item.s,
+          design: product?.design ?? 'Number Tee',
+          shirtName: item.n ?? product?.name ?? item.s,
+          shirtColor: item.c ?? singleColor ?? item.s,
+          shirtSize: item.z,
+          continueMonthly: item.m === 1,
+          source: product?.fulfillment ?? 'inhouse',
+        };
+      });
 
       // Create Fulfillment records FIRST — before the donation upsert.
-      // Order # and Child Name stay blank; Kevin fills them in when he
-      // reconciles which stockpile shirts went out.
+      // In-house: Order # and Child Name stay blank; Kevin fills them
+      // in when he reconciles which stockpile shirts went out.
+      // Printful: the row is handed straight to Printful (non-fatal;
+      // a failure leaves it in the admin Printful tab with a Retry).
       for (let i = 0; i < assignments.length; i++) {
         const a = assignments[i];
         try {
-          await createFulfillmentRecord({
-            design: 'Number Tee',
+          const rowId = await createFulfillmentRecord({
+            design: a.design,
             shirtColor: a.shirtColor,
             shirtSize: a.shirtSize,
             buyerName: name,
             buyerEmail: email,
             address: address || null,
             orderDate: donationDate,
-            notes: `${session.metadata?.sold_in_person === 'true' ? '[Market — handed at booth] ' : ''}${a.continueMonthly ? 'Cart item with monthly opt-in — match pending shipment' : 'Cart item — match pending shipment'}`,
+            notes: `${session.metadata?.sold_in_person === 'true' ? '[Market — handed at booth] ' : ''}${a.source === 'printful' ? 'Printful dropship' : a.continueMonthly ? 'Cart item with monthly opt-in — match pending shipment' : 'Cart item — match pending shipment'}`,
             // Idempotency: session + line-item index. Prevents Stripe
             // webhook retries from double-inserting the same cart row.
             stripeSessionId: session.id,
             itemIndex: i,
             soldInPerson: session.metadata?.sold_in_person === 'true',
+            productId: a.productId,
+            fulfillmentSource: a.source,
           });
+          if (a.source === 'printful' && rowId) {
+            const sub = await submitPrintfulOrder(rowId);
+            console.log(`[WH] Printful submit for item ${i}:`, sub.ok ? `order ${sub.printfulOrderId} #${sub.shirtNumber}` : `FAILED ${sub.error}`);
+          }
         } catch (err: any) {
           console.error('[WH] Cart fulfillment record failed:', String(err?.message || err).slice(0, 200));
         }

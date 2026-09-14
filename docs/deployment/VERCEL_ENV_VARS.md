@@ -53,10 +53,21 @@ ADMIN_PASSWORD=...       # legacy header path, kept until the old admin pages re
 CRON_SECRET=...          # Vercel sends it as a Bearer token to /api/cron/*
 ```
 
+## Printful (the seasonal dropship line, see docs/printful.md)
+
+```
+PRINTFUL_API_KEY=...            # private token for the API store
+PRINTFUL_STORE_ID=...           # only if the token sees more than one store
+PRINTFUL_WEBHOOK_SECRET=...     # any long random string; goes in the webhook URL
+PRINTFUL_AUTO_CONFIRM=true      # leave UNSET for drafts Kevin confirms in Printful
+```
+
+Without `PRINTFUL_API_KEY`, seasonal orders still record a fulfillment row; they show in the admin Printful tab as failed with a Retry, and nothing is sent.
+
 ## Optional
 
 ```
-NEXT_PUBLIC_SITE_URL=https://www.beanumber.org
+NEXT_PUBLIC_SITE_URL=https://www.beanumber.org   # also builds the print-file URLs Printful fetches
 NEXT_PUBLIC_GA_MEASUREMENT_ID=G-...
 ADMIN_NOTIFY_EMAIL=kevin@beanumber.org
 KEVIN_ALERT_EMAIL=kevin@beanumber.org

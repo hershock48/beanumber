@@ -5,6 +5,7 @@ import {
   discountedAmountCents,
 } from '@/lib/promo-codes';
 import { isFreeShippingWindowActive } from '@/lib/free-shipping-window';
+import { getProduct, isValidSelection } from '@/lib/products';
 
 async function getStripe() {
   const StripeModule = (await import('stripe')).default;
@@ -18,24 +19,23 @@ async function getStripe() {
   });
 }
 
-const SHIRTS: Record<string, { name: string }> = {
-  onyx: { name: 'Onyx' },
-  meadow: { name: 'Meadow' },
-  blossom: { name: 'Blossom' },
-  sky: { name: 'Sky' },
-};
-
+// The monthly sponsorship line is always $25 whatever the garment cost.
 const SHIRT_PRICE = 25;
 
-const cartItemSchema = z.object({
-  shirtId: z.enum(['onyx', 'meadow', 'blossom', 'sky']),
-  // Adult run S–2XL plus the July 2026 youth run (stored as literal
-  // "Youth S" / "Youth M" / "Youth L" strings so display everywhere
-  // reads clean without a translation layer).
-  size: z.enum(['S', 'M', 'L', 'XL', '2XL', 'Youth S', 'Youth M', 'Youth L', 'Youth XL']),
-  color: z.enum(['Onyx', 'Meadow', 'Blossom', 'Sky']),
-  continueMonthly: z.boolean().optional().default(false),
-});
+// Products, colors, sizes and prices come from src/lib/products.ts; a
+// line the catalog does not know is rejected below with a 400. Sizes
+// are stored as literal strings ("Youth S") so display everywhere reads
+// clean without a translation layer.
+const cartItemSchema = z
+  .object({
+    shirtId: z.string().min(1).max(40),
+    size: z.string().min(1).max(20),
+    color: z.string().min(1).max(40),
+    continueMonthly: z.boolean().optional().default(false),
+  })
+  .refine(item => isValidSelection(item.shirtId, item.color, item.size), {
+    message: 'That product, color, or size is not available.',
+  });
 
 const cartSchema = z.object({
   items: z.array(cartItemSchema).min(1).max(10),
@@ -79,30 +79,48 @@ export async function POST(request: NextRequest) {
     const appliedPromo =
       promoResult && promoResult.ok ? promoResult.code : null;
     /**
-     * unit_amount in cents for a shirt line item. With an applied
-     * promo, the cents are reduced; otherwise full price. Stripe
-     * wants integer cents.
+     * unit_amount in cents for a line item: the catalog price, reduced
+     * by the promo when one applies. Stripe wants integer cents.
      */
-    const shirtUnitAmount = appliedPromo
-      ? discountedAmountCents(SHIRT_PRICE * 100, appliedPromo.percentOff)
-      : SHIRT_PRICE * 100;
+    const unitAmountFor = (productId: string): number => {
+      const price = (getProduct(productId)?.price ?? SHIRT_PRICE) * 100;
+      return appliedPromo ? discountedAmountCents(price, appliedPromo.percentOff) : price;
+    };
+    const lineName = (item: (typeof items)[number]): string => {
+      const p = getProduct(item.shirtId);
+      if (!p) return `${item.shirtId} · ${item.size}`;
+      // Tees are one product per colorway ("Onyx tee · L"); seasonal
+      // pieces name the garment and the color ("Hoodie · Navy · L").
+      return p.colors.length === 1
+        ? `${p.name} tee · ${item.size}`
+        : `${p.name} · ${item.color} · ${item.size}`;
+    };
+    const lineDescription = (item: (typeof items)[number]): string => {
+      const p = getProduct(item.shirtId);
+      return p?.fulfillment === 'printful'
+        ? 'Be A Number. Printed to order with a unique number that connects you to a real child.'
+        : 'Be A Number heavyweight tee. Your shirt number connects you to a real child.';
+    };
 
     // Per-item metadata for the webhook (so it can build Fulfillment
     // and (when monthly) Sponsorship rows).
     //
     // Compact shape — Stripe caps each metadata VALUE at 500 chars,
-    // and this whole array serializes into one string. Dropped `n`
-    // (name) and `c` (color) — both are derivable from `s` (shirtId)
-    // via the SHIRTS map on the webhook side. For a 10-shirt cart with
-    // youth-size values, this keeps items_json around 420 chars vs.
-    // ~700 with the full shape, leaving comfortable margin under the
-    // 500-char cap even for future field additions.
-    const itemsMeta = items.map((item, i) => ({
-      i: i,
-      s: item.shirtId,
-      z: item.size,
-      m: item.continueMonthly ? 1 : 0,
-    }));
+    // and this whole array serializes into one string. `n` (name) is
+    // derivable from `s` (product id) on the webhook side, so it is
+    // omitted. `c` (color) is sent only for products with more than
+    // one color; the tees are one product per colorway. A 10-line
+    // cart stays around 450 chars, under the cap.
+    const itemsMeta = items.map((item, i) => {
+      const p = getProduct(item.shirtId);
+      return {
+        i: i,
+        s: item.shirtId,
+        ...(p && p.colors.length > 1 ? { c: item.color } : {}),
+        z: item.size,
+        m: item.continueMonthly ? 1 : 0,
+      };
+    });
 
     const hasMonthly = items.some(i => i.continueMonthly);
     const monthlyCount = items.filter(i => i.continueMonthly).length;
@@ -171,16 +189,14 @@ export async function POST(request: NextRequest) {
       // a clean array. Discounts (when applicable per the promo rules)
       // apply only to shirt one-time lines — never to recurring.
       const lineItems = items.flatMap(item => {
-        const shirt = SHIRTS[item.shirtId]!;
         const shirtLine = {
           price_data: {
             currency: 'usd' as const,
             product_data: {
-              name: `${shirt.name} tee · ${item.size}`,
-              description:
-                'Be A Number heavyweight tee. Your shirt number connects you to a real child.',
+              name: lineName(item),
+              description: lineDescription(item),
             },
-            unit_amount: shirtUnitAmount,
+            unit_amount: unitAmountFor(item.shirtId),
           },
           quantity: 1,
         };
@@ -249,16 +265,14 @@ export async function POST(request: NextRequest) {
       // items are one-time shirts so the promo discount (if applied)
       // hits every one of them at the discounted shirtUnitAmount.
       const lineItems = items.map(item => {
-        const shirt = SHIRTS[item.shirtId]!;
         return {
           price_data: {
             currency: 'usd' as const,
             product_data: {
-              name: `${shirt.name} tee · ${item.size}`,
-              description:
-                'Be A Number heavyweight tee. Your shirt number connects you to a real child.',
+              name: lineName(item),
+              description: lineDescription(item),
             },
-            unit_amount: shirtUnitAmount,
+            unit_amount: unitAmountFor(item.shirtId),
           },
           quantity: 1,
         };

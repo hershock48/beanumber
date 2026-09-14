@@ -24,12 +24,33 @@ interface Order {
   orderDate: string;
   notes: string;
   hasAddress: boolean;
+  // Printful line (2026-09-14). 'inhouse' rows are Kevin's queue.
+  source: 'inhouse' | 'printful' | string;
+  productId: string;
+  printfulOrderId: string;
+  printfulStatus: string;
+  tracking: string;
+  trackingUrl: string;
+  lastError: string;
+  shippedAt: string;
   drip?: {
     pipeline: string;
     stage: number;
     nextSend: string;
   };
 }
+
+const PRINTFUL_STATUS_LABELS: Record<string, string> = {
+  unsubmitted: 'Not sent yet',
+  failed: 'Failed',
+  draft: 'Draft (confirm in Printful)',
+  pending: 'Pending',
+  onhold: 'On hold',
+  inprocess: 'In production',
+  partial: 'Partly shipped',
+  fulfilled: 'Shipped',
+  canceled: 'Canceled',
+};
 
 const PIPELINE_LABELS: Record<string, string> = {
   shirt_nurture: 'Shirt Nurture',
@@ -47,6 +68,20 @@ const PIPELINE_MAX: Record<string, number> = {
   monthly_donor: 3,
 };
 
+/** "1, 2, 3, 4, 7, 9, 10" becomes "1-4, 7, 9-10" for the stock field. */
+function compressRanges(nums: number[]): string {
+  const sorted = Array.from(new Set(nums)).sort((a, b) => a - b);
+  const parts: string[] = [];
+  let i = 0;
+  while (i < sorted.length) {
+    let j = i;
+    while (j + 1 < sorted.length && sorted[j + 1] === sorted[j] + 1) j++;
+    parts.push(j > i ? `${sorted[i]}-${sorted[j]}` : String(sorted[i]));
+    i = j + 1;
+  }
+  return parts.join(', ');
+}
+
 export default function FulfillmentDashboard() {
   // Auth handled by middleware.ts + admin session cookie. No password
   // prompt; cookie ships automatically on every fetch.
@@ -54,11 +89,19 @@ export default function FulfillmentDashboard() {
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
 
-  const [activeTab, setActiveTab] = useState<'queue' | 'shipped'>('queue');
+  const [activeTab, setActiveTab] = useState<'queue' | 'printful' | 'shipped'>('queue');
   const [queueOrders, setQueueOrders] = useState<Order[]>([]);
+  const [printfulOrders, setPrintfulOrders] = useState<Order[]>([]);
   const [shippedOrders, setShippedOrders] = useState<Order[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isShipping, setIsShipping] = useState(false);
+  const [retryingId, setRetryingId] = useState<string | null>(null);
+  // Stocked numbers: every number ever printed on an in-house tee. The
+  // Printful assigner skips these. Edited as one text field.
+  const [stockText, setStockText] = useState('');
+  const [stockCount, setStockCount] = useState<number | null>(null);
+  const [stockSaving, setStockSaving] = useState(false);
+  const [stockOpen, setStockOpen] = useState(false);
 
   const fetchOrders = useCallback(async (status: string) => {
     const res = await fetch(`/api/admin/fulfillment/list?status=${status}`);
@@ -71,18 +114,74 @@ export default function FulfillmentDashboard() {
     setIsLoading(true);
     setError('');
     try {
-      const [queue, shipped] = await Promise.all([
+      const [queue, printful, shipped] = await Promise.all([
         fetchOrders('unshipped'),
+        fetchOrders('printful'),
         fetchOrders('shipped'),
       ]);
       setQueueOrders(queue);
+      setPrintfulOrders(printful);
       setShippedOrders(shipped);
     } catch (err: any) {
       setError(err.message || 'Failed to load');
     } finally {
       setIsLoading(false);
     }
+    try {
+      const res = await fetch('/api/admin/stocked-numbers');
+      if (res.ok) {
+        const data = await res.json();
+        const nums: number[] = data.numbers || [];
+        setStockCount(nums.length);
+        setStockText(compressRanges(nums));
+      }
+    } catch {
+      // The panel shows "unknown" and the save still works.
+    }
   }, [fetchOrders]);
+
+  const handleRetry = async (id: string) => {
+    setRetryingId(id);
+    setError('');
+    setSuccessMessage('');
+    try {
+      const res = await fetch('/api/admin/printful/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fulfillmentId: id }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Retry failed');
+      setSuccessMessage(`Sent to Printful: order ${data.printfulOrderId} (${data.status}), shirt #${data.shirtNumber}.`);
+      await loadAll();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setRetryingId(null);
+    }
+  };
+
+  const handleSaveStock = async () => {
+    setStockSaving(true);
+    setError('');
+    setSuccessMessage('');
+    try {
+      const res = await fetch('/api/admin/stocked-numbers', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: stockText }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Save failed');
+      setStockCount(data.count);
+      setStockText(compressRanges(data.numbers || []));
+      setSuccessMessage(`Stocked numbers saved: ${data.count} number${data.count === 1 ? '' : 's'} reserved for in-house tees.`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setStockSaving(false);
+    }
+  };
 
   // Auto-load on mount.
   useEffect(() => {
@@ -157,7 +256,7 @@ export default function FulfillmentDashboard() {
       <div className="max-w-6xl mx-auto px-4 py-4">
         <h1 className="text-lg font-bold text-[#0d0d0d]">Fulfillment</h1>
         <p className="text-xs text-[#666]">
-          {queueOrders.length} to ship · {shippedOrders.length} shipped
+          {queueOrders.length} to ship · {printfulOrders.length} at Printful · {shippedOrders.length} shipped
         </p>
       </div>
 
@@ -189,6 +288,16 @@ export default function FulfillmentDashboard() {
               }`}
             >
               To Ship ({queueOrders.length})
+            </button>
+            <button
+              onClick={() => setActiveTab('printful')}
+              className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                activeTab === 'printful'
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              Printful ({printfulOrders.length})
             </button>
             <button
               onClick={() => setActiveTab('shipped')}
@@ -337,6 +446,114 @@ export default function FulfillmentDashboard() {
         </div>
       )}
 
+      {/* Printful view: rows Printful prints and ships. Nothing here is
+          Kevin's to ship; a stuck row shows its error and a Retry. */}
+      {activeTab === 'printful' && (
+        <div className="max-w-6xl mx-auto px-4 pb-12">
+          <div className="bg-white border border-gray-200 rounded-lg px-4 py-3 mb-4 text-xs text-gray-600">
+            <p>
+              These pieces are printed and shipped by Printful. Drafts wait in the Printful dashboard until you confirm them there.
+              When a package ships, the row moves to Shipped on its own and the buyer gets tracking by email.
+            </p>
+            <div className="mt-2 flex flex-wrap gap-3">
+              <a href="/api/admin/printful/test-order" className="text-[#b58a2a] font-semibold hover:underline">Place a test order</a>
+              <button onClick={() => setStockOpen(o => !o)} className="text-[#b58a2a] font-semibold hover:underline">
+                {stockOpen ? 'Hide' : 'Edit'} stocked numbers{stockCount != null ? ` (${stockCount})` : ''}
+              </button>
+            </div>
+            {stockOpen && (
+              <div className="mt-3 border-t border-gray-100 pt-3">
+                <p className="text-gray-700 font-semibold mb-1">Numbers printed on in-house tees</p>
+                <p className="mb-2">
+                  List every number you have ever pressed onto a tee, sold or not. Printful pieces will never use one of these,
+                  so a hoodie can never land on the same number as a tee in the pile. Ranges are fine: 1-53, 60, 62-70.
+                </p>
+                <textarea
+                  id="stocked-numbers"
+                  value={stockText}
+                  onChange={e => setStockText(e.target.value)}
+                  rows={3}
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm font-mono"
+                  placeholder="1-53, 60, 62-70"
+                />
+                <button
+                  onClick={handleSaveStock}
+                  disabled={stockSaving}
+                  className="mt-2 px-4 py-1.5 text-sm bg-gray-900 text-white rounded-md hover:bg-gray-800 font-semibold disabled:bg-gray-400"
+                >
+                  {stockSaving ? 'Saving...' : 'Save stocked numbers'}
+                </button>
+              </div>
+            )}
+          </div>
+
+          {printfulOrders.length === 0 ? (
+            <div className="text-center py-16 text-gray-500">
+              <p className="text-lg font-medium">Nothing at Printful</p>
+              <p className="text-sm mt-1">Seasonal orders show here from checkout until they ship.</p>
+            </div>
+          ) : (
+            <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 text-xs text-gray-500 uppercase tracking-wider">
+                  <tr>
+                    <th className="text-left px-4 py-2">Number</th>
+                    <th className="text-left px-4 py-2">Buyer</th>
+                    <th className="text-left px-4 py-2">Piece</th>
+                    <th className="text-left px-4 py-2">Printful</th>
+                    <th className="text-left px-4 py-2">Ordered</th>
+                    <th className="text-right px-4 py-2"></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {printfulOrders.map(order => {
+                    const stuck = order.printfulStatus === 'failed' || order.printfulStatus === 'unsubmitted' || !order.printfulOrderId;
+                    return (
+                      <tr key={order.id} className="hover:bg-gray-50 align-top">
+                        <td className="px-4 py-2 font-bold text-gray-900">{order.orderNum ? `#${order.orderNum}` : <span className="text-gray-400 font-normal">not assigned</span>}</td>
+                        <td className="px-4 py-2">
+                          <p className="text-gray-900">{order.buyer}</p>
+                          <p className="text-xs text-gray-400">{order.email}</p>
+                          {!order.hasAddress && <p className="text-xs text-red-600 font-semibold">Address missing</p>}
+                        </td>
+                        <td className="px-4 py-2">
+                          <p className="text-gray-700">{order.design}</p>
+                          <p className="text-xs text-gray-400">{order.shirtColor} · {order.size}</p>
+                        </td>
+                        <td className="px-4 py-2">
+                          <p className={stuck ? 'text-red-700 font-semibold' : 'text-gray-700'}>
+                            {PRINTFUL_STATUS_LABELS[order.printfulStatus] || order.printfulStatus || 'Not sent yet'}
+                          </p>
+                          {order.printfulOrderId && <p className="text-xs text-gray-400">order {order.printfulOrderId}</p>}
+                          {order.lastError && <p className="text-xs text-red-600 mt-1 max-w-xs break-words">{order.lastError}</p>}
+                          {order.trackingUrl && (
+                            <a href={order.trackingUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-[#b58a2a] hover:underline">
+                              Track {order.tracking}
+                            </a>
+                          )}
+                        </td>
+                        <td className="px-4 py-2 text-xs text-gray-500">{order.orderDate}</td>
+                        <td className="px-4 py-2 text-right">
+                          {stuck && (
+                            <button
+                              onClick={() => handleRetry(order.id)}
+                              disabled={retryingId === order.id}
+                              className="px-3 py-1.5 text-xs bg-gray-900 text-white rounded-md hover:bg-gray-800 font-semibold disabled:bg-gray-400"
+                            >
+                              {retryingId === order.id ? 'Sending...' : 'Retry'}
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Shipped view */}
       {activeTab === 'shipped' && (
         <div className="max-w-6xl mx-auto px-4 pb-12">
@@ -365,6 +582,16 @@ export default function FulfillmentDashboard() {
                           <span className="ml-2 inline-block px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 text-[10px] font-semibold uppercase tracking-wide align-middle">
                             In person
                           </span>
+                        )}
+                        {order.source === 'printful' && (
+                          <span className="ml-2 inline-block px-1.5 py-0.5 rounded bg-sky-100 text-sky-800 text-[10px] font-semibold uppercase tracking-wide align-middle">
+                            Printful
+                          </span>
+                        )}
+                        {order.trackingUrl && (
+                          <a href={order.trackingUrl} target="_blank" rel="noopener noreferrer" className="block text-xs font-normal text-[#b58a2a] hover:underline">
+                            Track
+                          </a>
                         )}
                       </td>
                       <td className="px-4 py-2">

@@ -64,6 +64,9 @@ const PITCH_HOSTS = '([a-z0-9-]+\\.glazedweb\\.com|[a-z0-9-]+\\.vercel\\.app)';
 const onPitchHost = [{ type: 'host' as const, value: PITCH_HOSTS }];
 
 const nextConfig: NextConfig = {
+  // Native modules behind the Printful print-file routes (/print/*).
+  // Bundling them breaks their binary loading; keep them external.
+  serverExternalPackages: ['@resvg/resvg-js', 'sharp'],
   async rewrites() {
     return {
       beforeFiles: [
