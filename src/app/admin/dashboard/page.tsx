@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import Link from 'next/link';
 import { AdminShell } from '../_components/AdminShell';
 
 interface PendingUpdate {
@@ -20,48 +19,19 @@ interface PendingUpdate {
   createdTime: string;
 }
 
-interface OverdueChild {
-  sponsorCode: string;
-  childName: string;
-  childId: string;
-  sponsorEmail: string;
-  sponsorName?: string;
-  lastUpdateDate: string | null;
-  daysSinceUpdate: number;
-  lastUpdateTitle?: string;
-}
+// The "Overdue Updates" tab that used to sit beside Pending Updates read
+// the Airtable child-update review tables. It was removed with the
+// Airtable retirement on 2026-09-14. The roster deadlines banner on
+// /admin/roster covers the same question from Postgres.
 
 export default function AdminDashboard() {
   // Auth is handled by middleware.ts + the admin session cookie.
   // No password prompt here; the cookie ships automatically on every
   // fetch, so we drop the X-Admin-Token headers too.
   const [updates, setUpdates] = useState<PendingUpdate[]>([]);
-  const [overdueChildren, setOverdueChildren] = useState<OverdueChild[]>([]);
-  const [overdueStats, setOverdueStats] = useState<{ totalActive: number; overdueCount: number } | null>(null);
-  const [isLoadingOverdue, setIsLoadingOverdue] = useState(false);
   const [error, setError] = useState('');
   const [publishingId, setPublishingId] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState('');
-  const [activeTab, setActiveTab] = useState<'pending' | 'overdue'>('pending');
-
-  const loadOverdueData = async () => {
-    setIsLoadingOverdue(true);
-    try {
-      const response = await fetch('/api/admin/updates/overdue?threshold=90');
-      if (response.ok) {
-        const data = await response.json();
-        setOverdueChildren(data.data.overdueChildren);
-        setOverdueStats({
-          totalActive: data.data.totalActive,
-          overdueCount: data.data.overdueCount,
-        });
-      }
-    } catch (err) {
-      console.error('Failed to load overdue data:', err);
-    } finally {
-      setIsLoadingOverdue(false);
-    }
-  };
 
   const loadUpdates = async () => {
     try {
@@ -71,7 +41,7 @@ export default function AdminDashboard() {
         setUpdates(data.data.updates);
       } else {
         const data = await response.json().catch(() => ({}));
-        setError(`Couldn't load pending updates: ${data.message || response.statusText}. Dashboard still works — check Airtable API key in Vercel env vars.`);
+        setError(`Couldn't load pending updates: ${data.message || response.statusText}. Dashboard still works. Check DATABASE_URL in Vercel env vars.`);
       }
     } catch (err) {
       setError('Couldn\'t reach the updates API. Dashboard still works.');
@@ -81,7 +51,6 @@ export default function AdminDashboard() {
   // Auto-load on mount (cookie auth carries through).
   useEffect(() => {
     loadUpdates();
-    loadOverdueData();
   }, []);
 
   const handlePublish = async (updateId: string, title: string, sendNotification: boolean = false) => {
@@ -181,32 +150,7 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* Tabs */}
-        <div className="flex gap-4 mb-6 border-b border-gray-200">
-          <button
-            onClick={() => setActiveTab('pending')}
-            className={`pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${
-              activeTab === 'pending'
-                ? 'border-gray-900 text-gray-900'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            Pending Updates ({updates.length})
-          </button>
-          <button
-            onClick={() => setActiveTab('overdue')}
-            className={`pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${
-              activeTab === 'overdue'
-                ? 'border-gray-900 text-gray-900'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            Overdue Updates {overdueStats ? `(${overdueStats.overdueCount}/${overdueStats.totalActive})` : ''}
-          </button>
-        </div>
-
-        {/* Pending Updates Tab */}
-        {activeTab === 'pending' && (
+        {/* Pending Updates */}
         <div className="bg-white rounded-lg shadow-lg">
           <div className="px-6 py-4 border-b border-gray-200">
             <h2 className="text-xl font-semibold text-gray-900">
@@ -300,74 +244,6 @@ export default function AdminDashboard() {
             </div>
           )}
         </div>
-        )}
-
-        {/* Overdue Updates Tab */}
-        {activeTab === 'overdue' && (
-        <div className="bg-white rounded-lg shadow-lg">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h2 className="text-xl font-semibold text-gray-900">
-              Children Needing Updates
-            </h2>
-            <p className="text-sm text-gray-500 mt-1">
-              Children who haven't received an update in more than 90 days
-            </p>
-          </div>
-
-          {isLoadingOverdue ? (
-            <div className="px-6 py-12 text-center text-gray-500">
-              Loading overdue data...
-            </div>
-          ) : overdueChildren.length === 0 ? (
-            <div className="px-6 py-12 text-center text-gray-500">
-              All children have recent updates
-            </div>
-          ) : (
-            <div className="divide-y divide-gray-200">
-              {overdueChildren.map((child) => (
-                <div key={child.sponsorCode} className="p-6">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-900">
-                        {child.childName}
-                      </h3>
-                      <div className="flex items-center gap-4 mt-1 text-sm text-gray-500">
-                        <span className="font-mono bg-gray-100 px-2 py-0.5 rounded">
-                          {child.sponsorCode}
-                        </span>
-                        <span>Sponsor: {child.sponsorName || child.sponsorEmail}</span>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${
-                        child.daysSinceUpdate === -1
-                          ? 'bg-red-100 text-red-800'
-                          : child.daysSinceUpdate > 180
-                          ? 'bg-red-100 text-red-800'
-                          : 'bg-yellow-100 text-yellow-800'
-                      }`}>
-                        {child.daysSinceUpdate === -1
-                          ? 'Never updated'
-                          : `${child.daysSinceUpdate} days ago`}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="mt-3 text-sm text-gray-600">
-                    {child.lastUpdateDate ? (
-                      <>
-                        <span className="font-medium">Last update:</span>{' '}
-                        {child.lastUpdateTitle} ({formatDate(child.lastUpdateDate)})
-                      </>
-                    ) : (
-                      <span className="italic text-gray-400">No updates have been published for this child</span>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-        )}
       </div>
     </AdminShell>
   );

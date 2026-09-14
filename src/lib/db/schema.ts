@@ -1610,3 +1610,71 @@ export type NewPushDelivery = typeof pushDeliveries.$inferInsert;
 
 export type PendingDeferredLink = typeof pendingDeferredLinks.$inferSelect;
 export type NewPendingDeferredLink = typeof pendingDeferredLinks.$inferInsert;
+
+// ─────────────────────────────────────────────────────────────────
+//  Cohort members (the Founding Cohort trip program at /rep)
+// ─────────────────────────────────────────────────────────────────
+//
+// Applications from /rep and the magic-link sign-in for /rep/dashboard.
+// Lived in an Airtable "Reps" table until 2026-09-14; the base is
+// retired, so this is the only copy. shirts_sold / sponsor_count are
+// computed live from donations whose note carries "[Ref: code]" and
+// cached here for the leaderboard. See drizzle/0018_cohort_members.sql
+// and src/lib/cohort-members.ts.
+
+export const cohortMembers = pgTable(
+  'cohort_members',
+  {
+    id: uuid('id')
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+
+    name: text('name').notNull(),
+    email: text('email').notNull(),
+    phone: text('phone'),
+    school: text('school'),
+    organization: text('organization'),
+    why: text('why'),
+    firstFive: text('first_five'),
+    howHeard: text('how_heard'),
+
+    // Referral code the member shares: /shirts?ref=<code>
+    refCode: text('ref_code').notNull(),
+
+    // 'Applied' | 'Approved' | 'Declined'. Only Approved can sign in.
+    status: text('status').notNull().default('Applied'),
+    appliedAt: timestamp('applied_at', { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+
+    // Cached stats, refreshed on every dashboard load.
+    shirtsSold: integer('shirts_sold').notNull().default(0),
+    sponsorCount: integer('sponsor_count').notNull().default(0),
+
+    // The kid the member sponsors, set by hand.
+    childNumber: integer('child_number'),
+    childName: text('child_name'),
+
+    // Magic-link sign-in. 30-minute expiry.
+    authToken: text('auth_token'),
+    authTokenExpiry: timestamp('auth_token_expiry', { withTimezone: true }),
+
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+  },
+  table => ({
+    emailIdx: uniqueIndex('cohort_members_email_lower_idx').on(
+      sql`lower(${table.email})`
+    ),
+    refCodeIdx: uniqueIndex('cohort_members_ref_code_idx').on(table.refCode),
+    authTokenIdx: index('cohort_members_auth_token_idx').on(table.authToken),
+    statusIdx: index('cohort_members_status_idx').on(table.status),
+  })
+);
+
+export type CohortMember = typeof cohortMembers.$inferSelect;
+export type NewCohortMember = typeof cohortMembers.$inferInsert;

@@ -1,12 +1,20 @@
 /**
  * Reconcile Subscriptions Tool
  *
- * WAT-compliant tool for reconciling Stripe subscriptions with Airtable records.
- * Identifies mismatches between payment status and sponsorship records.
+ * WAT-compliant tool for reconciling Stripe subscriptions with the
+ * Postgres sponsorships table. Identifies mismatches between what
+ * Stripe is billing and what the site believes is an active sponsorship.
+ *
+ * Compared against Airtable until 2026-09-14; Airtable is retired and
+ * the sponsorships table is the source of truth.
  */
 
+import type Stripe from 'stripe';
+import { isNotNull } from 'drizzle-orm';
 import { logger } from '../../logger';
 import { ValidationResult, success, failure } from '../../validation';
+import { db } from '../../db/client';
+import { sponsorships } from '../../db/schema';
 
 // ============================================================================
 // INPUT/OUTPUT INTERFACES
@@ -26,11 +34,11 @@ export interface ReconcileSubscriptionsInput {
  * Subscription mismatch types
  */
 export type MismatchType =
-  | 'missing_in_airtable'   // Stripe sub exists but no Airtable record
-  | 'missing_in_stripe'     // Airtable record exists but no Stripe sub
+  | 'missing_in_postgres'   // Stripe sub exists but no sponsorship row
+  | 'missing_in_stripe'     // Sponsorship row exists but no Stripe sub
   | 'status_mismatch'       // Payment status doesn't match
   | 'amount_mismatch'       // Subscription amount differs
-  | 'canceled_subscription' // Subscription was canceled but record still active;
+  | 'canceled_subscription' // Subscription was canceled but row still active
 
 /**
  * Subscription mismatch record
@@ -42,9 +50,9 @@ export interface SubscriptionMismatch {
   customerEmail?: string;
   sponsorCode?: string;
   stripeStatus?: string;
-  airtableStatus?: string;
+  postgresStatus?: string;
   stripeAmount?: number;
-  airtableAmount?: number;
+  postgresAmount?: number;
   details?: string;
 }
 
@@ -55,10 +63,10 @@ export interface ReconcileSubscriptionsOutput {
   success: boolean;
   data?: {
     totalStripeSubscriptions: number;
-    totalAirtableSponsorships: number;
+    totalPostgresSponsorships: number;
     mismatches: SubscriptionMismatch[];
     mismatchSummary: {
-      missing_in_airtable: number;
+      missing_in_postgres: number;
       missing_in_stripe: number;
       status_mismatch: number;
       canceled_subscription: number;
@@ -108,10 +116,7 @@ function validateInput(input: unknown): ValidationResult<ReconcileSubscriptionsI
 // STRIPE HELPERS
 // ============================================================================
 
-/**
- * Fetch active subscriptions from Stripe
- */
-async function fetchStripeSubscriptions(sinceDate?: string): Promise<Array<{
+interface StripeSubSummary {
   id: string;
   customerId: string;
   customerEmail: string;
@@ -119,7 +124,12 @@ async function fetchStripeSubscriptions(sinceDate?: string): Promise<Array<{
   amount: number;
   currency: string;
   created: Date;
-}>> {
+}
+
+/**
+ * Fetch subscriptions from Stripe (all statuses)
+ */
+async function fetchStripeSubscriptions(sinceDate?: string): Promise<StripeSubSummary[]> {
   const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
   if (!stripeSecretKey) {
     throw new Error('STRIPE_SECRET_KEY not configured');
@@ -130,23 +140,16 @@ async function fetchStripeSubscriptions(sinceDate?: string): Promise<Array<{
     apiVersion: '2025-12-15.clover',
   });
 
-  const subscriptions: Array<{
-    id: string;
-    customerId: string;
-    customerEmail: string;
-    status: string;
-    amount: number;
-    currency: string;
-    created: Date;
-  }> = [];
+  const subscriptions: StripeSubSummary[] = [];
 
   // Fetch all subscriptions with pagination
   let hasMore = true;
   let startingAfter: string | undefined;
 
   while (hasMore) {
-    const params: Record<string, unknown> = {
+    const params: Stripe.SubscriptionListParams = {
       limit: 100,
+      status: 'all',
       expand: ['data.customer'],
     };
 
@@ -158,14 +161,15 @@ async function fetchStripeSubscriptions(sinceDate?: string): Promise<Array<{
       params.created = { gte: Math.floor(new Date(sinceDate).getTime() / 1000) };
     }
 
-    const response = await stripe.subscriptions.list(params as any);
+    const response = await stripe.subscriptions.list(params);
 
     for (const sub of response.data) {
-      const customer = sub.customer as any;
+      const customer = sub.customer;
       subscriptions.push({
         id: sub.id,
-        customerId: typeof customer === 'string' ? customer : customer?.id || '',
-        customerEmail: typeof customer === 'object' ? customer?.email || '' : '',
+        customerId: typeof customer === 'string' ? customer : customer.id,
+        customerEmail:
+          typeof customer === 'object' && 'email' in customer ? customer.email || '' : '',
         status: sub.status,
         amount: sub.items.data[0]?.price?.unit_amount || 0,
         currency: sub.currency,
@@ -183,73 +187,54 @@ async function fetchStripeSubscriptions(sinceDate?: string): Promise<Array<{
 }
 
 // ============================================================================
-// AIRTABLE HELPERS
+// POSTGRES HELPERS
 // ============================================================================
 
-/**
- * Fetch active sponsorships from Airtable that have subscription IDs
- */
-async function fetchAirtableSponsorships(): Promise<Array<{
+interface SponsorshipSummary {
   id: string;
   sponsorCode: string;
   sponsorEmail: string;
-  subscriptionId?: string;
+  subscriptionId: string;
   status: string;
-}>> {
-  const AIRTABLE_API_KEY = process.env.AIRTABLE_API_KEY;
-  const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID;
-  const AIRTABLE_DONATIONS_TABLE = process.env.AIRTABLE_DONATIONS_TABLE || 'Donations';
-
-  if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) {
-    // Airtable not configured — return empty list so reconciliation degrades
-    // to "all Stripe subs look unrecorded" rather than crashing the route.
-    logger.warn('Airtable not configured, returning empty sponsorship list');
-    return [];
-  }
-
-  // Fetch recurring donations with subscription IDs
-  const formula = `AND({Recurring Donation}=TRUE(),{Subscription ID}!='')`;
-  let response: Response;
-  try {
-    response = await fetch(
-      `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_DONATIONS_TABLE}?filterByFormula=${encodeURIComponent(formula)}`,
-      {
-        headers: {
-          Authorization: `Bearer ${AIRTABLE_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-      }
-    );
-  } catch (err) {
-    logger.warn('Airtable unreachable during reconciliation, returning empty list', {
-      error: err instanceof Error ? err.message : String(err),
-    });
-    return [];
-  }
-
-  if (!response.ok) {
-    const error = await response.text();
-    logger.warn('Airtable API error during reconciliation, returning empty list', { error });
-    return [];
-  }
-
-  const data = await response.json();
-
-  return data.records.map((record: any) => ({
-    id: record.id,
-    sponsorCode: record.fields['SponsorCode'] || '',
-    sponsorEmail: record.fields['Donor Email at Donation'] || '',
-    subscriptionId: record.fields['Subscription ID'],
-    status: record.fields['Payment Status'] || 'Unknown',
-  }));
+  monthlyAmount: number;
 }
+
+/**
+ * Every sponsorship row that carries a Stripe subscription id.
+ */
+async function fetchPostgresSponsorships(): Promise<SponsorshipSummary[]> {
+  const rows = await db
+    .select({
+      id: sponsorships.id,
+      sponsorCode: sponsorships.sponsorCode,
+      sponsorEmail: sponsorships.sponsorEmail,
+      subscriptionId: sponsorships.stripeSubscriptionId,
+      status: sponsorships.status,
+      monthlyAmount: sponsorships.monthlyAmount,
+    })
+    .from(sponsorships)
+    .where(isNotNull(sponsorships.stripeSubscriptionId));
+
+  return rows
+    .filter(r => !!r.subscriptionId)
+    .map(r => ({
+      id: r.id,
+      sponsorCode: r.sponsorCode,
+      sponsorEmail: r.sponsorEmail,
+      subscriptionId: r.subscriptionId as string,
+      status: r.status || 'Unknown',
+      monthlyAmount: Number(r.monthlyAmount ?? 0),
+    }));
+}
+
+const ACTIVE_ROW_STATUSES = new Set(['Active', 'Holder', 'Awaiting Sponsor', 'New']);
 
 // ============================================================================
 // MAIN TOOL FUNCTION
 // ============================================================================
 
 /**
- * Reconcile Stripe subscriptions with Airtable records
+ * Reconcile Stripe subscriptions with Postgres sponsorship rows
  *
  * @param input - Optional filter parameters
  * @returns Reconciliation report with mismatches
@@ -274,76 +259,98 @@ export async function reconcileSubscriptionsTool(
     logger.debug('Starting subscription reconciliation', { sinceDate });
 
     // Fetch data from both sources
-    const [stripeSubscriptions, airtableRecords] = await Promise.all([
+    const [stripeSubscriptions, sponsorshipRows] = await Promise.all([
       fetchStripeSubscriptions(sinceDate),
-      fetchAirtableSponsorships(),
+      fetchPostgresSponsorships(),
     ]);
 
     // Build lookup maps
     const stripeBySubId = new Map(stripeSubscriptions.map(s => [s.id, s]));
-    const airtableBySubId = new Map(airtableRecords.map(r => [r.subscriptionId, r]));
+    const rowsBySubId = new Map(sponsorshipRows.map(r => [r.subscriptionId, r]));
 
     const mismatches: SubscriptionMismatch[] = [];
 
-    // Check for Stripe subscriptions not in Airtable
+    // Stripe subscriptions with no sponsorship row
     for (const stripeSub of stripeSubscriptions) {
-      const airtableRecord = airtableBySubId.get(stripeSub.id);
+      const row = rowsBySubId.get(stripeSub.id);
 
-      if (!airtableRecord) {
+      if (!row) {
         // Only flag active subscriptions that are missing
         if (['active', 'trialing'].includes(stripeSub.status)) {
           mismatches.push({
-            type: 'missing_in_airtable',
+            type: 'missing_in_postgres',
             subscriptionId: stripeSub.id,
             customerId: stripeSub.customerId,
             customerEmail: stripeSub.customerEmail,
             stripeStatus: stripeSub.status,
             stripeAmount: stripeSub.amount / 100,
-            details: `Active Stripe subscription not found in Airtable`,
+            details: 'Active Stripe subscription has no sponsorship row',
           });
         }
-      } else {
-        // Check for canceled subscriptions
-        if (stripeSub.status === 'canceled' && airtableRecord.status === 'Succeeded') {
-          mismatches.push({
-            type: 'canceled_subscription',
-            subscriptionId: stripeSub.id,
-            customerEmail: stripeSub.customerEmail,
-            sponsorCode: airtableRecord.sponsorCode,
-            stripeStatus: stripeSub.status,
-            airtableStatus: airtableRecord.status,
-            details: `Subscription canceled in Stripe but Airtable record still shows active`,
-          });
-        }
+        continue;
+      }
+
+      // Canceled in Stripe, still active here
+      if (stripeSub.status === 'canceled' && ACTIVE_ROW_STATUSES.has(row.status)) {
+        mismatches.push({
+          type: 'canceled_subscription',
+          subscriptionId: stripeSub.id,
+          customerEmail: stripeSub.customerEmail,
+          sponsorCode: row.sponsorCode,
+          stripeStatus: stripeSub.status,
+          postgresStatus: row.status,
+          details: 'Subscription canceled in Stripe but the sponsorship row still shows active',
+        });
+      }
+
+      // Amount drift (compare in dollars, tolerate cents rounding)
+      const stripeDollars = stripeSub.amount / 100;
+      if (
+        ['active', 'trialing'].includes(stripeSub.status) &&
+        row.monthlyAmount > 0 &&
+        Math.abs(stripeDollars - row.monthlyAmount) >= 0.01
+      ) {
+        mismatches.push({
+          type: 'amount_mismatch',
+          subscriptionId: stripeSub.id,
+          customerEmail: stripeSub.customerEmail,
+          sponsorCode: row.sponsorCode,
+          stripeAmount: stripeDollars,
+          postgresAmount: row.monthlyAmount,
+          details: 'Monthly amount on the sponsorship row differs from what Stripe bills',
+        });
       }
     }
 
-    // Check for Airtable records with subscription IDs not in Stripe
-    for (const airtableRecord of airtableRecords) {
-      if (airtableRecord.subscriptionId && !stripeBySubId.has(airtableRecord.subscriptionId)) {
-        mismatches.push({
-          type: 'missing_in_stripe',
-          subscriptionId: airtableRecord.subscriptionId,
-          sponsorCode: airtableRecord.sponsorCode,
-          customerEmail: airtableRecord.sponsorEmail,
-          airtableStatus: airtableRecord.status,
-          details: `Airtable record references subscription not found in Stripe`,
-        });
+    // Sponsorship rows whose subscription is unknown to Stripe (only
+    // meaningful without a sinceDate filter, which narrows the Stripe side)
+    if (!sinceDate) {
+      for (const row of sponsorshipRows) {
+        if (!stripeBySubId.has(row.subscriptionId)) {
+          mismatches.push({
+            type: 'missing_in_stripe',
+            subscriptionId: row.subscriptionId,
+            sponsorCode: row.sponsorCode,
+            customerEmail: row.sponsorEmail,
+            postgresStatus: row.status,
+            details: 'Sponsorship row references a subscription not found in Stripe',
+          });
+        }
       }
     }
 
     // Build summary
     const mismatchSummary = {
-      missing_in_airtable: mismatches.filter(m => m.type === 'missing_in_airtable').length,
+      missing_in_postgres: mismatches.filter(m => m.type === 'missing_in_postgres').length,
       missing_in_stripe: mismatches.filter(m => m.type === 'missing_in_stripe').length,
-      status_mismatch: mismatches.filter(m => m.type === 'status_mismatch').length,
+      status_mismatch: mismatches.filter(m => m.type === 'status_mismatch' || m.type === 'amount_mismatch').length,
       canceled_subscription: mismatches.filter(m => m.type === 'canceled_subscription').length,
     };
 
     // 3. Log result
     logger.info('Subscription reconciliation complete', {
       stripeCount: stripeSubscriptions.length,
-      airtableCount: airtableRecords.length,
+      postgresCount: sponsorshipRows.length,
       mismatchCount: mismatches.length,
       summary: mismatchSummary,
     });
@@ -353,7 +360,7 @@ export async function reconcileSubscriptionsTool(
       success: true,
       data: {
         totalStripeSubscriptions: stripeSubscriptions.length,
-        totalAirtableSponsorships: airtableRecords.length,
+        totalPostgresSponsorships: sponsorshipRows.length,
         mismatches: includeDetails ? mismatches : mismatches.slice(0, 50), // Limit if not detailed
         mismatchSummary,
         reconciliationDate: new Date().toISOString(),

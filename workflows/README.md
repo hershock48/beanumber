@@ -6,12 +6,12 @@ Workflows are Markdown Standard Operating Procedures (SOPs) that define processe
 
 ```
 workflows/
-├── admin/        # Administrative workflows (digest, reconciliation)
+├── admin/        # Administrative workflows (review updates, reconciliation)
 ├── children/     # Child update intake and publishing
-├── compliance/   # Reminder and escalation automation
 ├── donation/     # Donation processing workflows
 ├── email/        # Email notification workflows
 ├── health/       # Site health monitoring
+├── social/       # Social content rules
 ├── sponsor/      # Sponsor-related workflows
 └── README.md     # This file
 ```
@@ -20,13 +20,15 @@ workflows/
 
 | Category | Purpose | Key Workflows |
 |----------|---------|---------------|
-| **admin** | Staff operations | Review updates, daily digest, reconciliation |
+| **admin** | Staff operations | Review updates, reconciliation |
 | **children** | Child updates | Field intake, academic intake, verification |
-| **compliance** | Automation | Reminders, escalation |
 | **donation** | Payments | Recurring processing |
 | **email** | Notifications | Sponsor welcome, update alerts |
 | **health** | Monitoring | Link checks |
+| **social** | Content | Posting rules |
 | **sponsor** | Sponsor ops | Login verification, onboarding |
+
+Many of these files still describe Airtable tables and tools under `src/lib/tools/` that were deleted on 2026-09-14 when Airtable was retired. Where a file names a tool that no longer exists, the process still stands but the data lives in Postgres (`src/lib/db/`). Update the file when you next touch that process.
 
 ## Workflow Format
 

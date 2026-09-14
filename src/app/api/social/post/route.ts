@@ -3,8 +3,9 @@
  *
  * POST /api/social/post
  *
- * Immediately posts content to Facebook and/or Instagram.
- * For scheduled posting, use /api/social/schedule instead.
+ * Immediately posts content to Facebook and/or Instagram. The scheduling
+ * queue that used to sit beside this route lived in Airtable and was
+ * retired on 2026-09-14.
  */
 
 import { NextRequest, NextResponse } from 'next/server';

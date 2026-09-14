@@ -1,6 +1,17 @@
 # Project state
 
-Last updated: July 6, 2026.
+Last updated: September 14, 2026.
+
+## 2026-09-14: Airtable is out of the codebase
+
+Airtable was retired account-wide in August 2026, but the repo still boot-required five `AIRTABLE_*` variables and kept live Airtable paths. All of it is gone as of this date:
+
+- `src/lib/env.ts` no longer requires anything at startup. The `AIRTABLE_*` variables in Vercel can be deleted.
+- The Stripe webhook is Postgres-only (4,292 → 3,249 lines). Donor dedupe, gift-kid assignment and the sponsorship child lookup now read `donors` / `children` directly.
+- **Monthly renewals now land in Postgres.** `invoice.payment_succeeded` used to write the renewal only to Airtable, so no renewal since August had a row in the source of truth. `tools/donation/process-recurring-payment.ts` writes `donations` now (idempotent on the invoice's payment intent). Renewals between the retirement and this date are not backfilled; Stripe has them.
+- **Founding Cohort (`/rep`) works again.** Apply and sign-in were returning 503 against the dead Airtable "Reps" table. New `cohort_members` table (`drizzle/0018_cohort_members.sql`, **Kevin runs it in the Supabase SQL editor**; until then the page returns the same 503 with a log line naming the migration). Any applications that were sitting in the old Airtable table were not migrated.
+- Deleted: `src/lib/airtable.ts`, the `children` / `compliance` / `updates` / `sponsors` tool families, the social scheduling queue, the `compliance` and `publish-scheduled` crons, `/api/admin/{digest,compliance/summary,updates/overdue}`, `/api/sponsorship/create`, `/api/social/{schedule,scheduled}`, the Airtable docs and scripts.
+- Reconciliation (`/api/admin/reconciliation`) compares Stripe against `sponsorships` now; mismatch keys renamed `missing_in_postgres` / `postgresStatus`.
 
 ## 2026-07-06 — where the business actually is
 

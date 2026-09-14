@@ -1,6 +1,6 @@
 /**
  * Subscription Reconciliation API
- * Compares Stripe subscriptions with Airtable records (REQUIRES ADMIN AUTH)
+ * Compares Stripe subscriptions with Postgres sponsorship rows (REQUIRES ADMIN AUTH)
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -39,7 +39,7 @@ async function handler(request: NextRequest): Promise<NextResponse> {
 
   logger.info('Reconciliation completed', {
     stripeCount: result.data?.totalStripeSubscriptions,
-    airtableCount: result.data?.totalAirtableSponsorships,
+    postgresCount: result.data?.totalPostgresSponsorships,
     mismatches: result.data?.mismatchSummary,
   });
 

@@ -1,31 +1,48 @@
+/**
+ * Founding Cohort magic-link sign-in for /rep/dashboard.
+ *
+ * POST /api/rep/auth            request a link (email in body)
+ * GET  /api/rep/auth?token=xxx  verify a link, return the member
+ *
+ * Backed by cohort_members in Postgres since 2026-09-14 (was Airtable).
+ */
+
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import crypto from 'crypto';
 import { sendEmail } from '@/lib/email';
-
-const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID || 'app73ZPGbM0BQTOZW';
-const AIRTABLE_PAT = process.env.AIRTABLE_PAT || '';
-const REPS_TABLE = 'Reps';
-
-function getAirtableHeaders() {
-  return {
-    Authorization: `Bearer ${AIRTABLE_PAT}`,
-    'Content-Type': 'application/json',
-  };
-}
+import {
+  findCohortMemberByEmail,
+  findCohortMemberByToken,
+  isMissingCohortTable,
+  isTokenExpired,
+  publicCohortMember,
+  setCohortMemberAuthToken,
+} from '@/lib/cohort-members';
 
 const requestSchema = z.object({
   email: z.string().email(),
 });
 
-const verifySchema = z.object({
-  token: z.string().min(1),
-});
+const UNAVAILABLE = {
+  error: 'Login service temporarily unavailable. Please try again in a few minutes.',
+};
 
-/**
- * POST /api/rep/auth — request a magic link
- * GET /api/rep/auth?token=xxx — verify a magic link token, return rep data
- */
+// Same reply whether or not the email exists, so the form cannot be
+// used to enumerate members.
+const SENT = {
+  success: true,
+  message: 'If an account exists with that email, a login link has been sent.',
+};
+
+function logFailure(scope: string, error: unknown) {
+  if (isMissingCohortTable(error)) {
+    console.error(`[Rep Auth] ${scope}: cohort_members table missing. Apply drizzle/0018_cohort_members.sql.`);
+  } else {
+    console.error(`[Rep Auth] ${scope} failed:`, error instanceof Error ? error.message : error);
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const parsed = requestSchema.safeParse(await request.json());
@@ -34,71 +51,29 @@ export async function POST(request: NextRequest) {
     }
 
     const email = parsed.data.email.toLowerCase();
+    const member = await findCohortMemberByEmail(email);
 
-    // Look up the rep by email
-    const searchResponse = await fetch(
-      `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${REPS_TABLE}?filterByFormula=${encodeURIComponent(`{Email}='${email}'`)}`,
-      { headers: getAirtableHeaders() }
-    );
-
-    if (!searchResponse.ok) {
-      console.warn('[Rep Auth] Airtable lookup failed:', searchResponse.status);
-      return NextResponse.json({ error: 'Login service temporarily unavailable. Please try again in a few minutes.' }, { status: 503 });
+    if (!member || member.status !== 'Approved') {
+      return NextResponse.json(SENT);
     }
 
-    const searchData = await searchResponse.json();
-    if (!searchData.records || searchData.records.length === 0) {
-      // Don't reveal whether the email exists — just say we sent it
-      return NextResponse.json({ success: true, message: 'If an account exists with that email, a login link has been sent.' });
-    }
-
-    const rep = searchData.records[0];
-    if (rep.fields.Status !== 'Approved') {
-      return NextResponse.json({ success: true, message: 'If an account exists with that email, a login link has been sent.' });
-    }
-
-    // Generate a token
     const token = crypto.randomBytes(32).toString('hex');
-    const expiry = new Date(Date.now() + 30 * 60 * 1000).toISOString(); // 30 minutes
+    const expiry = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes
 
-    // Store token on the rep record — if Airtable rejects this write, the
-    // magic link is useless (GET below won't find the token), so this one
-    // failure must surface as 503 instead of silently sending a dead link.
-    try {
-      const patchRes = await fetch(
-        `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${REPS_TABLE}/${rep.id}`,
-        {
-          method: 'PATCH',
-          headers: getAirtableHeaders(),
-          body: JSON.stringify({
-            fields: {
-              AuthToken: token,
-              AuthTokenExpiry: expiry,
-            },
-          }),
-        }
-      );
-      if (!patchRes.ok) {
-        console.warn('[Rep Auth] Airtable token write failed:', patchRes.status);
-        return NextResponse.json({ error: 'Login service temporarily unavailable. Please try again in a few minutes.' }, { status: 503 });
-      }
-    } catch (e: any) {
-      console.warn('[Rep Auth] Airtable token write threw:', e?.message || e);
-      return NextResponse.json({ error: 'Login service temporarily unavailable. Please try again in a few minutes.' }, { status: 503 });
-    }
+    await setCohortMemberAuthToken(member.id, token, expiry);
 
-    // Send the magic link
     const origin = request.headers.get('origin') || 'https://www.beanumber.org';
     const loginUrl = `${origin}/rep/dashboard?token=${token}`;
+    const firstName = member.name.split(' ')[0] || 'there';
 
     await sendEmail({
-      to: { email, name: rep.fields.Name || '' },
+      to: { email, name: member.name },
       subject: 'Your BAN Rep Dashboard Login',
-      text: `Hey ${rep.fields.Name?.split(' ')[0] || 'there'},\n\nHere's your login link for the BAN rep dashboard:\n\n${loginUrl}\n\nThis link expires in 30 minutes.\n\nKevin`,
+      text: `Hey ${firstName},\n\nHere's your login link for the BAN rep dashboard:\n\n${loginUrl}\n\nThis link expires in 30 minutes.\n\nKevin`,
       html: `
         <div style="font-family: Georgia, serif; max-width: 560px; margin: 0 auto; padding: 32px; background: #FFF8F0;">
           <p style="color: #0d0d0d; font-size: 15px; line-height: 1.7;">
-            Hey ${rep.fields.Name?.split(' ')[0] || 'there'},
+            Hey ${firstName},
           </p>
           <p style="color: #0d0d0d; font-size: 15px; line-height: 1.7;">
             Here's your login link for the BAN rep dashboard:
@@ -118,10 +93,10 @@ export async function POST(request: NextRequest) {
       `,
     });
 
-    return NextResponse.json({ success: true, message: 'If an account exists with that email, a login link has been sent.' });
-  } catch (error: any) {
-    console.warn('[Rep Auth] POST failed (likely Airtable unreachable):', error?.message || error);
-    return NextResponse.json({ error: 'Login service temporarily unavailable. Please try again in a few minutes.' }, { status: 503 });
+    return NextResponse.json(SENT);
+  } catch (error: unknown) {
+    logFailure('POST', error);
+    return NextResponse.json(UNAVAILABLE, { status: 503 });
   }
 }
 
@@ -132,52 +107,25 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Token required.' }, { status: 400 });
     }
 
-    // Look up rep by token
-    const searchResponse = await fetch(
-      `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${REPS_TABLE}?filterByFormula=${encodeURIComponent(`{AuthToken}='${token}'`)}`,
-      { headers: getAirtableHeaders() }
-    );
-
-    if (!searchResponse.ok) {
-      console.warn('[Rep Auth] GET Airtable lookup failed:', searchResponse.status);
-      return NextResponse.json({ error: 'Login service temporarily unavailable. Please try again in a few minutes.' }, { status: 503 });
-    }
-
-    const searchData = await searchResponse.json();
-    if (!searchData.records || searchData.records.length === 0) {
+    const member = await findCohortMemberByToken(token);
+    if (!member) {
       return NextResponse.json({ error: 'Invalid or expired link.' }, { status: 401 });
     }
 
-    const rep = searchData.records[0];
-
-    // Check expiry
-    const expiry = rep.fields.AuthTokenExpiry;
-    if (!expiry || new Date(expiry) < new Date()) {
+    if (isTokenExpired(member)) {
       return NextResponse.json({ error: 'Link expired. Request a new one.' }, { status: 401 });
     }
 
-    // Check status
-    if (rep.fields.Status !== 'Approved') {
+    if (member.status !== 'Approved') {
       return NextResponse.json({ error: 'Account not yet approved.' }, { status: 403 });
     }
 
     return NextResponse.json({
       success: true,
-      rep: {
-        name: rep.fields.Name || '',
-        email: rep.fields.Email || '',
-        refCode: rep.fields.RefCode || '',
-        school: rep.fields.School || '',
-        shirtsSold: rep.fields.ShirtsSold || 0,
-        sponsorCount: rep.fields.SponsorCount || 0,
-        status: rep.fields.Status || 'Applied',
-        appliedAt: rep.fields.AppliedAt || '',
-        childNumber: rep.fields.ChildNumber || null,
-        childName: rep.fields.ChildName || null,
-      },
+      rep: publicCohortMember(member),
     });
-  } catch (error: any) {
-    console.warn('[Rep Auth] GET failed (likely Airtable unreachable):', error?.message || error);
-    return NextResponse.json({ error: 'Login service temporarily unavailable. Please try again in a few minutes.' }, { status: 503 });
+  } catch (error: unknown) {
+    logFailure('GET', error);
+    return NextResponse.json(UNAVAILABLE, { status: 503 });
   }
 }

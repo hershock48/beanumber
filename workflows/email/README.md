@@ -23,7 +23,7 @@ Gmail takes priority when both are configured.
 - `src/lib/tools/send-email.ts` - WAT-compliant email sending tool
 - `src/lib/tools/email/send-update-notification.ts` - WAT-compliant sponsor notification tool
 - `src/lib/tools/email/send-sponsor-welcome.ts` - WAT-compliant sponsor welcome email tool
-- `src/lib/tools/email/send-admin-digest.ts` - WAT-compliant admin digest email tool
+- `src/lib/tools/email/send-campus-newsletter.ts` - the monthly campus newsletter send
 - `src/lib/email.ts` - Email service layer
 - `src/lib/gmail.ts` - Gmail API client
 

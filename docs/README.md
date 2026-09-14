@@ -24,11 +24,6 @@ System architecture and design:
 - `SPONSOR_SYSTEM_ARCHITECTURE.md` - Sponsor system architecture
 - `SPONSOR_SYSTEM_SUMMARY_FOR_CHATGPT.md` - Sponsor system summary
 
-### `/airtable`
-Airtable integration documentation:
-- `AIRTABLE_FIELD_MAPPING.md` - Field mapping reference
-- `AIRTABLE_FIELD_REFERENCE.md` - Field reference guide
-
 ### `/development`
 Development and implementation guides:
 - `IMPLEMENTATION_GUIDE.md` - Implementation guide

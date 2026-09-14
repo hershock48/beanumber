@@ -6,11 +6,9 @@
 import { NextRequest } from 'next/server';
 import { cookies } from 'next/headers';
 import { eq } from 'drizzle-orm';
-import { findSponsorshipByCode } from './airtable';
 import { logger } from './logger';
 import { AuthenticationError } from './errors';
-import { SESSION, ERROR_MESSAGES } from './constants';
-import type { AirtableSponsorshipRecord } from './types/airtable';
+import { SESSION } from './constants';
 import { ADMIN_SESSION_COOKIE, decodeSessionCookie } from './admin-session';
 import { db } from './db/client';
 import { mobileTokenRevocations } from './db/schema';
@@ -53,42 +51,10 @@ export async function getSession(): Promise<SessionData | null> {
   }
 }
 
-/**
- * Verify session and return sponsorship record
- */
-export async function verifySession(): Promise<AirtableSponsorshipRecord | null> {
-  const session = await getSession();
-
-  if (!session) {
-    return null;
-  }
-
-  // Verify sponsorship still exists and is active
-  const sponsorship = await findSponsorshipByCode(session.sponsorCode);
-
-  if (!sponsorship) {
-    logger.auth('session_invalid', false, {
-      reason: 'sponsorship_not_found',
-      code: logger.maskSponsorCode(session.sponsorCode),
-    });
-    return null;
-  }
-
-  return sponsorship;
-}
-
-/**
- * Require authentication - throws error if not authenticated
- */
-export async function requireAuth(): Promise<AirtableSponsorshipRecord> {
-  const sponsorship = await verifySession();
-
-  if (!sponsorship) {
-    throw new AuthenticationError(ERROR_MESSAGES.SESSION_EXPIRED);
-  }
-
-  return sponsorship;
-}
+// verifySession() / requireAuth() used to re-check the sponsor code
+// against Airtable on every call. Nothing imported them (every sponsor
+// route verifies the cookie against Postgres inline), so they went
+// with the Airtable retirement on 2026-09-14.
 
 /**
  * Verify session for specific sponsor code

@@ -1,17 +1,20 @@
+/**
+ * POST /api/rep/apply
+ *
+ * Founding Cohort application from /rep. Writes a cohort_members row
+ * (Postgres) and emails Kevin. Until 2026-09-14 this wrote an Airtable
+ * "Reps" table; the base is retired so every application had been
+ * returning 503.
+ */
+
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { sendEmail } from '@/lib/email';
-
-const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID || 'app73ZPGbM0BQTOZW';
-const AIRTABLE_PAT = process.env.AIRTABLE_PAT || '';
-const REPS_TABLE = 'Reps';
-
-function getAirtableHeaders() {
-  return {
-    Authorization: `Bearer ${AIRTABLE_PAT}`,
-    'Content-Type': 'application/json',
-  };
-}
+import {
+  createCohortMember,
+  findCohortMemberByEmail,
+  isMissingCohortTable,
+} from '@/lib/cohort-members';
 
 const applySchema = z.object({
   name: z.string().min(1).max(255),
@@ -23,6 +26,18 @@ const applySchema = z.object({
   first_five: z.string().min(10).max(2000).optional().default(''),
   how_heard: z.string().max(500).optional().default(''),
 });
+
+const UNAVAILABLE = {
+  error: 'Application service temporarily unavailable. Please try again in a few minutes.',
+};
+
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -36,65 +51,31 @@ export async function POST(request: NextRequest) {
 
     const { name, email, phone, school, organization, why, first_five, how_heard } = parsed.data;
 
-    // Generate a unique referral code: first name + random 4 chars
+    // Referral code: first name + random 4 chars. Rides checkout
+    // metadata as "[Ref: code]" in the donation note.
     const firstName = name.split(' ')[0].toLowerCase().replace(/[^a-z]/g, '');
     const randomSuffix = Math.random().toString(36).substring(2, 6);
     const refCode = `${firstName}-${randomSuffix}`;
 
-    // Check if this email already has an application
-    const checkResponse = await fetch(
-      `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${REPS_TABLE}?filterByFormula=${encodeURIComponent(`{Email}='${email}'`)}`,
-      { headers: getAirtableHeaders() }
-    );
-
-    if (checkResponse.ok) {
-      const checkData = await checkResponse.json();
-      if (checkData.records && checkData.records.length > 0) {
-        return NextResponse.json(
-          { error: 'An application with this email already exists. If you need to update your application, email kevin@beanumber.org.' },
-          { status: 409 }
-        );
-      }
-    }
-
-    // Create the rep record in Airtable
-    const createResponse = await fetch(
-      `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${REPS_TABLE}`,
-      {
-        method: 'POST',
-        headers: getAirtableHeaders(),
-        body: JSON.stringify({
-          records: [
-            {
-              fields: {
-                Name: name,
-                Email: email.toLowerCase(),
-                Phone: phone || undefined,
-                School: school || undefined,
-                Organization: organization || undefined,
-                Why: why,
-                FirstFive: first_five || undefined,
-                HowHeard: how_heard || undefined,
-                RefCode: refCode,
-                Status: 'Applied',
-                AppliedAt: new Date().toISOString(),
-                ShirtsSold: 0,
-                SponsorCount: 0,
-              },
-            },
-          ],
-        }),
-      }
-    );
-
-    if (!createResponse.ok) {
-      const errData = await createResponse.json().catch(() => ({}));
-      console.warn('[Rep Apply] Airtable unavailable:', JSON.stringify(errData));
+    const existing = await findCohortMemberByEmail(email);
+    if (existing) {
       return NextResponse.json(
-        { error: 'Application service temporarily unavailable. Please try again in a few minutes.' },
-        { status: 503 }
+        { error: 'An application with this email already exists. If you need to update your application, email kevin@beanumber.org.' },
+        { status: 409 }
       );
     }
+
+    await createCohortMember({
+      name,
+      email,
+      phone,
+      school,
+      organization,
+      why,
+      firstFive: first_five,
+      howHeard: how_heard,
+      refCode,
+    });
 
     // Send notification to Kevin
     try {
@@ -105,18 +86,19 @@ export async function POST(request: NextRequest) {
         html: `
           <div style="font-family: Georgia, serif; max-width: 560px; margin: 0 auto; padding: 32px; background: #FFF8F0;">
             <p style="color: #D4A843; font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.2em;">Founding Cohort Application</p>
-            <h2 style="font-family: Georgia, serif; color: #0d0d0d; margin: 16px 0 8px;">${name}</h2>
+            <h2 style="font-family: Georgia, serif; color: #0d0d0d; margin: 16px 0 8px;">${escapeHtml(name)}</h2>
             <p style="color: #555; font-size: 14px; line-height: 1.6;">
-              <strong>Email:</strong> ${email}<br/>
-              <strong>Phone:</strong> ${phone || 'N/A'}<br/>
-              <strong>School/Church:</strong> ${school || 'N/A'}<br/>
-              <strong>Organization:</strong> ${organization || 'N/A'}<br/>
+              <strong>Email:</strong> ${escapeHtml(email)}<br/>
+              <strong>Phone:</strong> ${escapeHtml(phone || 'N/A')}<br/>
+              <strong>School/Church:</strong> ${escapeHtml(school || 'N/A')}<br/>
+              <strong>Organization:</strong> ${escapeHtml(organization || 'N/A')}<br/>
               <strong>Ref Code:</strong> ${refCode}
             </p>
             <p style="color: #0d0d0d; font-size: 14px; line-height: 1.6; margin-top: 16px;"><strong>Why they want to go:</strong></p>
-            <p style="color: #555; font-size: 14px; line-height: 1.6;">${why}</p>
-            ${first_five ? `<p style="color: #0d0d0d; font-size: 14px; line-height: 1.6; margin-top: 16px;"><strong>First 5 they'd invite:</strong></p><p style="color: #555; font-size: 14px; line-height: 1.6;">${first_five}</p>` : ''}
-            <p style="color: #777; font-size: 13px; margin-top: 16px;">How they heard about BAN: ${how_heard || 'N/A'}</p>
+            <p style="color: #555; font-size: 14px; line-height: 1.6;">${escapeHtml(why)}</p>
+            ${first_five ? `<p style="color: #0d0d0d; font-size: 14px; line-height: 1.6; margin-top: 16px;"><strong>First 5 they'd invite:</strong></p><p style="color: #555; font-size: 14px; line-height: 1.6;">${escapeHtml(first_five)}</p>` : ''}
+            <p style="color: #777; font-size: 13px; margin-top: 16px;">How they heard about BAN: ${escapeHtml(how_heard || 'N/A')}</p>
+            <p style="color: #777; font-size: 13px; margin-top: 16px;">Approve by setting status = 'Approved' on the cohort_members row; the applicant can then sign in at /rep/dashboard.</p>
           </div>
         `,
       });
@@ -129,11 +111,12 @@ export async function POST(request: NextRequest) {
       success: true,
       message: 'Application submitted. Kevin will be in touch.',
     });
-  } catch (error: any) {
-    console.warn('[Rep Apply] Failed (likely Airtable unreachable):', error?.message || error);
-    return NextResponse.json(
-      { error: 'Application service temporarily unavailable. Please try again in a few minutes.' },
-      { status: 503 }
-    );
+  } catch (error: unknown) {
+    if (isMissingCohortTable(error)) {
+      console.error('[Rep Apply] cohort_members table missing. Apply drizzle/0018_cohort_members.sql.');
+    } else {
+      console.error('[Rep Apply] Failed:', error instanceof Error ? error.message : error);
+    }
+    return NextResponse.json(UNAVAILABLE, { status: 503 });
   }
 }

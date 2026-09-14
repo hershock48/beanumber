@@ -331,7 +331,6 @@ export const ROUTES = {
     SPONSOR_UPDATES: '/api/sponsor/updates',
     SPONSOR_REQUEST_UPDATE: '/api/sponsor/request-update',
     SPONSORSHIP_AVAILABLE: '/api/sponsorship/available',
-    SPONSORSHIP_CREATE: '/api/sponsorship/create',
     ADMIN_UPDATES_SUBMIT: '/api/admin/updates/submit',
     ADMIN_UPDATES_LIST: '/api/admin/updates/list',
     ADMIN_UPDATES_PUBLISH: '/api/admin/updates/publish',

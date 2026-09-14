@@ -127,7 +127,7 @@ Stripe → `www.beanumber.org/api/webhooks/stripe`. One endpoint per mode. The s
    - A new Donor record if the email was new (or updated if existing).
    - A thank-you email arrives at the address used.
    - Admin notification email arrives at kevin@beanumber.org.
-5. If any of the above is missing, pull runtime logs for `/api/webhooks/stripe` at the timestamp of the test, filter to 400/500, cross-reference with Airtable schema.
+5. If any of the above is missing, pull runtime logs for `/api/webhooks/stripe` at the timestamp of the test, filter to 400/500, cross-reference with `src/lib/db/schema.ts`.
 
 ## Logs from the app itself
 
@@ -139,7 +139,7 @@ Every log line from the webhook should start with `[Webhook]` so it's findable. 
 
 - **GitHub PAT** — embedded in the remote URL of the external clone. Don't commit, don't paste into chat, don't echo. If it leaks, Kevin rotates and we re-embed.
 - **Stripe secret keys** — in Vercel env only. Never in code, never in `.env.example`, never in docs.
-- **Airtable PAT** — in Vercel env (`AIRTABLE_PAT` or similar — check `src/lib/env.ts`).
+- **Database URL and Supabase service key**: in Vercel env. The service key can read and write every table and every storage bucket.
 - **SendGrid API key** — in Vercel env.
 
 Kevin has explicitly told me not to nag him about PAT rotation. Don't bring it up unless there's a concrete reason to think one has leaked.
@@ -147,7 +147,7 @@ Kevin has explicitly told me not to nag him about PAT rotation. Don't bring it u
 ## When something breaks in production
 
 1. Check Stripe dashboard (Payments, Events, Webhook attempts) — the ground truth of money flow.
-2. Check Airtable — was the record created? If yes, what's wrong with it? If no, why not?
+2. Check Postgres (Supabase table editor, or `npm run db:studio` with `DATABASE_URL` set): was the row created? If yes, what's wrong with it? If no, why not? The `audit_log` table says who wrote what.
 3. Pull Vercel runtime logs for the route at the timestamp. Filter status codes.
 4. If the stack trace is truncated by the log MCP, audit the code path using whatever keyword survived the truncation.
 5. If you find the root cause, fix it in the mount, copy to the clone, commit with a `fix(scope):` message that says why, push.
@@ -157,7 +157,7 @@ Kevin has explicitly told me not to nag him about PAT rotation. Don't bring it u
 ## When the fix requires Kevin's hands
 
 - Stripe dashboard changes (adding/removing webhook endpoints, rotating keys, swapping test/live).
-- Airtable schema changes (new fields, new singleSelect options, new tables).
+- Applying a schema migration: the SQL in `drizzle/NNNN_*.sql` is run by hand in the Supabase SQL editor. Write the file, tell Kevin which one.
 - Vercel env var changes.
 - Domain / DNS changes.
 

@@ -1,40 +1,18 @@
-# Vercel Environment Variables Setup
+# Vercel Environment Variables
 
-## ✅ What You Have
+Set these in **Vercel Dashboard → beanumber → Settings → Environment Variables**. Kevin sets them; nothing in the repo reads a `.env` file in production.
 
-- **Airtable Base ID**: `app73ZPGbM0BQTOZW`
-- **Table Names**: Donors, Donations, Communications, Exports, Subscriptions
+Since 2026-09-14 nothing is required at boot. A missing variable fails the one feature that needs it with a clear log line instead of taking the site down. Airtable variables (`AIRTABLE_*`) are no longer read anywhere and can be deleted.
 
-## ⚠️ What You Still Need
-
-1. **Generate Airtable Personal Access Token** (you need to do this):
-   - Go to https://airtable.com/create/tokens
-   - Create token with name "Donor Management Webhook"
-   - Scopes needed: `data.records:read`, `data.records:write`, `schema.bases:read`
-   - Grant access to your "Donor Management" base
-   - Copy the token (starts with `pat_`)
-
-2. **Add All Environment Variables to Vercel**
-
-## 📋 Complete Environment Variables for Vercel
-
-Add these to **Vercel Dashboard → Your Project → Settings → Environment Variables**:
-
-### Airtable Configuration (REQUIRED)
+## Database (required for every data-backed page)
 
 ```
-AIRTABLE_API_KEY=pat_your_personal_access_token_here
-AIRTABLE_BASE_ID=app73ZPGbM0BQTOZW
-AIRTABLE_DONORS_TABLE=Donors
-AIRTABLE_DONATIONS_TABLE=Donations
-AIRTABLE_COMMUNICATIONS_TABLE=Communications
-AIRTABLE_SPONSORSHIPS_TABLE=Sponsorships
-AIRTABLE_UPDATES_TABLE=Updates
+DATABASE_URL=postgresql://...        # Supabase transaction-mode pooler, port 6543
+SUPABASE_URL=https://....supabase.co
+SUPABASE_SERVICE_ROLE_KEY=...        # Storage uploads (kid photos, newsletter images)
 ```
 
-**Note:** The Exports and Subscriptions tables are optional for the webhook - they're used by other parts of the system.
-
-### Stripe Configuration (REQUIRED - you should already have these)
+## Stripe (required for checkout and the webhook)
 
 ```
 STRIPE_SECRET_KEY=sk_live_...
@@ -42,71 +20,57 @@ NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_live_...
 STRIPE_WEBHOOK_SECRET=whsec_...
 ```
 
-### Email Configuration (REQUIRED for thank-you emails)
+## Email (required for every transactional email)
 
-Choose ONE provider: Gmail (recommended) or SendGrid. Gmail takes priority if both are configured.
+Choose one provider. Gmail takes priority if both are configured.
 
-#### Option 1: Gmail (Recommended)
+### Gmail (active in production)
 
-Uses Gmail API via Google Workspace. See `docs/setup/GMAIL_SETUP.md` for full setup instructions.
+See `docs/setup/GMAIL_SETUP.md` for the OAuth setup.
 
 ```
-GMAIL_CLIENT_ID=your_gmail_client_id
-GMAIL_CLIENT_SECRET=your_gmail_client_secret
-GMAIL_REFRESH_TOKEN=your_gmail_refresh_token
+GMAIL_CLIENT_ID=...
+GMAIL_CLIENT_SECRET=...
+GMAIL_REFRESH_TOKEN=...
 GMAIL_USER_EMAIL=Kevin@beanumber.org
 GMAIL_FROM_EMAIL=Kevin@beanumber.org
 GMAIL_FROM_NAME=Be A Number, International
 ```
 
-#### Option 2: SendGrid (Alternative)
+### SendGrid (fallback)
 
 ```
-SENDGRID_API_KEY=SG.your_api_key_here
+SENDGRID_API_KEY=SG....
 SENDGRID_FROM_EMAIL=Kevin@beanumber.org
 SENDGRID_FROM_NAME=Be A Number, International
 ```
 
-### Optional Configuration
+## Admin and cron
+
+```
+ADMIN_API_TOKEN=...      # X-Admin-Token header for scripts; the browser uses the session cookie
+ADMIN_PASSWORD=...       # legacy header path, kept until the old admin pages retire
+CRON_SECRET=...          # Vercel sends it as a Bearer token to /api/cron/*
+```
+
+## Optional
 
 ```
 NEXT_PUBLIC_SITE_URL=https://www.beanumber.org
-NODE_ENV=production
+NEXT_PUBLIC_GA_MEASUREMENT_ID=G-...
+ADMIN_NOTIFY_EMAIL=kevin@beanumber.org
+KEVIN_ALERT_EMAIL=kevin@beanumber.org
 ```
 
-## 🔒 Security Notes
+The mobile app adds four more (Apple and Google sign-in, push). They are listed in `docs/app-store-submission.md`.
 
-- ✅ **Never commit tokens to git** (they're already in `.gitignore`)
-- ✅ **Use different tokens for dev/prod** if you have multiple environments
-- ✅ **Rotate tokens periodically** for security
-- ✅ **Select all environments** (Development, Preview, Production) when adding to Vercel
+## After changing a variable
 
-## ✅ Quick Checklist
+Redeploy. Vercel does not restart running functions when a variable changes.
 
-- [ ] Generate Airtable Personal Access Token
-- [ ] Add `AIRTABLE_API_KEY` to Vercel
-- [ ] Add `AIRTABLE_BASE_ID` to Vercel (already have: `app73ZPGbM0BQTOZW`)
-- [ ] Add `AIRTABLE_DONORS_TABLE=Donors` to Vercel
-- [ ] Add `AIRTABLE_DONATIONS_TABLE=Donations` to Vercel
-- [ ] Add `AIRTABLE_COMMUNICATIONS_TABLE=Communications` to Vercel
-- [ ] Verify Stripe variables are set
-- [ ] Add email provider variables (Gmail OR SendGrid)
-  - [ ] If Gmail: Add all `GMAIL_*` variables
-  - [ ] If SendGrid: Add `SENDGRID_API_KEY` and `SENDGRID_FROM_EMAIL`
-- [ ] Redeploy on Vercel after adding variables
-- [ ] Test with a small donation
+## Testing after setup
 
-## 🧪 Testing After Setup
-
-1. Make a test donation on your site
-2. Check Vercel Function Logs for webhook processing
-3. Verify record appears in Airtable Donors table
-4. Verify record appears in Airtable Donations table
-5. Verify record appears in Airtable Communications table
-6. Check that thank-you email was sent
-
-## 📝 Notes
-
-- **Table IDs vs Table Names**: The webhook uses table **names** (Donors, Donations, etc.), not the internal table IDs. This is more maintainable.
-- **Exports Table**: Handled by the export script, not the webhook
-- **Subscriptions Table**: Can be added later if you need to track recurring donations separately
+1. Make a $1 donation on the live site and refund it in Stripe.
+2. Check Vercel function logs for `/api/webhooks/stripe`.
+3. Confirm the donor and donation rows in Supabase (`donors`, `donations`).
+4. Confirm the thank-you email and the admin notification both arrived.

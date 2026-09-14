@@ -71,18 +71,19 @@ Deprecated routes (still in code but should not be the primary path):
 
 **Webhook:**
 
-- `POST /api/webhooks/stripe` — The single most load-bearing file in the repo at `src/app/api/webhooks/stripe/route.ts` (~1900 lines). Verifies signature with `STRIPE_WEBHOOK_SECRET`, dispatches on event type:
+- `POST /api/webhooks/stripe`: The single most load-bearing file in the repo at `src/app/api/webhooks/stripe/route.ts` (~3,250 lines, Postgres-only since 2026-09-14). Verifies signature with `STRIPE_WEBHOOK_SECRET`, dispatches on event type:
   - `checkout.session.completed` — creates Donation record, sends thank-you email, notifies admin (email only, no SMS), creates Sponsorship record if applicable, links to Donor (creates if new).
-  - `customer.subscription.created` / `.updated` / `.deleted` — mirror subscription lifecycle into Airtable.
-  - `invoice.payment_succeeded` — logs recurring payments as Donation records.
+  - `customer.subscription.created` / `.updated` / `.deleted`: upserts the `subscriptions` row, moves the donor onto the right drip pipeline on `.created`, cancels sponsorships on `.deleted`.
+  - `invoice.payment_succeeded`: records each monthly renewal as a `donations` row (via `tools/donation/process-recurring-payment.ts`) and sends the renewal thank-you.
   - `charge.refunded` — flags Donation as refunded.
 
 **Cron (hit by Vercel Cron):**
 
 - `/api/cron/drip` — Daily drip email dispatch. Queries Donors where `DripPipeline` is set and `DripNextSend` ≤ today. Sends the next email in the pipeline, advances `DripStage`, sets the next `DripNextSend` based on per-pipeline gap arrays. Clears drip fields when the sequence completes. 5 pipelines, 17 total emails.
-- `/api/cron/newsletter` — Daily newsletter assembly from `Scheduled Posts` and dispatch.
-- `/api/cron/publish-scheduled` — Runs child-update publishing logic.
-- `/api/cron/compliance` — Compliance checks (retention windows, receipt deadlines).
+- `/api/cron/newsletter`: Sends any newsletter whose scheduled send time has passed.
+- `/api/cron/push-drain` and `/api/cron/sunday-batch`: mobile push delivery and the weekly batch snapshot.
+
+The `publish-scheduled` (social queue) and `compliance` (child-update reminder) crons were deleted on 2026-09-14; both read Airtable and nothing else.
 
 **Admin:**
 
@@ -98,17 +99,15 @@ Deprecated routes (still in code but should not be the primary path):
 
 ### `src/lib/db/` — Postgres data-access layer (source of truth as of July 2026)
 
-Postgres is now the source of truth. The public site reads through `db/queries.ts`; the webhook writes through `db/webhook-bridge.ts` and `db/mutations.ts`. Airtable is legacy read-only in a handful of admin-only surfaces and can be ignored for anything sponsor-facing. The intake route (`/api/admin/child-updates/intake`) and the stripe-sync page are Postgres-only. If you find a route still calling Airtable, it's either intentional (admin-side historical read) or drift — flag it.
+Postgres is the only data store. The public site reads through `db/queries.ts`; the webhook writes through `db/webhook-bridge.ts` and `db/mutations.ts`. Airtable was retired in August 2026 and the last code paths that called it were removed on 2026-09-14. If you find anything that still expects an `AIRTABLE_*` variable, it is drift; remove it.
 
-- `db/schema.ts` — Drizzle table definitions. Source of truth for the database. Changes go HERE first, then `npx drizzle-kit generate` produces a SQL migration in `/drizzle`, then `npx drizzle-kit migrate` applies it. Conventions: UUID PKs, `airtable_id` text for cross-reference, every queryable column indexed, singleSelect-style stored as text not Postgres enums (easier to evolve).
+- `db/schema.ts`: Drizzle table definitions. Source of truth for the database. Changes go HERE first, then a matching hand-written SQL file lands in `/drizzle` (`NNNN_name.sql`, idempotent with `IF NOT EXISTS`) that Kevin runs in the Supabase SQL editor. `drizzle-kit generate` only tracked 0000 and 0001; everything after is hand-written. Conventions: UUID PKs, `airtable_id` text kept on the migrated tables for cross-reference, every queryable column indexed, singleSelect-style stored as text not Postgres enums (easier to evolve).
 - `db/client.ts` — Drizzle + `postgres` driver. Single module-level connection. `prepare:false, max:1` required for Supabase's transaction-mode pooler.
-- `db/queries.ts` — Every read the public site needs. Use these instead of going to Airtable directly. Backwards-compat join keys (child UUID + legacy ChildID text) so lookups work during the transition.
+- `db/queries.ts`: Every read the public site needs. Backwards-compat join keys (child UUID + legacy ChildID text) so lookups work for rows that only carry the legacy id.
 - `db/mutations.ts` — Every write the webhook/admin makes. Idempotent on natural keys. Every mutation auto-writes a row to `audit_log` with a computed `changed_fields` jsonb diff.
-- `db/webhook-bridge.ts` — The Stripe webhook calls into this. Every function is wrapped in `mirrorToPostgres(label, fn)` at the call site so Postgres errors log without breaking the Airtable path or the Stripe response. Bridge re-resolves the donor by email inside each call, so out-of-order events work (a donation mirror that arrives before the donor mirror just creates a stub donor).
+- `db/webhook-bridge.ts`: The Stripe webhook calls into this. Every function is wrapped in `mirrorToPostgres(label, fn)` at the call site so a Postgres error logs (`[pg-mirror] ✗ label`) without failing the Stripe response, which would make Stripe retry every side effect. Bridge re-resolves the donor by email inside each call, so out-of-order events work (a donation that arrives before the donor row just creates a stub donor). The "mirror" naming is from the June 2026 dual-write window; these are now the only writes.
 
-When the public read paths get refactored, this is where to import from. When the cutover happens, the Airtable branches in the webhook get deleted; the bridge calls stay.
-
-- `airtable.ts` — The one place the Airtable client is configured. All reads/writes route through here. Table names and field keys are strings; check `airtable_schema.md` before adding new ones — the webhook has 422'd more than once because we wrote to fields that don't exist.
+- `cohort-members.ts`: The Founding Cohort program behind `/rep` (applications, magic-link sign-in, referral stats). Table `cohort_members`, migration `drizzle/0018`.
 - `auth.ts` — Sponsor session cookie helpers (`getViewerSponsorCode`, `verifySessionForCode`) and admin token verification. The "sponsor portal" comments in here are outdated — sponsor auth now gates content on `/[number]`, not a dedicated portal route.
 - `email.ts` — `sendEmail()` abstraction that tries Gmail OAuth2 first, falls back to SendGrid if Gmail isn't configured. In production, Gmail is active. Contains several template functions (`sendSponsorWelcomeEmail`, `sendDonationReceiptEmail`, etc.) that still use old copy and need a voice.md rewrite. All transactional email routes through this file.
 - `gmail.ts` — Gmail OAuth2 send implementation. Builds raw MIME messages, handles plain-text-only mode, refresh token flow. This is the active email provider in production.
@@ -125,16 +124,15 @@ When the public read paths get refactored, this is where to import from. When th
 ### `src/lib/tools/` — the reusable data layer
 
 - `tools/index.ts` — Barrel export. Import domain helpers from here.
-- `tools/children/` — `getChildByShirtNumber`, `listChildren`, `getChildUpdates`. These are the canonical read paths for child data.
-- `tools/sponsors/` — Sponsor CRUD, subscription state, reveal gate logic.
-- `tools/donation/` — `upsertDonation`, Donation Source normalizer, receipt generation.
-- `tools/email/` — Template-specific email senders (thank-you, welcome, reveal, monthly update).
-- `tools/updates/` — Child update publishing (draft → scheduled → sent).
-- `tools/media/` — Image handling, S3/Airtable attachment helpers.
-- `tools/social/` — Social post scheduling, attribution shortlinks.
-- `tools/compliance/` — 501(c)(3) compliance helpers (receipt year-end roll-up, retention enforcement).
+- `tools/donation/`: `process-recurring-payment.ts` (monthly renewals into `donations`) and `reconcile-subscriptions.ts` (Stripe vs `sponsorships`, behind `/api/admin/reconciliation`).
+- `tools/email/`: `send-campus-newsletter.ts` (the live one), plus the sponsor welcome and update-notification senders.
+- `tools/media/`: Google Drive folder and upload helpers for the intake route.
+- `tools/social/`: Direct posting to Instagram and Facebook via the Meta Graph API.
+- `tools/health/`: Link checker behind `/api/health/links`.
 - `tools/send-email.ts` — Lower-level send that `email.ts` wraps. Rarely import directly.
 - `tools/_template.ts` — Starter file for a new tool module.
+
+The `children`, `compliance`, `updates` and `sponsors` tool families, and the social scheduling queue, were deleted on 2026-09-14. They only talked to Airtable and backed the per-child quarterly review workflow that was retired with it.
 
 ## Patterns that are load-bearing
 
@@ -154,9 +152,9 @@ All Donation/Sponsorship records are written by the Stripe webhook, never by the
 
 Every outgoing email — transactional, admin notification, cron-driven — goes through `src/lib/email.ts`. Commit `5b8e42a` refactored this; do not reintroduce direct `sgMail.send()` calls in route handlers.
 
-### Airtable reads use the lib, not fetch
+### Reads go through `db/queries.ts`, writes through `db/mutations.ts`
 
-Never hit the Airtable REST API directly from a route. Use `src/lib/airtable.ts` or `src/lib/tools/*`. Reason: the lib handles retries, rate limiting, and field-name indirection in one place.
+A route that needs a new read adds a function to `queries.ts`; a new write goes in `mutations.ts` so it gets the audit-log row and the natural-key idempotency for free. Reaching for `db` directly inside a route is the exception, not the pattern.
 
 ### Typed metadata on Stripe sessions
 
@@ -169,7 +167,7 @@ The `/children/[number]` page checks `hasStructured` (any of HomeVillage, Family
 ## Integrations
 
 - **Stripe** — Test mode and live mode are different environments. `hershock48` dashboard owns both. Webhook secret differs per endpoint; there's currently a stale endpoint somewhere in the dashboard causing 400 signature-verification failures (see `project_state.md`).
-- **Airtable** — Base `app73ZPGbM0BQTOZW` named `Donor Management`. Schema in `airtable_schema.md`. Metadata API (adding singleSelect options, creating fields) is blocked by the sandbox proxy, so schema changes have to happen in the Airtable UI.
+- **Supabase**: Postgres 17 (project `ttsnwphctjcbtiyijmdf`) via the transaction-mode pooler, plus three public Storage buckets for kid, update and newsletter photos. Env: `DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`.
 - **Gmail OAuth2** — Active email provider. All transactional email (thank-you, drip, admin notification, newsletter, magic link) sends through Gmail API via `src/lib/gmail.ts`. Credentials: `GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`, `GMAIL_REFRESH_TOKEN` in Vercel env.
 - **SendGrid** — Inactive fallback in `src/lib/email.ts`. Code exists but Gmail takes priority when configured. SendGrid API key is in env but not used in production.
 - **Vercel** — Two projects under team `kevins-projects-ec116b76`: `beanumber` (prod, `prj_IwSgQIaCFpVrkmjydT1HcLvufYeO`, serves `www.beanumber.org`) and `beanumber-live` (`prj_vuBv3enBM2LxEBYFMqaupqcRbcAn`, not currently prod). Auto-deploy on push to `main`.

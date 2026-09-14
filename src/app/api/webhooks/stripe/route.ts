@@ -13,16 +13,26 @@ import {
   findDonationByPaymentIntent,
 } from '@/lib/db/webhook-bridge';
 import { db } from '@/lib/db/client';
-import { fulfillments } from '@/lib/db/schema';
-import { and, eq } from 'drizzle-orm';
+import { children, fulfillments } from '@/lib/db/schema';
+import { and, asc, eq, isNotNull, isNull, notInArray, or, sql } from 'drizzle-orm';
+import { upsertDonorByEmail } from '@/lib/db/mutations';
 import { generateUniqueSponsorCode } from '@/lib/sponsor-codes';
-import { isNumberClaimedByOtherEmail } from '@/lib/db/queries';
+import {
+  getChildByRecordId,
+  getDonorByEmail,
+  getDonorByStripeCustomerId,
+  isNumberClaimedByOtherEmail,
+} from '@/lib/db/queries';
 import { legacyIdForShirtNumber } from '@/lib/claim-resolve';
 import { CANONICAL_ROSTER_MAX } from '@/lib/roster-config';
 
 // Allow up to 60 seconds for the webhook handler. The default 10s on
-// Hobby plans is too tight — a shirt order does 8+ Airtable API calls,
+// Hobby plans is too tight. A shirt order does several Postgres writes,
 // email sends, and Stripe subscription backfills.
+//
+// 2026-09-14: Postgres-only. Every Airtable branch that used to run
+// beside these writes (the "dual-write window" from June 2026) is gone.
+// Airtable was retired account-wide in August 2026.
 export const maxDuration = 60;
 
 const SHIRT_PRICE = 25; // dollars — used for subscription unit_amount and sponsorship records
@@ -45,8 +55,7 @@ function validateWebhookEnvVars() {
   const required = {
     STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
     STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET,
-    AIRTABLE_API_KEY: process.env.AIRTABLE_API_KEY,
-    AIRTABLE_BASE_ID: process.env.AIRTABLE_BASE_ID,
+    DATABASE_URL: process.env.DATABASE_URL,
   };
   
   const missing = Object.entries(required)
@@ -59,86 +68,6 @@ function validateWebhookEnvVars() {
   }
 }
 
-// Rate limiter for Airtable API (5 requests per second)
-class RateLimiter {
-  private queue: Array<() => void> = [];
-  private tokens: number;
-  private maxTokens: number;
-  private refillRate: number; // tokens per second
-
-  constructor(maxTokens: number, perSeconds: number = 1) {
-    this.maxTokens = maxTokens;
-    this.tokens = maxTokens;
-    this.refillRate = maxTokens / perSeconds;
-    this.startRefill();
-  }
-
-  private startRefill() {
-    setInterval(() => {
-      this.tokens = Math.min(this.maxTokens, this.tokens + this.refillRate / 10);
-      this.processQueue();
-    }, 100); // Check every 100ms
-  }
-
-  private processQueue() {
-    while (this.queue.length > 0 && this.tokens >= 1) {
-      this.tokens -= 1;
-      const resolve = this.queue.shift();
-      if (resolve) resolve();
-    }
-  }
-
-  async removeTokens(count: number): Promise<void> {
-    return new Promise((resolve) => {
-      for (let i = 0; i < count; i++) {
-        this.queue.push(resolve);
-      }
-      this.processQueue();
-    });
-  }
-}
-
-const airtableRateLimiter = new RateLimiter(5, 1);
-
-// Airtable API helper with retry logic
-async function airtableAPICall<T>(
-  operation: () => Promise<T>,
-  maxRetries: number = 3
-): Promise<T> {
-  await airtableRateLimiter.removeTokens(1);
-
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      return await operation();
-    } catch (error: any) {
-      if (attempt === maxRetries) throw error;
-      
-      // Exponential backoff
-      const delay = Math.pow(2, attempt) * 1000;
-      console.log(`[Airtable] Retry attempt ${attempt} after ${delay}ms`);
-      await new Promise((resolve) => setTimeout(resolve, delay));
-    }
-  }
-  throw new Error('Max retries exceeded');
-}
-
-// Airtable API configuration
-const AIRTABLE_API_KEY = process.env.AIRTABLE_API_KEY;
-const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID;
-const AIRTABLE_DONORS_TABLE = process.env.AIRTABLE_DONORS_TABLE || 'Donors';
-const AIRTABLE_DONATIONS_TABLE = process.env.AIRTABLE_DONATIONS_TABLE || 'Donations';
-const AIRTABLE_COMMUNICATIONS_TABLE = process.env.AIRTABLE_COMMUNICATIONS_TABLE || 'Communications';
-const AIRTABLE_SPONSORSHIPS_TABLE = process.env.AIRTABLE_SPONSORSHIPS_TABLE || 'Sponsorships';
-const AIRTABLE_CHILDREN_TABLE = process.env.AIRTABLE_CHILDREN_TABLE || 'Children';
-const AIRTABLE_SUBSCRIPTIONS_TABLE = 'Subscriptions';
-const AIRTABLE_FULFILLMENT_TABLE_ID = 'tblkSZBRrMiHhT3MP';
-
-function getAirtableHeaders() {
-  return {
-    Authorization: `Bearer ${AIRTABLE_API_KEY}`,
-    'Content-Type': 'application/json',
-  };
-}
 
 // Map free-text referral answer to one of the How They Heard single-select choices.
 // Everything that doesn't match goes to Notes verbatim.
@@ -178,8 +107,8 @@ function classifyReferral(raw: string): { choice: string | null; rawNote: string
 // Fulfillment record auto-creation
 // ---------------------------------------------------------------------------
 // Determines print ink color based on shirt color. Dark shirts get white
-// ink, light shirts get black ink. The function name and the Airtable
-// field names ("Vinyl Front" / "Vinyl Back") are legacy from the HTV
+// ink, light shirts get black ink. The function name and the column
+// names (vinyl_front / vinyl_back) are legacy from the HTV
 // production era; production is now screen-printed but the semantics —
 // what color sits on the shirt — are identical.
 //
@@ -192,7 +121,7 @@ function vinylColorForShirt(shirtColor: string): string {
   return 'Black'; // Sky, Meadow, Blossom, White, Pink, Yellow, etc.
 }
 
-// Creates one Fulfillment record per shirt in Airtable. Non-fatal — if this
+// Creates one fulfillments row per shirt. Non-fatal: if this
 // fails the order still succeeds. Called from all three shirt flows.
 // Idempotency guard for Stripe webhook retries (2026-07-10). When
 // stripeSessionId + itemIndex are both provided, we skip the INSERT
@@ -241,10 +170,8 @@ async function createFulfillmentRecord(opts: {
   const vinylFront = vinylColorForShirt(opts.shirtColor);
   const vinylBack = vinylColorForShirt(opts.shirtColor);
 
-  // 1. Postgres — the source-of-truth write. Runs regardless of
-  //    Airtable state, since Airtable is legacy read-only in a few
-  //    admin surfaces (per project_state.md 2026-07-06) and the admin
-  //    dashboard reads exclusively from fulfillments.* here in Postgres.
+  // Postgres is the source of truth; the admin shirts-to-ship queue
+  // reads fulfillments.* here.
   //
   //    Discovered 2026-07-08: webhook was still Airtable-only, so every
   //    shirt order after 2026-06-22 (Postgres cutover date) silently
@@ -315,7 +242,7 @@ async function createFulfillmentRecord(opts: {
     }
     const message = err instanceof Error ? err.message : String(err);
     console.error('[WH] Fulfillment PG insert FAILED (queue will be missing this order):', message.slice(0, 300));
-    // Don't return — Airtable dual-write below still gets a chance.
+
 
     // Ping Kevin inline so a PG-write failure isn't silently hidden
     // behind console noise. The admin queue reads Postgres now, so a
@@ -376,94 +303,19 @@ async function createFulfillmentRecord(opts: {
     }
   }
 
-  // 2. Airtable — legacy dual-write. Skipped when env is unset (Kevin
-  //    has been removing AIRTABLE_API_KEY as part of the sunset).
-  if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) {
-    console.log('[WH] Fulfillment: Airtable disabled by env, PG insert only');
-    return;
-  }
-
-  const fields: Record<string, unknown> = {
-    'fldsWHbE3yq7Xoyn4': opts.design,            // Design
-    'fldaVW0nkpBjz0Gm7': opts.shirtColor,        // Shirt Color
-    'fldicYGUVXRbCP4ze': opts.shirtSize,          // Size
-    'fldwFBqD55i4G5yBf': vinylFront,              // Vinyl Front
-    'fldp3RObd3abl3O7w': vinylBack,               // Vinyl Back
-    'fldbGofwASSXDYj9R': opts.buyerName,          // Buyer
-    'fldUakXkAhW2hYLxL': opts.buyerEmail,         // Email
-    'fldnXiHlwBtEWP3io': opts.orderDate,          // Order Date
-    'fldbBZtOLYVVDS28X': 'Pending',               // Production
-    // Airtable Shipping stays 'Not Shipped' even for market sales —
-    // 'Handed in Person' isn't a singleSelect option there and adding
-    // one mid-sunset isn't worth a 422 risk. Postgres (which the admin
-    // queue reads) carries the real value; Airtable rows get the
-    // market marker via the Notes text instead.
-    'fldJ6ehpDkpindHtO': 'Not Shipped',            // Shipping
-  };
-
-  // Order # and Child Name are only written when the assignment is known
-  // (portal repeats, gift sponsorships). For initial purchases under the
-  // stockpile model, both stay blank until Kevin records what shipped.
-  if (typeof opts.shirtNumber === 'number' && !Number.isNaN(opts.shirtNumber)) {
-    fields['fldsUZIXLFesyzg8u'] = opts.shirtNumber;  // Order #
-  }
-  if (opts.childName) {
-    fields['fldkACkyAtFQCOPFL'] = opts.childName;    // Child Name
-  }
-
-  // Address fields (only set if we have an address object)
-  if (opts.address) {
-    fields['fldOhzT4xrR1jaJYC'] = opts.buyerName;                    // Ship Name
-    fields['fldaNij76IbSJwf8l'] = opts.address.line1 || '';           // Ship Street1
-    fields['fldIptRN8o5c1JYZV'] = opts.address.line2 || '';           // Ship Street2
-    fields['fldklictYmJe4rW5C'] = opts.address.city || '';            // Ship City
-    fields['fldqXjndiZ1dOoIZj'] = opts.address.state || '';           // Ship State
-    fields['fld4TPxLBb9jaAa14'] = opts.address.postal_code || '';     // Ship ZIP
-  }
-
-  if (opts.notes) {
-    fields['fldoX0697ASTKcDvD'] = opts.notes;                        // Notes
-  }
-
-  try {
-    await airtableAPICall(() =>
-      fetch(
-        `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_FULFILLMENT_TABLE_ID}`,
-        {
-          method: 'POST',
-          headers: getAirtableHeaders(),
-          body: JSON.stringify({ fields }),
-        }
-      ).then(async (res) => {
-        if (!res.ok) {
-          const body = await res.text();
-          throw new Error(`Fulfillment create failed (${res.status}): ${body}`);
-        }
-        return res.json();
-      })
-    );
-
-    const numLabel = typeof opts.shirtNumber === 'number' ? `#${opts.shirtNumber}` : '#TBD';
-    console.log(`[WH] Fulfillment record created: ${numLabel} ${opts.design} / ${opts.shirtColor} / ${opts.shirtSize}`);
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : String(err);
-    console.error('[WH] Fulfillment Airtable write failed (non-fatal):', message.slice(0, 300));
-    return;
-  }
 }
 
-// Find or create donor with deduplication.
+// Find or create the donor row in Postgres. Dedupes by Stripe customer
+// id first, then by lowercased email (upsertDonorByEmail), so a buyer
+// who checks out twice with different capitalisation is one donor.
+// Returns the donors.id uuid, or '' if the write failed. Callers pass
+// the id along for logging; every downstream write re-resolves the
+// donor by email inside the bridge, so an empty id never loses data.
 //
-// Returns an Airtable donor record ID when Airtable is healthy, else
-// returns an empty string. Callers must treat an empty donor id as a
-// "skip Airtable-only writes" signal and rely on the Postgres mirror
-// (mirrorDonation / upsertDonorByEmail) to persist the donor by email.
-//
-// This is the result of a June 27 incident: Airtable rate-limit /
-// quota failures were causing this function to throw, which bailed the
-// entire webhook before the Postgres mirror could run. Donations
-// stopped landing in Postgres on June 22. Postgres-first writes via
-// mirrorDonation now run unconditionally; Airtable is best-effort.
+// History: until 2026-09-14 this returned an Airtable record id. The
+// June 27 incident (Airtable quota failures throwing here and bailing
+// the webhook before the Postgres mirror ran) is why every Postgres
+// write in this file is decoupled from the donor id.
 async function findOrCreateDonor(
   stripeCustomerId: string | null,
   email: string | null,
@@ -476,276 +328,45 @@ async function findOrCreateDonor(
     referral?: string;
   }
 ): Promise<string> {
-  if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) {
-    console.warn('[WH] findOrCreateDonor: Airtable creds missing — returning empty donor id (Postgres mirror will create by email)');
-    return '';
-  }
-
   try {
-    return await findOrCreateDonorViaAirtable(stripeCustomerId, email, donorData);
+    if (stripeCustomerId) {
+      const byCustomer = await getDonorByStripeCustomerId(stripeCustomerId);
+      if (byCustomer) {
+        console.log('[WH] Found donor by Stripe Customer ID:', byCustomer.id);
+        return byCustomer.id;
+      }
+    }
+
+    const donorEmail = donorData.email || email || '';
+    if (!donorEmail) {
+      console.warn('[WH] findOrCreateDonor: no email on session, skipping donor row');
+      return '';
+    }
+
+    // How-they-heard only lands on a brand-new donor. An existing row
+    // may carry notes Kevin typed by hand; never overwrite those.
+    const existing = await getDonorByEmail(donorEmail);
+    const { choice, rawNote } =
+      !existing && donorData.referral
+        ? classifyReferral(donorData.referral)
+        : { choice: null, rawNote: '' };
+
+    const donor = await upsertDonorByEmail({
+      email: donorEmail,
+      name: donorData.name || null,
+      organizationName: donorData.organization || null,
+      phoneNumber: donorData.phone || null,
+      mailingAddress: donorData.address || null,
+      stripeCustomerId: stripeCustomerId || null,
+      howTheyHeard: choice,
+      notes: rawNote ? `Heard about BAN via: "${rawNote}"` : null,
+    });
+    console.log('[WH] Donor row ready:', donor.id, existing ? '(existing)' : '(new)');
+    return donor.id;
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
-    console.error('[WH] findOrCreateDonor: Airtable failed (non-fatal, falling back to Postgres-only):', message.slice(0, 300));
-    // Even though Airtable failed, ensure the donor exists in Postgres
-    // by email so downstream mirrorDonation/mirrorDripFields calls have
-    // a row to attach to. mirrorDonation also calls upsertDonorByEmail
-    // internally — this is a safety net to make sure the donor row is
-    // present even if mirrorDonation hasn't fired yet (e.g. drip
-    // enrollment path that runs before any donation).
-    if (donorData.email) {
-      await mirrorToPostgres('donor-fallback', async () => {
-        const { upsertDonorByEmail } = await import('@/lib/db/mutations');
-        await upsertDonorByEmail({
-          email: donorData.email,
-          name: donorData.name || null,
-          organizationName: donorData.organization || null,
-          mailingAddress: donorData.address || null,
-          stripeCustomerId: stripeCustomerId || null,
-        });
-      });
-    }
+    console.error('[WH] findOrCreateDonor failed (non-fatal, bridge re-resolves by email):', message.slice(0, 300));
     return '';
-  }
-}
-
-// Internal: the original Airtable-only path. May throw on any Airtable
-// failure; the public findOrCreateDonor wrapper catches.
-async function findOrCreateDonorViaAirtable(
-  stripeCustomerId: string | null,
-  email: string | null,
-  donorData: {
-    name: string;
-    organization?: string;
-    email: string;
-    phone?: string;
-    address?: string;
-    referral?: string;
-  }
-): Promise<string> {
-  // Step 1: Search by Stripe Customer ID first
-  if (stripeCustomerId) {
-    const formula = `{Stripe Customer ID} = "${stripeCustomerId}"`;
-    const response = await airtableAPICall(() =>
-      fetch(
-        `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_DONORS_TABLE}?filterByFormula=${encodeURIComponent(formula)}`,
-        {
-          headers: getAirtableHeaders(),
-        }
-      )
-    );
-
-    if (response.ok) {
-      const data = await response.json();
-      if (data.records && data.records.length > 0) {
-        console.log('[Airtable] Found donor by Stripe Customer ID:', data.records[0].id);
-        return data.records[0].id;
-      }
-    }
-  }
-
-  // Step 2: Search by email if no Stripe ID match
-  if (email) {
-    const formula = `{Email Address} = "${email}"`;
-    const response = await airtableAPICall(() =>
-      fetch(
-        `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_DONORS_TABLE}?filterByFormula=${encodeURIComponent(formula)}`,
-        {
-          headers: getAirtableHeaders(),
-        }
-      )
-    );
-
-    if (response.ok) {
-      const data = await response.json();
-      if (data.records && data.records.length > 0) {
-        const donorId = data.records[0].id;
-        console.log('[Airtable] Found donor by email:', donorId);
-        
-        // Update with Stripe Customer ID if we have it
-        if (stripeCustomerId) {
-          await airtableAPICall(() =>
-            fetch(
-              `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_DONORS_TABLE}/${donorId}`,
-              {
-                method: 'PATCH',
-                headers: getAirtableHeaders(),
-                body: JSON.stringify({
-                  fields: {
-                    'Stripe Customer ID': stripeCustomerId,
-                  },
-                }),
-              }
-            )
-          );
-        }
-        
-        return donorId;
-      }
-    }
-  }
-
-  // Step 3: Create new donor if no matches
-  const newDonorFields: any = {
-    'Donor Name': donorData.name,
-    'Email Address': donorData.email,
-  };
-
-  if (donorData.organization) {
-    newDonorFields['Organization Name'] = donorData.organization;
-  }
-  if (donorData.phone) {
-    newDonorFields['Phone Number'] = donorData.phone;
-  }
-  if (donorData.address) {
-    newDonorFields['Mailing Address'] = donorData.address;
-  }
-  if (stripeCustomerId) {
-    newDonorFields['Stripe Customer ID'] = stripeCustomerId;
-  }
-  if (donorData.referral) {
-    const { choice, rawNote } = classifyReferral(donorData.referral);
-    if (choice) {
-      newDonorFields['How They Heard'] = choice;
-    }
-    if (rawNote) {
-      newDonorFields['Notes'] = `Heard about BAN via: "${rawNote}"`;
-    }
-  }
-
-  const response = await airtableAPICall(() =>
-    fetch(
-      `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_DONORS_TABLE}`,
-      {
-        method: 'POST',
-        headers: getAirtableHeaders(),
-        body: JSON.stringify({
-          fields: newDonorFields,
-        }),
-      }
-    )
-  );
-
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Airtable API error: ${error}`);
-  }
-
-  const data = await response.json();
-  console.log('[Airtable] Created new donor:', data.id);
-  return data.id;
-}
-
-// After creating a donation, recalculate the donor's summary fields.
-// Keeps Total Lifetime Giving, First/Most Recent Donation, Donor Status,
-// and Recurring Supporter current without manual intervention.
-async function updateDonorSummary(donorId: string): Promise<void> {
-  if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) return;
-  try {
-    // Fetch all donations linked to this donor
-    const formula = `FIND("${donorId}", ARRAYJOIN(RECORD_ID({Donor})))`;
-    // Simpler: just fetch the donor's linked donation IDs, then get those records.
-    // Actually, easier: get the donor record with its linked Donations, then
-    // fetch those donation records for amounts and dates.
-    const donorRes = await airtableAPICall(() =>
-      fetch(
-        `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_DONORS_TABLE}/${donorId}?fields%5B%5D=Donations&fields%5B%5D=Subscriptions`,
-        { headers: getAirtableHeaders() }
-      )
-    );
-    if (!donorRes.ok) return;
-    const donorData = await donorRes.json();
-    const donationIds: string[] = (donorData.fields?.Donations || []).map(
-      (d: any) => (typeof d === 'string' ? d : d.id)
-    );
-
-    if (donationIds.length === 0) return;
-
-    // Fetch each donation's amount and date (batch-friendly: up to 100 per URL)
-    let totalGiving = 0;
-    let firstDate: string | null = null;
-    let lastDate: string | null = null;
-
-    // Airtable: fetch by record IDs using filterByFormula with OR(RECORD_ID()=...)
-    // Simpler for small sets: just fetch each. Most donors have 1-3 donations.
-    for (const donId of donationIds) {
-      const dRes = await airtableAPICall(() =>
-        fetch(
-          `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_DONATIONS_TABLE}/${donId}?fields%5B%5D=Donation%20Amount&fields%5B%5D=Donation%20Date&fields%5B%5D=Payment%20Status`,
-          { headers: getAirtableHeaders() }
-        )
-      );
-      if (!dRes.ok) continue;
-      const dData = await dRes.json();
-      const status = dData.fields?.['Payment Status'];
-      const statusName = typeof status === 'object' ? status?.name : status;
-      if (statusName === 'Succeeded' || !statusName) {
-        totalGiving += dData.fields?.['Donation Amount'] || 0;
-      }
-      const date = dData.fields?.['Donation Date'];
-      if (date) {
-        if (!firstDate || date < firstDate) firstDate = date;
-        if (!lastDate || date > lastDate) lastDate = date;
-      }
-    }
-
-    // Check subscription status
-    const subIds: string[] = (donorData.fields?.Subscriptions || []).map(
-      (s: any) => (typeof s === 'string' ? s : s.id)
-    );
-    let hasActiveSub = false;
-    for (const subId of subIds) {
-      const sRes = await airtableAPICall(() =>
-        fetch(
-          `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/Subscriptions/${subId}?fields%5B%5D=Status`,
-          { headers: getAirtableHeaders() }
-        )
-      );
-      if (!sRes.ok) continue;
-      const sData = await sRes.json();
-      const st = sData.fields?.Status;
-      const stName = typeof st === 'object' ? st?.name : st;
-      if (stName === 'active' || stName === 'Active') {
-        hasActiveSub = true;
-        break;
-      }
-    }
-
-    // Determine donor status
-    let donorStatus = 'New';
-    if (donationIds.length > 0) {
-      if (hasActiveSub) {
-        donorStatus = 'Active';
-      } else if (lastDate) {
-        const daysSince = Math.floor(
-          (Date.now() - new Date(lastDate).getTime()) / (1000 * 60 * 60 * 24)
-        );
-        donorStatus = daysSince <= 180 ? 'Active' : 'Lapsed';
-      }
-    }
-
-    // Write summary fields
-    const fields: Record<string, any> = {
-      'Total Lifetime Giving': totalGiving,
-      'Donor Status': donorStatus,
-      'Recurring Supporter': hasActiveSub,
-    };
-    if (firstDate) fields['First Donation Date'] = firstDate;
-    if (lastDate) fields['Most Recent Donation'] = lastDate;
-
-    await airtableAPICall(() =>
-      fetch(
-        `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_DONORS_TABLE}/${donorId}`,
-        {
-          method: 'PATCH',
-          headers: getAirtableHeaders(),
-          body: JSON.stringify({ fields }),
-        }
-      )
-    );
-    console.log('[WH] Donor summary updated:', donorId, `$${totalGiving}`, donorStatus);
-  } catch (err) {
-    // Non-fatal — log and continue
-    console.error('[WH] Failed to update donor summary:', donorId, err);
   }
 }
 
@@ -768,37 +389,16 @@ async function upsertDonation(
     address?: any;
     donationSource?: string;
     notes?: string;
-    childRecordId?: string;
+    // Legacy ChildID (HSP/BAN-005) when the caller knows which kid this
+    // payment is for; resolved to a children FK inside the bridge.
+    childLegacyId?: string;
   }
 ): Promise<string> {
-  // Normalize donation source (used by both Postgres and Airtable writes).
-  const VALID_SOURCES = new Set([
-    'Website',
-    'Manual Entry',
-    'Event',
-    'Other',
-    'Portal Repeat',
-    'Sponsorship',
-    'Shirt Order',
-    'Shirt + Monthly',
-  ]);
-  const rawSource = donationData.donationSource || 'Website';
-  const sourceForAirtable = VALID_SOURCES.has(rawSource) ? rawSource : 'Website';
-  const sourceLabelForNote = VALID_SOURCES.has(rawSource) ? null : rawSource;
-  const noteParts: string[] = [];
-  if (sourceLabelForNote) noteParts.push(`[${sourceLabelForNote}]`);
-  if (donationData.notes) noteParts.push(donationData.notes);
-  const finalNote = noteParts.join(' ') || undefined;
+  const finalNote = donationData.notes || undefined;
 
-  // POSTGRES FIRST. Source of truth since the June 22 migration.
-  // Previously this ran AFTER the Airtable write and only if the Airtable
-  // write succeeded — meaning every Airtable failure (rate limit, quota
-  // exhaustion, network blip) also silently dropped the Postgres mirror.
-  // That's why donations stopped landing in Postgres after June 22 when
-  // Airtable quota started failing writes. Postgres-first decouples the
-  // mirror from Airtable's health and is itself idempotent on the payment
-  // intent id (see lib/db/mutations.ts recordDonation).
-  await mirrorToPostgres(
+  // Idempotent on the payment intent id (see lib/db/mutations.ts
+  // recordDonation), so a Stripe retry never double-books.
+  const mirrored = await mirrorToPostgres(
     `donation ${paymentIntentId}`,
     () =>
       mirrorDonation({
@@ -826,94 +426,16 @@ async function upsertDonation(
           donationNote: finalNote || null,
           donationDate: donationData.donationDate || null,
         },
-        // Pass legacy ChildID for FK resolution if the upstream
-        // caller knew which kid this was for (sponsorship branch).
-        // The childRecordId here is the Airtable record id — we
-        // can&rsquo;t use it for Postgres FK; the bridge falls back to
-        // text legacy id resolution via id_mapping if needed.
-        designatedChildLegacyId: null,
+        designatedChildLegacyId: donationData.childLegacyId ?? null,
       })
   );
   console.log('[WH] donation mirrored to Postgres:', paymentIntentId);
 
-  // AIRTABLE BEST-EFFORT. Try the legacy mirror; failures (quota,
-  // network, schema drift) are logged but no longer break the webhook
-  // or block downstream Postgres operations.
-  if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) {
-    console.warn('[WH] Airtable credentials not configured — skipping Airtable mirror');
-    return paymentIntentId;
-  }
-
-  try {
-    // Idempotency check: don't double-write to Airtable if the record
-    // already exists.
-    const formula = `{Stripe Payment Intent ID} = "${paymentIntentId}"`;
-    const searchResponse = await airtableAPICall(() =>
-      fetch(
-        `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_DONATIONS_TABLE}?filterByFormula=${encodeURIComponent(formula)}`,
-        { headers: getAirtableHeaders() }
-      )
-    );
-    if (searchResponse.ok) {
-      const searchData = await searchResponse.json();
-      if (searchData.records && searchData.records.length > 0) {
-        console.log('[Airtable] Donation already exists:', searchData.records[0].id);
-        return searchData.records[0].id;
-      }
-    }
-
-    const donationFields: any = {
-      'Stripe Payment Intent ID': paymentIntentId,
-      'Stripe Checkout Session ID': donationData.sessionId,
-      'Stripe Customer ID': donationData.customerId || '',
-      'Donation Amount': donationData.amount,
-      'Currency': donationData.currency.toUpperCase(),
-      'Donation Date': donationData.donationDate,
-      'Payment Status': donationData.status,
-      'Recurring Donation': donationData.isRecurring,
-      'Donor': [donationData.donorId],
-      'Donor Email at Donation': donationData.email,
-      'Donation Source': sourceForAirtable,
-    };
-    if (finalNote) donationFields['Donation Note'] = finalNote;
-    if (donationData.childRecordId) donationFields['Child'] = [donationData.childRecordId];
-
-    const response = await airtableAPICall(() =>
-      fetch(
-        `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_DONATIONS_TABLE}`,
-        {
-          method: 'POST',
-          headers: getAirtableHeaders(),
-          body: JSON.stringify({ fields: donationFields }),
-        }
-      )
-    );
-
-    if (!response.ok) {
-      const error = await response.text();
-      console.error('[WH] Airtable donation REJECT (non-fatal):', response.status, error.slice(0, 300));
-      return paymentIntentId;
-    }
-
-    const data = await response.json();
-    console.log('[WH] donation also created in Airtable:', data.id);
-
-    if (donationData.donorId) {
-      updateDonorSummary(donationData.donorId).catch(() => {});
-    }
-
-    return data.id;
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : String(err);
-    console.error('[WH] Airtable donation write failed (non-fatal, Postgres has the donation):', message.slice(0, 300));
-    return paymentIntentId;
-  }
+  return mirrored?.donation?.id ?? paymentIntentId;
 }
 
-// Create communication record
+// Create communication record (Postgres audit row for a sent email)
 async function createCommunicationRecord(
-  donationId: string,
-  donorId: string,
   emailData: {
     email: string;
     subject: string;
@@ -928,10 +450,9 @@ async function createCommunicationRecord(
     stripePaymentIntentId?: string | null;
   }
 ): Promise<string> {
-  // Postgres-first: write the audit row to communications regardless of
-  // Airtable health. Email itself already sent via SendGrid; this is
-  // pure record-keeping. mirrorToPostgres swallows errors so a Postgres
-  // outage can't block the Airtable write either.
+  // The email itself already went out; this is record-keeping.
+  // mirrorToPostgres swallows errors so a Postgres outage cannot fail
+  // the webhook.
   await mirrorToPostgres('communication', () =>
     mirrorCommunication({
       recipientEmail: emailData.email,
@@ -942,50 +463,7 @@ async function createCommunicationRecord(
     })
   );
 
-  if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) {
-    console.warn('[WH] Communication: missing Airtable creds, skipping Airtable side (Postgres mirrored)');
-    return '';
-  }
-
-  const communicationFields: any = {
-    'Subject': emailData.subject,
-    'Email Body': emailData.body,
-    'Send Date': new Date().toISOString(),
-    'Recipient Email': emailData.email,
-    'Status': emailData.status,
-    'Email Type': 'Thank You',
-    'Related Donation': [donationId],
-    'Related Donor': [donorId],
-  };
-
-  try {
-    const response = await airtableAPICall(() =>
-      fetch(
-        `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_COMMUNICATIONS_TABLE}`,
-        {
-          method: 'POST',
-          headers: getAirtableHeaders(),
-          body: JSON.stringify({
-            fields: communicationFields,
-          }),
-        }
-      )
-    );
-
-    if (!response.ok) {
-      const error = await response.text();
-      console.error('[WH] Communication Airtable write rejected (non-fatal):', response.status, error.slice(0, 300));
-      return '';
-    }
-
-    const data = await response.json();
-    console.log('[Airtable] Created communication record:', data.id);
-    return data.id;
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : String(err);
-    console.error('[WH] Communication Airtable write failed (non-fatal):', message.slice(0, 300));
-    return '';
-  }
+  return '';
 }
 
 // Send thank-you email via SendGrid
@@ -1061,16 +539,19 @@ async function sendThankYouEmail(donationData: {
   console.log('[Webhook] Thank-you email sent to:', donationData.email, 'via', result.data?.provider);
 }
 
-// Assign the next available child (lowest ShirtNumber, ShirtAssignedAt blank,
-// Status active) to a shirt buyer. Writes the assignment atomically-ish by
-// patching the Child record, then returns the child info so the caller can
-// link the Donation and render the confirmation email.
+// Assign the next available kid (lowest shirt number with no buyer yet,
+// not departed, not graduated or archived, not reserved for auction) to a
+// gift recipient. Stamps shirt_assigned_at + buyer fields on the children
+// row and returns the kid so the caller can tag the Donation and render
+// the gift email.
 //
-// Returns null if no child is currently available. Caller should degrade
-// gracefully (still send a confirmation, flag internally) rather than fail.
+// Only the gift-sponsorship branch calls this; every other flow is
+// stockpile (no assignment at purchase). Returns null if nobody is
+// available; the caller degrades gracefully.
 async function assignNextShirtChild(
   buyerEmail: string,
-  buyerName: string
+  buyerName: string,
+  attempt: number = 0
 ): Promise<{
   recordId: string;
   childId: string;
@@ -1078,92 +559,64 @@ async function assignNextShirtChild(
   shirtNumber: number;
   photoUrl?: string;
 } | null> {
-  if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) {
-    console.warn('[Webhook] Airtable not configured, skipping shirt assignment');
-    return null;
-  }
-
-  // Query children where:
-  // - ShirtNumber is populated (they have a number to give away)
-  // - ShirtAssignedAt is blank (shirt not yet claimed by a buyer)
-  // - Status is not 'Graduated' or 'Archived' (case-insensitive)
-  // - ReservedForAuction is not checked (numbers 1, 7, 67, 69, 420, 911 etc
-  //   are held back for live auctions and must never be auto-assigned)
-  // Sorted ascending by ShirtNumber so lowest-numbered child is claimed first,
-  // matching the enrollment-order policy.
-  const formula = `AND(NOT({ShirtNumber}=BLANK()), {ShirtAssignedAt}=BLANK(), LOWER({Status})!="graduated", LOWER({Status})!="archived", NOT({ReservedForAuction}))`;
-  const listUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_CHILDREN_TABLE}?filterByFormula=${encodeURIComponent(formula)}&sort%5B0%5D%5Bfield%5D=ShirtNumber&sort%5B0%5D%5Bdirection%5D=asc&maxRecords=1`;
-
-  let candidate: any = null;
   try {
-    const res = await airtableAPICall(() =>
-      fetch(listUrl, { headers: getAirtableHeaders() })
-    );
-    if (!res.ok) {
-      console.error('[Webhook] Child lookup for shirt assignment failed:', res.status);
-      return null;
-    }
-    const data = await res.json();
-    if (!data.records || data.records.length === 0) {
-      console.warn('[Webhook] No available children to assign for shirt order', { buyerEmail });
-      return null;
-    }
-    candidate = data.records[0];
-  } catch (error) {
-    console.error('[Webhook] Error during shirt assignment lookup:', error);
-    return null;
-  }
-
-  // Claim this child by writing buyer info and a timestamp. If two webhooks
-  // raced and both picked the same child, the second write still succeeds but
-  // overwrites the first buyer's trail; acceptable given BAN's volume. If that
-  // ever becomes a real risk we can move to a conditional-update pattern or
-  // serialize via a dedicated queue.
-  const nowIso = new Date().toISOString();
-  const childRecordId = candidate.id as string;
-  const displayName =
-    candidate.fields?.DisplayName ||
-    `${candidate.fields?.FirstName || 'Child'} ${candidate.fields?.LastInitial || ''}`.trim();
-  const shirtNumber = Number(candidate.fields?.ShirtNumber);
-  const photoUrl = candidate.fields?.ProfilePhoto?.[0]?.url;
-  const childId = candidate.fields?.ChildID || childRecordId;
-
-  try {
-    const patchRes = await airtableAPICall(() =>
-      fetch(
-        `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_CHILDREN_TABLE}/${childRecordId}`,
-        {
-          method: 'PATCH',
-          headers: getAirtableHeaders(),
-          body: JSON.stringify({
-            fields: {
-              ShirtAssignedAt: nowIso,
-              ShirtBuyerEmail: buyerEmail,
-              ShirtBuyerName: buyerName,
-            },
-          }),
-        }
+    const candidates = await db
+      .select()
+      .from(children)
+      .where(
+        and(
+          isNotNull(children.shirtNumber),
+          isNull(children.shirtAssignedAt),
+          isNull(children.departedAt),
+          or(isNull(children.reservedForAuction), eq(children.reservedForAuction, false)),
+          or(
+            isNull(children.status),
+            notInArray(sql`lower(${children.status})`, ['graduated', 'archived'])
+          )
+        )
       )
-    );
-    if (!patchRes.ok) {
-      const body = await patchRes.text();
-      console.error('[Webhook] Failed to mark child assigned:', patchRes.status, body);
+      .orderBy(asc(children.shirtNumber))
+      .limit(1);
+    const candidate = candidates[0];
+    if (!candidate || candidate.shirtNumber == null) {
+      console.warn('[Webhook] No available children to assign for gift sponsorship', { buyerEmail });
       return null;
     }
+
+    // Claim only if still unassigned, so two racing webhook deliveries
+    // cannot hand the same kid to two recipients.
+    const updated = await db
+      .update(children)
+      .set({
+        shirtAssignedAt: new Date(),
+        shirtBuyerEmail: buyerEmail,
+        shirtBuyerName: buyerName,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(children.id, candidate.id), isNull(children.shirtAssignedAt)))
+      .returning({ id: children.id });
+    if (updated.length === 0) {
+      if (attempt >= 1) return null;
+      console.warn('[Webhook] Gift assignment lost a race for #' + candidate.shirtNumber + ', retrying once');
+      return assignNextShirtChild(buyerEmail, buyerName, attempt + 1);
+    }
+
+    const displayName =
+      candidate.displayName ||
+      `${candidate.firstName || 'Child'} ${candidate.lastInitial || ''}`.trim();
+    console.log('[Webhook] Assigned shirt #' + candidate.shirtNumber + ' (' + displayName + ') to ' + buyerEmail);
+
+    return {
+      recordId: candidate.id,
+      childId: candidate.childId,
+      displayName,
+      shirtNumber: candidate.shirtNumber,
+      photoUrl: candidate.profilePhotoUrl || undefined,
+    };
   } catch (error) {
-    console.error('[Webhook] Error marking child assigned:', error);
+    console.error('[Webhook] Error during gift shirt assignment:', error);
     return null;
   }
-
-  console.log('[Webhook] Assigned shirt #' + shirtNumber + ' (' + displayName + ') to ' + buyerEmail);
-
-  return {
-    recordId: childRecordId,
-    childId,
-    displayName,
-    shirtNumber,
-    photoUrl,
-  };
 }
 
 // Send shirt order confirmation email via SendGrid.
@@ -1183,7 +636,7 @@ async function assignNextShirtChild(
 // Shirt+monthly opt-in buyers get an "your monthly is active" block but
 // no sponsor code (none generated yet under the stockpile model). The
 // sponsor code + portal access activates once Kevin reconciles the
-// shipped number into Airtable.
+// shipped number into the fulfillment row.
 async function sendShirtConfirmationEmail(orderData: {
   email: string;
   name: string;
@@ -1592,35 +1045,37 @@ function escapeHtml(s: string): string {
 // generateUniqueSponsorCode() — DB-checked so we never mint a code
 // that collides with an existing sponsorships row.
 
-// Fetch a child record to enrich the sponsorship with display data
-async function fetchChildRecord(childRecordId: string): Promise<any | null> {
-  if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) return null;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// Fetch the kid's row to enrich the sponsorship with display data.
+// child_record_id on the checkout metadata is the children.id uuid.
+// Sessions minted before the Postgres cutover carried the Airtable
+// record id instead; those resolve through the airtable_id column so
+// an in-flight old session still completes.
+async function fetchChildRecord(childRecordId: string) {
   try {
-    const response = await airtableAPICall(() =>
-      fetch(
-        `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_CHILDREN_TABLE}/${childRecordId}`,
-        { headers: getAirtableHeaders() }
-      )
-    );
-    if (!response.ok) return null;
-    return await response.json();
+    if (UUID_RE.test(childRecordId)) {
+      const byId = await getChildByRecordId(childRecordId);
+      if (byId) return byId;
+    }
+    const rows = await db
+      .select()
+      .from(children)
+      .where(eq(children.airtableId, childRecordId))
+      .limit(1);
+    return rows[0] ?? null;
   } catch (error) {
-    console.error('[Airtable] Failed to fetch child record:', error);
+    console.error('[WH] Failed to fetch child row:', error);
     return null;
   }
 }
 
 // Create a new Sponsorship record linked to Child and Donor
 async function createSponsorshipRecord(data: {
-  childRecordId: string;
   childId: string;
   childDisplayName: string;
-  childAge?: string;
-  childLocation?: string;
-  childPhoto?: any[];
   sponsorEmail: string;
   sponsorName?: string;
-  donorRecordId: string;
   subscriptionId?: string | null;
   monthlyAmount?: number;
   // When true, set ChildRevealedAt to now so the sponsor portal skips
@@ -1639,10 +1094,9 @@ async function createSponsorshipRecord(data: {
   const sponsorCode = await generateUniqueSponsorCode();
   const today = new Date().toISOString().split('T')[0];
 
-  // POSTGRES FIRST. Source of truth since the June 22 migration. Idempotent
-  // on sponsor_code (uniquely indexed) — a webhook retry won't duplicate.
-  // Mirrors before Airtable so an Airtable outage can't drop the sponsorship.
-  await mirrorToPostgres(
+  // Idempotent on sponsor_code (uniquely indexed): a webhook retry
+  // won't duplicate.
+  const mirrored = await mirrorToPostgres(
     `sponsorship ${sponsorCode}`,
     () =>
       mirrorSponsorship({
@@ -1660,69 +1114,7 @@ async function createSponsorshipRecord(data: {
   );
   console.log('[WH] sponsorship mirrored to Postgres:', sponsorCode);
 
-  // AIRTABLE BEST-EFFORT. Try the legacy mirror; failures (quota,
-  // network, schema drift) are logged but no longer break the webhook
-  // or block downstream Postgres operations.
-  if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) {
-    console.warn('[WH] Sponsorship: missing Airtable creds, skipping Airtable mirror (non-fatal)');
-    return { recordId: '', sponsorCode };
-  }
-
-  const sponsorshipFields: Record<string, unknown> = {
-    SponsorCode: sponsorCode,
-    SponsorEmail: data.sponsorEmail,
-    ChildID: data.childId,
-    ChildDisplayName: data.childDisplayName,
-    AuthStatus: 'Active',
-    Status: 'Active',
-    VisibleToSponsor: true,
-    SponsorshipStartDate: today,
-    // Bidirectional link to child record
-    Children: [data.childRecordId],
-    // Bidirectional link to donor (full CRM profile)
-    Donor: [data.donorRecordId],
-    MonthlyAmount: data.monthlyAmount ?? 25,
-  };
-
-  if (data.sponsorName) sponsorshipFields.SponsorName = data.sponsorName;
-  if (data.childAge) sponsorshipFields.ChildAge = data.childAge;
-  if (data.childLocation) sponsorshipFields.ChildLocation = data.childLocation;
-  if (data.childPhoto && data.childPhoto.length > 0) {
-    sponsorshipFields.ChildPhoto = data.childPhoto;
-  }
-  if (data.subscriptionId) {
-    sponsorshipFields.StripeSubscriptionID = data.subscriptionId;
-  }
-  if (data.alreadyRevealed) {
-    sponsorshipFields.ChildRevealedAt = new Date().toISOString();
-  }
-
-  try {
-    const response = await airtableAPICall(() =>
-      fetch(
-        `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_SPONSORSHIPS_TABLE}`,
-        {
-          method: 'POST',
-          headers: getAirtableHeaders(),
-          body: JSON.stringify({ fields: sponsorshipFields }),
-        }
-      )
-    );
-
-    if (!response.ok) {
-      const error = await response.text();
-      console.error('[WH] Airtable Sponsorship create rejected (non-fatal):', response.status, error.slice(0, 300));
-      return { recordId: '', sponsorCode };
-    }
-
-    const result = await response.json();
-    console.log('[Airtable] Created sponsorship:', result.id, sponsorCode);
-    return { recordId: result.id, sponsorCode };
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : String(err);
-    console.error('[WH] Airtable Sponsorship write failed (non-fatal, Postgres has the sponsorship):', message.slice(0, 300));
-    return { recordId: '', sponsorCode };
-  }
+  return { recordId: (mirrored as { id?: string } | undefined)?.id ?? '', sponsorCode };
 }
 
 /**
@@ -1738,12 +1130,10 @@ async function createSponsorshipFromCartCheckout(data: {
   sponsorName?: string;
   monthlyAmount: number;
   stripeSubscriptionId: string;
-  donorRecordId: string;
   sponsorshipStartDate: string;
 }): Promise<{ recordId: string }> {
-  // POSTGRES FIRST. Source of truth since the June 22 migration. No child
-  // link — matches the cart-mode Airtable shape. Idempotent on sponsor_code.
-  await mirrorToPostgres(
+  // No child link (core_model.md §0). Idempotent on sponsor_code.
+  const mirrored = await mirrorToPostgres(
     `cart sponsorship ${data.sponsorCode}`,
     () =>
       mirrorSponsorship({
@@ -1759,51 +1149,7 @@ async function createSponsorshipFromCartCheckout(data: {
   );
   console.log('[WH] cart sponsorship mirrored to Postgres:', data.sponsorCode);
 
-  // AIRTABLE BEST-EFFORT.
-  if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) {
-    console.warn('[WH] Cart Sponsorship: missing Airtable creds, skipping Airtable mirror (non-fatal)');
-    return { recordId: '' };
-  }
-
-  const fields: Record<string, unknown> = {
-    SponsorCode: data.sponsorCode,
-    SponsorEmail: data.sponsorEmail,
-    AuthStatus: 'Active',
-    Status: 'Active',
-    VisibleToSponsor: true,
-    SponsorshipStartDate: data.sponsorshipStartDate,
-    Donor: [data.donorRecordId],
-    MonthlyAmount: data.monthlyAmount,
-    StripeSubscriptionID: data.stripeSubscriptionId,
-  };
-  if (data.sponsorName) fields.SponsorName = data.sponsorName;
-
-  try {
-    const response = await airtableAPICall(() =>
-      fetch(
-        `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_SPONSORSHIPS_TABLE}`,
-        {
-          method: 'POST',
-          headers: getAirtableHeaders(),
-          body: JSON.stringify({ fields }),
-        }
-      )
-    );
-
-    if (!response.ok) {
-      const error = await response.text();
-      console.error('[WH] Airtable cart Sponsorship create rejected (non-fatal):', response.status, error.slice(0, 300));
-      return { recordId: '' };
-    }
-
-    const result = await response.json();
-    console.log('[Airtable] Created cart Sponsorship:', result.id, data.sponsorCode);
-    return { recordId: result.id };
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : String(err);
-    console.error('[WH] Airtable cart Sponsorship write failed (non-fatal, Postgres has the sponsorship):', message.slice(0, 300));
-    return { recordId: '' };
-  }
+  return { recordId: (mirrored as { id?: string } | undefined)?.id ?? '' };
 }
 
 // Send sponsor welcome email with sponsor code
@@ -2150,11 +1496,9 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
     // the donation upsert in every flow.  Emails / drip / notifications
     // are non-fatal and safe to skip on retry.
     //
-    // Postgres-first: ask the donations table directly. This is the only
-    // store that's reliably available — Airtable can be down or quota-
-    // limited and we still need idempotency to hold so Stripe retries
-    // during an Airtable outage don't double-process the same payment
-    // (duplicate admin emails, duplicate drip enrollment, etc.).
+    // Ask the donations table: if a row exists for this PI, Stripe is
+    // retrying and we must not double-process (duplicate admin emails,
+    // duplicate drip enrollment, etc.).
     // ────────────────────────────────────────────────────────────────────
     const pgIdempotency = await findDonationByPaymentIntent(paymentIntentId);
     if (pgIdempotency) {
@@ -2165,39 +1509,6 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
       return;
     }
 
-    // Secondary defense: the original Airtable-based check stays until we
-    // cut over fully. If Postgres said "no row yet" but Airtable already
-    // logged this PI (the most likely cause is a Postgres write that
-    // hadn't landed at retry time), skip the side effects on Airtable's
-    // word. If Airtable is down, this block is a no-op and Postgres
-    // already had the final say above.
-    if (AIRTABLE_API_KEY && AIRTABLE_BASE_ID) {
-      const idempotencyFormula = `{Stripe Payment Intent ID} = "${paymentIntentId}"`;
-      try {
-        const idempotencyRes = await airtableAPICall(() =>
-          fetch(
-            `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_DONATIONS_TABLE}?filterByFormula=${encodeURIComponent(idempotencyFormula)}&maxRecords=1`,
-            { headers: getAirtableHeaders() }
-          )
-        );
-        if (idempotencyRes.ok) {
-          const idempotencyData = await idempotencyRes.json();
-          const existing = idempotencyData.records?.[0];
-          if (existing) {
-            const existingStatus = existing.fields?.Status || existing.fields?.['Status'] || '';
-            console.log(
-              `[WH] IDEMPOTENCY: donation already exists for PI ${paymentIntentId}, ` +
-              `status=${existingStatus}, record=${existing.id}. Skipping all side effects.`
-            );
-            return;
-          }
-        }
-      } catch (err) {
-        // If the idempotency check itself fails, log and continue —
-        // better to risk a duplicate than to silently drop a real order.
-        console.error('[WH] IDEMPOTENCY check failed, proceeding anyway:', err);
-      }
-    }
 
     const email = session.customer_email || session.customer_details?.email || '';
     // Name resolution — three-way fallback (2026-07-10 middle-path fix).
@@ -2256,8 +1567,8 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
     // Step 1: Find or create donor (shared for donations, shirt orders, sponsorships)
     // Branch: Shirt order, Shirt + Monthly, Sponsorship, or standard donation.
     // We determine the branch BEFORE calling findOrCreateDonor so we can
-    // parallelize the donor lookup with path-specific Airtable work (child
-    // assignment or child record fetch). This shaves ~1-2s off total time,
+    // parallelize the donor lookup with path-specific work (gift child
+    // assignment or child row fetch). This shaves ~1-2s off total time,
     // critical for staying inside the serverless timeout.
     const isShirtOrder = session.metadata?.order_type === 'shirt';
     const isShirtPlusMonthly = session.metadata?.order_type === 'shirt_plus_monthly';
@@ -2446,7 +1757,6 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
             sponsorName: name,
             monthlyAmount,
             stripeSubscriptionId: existingSubscriptionId,
-            donorRecordId: donorId,
             sponsorshipStartDate: donationDate,
           });
           console.log('[WH] Created cart Sponsorship row, code=' + sponsorCode + ', sub=' + existingSubscriptionId);
@@ -2455,7 +1765,7 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
           await sendEmail({
             to: { email: 'kevin@beanumber.org', name: 'Kevin' },
             subject: 'Cart Sponsorship row failed to create (sub exists in Stripe)',
-            html: `<p>A cart+monthly checkout completed and the Stripe subscription was created (${existingSubscriptionId}), but the Airtable Sponsorship row failed to write.</p>
+            html: `<p>A cart+monthly checkout completed and the Stripe subscription was created (${existingSubscriptionId}), but the sponsorship row failed to write.</p>
 <p><strong>Buyer:</strong> ${name || 'unknown'} (${email})<br/>
 <strong>Session:</strong> ${session.id}<br/>
 <strong>Error:</strong> ${err?.message || String(err)}</p>
@@ -2533,7 +1843,7 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
 
       // Communication record
       try {
-        await createCommunicationRecord(donationId, donorId, {
+        await createCommunicationRecord({
           email,
           subject: `Your ${cartItems.length} shirt${cartItems.length > 1 ? 's are' : ' is'} being made.`,
           body: `Cart order: ${assignmentNotes.join('; ')}`,
@@ -2588,31 +1898,8 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
         const dripNextSendDate = new Date(Date.now() + dripDelayDays * 86400000);
         const dripNextSendStr = dripNextSendDate.toISOString().split('T')[0];
 
-        try {
-          await airtableAPICall(() =>
-            fetch(
-              `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_DONORS_TABLE}/${donorId}`,
-              {
-                method: 'PATCH',
-                headers: getAirtableHeaders(),
-                body: JSON.stringify({
-                  fields: {
-                    DripPipeline: pipeline,
-                    DripStage: 0,
-                    DripNextSend: dripNextSendStr,
-                  },
-                }),
-              }
-            )
-          );
-          console.log(`[WH] Cart: enrolled in ${pipeline} drip (no numbers yet), next send ${dripNextSendStr}`);
-        } catch (err: any) {
-          console.error('[WH] Cart drip enrollment failed:', String(err?.message || err).slice(0, 200));
-        }
 
-        // Mirror to Postgres so the drip cron (which queries Postgres)
-        // can find this donor. Wrapped in mirrorToPostgres so a Postgres
-        // failure logs without breaking the Airtable write or the receipt.
+        // Enroll in Postgres so the drip cron can find this donor.
         const cartDonorEmail = email;
         if (cartDonorEmail) {
           await mirrorToPostgres('cart-drip-fields', async () => {
@@ -2623,6 +1910,7 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
               dripNextSend: dripNextSendDate,
             });
           });
+          console.log(`[WH] Cart: enrolled in ${pipeline} drip (no numbers yet), next send ${dripNextSendStr}`);
         }
       }
 
@@ -2648,18 +1936,15 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
         console.error('[Webhook] Sponsorship missing child_record_id in metadata');
       }
 
-      // Parallelize: donor lookup + child record fetch
+      // Parallelize: donor lookup + child row fetch
       const [donorId, childRecord] = await Promise.all([
         donorPromise,
         childRecordId ? fetchChildRecord(childRecordId) : Promise.resolve(null),
       ]);
-      const childFields = childRecord?.fields || {};
-      const childDisplayName = childFields.DisplayName || childDisplayNameMeta || 'a child';
-      const childId = childFields.ChildID || childFields['Child ID'] || childIdMeta;
-      const childPhoto = childFields.ProfilePhoto;
-      const childLocation = childFields.SchoolLocation;
+      const childDisplayName = childRecord?.displayName || childDisplayNameMeta || 'a child';
+      const childId = childRecord?.childId || childIdMeta;
       const childShirtNumber =
-        typeof childFields.ShirtNumber === 'number' ? childFields.ShirtNumber : null;
+        typeof childRecord?.shirtNumber === 'number' ? childRecord.shirtNumber : null;
 
       // Step 2c: Record the first month as a donation tagged as Sponsorship
       console.log('[WH] S3: upsert donation, pi=' + paymentIntentId);
@@ -2679,7 +1964,7 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
         address,
         donationSource: 'Sponsorship',
         notes: `Sponsorship of ${childDisplayName} (${childId || 'no id'})${referral ? ` \u00b7 Heard via: ${referral}` : ''}`,
-        childRecordId: childRecordId || undefined,
+        childLegacyId: childId || undefined,
       });
 
       // Direct-pay claim (Kevin, 2026-08-02): when the checkout was
@@ -2729,16 +2014,11 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
       if (childRecordId) {
         try {
           const result = await createSponsorshipRecord({
-            childRecordId,
             childId: childId || '',
             childDisplayName,
             claimShirtNumber,
-            childAge: childFields.DateOfBirth ? undefined : childFields.GradeClass,
-            childLocation,
-            childPhoto,
             sponsorEmail: email,
             sponsorName: name,
-            donorRecordId: donorId,
             subscriptionId,
             monthlyAmount: amount,
             // Regular sponsorship path: the sponsor landed on this
@@ -2779,7 +2059,7 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
 
       // Step 5c: Communication record
       try {
-        await createCommunicationRecord(donationId, donorId, {
+        await createCommunicationRecord({
           email,
           subject: `You're sponsoring ${childDisplayName}.`,
           body: `Sponsorship welcome. Code: ${sponsorCode || 'N/A'}. Child: ${childDisplayName} (${childId || 'no id'}). $${amount.toFixed(2)}/mo.`,
@@ -2938,7 +2218,7 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
 
       // Step 7: Communication record
       try {
-        await createCommunicationRecord(donationId, donorId, {
+        await createCommunicationRecord({
           email,
           subject: 'Your shirt + monthly sponsorship is confirmed.',
           body: `Shirt+Monthly (stockpile, match pending): ${shirtName} (${shirtColor}, ${shirtSize}) / $${amount.toFixed(2)}/mo`,
@@ -2970,29 +2250,18 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
       // Step 9: Enroll into shirt_sponsor drip with no specific child/number.
       // The drip templates already branch on whether a child name is set, so
       // they'll render the generic "the child connected to your shirt" copy.
-      try {
-        await airtableAPICall(() =>
-          fetch(
-            `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_DONORS_TABLE}/${donorId}`,
-            {
-              method: 'PATCH',
-              headers: getAirtableHeaders(),
-              body: JSON.stringify({
-                fields: {
-                  DripPipeline: 'shirt_sponsor',
-                  DripStage: 0,
-                  // Drip kicks off 10 days from enrollment. See shirt-only
-                  // branch for rationale.
-                  DripNextSend: new Date(Date.now() + 10 * 86400000).toISOString().split('T')[0],
-                  // DripChildName / DripShirtNumber left blank
-                },
-              }),
-            }
-          )
-        );
+      if (email) {
+        await mirrorToPostgres('shirt-sponsor-drip-fields', async () => {
+          await mirrorDripFields({
+            email,
+            dripPipeline: 'shirt_sponsor',
+            dripStage: 0,
+            // Drip kicks off 10 days from enrollment. See shirt-only
+            // branch for rationale.
+            dripNextSend: new Date(Date.now() + 10 * 86400000),
+          });
+        });
         console.log('[WH] Enrolled in shirt_sponsor drip (no number yet)');
-      } catch (err: any) {
-        console.error('[WH] shirt_sponsor drip enrollment failed (non-fatal):', String(err?.message || err).slice(0, 200));
       }
 
       console.log('[Webhook] Successfully processed shirt + monthly:', {
@@ -3030,7 +2299,7 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
       // The idempotency guard checks for an existing donation — if fulfillment
       // runs after the donation, a Stripe retry can skip it permanently.
       // Order # and Child Name stay blank; Kevin fills in the number that
-      // physically shipped when he reconciles in Airtable.
+      // physically shipped when he reconciles in the admin queue.
       try {
         await createFulfillmentRecord({
           design: 'Number Tee',  // 2026 lineup: every shirt is the same design (4 colorways)
@@ -3094,7 +2363,7 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
 
       // Step 5a: Create communication record for shirt order.
       try {
-        await createCommunicationRecord(donationId, donorId, {
+        await createCommunicationRecord({
           email,
           subject: 'Your shirt is being made right now.',
           body: `Shirt order (stockpile, number not yet assigned): ${shirtName} (${shirtColor}, ${shirtSize}) / $${amount.toFixed(2)}`,
@@ -3150,36 +2419,9 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
       const dripNextSendDate = new Date(Date.now() + dripDelayDays * 86400000);
       const dripNextSendStr = dripNextSendDate.toISOString().split('T')[0];
 
-      try {
-        await airtableAPICall(() =>
-          fetch(
-            `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_DONORS_TABLE}/${donorId}`,
-            {
-              method: 'PATCH',
-              headers: getAirtableHeaders(),
-              body: JSON.stringify({
-                fields: {
-                  DripPipeline: dripPipelineName,
-                  DripStage: 0,
-                  DripNextSend: dripNextSendStr,
-                  // DripChildName / DripShirtNumber left blank — match
-                  // happens at unboxing/lookup, not at checkout
-                },
-              }),
-            }
-          )
-        );
-        console.log(`[WH] Enrolled in ${dripPipelineName} drip (no number yet), next send ${dripNextSendStr}`);
-      } catch (err: any) {
-        // Non-fatal — the purchase still succeeded even if drip enrollment fails
-        console.error('[WH] Drip enrollment failed:', String(err?.message || err).slice(0, 200));
-      }
 
-      // Mirror to Postgres so the drip cron (which queries Postgres only)
-      // can find this donor. Wrapped in mirrorToPostgres so a Postgres
-      // failure logs without breaking the Airtable write or the Stripe
-      // receipt. Email is the join key — mirrorDripFields updates by
-      // lower(email) match.
+      // Enroll in Postgres so the drip cron can find this donor. Email is
+      // the join key: mirrorDripFields updates by lower(email) match.
       await mirrorToPostgres('drip-fields', async () => {
         await mirrorDripFields({
           email,
@@ -3188,6 +2430,7 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
           dripNextSend: dripNextSendDate,
         });
       });
+      console.log(`[WH] Enrolled in ${dripPipelineName} drip (no number yet), next send ${dripNextSendStr}`);
 
       return { donorId, donationId };
 
@@ -3282,7 +2525,7 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
       }
 
       try {
-        await createCommunicationRecord(donationId, donorId, {
+        await createCommunicationRecord({
           email,
           subject: `Your reorder is being made (#${existingShirtNumber}).`,
           body: `Portal reorder: ${shirtName} (${shirtColor}, ${shirtSize}) / $${amount.toFixed(2)} / Re-using #${existingShirtNumber} (${childDisplayName})`,
@@ -3349,11 +2592,8 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
       const donorId = await donorPromise;
 
       // Step 3: Donation record for accounting + LTV reporting. The
-      // Donation Source 'Merch' isn't a singleSelect option yet, so the
-      // VALID_SOURCES normalizer will route this to 'Website' and stash
-      // the real label as a prefix on Donation Note. Once Kevin adds
-      // 'Merch' as an Airtable option this flips to the real value
-      // automatically.
+      // Donation Source 'Merch' is stored as written (donation_source is
+      // free text in Postgres).
       const donationId = await upsertDonation(paymentIntentId, {
         sessionId: session.id,
         customerId: stripeCustomerId,
@@ -3391,7 +2631,7 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
 
       // Step 5: Communication record (audit trail)
       try {
-        await createCommunicationRecord(donationId, donorId, {
+        await createCommunicationRecord({
           email,
           subject: `Your ${merchName} order is being made.`,
           body: `Merch order: ${merchName}${size ? ` (${size})` : ''}, #${shirtNumber}, ${childDisplayName || ''} / $${amount.toFixed(2)}`,
@@ -3487,10 +2727,7 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
         throw error;
       }
 
-      // Book the gifter's $25 donation. Source 'Gift Sponsorship' is not
-      // (yet) an Airtable option — until Kevin adds it, the normalizer
-      // falls back to 'Website' and prefixes '[Gift Sponsorship]' onto
-      // the Donation Note, per trap 1.
+      // Book the gifter's $25 donation under source 'Gift Sponsorship'.
       const assignmentNote = assignedChild
         ? ` / Assigned to #${assignedChild.shirtNumber} (${assignedChild.displayName})`
         : ' / No child assigned (out of stock or assignment failed)';
@@ -3513,7 +2750,7 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
           `Gift to ${recipientName || 'unknown'} <${recipientEmail || 'unknown'}>` +
           assignmentNote +
           (giftMessage ? ` / Message: ${giftMessage.slice(0, 200)}` : ''),
-        childRecordId: assignedChild?.recordId,
+        childLegacyId: assignedChild?.childId,
       });
 
       // Email the recipient — the reveal hook.
@@ -3553,7 +2790,7 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
 
       // Communication record covers both emails as one transaction.
       try {
-        await createCommunicationRecord(donationId, donorId, {
+        await createCommunicationRecord({
           email,
           subject: `Gift sponsorship → ${recipientEmail || 'unknown'} (#${assignedChild?.shirtNumber || '?'})`,
           body:
@@ -3637,7 +2874,7 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
 
       // Step 4b: Create communication record
       try {
-        await createCommunicationRecord(donationId, donorId, {
+        await createCommunicationRecord({
           email,
           subject: isRecurring ? 'You just became a monthly sponsor.' : 'Thank you. This matters.',
           body: `${isRecurring ? 'Monthly sponsor' : 'One-time gift'} of $${amount.toFixed(2)}.`,
@@ -3671,28 +2908,20 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
 
       // Step 9: Enroll one-time donors into donor_convert drip.
       // Monthly donors (isRecurring) skip this — they're already committed.
-      if (!isRecurring && donorId) {
+      if (!isRecurring && email) {
         try {
           const dripStartDate = new Date();
           dripStartDate.setUTCDate(dripStartDate.getUTCDate() + 5);
           const dripNextSend = dripStartDate.toISOString().split('T')[0];
 
-          await airtableAPICall(() =>
-            fetch(
-              `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_DONORS_TABLE}/${donorId}`,
-              {
-                method: 'PATCH',
-                headers: getAirtableHeaders(),
-                body: JSON.stringify({
-                  fields: {
-                    DripPipeline: 'donor_convert',
-                    DripStage: 0,
-                    DripNextSend: dripNextSend,
-                  },
-                }),
-              }
-            )
-          );
+          await mirrorToPostgres('donor-convert-drip-fields', async () => {
+            await mirrorDripFields({
+              email,
+              dripPipeline: 'donor_convert',
+              dripStage: 0,
+              dripNextSend: dripStartDate,
+            });
+          });
           console.log('[WH] Enrolled in donor_convert drip, next send:', dripNextSend);
         } catch (err: any) {
           console.error('[WH] donor_convert drip enrollment failed:', String(err?.message || err).slice(0, 200));
@@ -3763,75 +2992,12 @@ async function verifyWebhookSignature(
 async function handleSubscriptionCanceled(subscription: Stripe.Subscription): Promise<void> {
   const subscriptionId = subscription.id;
 
-  // POSTGRES FIRST. Source of truth — flip the sponsorship to ended regardless
-  // of Airtable health so cancellations always land.
+  // Flip every sponsorship on this subscription to Cancelled.
   await mirrorToPostgres(
     `sub.deleted ${subscriptionId}`,
     () => mirrorSubscriptionDeleted(subscriptionId)
   );
 
-  // AIRTABLE BEST-EFFORT.
-  if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) {
-    console.warn('[WH] Subscription canceled: missing Airtable creds, skipping Airtable mirror (non-fatal)');
-    return;
-  }
-
-  try {
-    // Find the Sponsorship row by StripeSubscriptionID
-    const formula = `{StripeSubscriptionID} = "${subscriptionId}"`;
-    const searchResponse = await airtableAPICall(() =>
-      fetch(
-        `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_SPONSORSHIPS_TABLE}?filterByFormula=${encodeURIComponent(formula)}`,
-        { headers: getAirtableHeaders() }
-      )
-    );
-
-    if (!searchResponse.ok) {
-      const errText = await searchResponse.text();
-      console.error('[WH] Failed to look up sponsorship for canceled subscription (non-fatal):', subscriptionId, errText.slice(0, 300));
-      return;
-    }
-
-    const searchData = await searchResponse.json();
-    const records = searchData.records ?? [];
-
-    if (records.length === 0) {
-      // Not every subscription cancellation is a sponsor — could be an old
-      // recurring donor with no sponsorship row. Log and move on.
-      console.log('[Webhook] No sponsorship found for canceled subscription:', subscriptionId);
-      return;
-    }
-
-    // Defensive: if we somehow have duplicates, update them all
-    for (const record of records) {
-      const updateResponse = await airtableAPICall(() =>
-        fetch(
-          `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_SPONSORSHIPS_TABLE}/${record.id}`,
-          {
-            method: 'PATCH',
-            headers: getAirtableHeaders(),
-            body: JSON.stringify({
-              fields: {
-                Status: 'Ended',
-                AuthStatus: 'Inactive',
-                VisibleToSponsor: false,
-              },
-            }),
-          }
-        )
-      );
-
-      if (updateResponse.ok) {
-        console.log('[Webhook] Sponsorship marked Ended:', record.id, 'subscription:', subscriptionId);
-      } else {
-        const errText = await updateResponse.text();
-        console.error('[Webhook] Failed to mark sponsorship Ended (non-fatal):', record.id, errText.slice(0, 300));
-      }
-    }
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : String(err);
-    console.error('[WH] Airtable subscription-canceled mirror failed (non-fatal, Postgres has the cancellation):', message.slice(0, 300));
-  }
 }
 
 /**
@@ -3858,8 +3024,7 @@ async function handleChargeRefunded(charge: Stripe.Charge): Promise<void> {
   const isFullRefund = amountRefundedCents >= amountTotalCents;
   const refundedDollars = (amountRefundedCents / 100).toFixed(2);
 
-  // POSTGRES FIRST. Source of truth — record the refund regardless of
-  // Airtable health so the donation status always reflects reality.
+  // Record the refund on the donations row.
   await mirrorToPostgres(
     `refund ${paymentIntentId}`,
     () =>
@@ -3870,77 +3035,12 @@ async function handleChargeRefunded(charge: Stripe.Charge): Promise<void> {
         refundedAt: new Date(),
       })
   );
+  console.log(
+    '[Webhook] Refund recorded for payment_intent',
+    paymentIntentId,
+    isFullRefund ? '(full)' : `(partial $${refundedDollars})`
+  );
 
-  // AIRTABLE BEST-EFFORT.
-  if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) {
-    console.warn('[WH] Charge refunded: missing Airtable creds, skipping Airtable mirror (non-fatal)');
-    return;
-  }
-
-  try {
-    // Find the Donation row by Stripe Payment Intent ID
-    const formula = `{Stripe Payment Intent ID} = "${paymentIntentId}"`;
-    const searchResponse = await airtableAPICall(() =>
-      fetch(
-        `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_DONATIONS_TABLE}?filterByFormula=${encodeURIComponent(formula)}`,
-        { headers: getAirtableHeaders() }
-      )
-    );
-
-    if (!searchResponse.ok) {
-      const errText = await searchResponse.text();
-      console.error('[WH] Failed to look up donation for refunded charge (non-fatal):', paymentIntentId, errText.slice(0, 300));
-      return;
-    }
-
-    const searchData = await searchResponse.json();
-    const records = searchData.records ?? [];
-
-    if (records.length === 0) {
-      // This can legitimately happen if the charge was from a test or from
-      // before we started recording donations. Log and move on.
-      console.log('[Webhook] No donation found for refunded charge, payment_intent:', paymentIntentId);
-      return;
-    }
-
-    for (const record of records) {
-      const existingNote = (record.fields?.['Donation Note'] as string | undefined) ?? '';
-      const refundLabel = isFullRefund
-        ? `[Refunded in full on ${new Date().toISOString().split('T')[0]}]`
-        : `[Partially refunded $${refundedDollars} on ${new Date().toISOString().split('T')[0]}]`;
-      const mergedNote = existingNote ? `${existingNote}\n${refundLabel}` : refundLabel;
-
-      const updateResponse = await airtableAPICall(() =>
-        fetch(
-          `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_DONATIONS_TABLE}/${record.id}`,
-          {
-            method: 'PATCH',
-            headers: getAirtableHeaders(),
-            body: JSON.stringify({
-              fields: {
-                'Payment Status': 'Refunded',
-                'Donation Note': mergedNote,
-              },
-            }),
-          }
-        )
-      );
-
-      if (updateResponse.ok) {
-        console.log(
-          '[Webhook] Donation marked Refunded:',
-          record.id,
-          isFullRefund ? '(full)' : `(partial $${refundedDollars})`
-        );
-      } else {
-        const errText = await updateResponse.text();
-        console.error('[Webhook] Failed to mark donation Refunded (non-fatal):', record.id, errText.slice(0, 300));
-      }
-    }
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : String(err);
-    console.error('[WH] Airtable refund mirror failed (non-fatal, Postgres has the refund):', message.slice(0, 300));
-  }
 }
 
 export async function POST(request: NextRequest) {
@@ -3973,186 +3073,9 @@ export async function POST(request: NextRequest) {
         const subscription = event.data.object as Stripe.Subscription;
         console.log('[Webhook] Subscription event:', event.type, subscription.id);
 
-        // When a subscription is created, the buyer has converted — clear any
-        // active shirt_nurture drip so they stop getting conversion emails.
-        if (event.type === 'customer.subscription.created') {
-          try {
-            // Look up donor by Stripe customer ID
-            const custId = typeof subscription.customer === 'string'
-              ? subscription.customer
-              : subscription.customer?.id || '';
-            if (custId && AIRTABLE_API_KEY && AIRTABLE_BASE_ID) {
-              const formula = `{Stripe Customer ID} = "${custId}"`;
-              const lookupRes = await fetch(
-                `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_DONORS_TABLE}?filterByFormula=${encodeURIComponent(formula)}&maxRecords=1`,
-                { headers: getAirtableHeaders() }
-              );
-              if (lookupRes.ok) {
-                const lookupData = await lookupRes.json();
-                const donorRecord = lookupData.records?.[0];
-                if (donorRecord) {
-                  // Determine the target pipeline based on the subscription
-                  // type. Sponsorship subs (order_type='sponsorship') go to
-                  // sponsor_onboard; monthly donations (no order_type)
-                  // go to monthly_donor.
-                  const subMeta = subscription.metadata || {};
-                  const isSponsorship = subMeta.order_type === 'sponsorship';
-                  const targetPipeline = isSponsorship ? 'sponsor_onboard' : 'monthly_donor';
 
-                  const currentPipeline = donorRecord.fields?.DripPipeline || '';
-
-                  // Drip-drift fix (June 2026): the old rule was &ldquo;if the
-                  // donor is already on shirt_sponsor or shirt_nurture,
-                  // leave them there.&rdquo; That stranded converting buyers
-                  // (Christina&rsquo;s case): they bought a shirt, entered the
-                  // shirt_nurture drip, met their kid, sponsored — but
-                  // kept getting &ldquo;have you sponsored yet?&rdquo; nudges
-                  // because the webhook never moved them. The fix: when
-                  // a sponsorship subscription is created, ALWAYS move the
-                  // donor to sponsor_onboard regardless of where they
-                  // started. shirt_sponsor + shirt_nurture are conversion
-                  // drips with a single goal; once the conversion happens,
-                  // they&rsquo;re done.
-                  //
-                  // The remaining preserve-don&rsquo;t-overwrite case is when
-                  // a NON-sponsorship subscription lands (monthly donation
-                  // from /donate) on a donor already in a shirt drip —
-                  // their shirt journey is still relevant, the monthly
-                  // donation is a side-channel relationship.
-                  const isInShirtDrip =
-                    currentPipeline === 'shirt_sponsor' ||
-                    currentPipeline === 'shirt_nurture';
-                  if (isInShirtDrip && !isSponsorship) {
-                    console.log(`[WH] Donor in ${currentPipeline} + non-sponsorship sub created, leaving drip alone`);
-                  } else {
-                    const dripStartDate = new Date();
-                    dripStartDate.setUTCDate(dripStartDate.getUTCDate() + 3);
-                    const dripNextSend = dripStartDate.toISOString().split('T')[0];
-
-                    await fetch(
-                      `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_DONORS_TABLE}/${donorRecord.id}`,
-                      {
-                        method: 'PATCH',
-                        headers: getAirtableHeaders(),
-                        body: JSON.stringify({
-                          fields: {
-                            DripPipeline: targetPipeline,
-                            DripStage: 0,
-                            DripNextSend: dripNextSend,
-                            // Keep existing DripChildName/DripShirtNumber if set
-                          },
-                        }),
-                      }
-                    );
-                    if (isInShirtDrip) {
-                      console.log(`[WH] Migrated ${currentPipeline} → ${targetPipeline}:`, donorRecord.id);
-                    } else {
-                      console.log(`[WH] Enrolled in ${targetPipeline} drip:`, donorRecord.id);
-                    }
-                  }
-                }
-              }
-            }
-          } catch (err: any) {
-            console.error('[WH] sponsor_onboard drip enrollment failed (non-fatal):', String(err?.message || err).slice(0, 200));
-          }
-        }
-
-        // Write/update the Subscriptions table so Airtable mirrors Stripe state.
-        // This was missing entirely before — the table was always empty.
-        if (AIRTABLE_API_KEY && AIRTABLE_BASE_ID) {
-          try {
-            const subId = subscription.id;
-            const subStatus = subscription.status; // active, past_due, canceled, etc.
-            const custId = typeof subscription.customer === 'string'
-              ? subscription.customer
-              : subscription.customer?.id || '';
-
-            // Check if a record already exists for this subscription
-            const existFormula = `{Subscription ID} = "${subId}"`;
-            const existRes = await airtableAPICall(() =>
-              fetch(
-                `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_SUBSCRIPTIONS_TABLE}?filterByFormula=${encodeURIComponent(existFormula)}&maxRecords=1`,
-                { headers: getAirtableHeaders() }
-              )
-            );
-
-            // Find the linked donor record for the Donor field
-            let donorRecordId: string | null = null;
-            if (custId) {
-              const donorFormula = `{Stripe Customer ID} = "${custId}"`;
-              const donorRes = await airtableAPICall(() =>
-                fetch(
-                  `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_DONORS_TABLE}?filterByFormula=${encodeURIComponent(donorFormula)}&maxRecords=1`,
-                  { headers: getAirtableHeaders() }
-                )
-              );
-              if (donorRes.ok) {
-                const donorData = await donorRes.json();
-                donorRecordId = donorData.records?.[0]?.id || null;
-              }
-            }
-
-            // Cast to any for fields that vary across Stripe API versions
-            const subAny = subscription as any;
-            const amount = subAny.items?.data?.[0]?.price?.unit_amount
-              ? subAny.items.data[0].price.unit_amount / 100
-              : 25;
-            const periodEnd = subAny.current_period_end
-              ? new Date(subAny.current_period_end * 1000).toISOString().split('T')[0]
-              : undefined;
-            const startDate = subAny.start_date
-              ? new Date(subAny.start_date * 1000).toISOString().split('T')[0]
-              : new Date().toISOString().split('T')[0];
-
-            const subFields: Record<string, unknown> = {
-              'Subscription ID': subId,
-              Status: subStatus,
-              Amount: amount,
-              Frequency: 'Monthly',
-            };
-            if (periodEnd) subFields['Current Period End'] = periodEnd;
-            if (donorRecordId) subFields.Donor = [donorRecordId];
-
-            if (existRes.ok) {
-              const existData = await existRes.json();
-              if (existData.records?.length > 0) {
-                // Update existing record
-                const recId = existData.records[0].id;
-                await airtableAPICall(() =>
-                  fetch(
-                    `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_SUBSCRIPTIONS_TABLE}/${recId}`,
-                    {
-                      method: 'PATCH',
-                      headers: getAirtableHeaders(),
-                      body: JSON.stringify({ fields: subFields }),
-                    }
-                  )
-                );
-                console.log('[WH] Updated Subscriptions record:', recId, subId, subStatus);
-              } else {
-                // Create new record
-                subFields['Start Date'] = startDate;
-                await airtableAPICall(() =>
-                  fetch(
-                    `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_SUBSCRIPTIONS_TABLE}`,
-                    {
-                      method: 'POST',
-                      headers: getAirtableHeaders(),
-                      body: JSON.stringify({ fields: subFields }),
-                    }
-                  )
-                );
-                console.log('[WH] Created Subscriptions record for:', subId, subStatus);
-              }
-            }
-          } catch (err: any) {
-            console.error('[WH] Subscriptions table write failed (non-fatal):', String(err?.message || err).slice(0, 200));
-          }
-        }
-
-        // Dual-write to Postgres: shadow the Subscriptions table and
-        // any drip-pipeline changes from the .created branch above.
+        // Mirror the subscription row and, on .created, move the donor
+        // to the right drip pipeline.
         {
           const custIdMirror =
             typeof subscription.customer === 'string'
@@ -4201,25 +3124,53 @@ export async function POST(request: NextRequest) {
               })
           );
 
-          // Mirror drip-field updates for the .created branch.
+          // On .created the buyer has converted. Sponsorship subs
+          // (order_type='sponsorship') go to sponsor_onboard; monthly
+          // donations go to monthly_donor.
+          //
+          // Drip-drift fix (June 2026): a sponsorship sub ALWAYS moves the
+          // donor to sponsor_onboard, even off shirt_sponsor / shirt_nurture
+          // (those are conversion drips and the conversion just happened;
+          // Christina kept getting 'have you sponsored yet?' after she had).
+          // The one preserve case: a NON-sponsorship sub landing on a donor
+          // still in a shirt drip leaves that drip alone, because their
+          // shirt journey is still the relevant one.
           if (event.type === 'customer.subscription.created' && donorEmailMirror) {
             const subMetaM = subscription.metadata || {};
             const isSponsorshipM = subMetaM.order_type === 'sponsorship';
-            const targetPipelineM = isSponsorshipM
-              ? 'sponsor_onboard'
-              : 'monthly_donor';
-            const dripStartM = new Date();
-            dripStartM.setUTCDate(dripStartM.getUTCDate() + 3);
-            await mirrorToPostgres(
-              `drip ${donorEmailMirror}`,
-              () =>
-                mirrorDripFields({
-                  email: donorEmailMirror,
-                  dripPipeline: targetPipelineM,
-                  dripStage: 0,
-                  dripNextSend: dripStartM,
-                })
-            );
+            const targetPipelineM = isSponsorshipM ? 'sponsor_onboard' : 'monthly_donor';
+            try {
+              const donorRow = await getDonorByEmail(donorEmailMirror);
+              const currentPipeline = donorRow?.dripPipeline || '';
+              const isInShirtDrip =
+                currentPipeline === 'shirt_sponsor' || currentPipeline === 'shirt_nurture';
+              if (isInShirtDrip && !isSponsorshipM) {
+                console.log(`[WH] Donor in ${currentPipeline} + non-sponsorship sub created, leaving drip alone`);
+              } else {
+                const dripStartM = new Date();
+                dripStartM.setUTCDate(dripStartM.getUTCDate() + 3);
+                await mirrorToPostgres(
+                  `drip ${donorEmailMirror}`,
+                  () =>
+                    mirrorDripFields({
+                      email: donorEmailMirror,
+                      dripPipeline: targetPipelineM,
+                      dripStage: 0,
+                      dripNextSend: dripStartM,
+                      // Keep the kid name / number the donor already carries.
+                      dripChildName: donorRow?.dripChildName ?? null,
+                      dripShirtNumber: donorRow?.dripShirtNumber ?? null,
+                    })
+                );
+                console.log(
+                  isInShirtDrip
+                    ? `[WH] Migrated ${currentPipeline} → ${targetPipelineM}: ${donorEmailMirror}`
+                    : `[WH] Enrolled in ${targetPipelineM} drip: ${donorEmailMirror}`
+                );
+              }
+            } catch (err: any) {
+              console.error('[WH] drip enrollment on subscription.created failed (non-fatal):', String(err?.message || err).slice(0, 200));
+            }
           }
         }
         break;
@@ -4250,6 +3201,10 @@ export async function POST(request: NextRequest) {
         // Process recurring subscription payments
         const result = await processRecurringPaymentTool({
           invoiceId: invoice.id || '',
+          paymentIntentId:
+            (typeof invoice.payment_intent === 'string'
+              ? invoice.payment_intent
+              : invoice.payment_intent?.id) || undefined,
           subscriptionId: (typeof invoice.subscription === 'string' ? invoice.subscription : invoice.subscription?.id) || '',
           customerId: (typeof invoice.customer === 'string' ? invoice.customer : invoice.customer?.id) || '',
           email: invoice.customer_email || '',

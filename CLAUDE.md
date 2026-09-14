@@ -54,9 +54,11 @@ Read **`docs/claude/project_state.md`** before claiming anything is or isn't don
 
 Read **`docs/claude/architecture.md`** before touching unfamiliar files. Key routes, key libs, key patterns, key integrations.
 
-## What lives in Airtable
+## Where the data lives
 
-Read **`docs/claude/airtable_schema.md`** before writing ANYTHING to Airtable. Every table, every field, every singleSelect option, every trap we've already hit. The webhook has 422'd more than once because code tried to write to fields that don't exist. Check the schema first.
+Postgres on Supabase, through Drizzle. `src/lib/db/schema.ts` is the schema, `db/queries.ts` is every read, `db/mutations.ts` is every write, and the Stripe webhook writes through `db/webhook-bridge.ts`. Schema changes are hand-written SQL files in `drizzle/` (idempotent, `IF NOT EXISTS`) that Kevin applies in the Supabase SQL editor.
+
+Airtable is gone. It was retired account-wide in August 2026 and the last code that touched it was removed on 2026-09-14. If a doc, comment, or workflow file still says "Airtable", it is history, not an instruction. Do not add Airtable env vars back to Vercel and do not write code that expects them.
 
 ## How to actually ship
 

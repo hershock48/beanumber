@@ -2,12 +2,23 @@
  * Process Recurring Payment Tool
  *
  * WAT-compliant tool for processing recurring subscription payments.
- * Records the payment in Airtable and sends a follow-up thank-you email.
+ * Records the renewal as a donations row in Postgres and sends a
+ * follow-up thank-you email.
+ *
+ * Until 2026-09-14 the renewal was recorded only in Airtable. Airtable
+ * was retired in August 2026, so every monthly renewal since then had
+ * no record in the source of truth. This is the Postgres version.
  */
 
 import { logger } from '../../logger';
 import { ValidationResult, success, failure } from '../../validation';
 import { sendRecurringDonationThankYouEmail, EmailSendResult } from '../../email';
+import { recordDonation, upsertDonorByEmail } from '../../db/mutations';
+import {
+  getChildByRecordId,
+  getDonorByStripeCustomerId,
+  getSponsorshipByStripeSubscriptionId,
+} from '../../db/queries';
 
 // ============================================================================
 // INPUT/OUTPUT INTERFACES
@@ -19,6 +30,12 @@ import { sendRecurringDonationThankYouEmail, EmailSendResult } from '../../email
 export interface ProcessRecurringPaymentInput {
   /** Stripe invoice ID */
   invoiceId: string;
+  /**
+   * Stripe payment intent ID for the invoice, when Stripe provides one.
+   * Preferred as the donations natural key so a later charge.refunded
+   * (which carries the payment intent, not the invoice) finds the row.
+   */
+  paymentIntentId?: string;
   /** Stripe subscription ID */
   subscriptionId: string;
   /** Stripe customer ID */
@@ -98,6 +115,10 @@ function validateInput(input: unknown): ValidationResult<ProcessRecurringPayment
 
   return success({
     invoiceId: obj.invoiceId,
+    paymentIntentId:
+      typeof obj.paymentIntentId === 'string' && obj.paymentIntentId
+        ? obj.paymentIntentId
+        : undefined,
     subscriptionId: obj.subscriptionId,
     customerId: obj.customerId,
     email: obj.email,
@@ -110,55 +131,30 @@ function validateInput(input: unknown): ValidationResult<ProcessRecurringPayment
 }
 
 // ============================================================================
-// AIRTABLE HELPERS
+// POSTGRES HELPERS
 // ============================================================================
 
 /**
- * Resolve the sponsor's child context (display name + shirt number) from a
- * Stripe subscription ID. Returns null when the subscription isn't tied to a
- * sponsorship (i.e. it's a plain recurring donation). Best-effort: any failure
- * returns null so the renewal email still goes out, just in donor flavor.
+ * Resolve the sponsor's child context (display name + shirt number) from
+ * a Stripe subscription ID. Returns null when the subscription isn't tied
+ * to a sponsorship (a plain recurring donation). Best-effort: any failure
+ * returns null so the renewal email still goes out, in donor flavor.
  */
 async function resolveSponsorChildContext(
   subscriptionId: string
 ): Promise<{ childName: string | null; shirtNumber: number | null } | null> {
-  const AIRTABLE_API_KEY = process.env.AIRTABLE_API_KEY;
-  const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID;
-  if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) return null;
-
-  const headers = {
-    Authorization: `Bearer ${AIRTABLE_API_KEY}`,
-    'Content-Type': 'application/json',
-  };
-
   try {
-    const SPONSORSHIPS_TABLE = process.env.AIRTABLE_SPONSORSHIPS_TABLE || 'Sponsorships';
-    const formula = `{StripeSubscriptionID} = "${subscriptionId}"`;
-    const res = await fetch(
-      `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${SPONSORSHIPS_TABLE}?filterByFormula=${encodeURIComponent(formula)}&maxRecords=1`,
-      { headers }
-    );
-    if (!res.ok) return null;
-    const json = await res.json();
-    const sponsorship = json.records?.[0];
+    const sponsorship = await getSponsorshipByStripeSubscriptionId(subscriptionId);
     if (!sponsorship) return null;
 
-    const childName: string | null = sponsorship.fields?.ChildDisplayName || null;
-    const childLinks = sponsorship.fields?.Children as string[] | undefined;
-    const childRecordId = childLinks && childLinks.length > 0 ? childLinks[0] : null;
+    const childName: string | null = sponsorship.childDisplayName || null;
 
-    let shirtNumber: number | null = null;
-    if (childRecordId) {
-      const CHILDREN_TABLE = process.env.AIRTABLE_CHILDREN_TABLE || 'Children';
-      const childRes = await fetch(
-        `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${CHILDREN_TABLE}/${childRecordId}`,
-        { headers }
-      );
-      if (childRes.ok) {
-        const childJson = await childRes.json();
-        const sn = childJson.fields?.ShirtNumber;
-        if (typeof sn === 'number') shirtNumber = sn;
-      }
+    // The number the sponsor holds beats the kid's roster number: a
+    // cycle-number claim (#70) is what is on their shirt.
+    let shirtNumber: number | null = sponsorship.claimedShirtNumber ?? null;
+    if (shirtNumber == null && sponsorship.childId) {
+      const child = await getChildByRecordId(sponsorship.childId);
+      if (child && typeof child.shirtNumber === 'number') shirtNumber = child.shirtNumber;
     }
 
     return { childName, shirtNumber };
@@ -168,140 +164,53 @@ async function resolveSponsorChildContext(
 }
 
 /**
- * Record recurring donation in Airtable
+ * Record the renewal in Postgres. Idempotent on the payment intent (or
+ * invoice id when Stripe gave us no intent), so a webhook retry is a
+ * no-op. Returns the donations row id.
  */
 async function recordRecurringDonation(data: ProcessRecurringPaymentInput): Promise<string | null> {
-  const AIRTABLE_API_KEY = process.env.AIRTABLE_API_KEY;
-  const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID;
-  const AIRTABLE_DONATIONS_TABLE = process.env.AIRTABLE_DONATIONS_TABLE || 'Donations';
+  // Donor: prefer the Stripe customer link, fall back to email (creating
+  // the row if this is the first time we have seen them).
+  const byCustomer = await getDonorByStripeCustomerId(data.customerId);
+  const donor =
+    byCustomer ??
+    (await upsertDonorByEmail({
+      email: data.email,
+      name: data.name || null,
+      stripeCustomerId: data.customerId,
+    }));
 
-  if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) {
-    logger.warn('Airtable not configured, skipping donation record');
-    return null;
-  }
-
-  // Check if donation already exists (idempotency via invoice ID)
-  const formula = `{Stripe Payment Intent ID} = "${data.invoiceId}"`;
-  const searchResponse = await fetch(
-    `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_DONATIONS_TABLE}?filterByFormula=${encodeURIComponent(formula)}`,
-    {
-      headers: {
-        Authorization: `Bearer ${AIRTABLE_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-    }
-  );
-
-  if (searchResponse.ok) {
-    const searchData = await searchResponse.json();
-    if (searchData.records && searchData.records.length > 0) {
-      logger.info('Recurring donation already recorded', { invoiceId: data.invoiceId });
-      return searchData.records[0].id;
-    }
-  }
-
-  // Find donor by Stripe customer ID
-  const AIRTABLE_DONORS_TABLE = process.env.AIRTABLE_DONORS_TABLE || 'Donors';
-  const donorFormula = `{Stripe Customer ID} = "${data.customerId}"`;
-  const donorResponse = await fetch(
-    `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_DONORS_TABLE}?filterByFormula=${encodeURIComponent(donorFormula)}`,
-    {
-      headers: {
-        Authorization: `Bearer ${AIRTABLE_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-    }
-  );
-
-  let donorId: string | null = null;
-  if (donorResponse.ok) {
-    const donorData = await donorResponse.json();
-    if (donorData.records && donorData.records.length > 0) {
-      donorId = donorData.records[0].id;
-    }
-  }
-
-  // Check if this subscription belongs to a sponsorship; if so, enrich the donation
-  const AIRTABLE_SPONSORSHIPS_TABLE = process.env.AIRTABLE_SPONSORSHIPS_TABLE || 'Sponsorships';
-  let linkedChildRecordId: string | null = null;
-  let linkedChildDisplayName: string | null = null;
-
+  // If this subscription is a sponsorship, tag the donation to the kid.
+  let sponsorship: Awaited<ReturnType<typeof getSponsorshipByStripeSubscriptionId>> = null;
   try {
-    const sponsorshipFormula = `{StripeSubscriptionID} = "${data.subscriptionId}"`;
-    const sponsorshipResponse = await fetch(
-      `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_SPONSORSHIPS_TABLE}?filterByFormula=${encodeURIComponent(sponsorshipFormula)}`,
-      {
-        headers: {
-          Authorization: `Bearer ${AIRTABLE_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-      }
-    );
-
-    if (sponsorshipResponse.ok) {
-      const sponsorshipData = await sponsorshipResponse.json();
-      if (sponsorshipData.records && sponsorshipData.records.length > 0) {
-        const sponsorship = sponsorshipData.records[0];
-        const childLinks = sponsorship.fields?.Children as string[] | undefined;
-        if (childLinks && childLinks.length > 0) {
-          linkedChildRecordId = childLinks[0];
-        }
-        linkedChildDisplayName = sponsorship.fields?.ChildDisplayName || null;
-      }
-    }
+    sponsorship = await getSponsorshipByStripeSubscriptionId(data.subscriptionId);
   } catch (error) {
     logger.warn('Could not resolve sponsorship for subscription (continuing)', {
       subscriptionId: data.subscriptionId,
+      error: error instanceof Error ? error.message : String(error),
     });
   }
 
-  // Create donation record
-  const donationFields: Record<string, unknown> = {
-    'Stripe Payment Intent ID': data.invoiceId, // Use invoice ID for recurring
-    'Stripe Customer ID': data.customerId,
-    'Donation Amount': data.amountCents / 100,
-    'Currency': data.currency.toUpperCase(),
-    'Donation Date': data.paymentDate,
-    'Payment Status': 'Succeeded',
-    'Recurring Donation': true,
-    'Subscription ID': data.subscriptionId,
-    'Donor Email at Donation': data.email,
-    'Donation Source': linkedChildRecordId ? 'Sponsorship' : 'Website - Recurring',
-  };
+  const note = sponsorship?.childDisplayName
+    ? `Sponsorship renewal for ${sponsorship.childDisplayName} (${data.subscriptionId}, invoice ${data.invoiceId})`
+    : `Monthly renewal (${data.subscriptionId}, invoice ${data.invoiceId})`;
 
-  if (donorId) {
-    donationFields['Donor'] = [donorId];
-  }
+  const donation = await recordDonation({
+    donorId: donor.id,
+    donationAmount: data.amountCents / 100,
+    currency: data.currency.toLowerCase(),
+    donationSource: sponsorship ? 'Sponsorship' : 'Website - Recurring',
+    paymentStatus: 'Succeeded',
+    recurringDonation: true,
+    stripePaymentIntentId: data.paymentIntentId || data.invoiceId,
+    stripeCustomerId: data.customerId,
+    donorEmailAtDonation: data.email,
+    donationNote: note,
+    designatedToChildIds: sponsorship?.childId ? [sponsorship.childId] : [],
+    donationDate: data.paymentDate.slice(0, 10),
+  });
 
-  if (linkedChildRecordId) {
-    donationFields['Child'] = [linkedChildRecordId];
-    if (linkedChildDisplayName) {
-      donationFields['Donation Note'] = `Sponsorship renewal for ${linkedChildDisplayName}`;
-    }
-  }
-
-  const createResponse = await fetch(
-    `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_DONATIONS_TABLE}`,
-    {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${AIRTABLE_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ fields: donationFields }),
-    }
-  );
-
-  if (!createResponse.ok) {
-    const error = await createResponse.text();
-    // Airtable is best-effort here — the Stripe webhook has already written
-    // the donation to Postgres. Log and return null instead of throwing.
-    logger.warn('Failed to create Airtable donation record (Postgres write already succeeded)', { error });
-    return null;
-  }
-
-  const createData = await createResponse.json();
-  return createData.id;
+  return donation.id;
 }
 
 // ============================================================================
@@ -313,7 +222,7 @@ async function recordRecurringDonation(data: ProcessRecurringPaymentInput): Prom
  *
  * This tool:
  * 1. Validates the payment is a subscription renewal (not initial payment)
- * 2. Records the donation in Airtable
+ * 2. Records the donation in Postgres
  * 3. Sends a follow-up thank-you email
  *
  * @param input - Payment details from Stripe invoice
@@ -336,6 +245,7 @@ export async function processRecurringPaymentTool(
 
   // 2. Skip if not a subscription renewal
   // billing_reason can be: 'subscription_cycle', 'subscription_create', 'subscription_update', etc.
+  // The first invoice is recorded by checkout.session.completed.
   if (data.billingReason !== 'subscription_cycle') {
     logger.info('Skipping non-renewal invoice', {
       invoiceId: data.invoiceId,
@@ -361,7 +271,7 @@ export async function processRecurringPaymentTool(
       email: logger.maskEmail(data.email),
     });
 
-    // Record in Airtable
+    // Record in Postgres
     let donationId: string | null = null;
     try {
       donationId = await recordRecurringDonation(data);
@@ -369,7 +279,7 @@ export async function processRecurringPaymentTool(
       logger.error('Failed to record recurring donation', error, {
         invoiceId: data.invoiceId,
       });
-      // Continue with email even if Airtable fails
+      // Continue with the email even if the write fails; the money moved.
     }
 
     // Send follow-up thank-you email

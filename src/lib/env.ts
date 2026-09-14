@@ -1,18 +1,16 @@
 /**
  * Environment variable validation and access
- * Ensures all required environment variables are present at startup
+ *
+ * Nothing is hard-required at module load any more. Until 2026-09-14
+ * this file threw at startup if five AIRTABLE_* variables were missing,
+ * which meant deleting the retired Airtable credentials from Vercel
+ * would have taken the whole site down, not just Airtable features.
+ * Postgres (DATABASE_URL) is checked lazily by src/lib/db/client.ts so
+ * a missing value fails the one request that needs it with a clear
+ * message instead of crashing every route.
  */
 
 interface EnvironmentVariables {
-  // Airtable
-  AIRTABLE_API_KEY: string;
-  AIRTABLE_BASE_ID: string;
-  AIRTABLE_SPONSORSHIPS_TABLE: string;
-  AIRTABLE_UPDATES_TABLE: string;
-  AIRTABLE_NEWSLETTERS_TABLE: string;
-  AIRTABLE_CHILDREN_TABLE?: string;
-  AIRTABLE_CHILD_UPDATES_TABLE?: string;
-
   // Cron auth
   CRON_SECRET?: string;
 
@@ -36,56 +34,13 @@ interface EnvironmentVariables {
   NEXT_PUBLIC_GA_MEASUREMENT_ID?: string;
 }
 
-class EnvironmentError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'EnvironmentError';
-  }
-}
-
 /**
- * Validates that all required environment variables are present
- * @throws {EnvironmentError} if any required variables are missing
+ * Reads the environment once and warns (outside production) about
+ * recommended variables that are missing.
  */
-function validateEnvironment(): EnvironmentVariables {
-  const requiredVars = [
-    'AIRTABLE_API_KEY',
-    'AIRTABLE_BASE_ID',
-    'AIRTABLE_SPONSORSHIPS_TABLE',
-    'AIRTABLE_UPDATES_TABLE',
-    'AIRTABLE_NEWSLETTERS_TABLE',
-  ] as const;
-  
-  // Optional new tables (for Child Update System)
-  const optionalAirtableVars = [
-    'AIRTABLE_CHILDREN_TABLE',
-    'AIRTABLE_CHILD_UPDATES_TABLE',
-  ] as const;
-
-  const missing: string[] = [];
-
-  for (const varName of requiredVars) {
-    if (!process.env[varName]) {
-      missing.push(varName);
-    }
-  }
-
-  if (missing.length > 0) {
-    throw new EnvironmentError(
-      `Missing required environment variables: ${missing.join(', ')}\n` +
-        'Please check your .env.local file or Vercel environment settings.'
-    );
-  }
-
-  // Warn about optional but recommended variables
-  const recommendedVars = ['STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET', 'SENDGRID_API_KEY', 'ADMIN_API_TOKEN'];
-  const missingRecommended: string[] = [];
-
-  for (const varName of recommendedVars) {
-    if (!process.env[varName]) {
-      missingRecommended.push(varName);
-    }
-  }
+function readEnvironment(): EnvironmentVariables {
+  const recommendedVars = ['STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET', 'ADMIN_API_TOKEN', 'DATABASE_URL'];
+  const missingRecommended = recommendedVars.filter(name => !process.env[name]);
 
   if (missingRecommended.length > 0 && process.env.NODE_ENV !== 'production') {
     console.warn(
@@ -94,16 +49,6 @@ function validateEnvironment(): EnvironmentVariables {
   }
 
   return {
-    // Accept either AIRTABLE_PAT (newer Airtable personal access tokens)
-    // or AIRTABLE_API_KEY (legacy). Different parts of the codebase
-    // grew up using different names; this normalizes them.
-    AIRTABLE_API_KEY: (process.env.AIRTABLE_PAT || process.env.AIRTABLE_API_KEY)!,
-    AIRTABLE_BASE_ID: process.env.AIRTABLE_BASE_ID!,
-    AIRTABLE_SPONSORSHIPS_TABLE: process.env.AIRTABLE_SPONSORSHIPS_TABLE!,
-    AIRTABLE_UPDATES_TABLE: process.env.AIRTABLE_UPDATES_TABLE!,
-    AIRTABLE_NEWSLETTERS_TABLE: process.env.AIRTABLE_NEWSLETTERS_TABLE!,
-    AIRTABLE_CHILDREN_TABLE: process.env.AIRTABLE_CHILDREN_TABLE,
-    AIRTABLE_CHILD_UPDATES_TABLE: process.env.AIRTABLE_CHILD_UPDATES_TABLE,
     CRON_SECRET: process.env.CRON_SECRET,
     STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
     STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET,
@@ -119,39 +64,15 @@ function validateEnvironment(): EnvironmentVariables {
   };
 }
 
-// Validate environment on module load (only on server-side)
-let env: EnvironmentVariables;
-
-if (typeof window === 'undefined') {
-  try {
-    env = validateEnvironment();
-
-    if (process.env.NODE_ENV !== 'production') {
-      console.log('✅ Environment variables validated successfully');
-    }
-  } catch (error) {
-    if (error instanceof EnvironmentError) {
-      console.error('❌ Environment validation failed:');
-      console.error(error.message);
-
-      // In development, throw error to stop the server
-      // In production, let it fail at runtime with better error messages
-      if (process.env.NODE_ENV !== 'production') {
-        process.exit(1);
-      }
-    }
-    throw error;
-  }
-}
+let env: EnvironmentVariables | undefined;
 
 /**
- * Get validated environment variables
+ * Get environment variables
  * Safe to use throughout the application
  */
 export function getEnv(): EnvironmentVariables {
   if (!env) {
-    // Lazy initialization for edge cases
-    env = validateEnvironment();
+    env = readEnvironment();
   }
   return env;
 }
@@ -162,24 +83,6 @@ export function getEnv(): EnvironmentVariables {
 export function hasEnv(key: keyof EnvironmentVariables): boolean {
   const envVars = getEnv();
   return !!envVars[key];
-}
-
-/**
- * Get Airtable configuration
- */
-export function getAirtableConfig() {
-  const envVars = getEnv();
-  return {
-    apiKey: envVars.AIRTABLE_API_KEY,
-    baseId: envVars.AIRTABLE_BASE_ID,
-    tables: {
-      sponsorships: envVars.AIRTABLE_SPONSORSHIPS_TABLE,
-      updates: envVars.AIRTABLE_UPDATES_TABLE,
-      children: envVars.AIRTABLE_CHILDREN_TABLE,
-      childUpdates: envVars.AIRTABLE_CHILD_UPDATES_TABLE,
-      newsletters: envVars.AIRTABLE_NEWSLETTERS_TABLE,
-    },
-  };
 }
 
 /**

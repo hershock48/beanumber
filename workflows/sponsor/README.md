@@ -6,9 +6,10 @@ This directory contains workflows for sponsor-related operations.
 
 | Workflow | Purpose | Status |
 |----------|---------|--------|
-| [verify-sponsor-login.md](verify-sponsor-login.md) | Authenticate sponsor login | Active |
-| [list-available-children.md](list-available-children.md) | Display children awaiting sponsors | Active |
-| [onboard-sponsor.md](onboard-sponsor.md) | Create new sponsorship | Active |
+| [verify-sponsor-login.md](verify-sponsor-login.md) | Authenticate sponsor login | Historical (sponsor identity is the `sponsor_session` cookie on `/[number]` now) |
+| [onboard-sponsor.md](onboard-sponsor.md) | Create new sponsorship | Historical (the Stripe webhook creates sponsorships; nothing assigns kids) |
+
+The `list-available-children` workflow and both tools below were deleted on 2026-09-14 with Airtable.
 
 ## Sponsor Architecture
 
@@ -30,13 +31,12 @@ This directory contains workflows for sponsor-related operations.
 
 ## Related Tools
 
-- `src/lib/tools/sponsors/list-available-children.ts` - WAT-compliant catalog tool
-- `src/lib/tools/sponsors/create-sponsorship.ts` - WAT-compliant sponsorship creation
+- `src/lib/db/queries.ts` - sponsorship and kid reads
+- `src/app/api/webhooks/stripe/route.ts` - the only place sponsorships are created
 
 ## Related API Routes
 
 - `GET /api/sponsorship/available` - List available children (public)
-- `POST /api/sponsorship/create` - Create new sponsorship (admin)
 - `POST /api/sponsor/verify` - Verify sponsor login
 - `GET /api/sponsor/updates` - Get sponsor's child updates
 

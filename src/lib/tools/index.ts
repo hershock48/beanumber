@@ -8,39 +8,29 @@
  * - Structured error handling (returns { success, data?, error? })
  * - Logging via src/lib/logger.ts
  * - Input validation via src/lib/validation.ts
+ *
+ * 2026-09-14: the children, compliance, updates and sponsors tool
+ * families were deleted with the Airtable retirement. They read and
+ * wrote the Airtable base directly and backed the per-child quarterly
+ * review workflow that was retired with it. Child updates now flow
+ * through /api/admin/child-updates/intake and /api/admin/updates/*,
+ * which read Postgres.
  */
 
 // Export all tools from this directory
 export { sendEmailTool, type SendEmailInput, type SendEmailOutput } from './send-email';
-
-// Updates tools
-export {
-  publishUpdateTool,
-  type PublishUpdateInput,
-  type PublishUpdateOutput,
-  listOverdueTool,
-  type ListOverdueInput,
-  type ListOverdueOutput,
-  type OverdueChild,
-} from './updates';
 
 // Email notification tools
 export {
   sendUpdateNotificationTool,
   type SendUpdateNotificationInput,
   type SendUpdateNotificationOutput,
-  sendAdminDigestTool,
-  type SendAdminDigestInput,
-  type SendAdminDigestOutput,
   sendSponsorWelcomeTool,
   type SendSponsorWelcomeInput,
   type SendSponsorWelcomeOutput,
-  sendReminderEmailTool,
-  type SendReminderEmailInput,
-  type SendReminderEmailOutput,
-  sendEscalationNoticeTool,
-  type SendEscalationNoticeInput,
-  type SendEscalationNoticeOutput,
+  sendCampusNewsletterTool,
+  type SendCampusNewsletterInput,
+  type SendCampusNewsletterOutput,
 } from './email';
 
 // Health tools
@@ -50,17 +40,6 @@ export {
   type CheckLinksOutput,
   type LinkCheckResult,
 } from './health';
-
-// Sponsor tools
-export {
-  listAvailableChildrenTool,
-  type ListAvailableChildrenInput,
-  type ListAvailableChildrenOutput,
-  type AvailableChild,
-  createSponsorshipTool,
-  type CreateSponsorshipInput,
-  type CreateSponsorshipOutput,
-} from './sponsors';
 
 // Donation tools
 export {
@@ -87,36 +66,8 @@ export {
   type EnsurePeriodFolderOutput,
 } from './media';
 
-// Children / Child Update System tools
-export {
-  getActiveChildrenTool,
-  type GetActiveChildrenOutput,
-  getChildByChildIdTool,
-  type GetChildByIdInput,
-  type GetChildByIdOutput,
-  findChildUpdateTool,
-  type FindChildUpdateInput,
-  type FindChildUpdateOutput,
-  createChildUpdateRecordTool,
-  type CreateChildUpdateOutput,
-  listPendingUpdatesTool,
-  type ListPendingUpdatesOutput,
-  updateChildUpdateStatusTool,
-  type UpdateStatusInput,
-  type UpdateStatusOutput,
-} from './children';
-
-// Compliance tools
-export {
-  detectMissingUpdatesTool,
-  type DetectMissingUpdatesInput,
-  type DetectMissingUpdatesOutput,
-  generateComplianceSummaryTool,
-  type GenerateComplianceSummaryInput,
-  type GenerateComplianceSummaryOutput,
-} from './compliance';
-
-// Social media tools
+// Social media tools (direct posting only; the Airtable-backed
+// scheduling queue was retired 2026-09-14)
 export {
   postToInstagramTool,
   type PostToInstagramInput,
@@ -124,18 +75,4 @@ export {
   postToFacebookTool,
   type PostToFacebookInput,
   type PostToFacebookOutput,
-  schedulePostTool,
-  type SchedulePostInput,
-  type SchedulePostOutput,
-  listScheduledPostsTool,
-  type ListScheduledPostsInput,
-  type ListScheduledPostsOutput,
-  cancelScheduledPostTool,
-  type CancelScheduledPostInput,
-  type CancelScheduledPostOutput,
-  publishDuePostsTool,
-  type PublishDuePostsOutput,
 } from './social';
-
-// Future tools:
-// export { queryAirtable } from './query-airtable';
