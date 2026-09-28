@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import type Stripe from 'stripe';
-import { sendEmail } from '@/lib/email';
+import {
+  sendEmail,
+  sendPaymentFailedEmail,
+  sendSponsorshipEndedEmail,
+  sendKevinPaymentFailedAlert,
+} from '@/lib/email';
+import { makeBillingToken } from '@/lib/billing-tokens';
 import {
   mirrorToPostgres,
   mirrorDonation,
@@ -18,9 +24,11 @@ import { and, asc, eq, isNotNull, isNull, notInArray, or, sql } from 'drizzle-or
 import { upsertDonorByEmail } from '@/lib/db/mutations';
 import { generateUniqueSponsorCode } from '@/lib/sponsor-codes';
 import {
+  getChildByChildId,
   getChildByRecordId,
   getDonorByEmail,
   getDonorByStripeCustomerId,
+  getSponsorshipByStripeSubscriptionId,
   isNumberClaimedByOtherEmail,
 } from '@/lib/db/queries';
 import { legacyIdForShirtNumber } from '@/lib/claim-resolve';
@@ -3012,6 +3020,175 @@ async function verifyWebhookSignature(
 }
 
 /**
+ * Resolve who and which kid a subscription id belongs to, for the
+ * dunning + cancel emails. Best-effort: any lookup failure returns
+ * whatever was resolved so far — these emails degrade to generic copy
+ * rather than blocking the webhook.
+ */
+async function resolveSponsorAndKidForSubscription(
+  subscriptionId: string
+): Promise<{
+  sponsorEmail: string | null;
+  sponsorName: string | null;
+  kidFirstName: string | null;
+  shirtNumber: number | null;
+}> {
+  const out: {
+    sponsorEmail: string | null;
+    sponsorName: string | null;
+    kidFirstName: string | null;
+    shirtNumber: number | null;
+  } = { sponsorEmail: null, sponsorName: null, kidFirstName: null, shirtNumber: null };
+  try {
+    const sponsorship = await getSponsorshipByStripeSubscriptionId(subscriptionId);
+    if (!sponsorship) return out;
+    out.sponsorEmail = sponsorship.sponsorEmail ?? null;
+    out.sponsorName = sponsorship.sponsorName ?? null;
+
+    // Dual-key kid lookup, same pattern as the rest of the codebase:
+    // UUID FK first, legacy ChildID as fallback. Both null means the
+    // buyer hasn't claimed yet — that's normal, the copy goes generic.
+    let kid = null;
+    if (sponsorship.childId) {
+      kid = await getChildByRecordId(sponsorship.childId);
+    }
+    if (!kid && sponsorship.childIdLegacy) {
+      kid = await getChildByChildId(sponsorship.childIdLegacy);
+    }
+    if (kid) {
+      out.kidFirstName = kid.firstName ?? null;
+      out.shirtNumber = kid.shirtNumber ?? null;
+    }
+  } catch (err) {
+    console.warn(
+      '[Webhook] resolveSponsorAndKidForSubscription failed (non-fatal):',
+      err instanceof Error ? err.message : String(err)
+    );
+  }
+  return out;
+}
+
+/**
+ * The slice of a Stripe invoice payload the payment-failed handler
+ * reads. Typed structurally (like the rest of this file's casts)
+ * because Stripe's own Invoice type marks several of these as
+ * expandable unions that are noisy to narrow.
+ */
+type FailedInvoicePayload = {
+  id?: string;
+  subscription?: string | { id?: string } | null;
+  attempt_count?: number;
+  next_payment_attempt?: number | null;
+  customer?: string | { id?: string } | null;
+  customer_email?: string | null;
+  customer_name?: string | null;
+  amount_due?: number | null;
+};
+
+/**
+ * Handle invoice.payment_failed.
+ *
+ * Failed-payment recovery, sponsor half: on the FIRST failed attempt of a
+ * subscription invoice, email the sponsor a human-voice note with a signed
+ * one-click link into the Stripe Billing Portal, and send Kevin one alert.
+ * Later attempts are Stripe's Smart Retries doing their job — we log and
+ * stay quiet, because a reminder email per retry is how orgs teach
+ * sponsors to dread their inbox. If every retry fails, Stripe cancels the
+ * subscription and the customer.subscription.deleted path sends the one
+ * save email.
+ *
+ * One-time invoices (no subscription) are skipped — a failed one-time
+ * checkout never completes and there's nobody to dun.
+ */
+async function handleInvoicePaymentFailed(invoice: FailedInvoicePayload): Promise<void> {
+  const subscriptionId =
+    (typeof invoice.subscription === 'string'
+      ? invoice.subscription
+      : invoice.subscription?.id) || '';
+  if (!subscriptionId) {
+    console.log('[Webhook] invoice.payment_failed with no subscription — skipping:', invoice.id);
+    return;
+  }
+
+  const attemptCount = typeof invoice.attempt_count === 'number' ? invoice.attempt_count : 1;
+  const nextRetryAt = invoice.next_payment_attempt
+    ? new Date(invoice.next_payment_attempt * 1000)
+    : null;
+
+  if (attemptCount > 1) {
+    console.log(
+      '[Webhook] invoice.payment_failed retry',
+      `#${attemptCount}`,
+      'for',
+      subscriptionId,
+      nextRetryAt ? `next retry ${nextRetryAt.toISOString()}` : 'no more retries'
+    );
+    return;
+  }
+
+  const resolved = await resolveSponsorAndKidForSubscription(subscriptionId);
+  const sponsorEmail = resolved.sponsorEmail || invoice.customer_email || null;
+  const sponsorName = resolved.sponsorName || invoice.customer_name || null;
+  const customerId =
+    (typeof invoice.customer === 'string' ? invoice.customer : invoice.customer?.id) || '';
+
+  if (!sponsorEmail) {
+    console.error(
+      '[Webhook] invoice.payment_failed: no sponsor email resolvable for',
+      subscriptionId
+    );
+  } else if (!customerId) {
+    console.error(
+      '[Webhook] invoice.payment_failed: no customer id on invoice for',
+      subscriptionId
+    );
+  } else {
+    try {
+      const siteUrl =
+        process.env.NEXT_PUBLIC_SITE_URL || 'https://www.beanumber.org';
+      const token = makeBillingToken(customerId, resolved.shirtNumber);
+      const updateCardUrl = `${siteUrl}/api/sponsor/billing?t=${token}`;
+      const result = await sendPaymentFailedEmail({
+        sponsorEmail,
+        sponsorName,
+        kidFirstName: resolved.kidFirstName,
+        updateCardUrl,
+      });
+      if (!result.success) {
+        console.error('[Webhook] payment-failed email send failed:', result.error);
+      }
+    } catch (err) {
+      console.error(
+        '[Webhook] payment-failed email threw:',
+        err instanceof Error ? err.message : String(err)
+      );
+    }
+  }
+
+  // Kevin's copy — non-fatal, independent of the sponsor send.
+  try {
+    const amountDueCents = typeof invoice.amount_due === 'number' ? invoice.amount_due : null;
+    await sendKevinPaymentFailedAlert({
+      sponsorEmail: sponsorEmail || '(unknown)',
+      sponsorName,
+      kidLabel: resolved.kidFirstName
+        ? resolved.shirtNumber
+          ? `${resolved.kidFirstName} (#${resolved.shirtNumber})`
+          : resolved.kidFirstName
+        : null,
+      amountDollars: amountDueCents != null ? amountDueCents / 100 : null,
+      stripeSubscriptionId: subscriptionId,
+      nextRetryAt,
+    });
+  } catch (err) {
+    console.warn(
+      '[Webhook] Kevin payment-failed alert failed (non-fatal):',
+      err instanceof Error ? err.message : String(err)
+    );
+  }
+}
+
+/**
  * Handle customer.subscription.deleted.
  *
  * A sponsor canceled (or their subscription ended). We find the Sponsorship
@@ -3025,12 +3202,45 @@ async function verifyWebhookSignature(
 async function handleSubscriptionCanceled(subscription: Stripe.Subscription): Promise<void> {
   const subscriptionId = subscription.id;
 
+  // Resolve the sponsor + kid BEFORE the mirror flips the row state —
+  // the lookup itself only reads join keys the mirror doesn't touch,
+  // but resolving first keeps this ordering-proof if that ever changes.
+  const resolved = await resolveSponsorAndKidForSubscription(subscriptionId);
+
   // Flip every sponsorship on this subscription to Cancelled.
   await mirrorToPostgres(
     `sub.deleted ${subscriptionId}`,
     () => mirrorSubscriptionDeleted(subscriptionId)
   );
 
+  // One save email — whether this was a chosen cancel or Stripe giving
+  // up after exhausted retries. Non-fatal: the state flip above is the
+  // load-bearing part; a failed email logs and moves on. Fires once per
+  // subscription because Stripe emits .deleted once.
+  if (resolved.sponsorEmail) {
+    try {
+      const result = await sendSponsorshipEndedEmail({
+        sponsorEmail: resolved.sponsorEmail,
+        sponsorName: resolved.sponsorName,
+        kidFirstName: resolved.kidFirstName,
+        shirtNumber: resolved.shirtNumber,
+      });
+      if (!result.success) {
+        console.error('[Webhook] sponsorship-ended email send failed:', result.error);
+      }
+    } catch (err) {
+      console.error(
+        '[Webhook] sponsorship-ended email threw:',
+        err instanceof Error ? err.message : String(err)
+      );
+    }
+  } else {
+    console.warn(
+      '[Webhook] sub.deleted: no sponsorship row found for',
+      subscriptionId,
+      '— no save email sent'
+    );
+  }
 }
 
 /**
@@ -3261,6 +3471,15 @@ export async function POST(request: NextRequest) {
         } else {
           console.error('[Webhook] Failed to process recurring payment:', result.error);
         }
+        break;
+      }
+
+      case 'invoice.payment_failed': {
+        // Structural cast for the same reason payment_succeeded casts
+        // above — Stripe's expandable unions are noisy to narrow.
+        const invoice = event.data.object as unknown as FailedInvoicePayload;
+        console.log('[Webhook] Invoice payment failed:', invoice.id);
+        await handleInvoicePaymentFailed(invoice);
         break;
       }
 

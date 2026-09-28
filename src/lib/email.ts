@@ -1274,6 +1274,175 @@ export async function sendKevinDeclineAlert(params: {
   });
 }
 
+/**
+ * Sponsor-facing email when a monthly payment fails (first attempt
+ * only — Stripe's own retries handle the rest, and the cancel path
+ * has its own email). One job: get the card updated. No guilt, no
+ * urgency theater. The reply-to-Kevin escape hatch is deliberate —
+ * a sponsor who's struggling should talk to a person, not a dunning
+ * machine.
+ *
+ * kidFirstName is null when the sponsorship has no claimed kid yet
+ * (buyer hasn't done Hold-to-Meet); copy falls back to "your
+ * sponsorship" without naming anyone.
+ */
+export async function sendPaymentFailedEmail(params: {
+  sponsorEmail: string;
+  sponsorName: string | null;
+  kidFirstName: string | null;
+  updateCardUrl: string;
+}): Promise<EmailSendResult> {
+  const { sponsorEmail, sponsorName, kidFirstName, updateCardUrl } = params;
+  const firstName = (sponsorName || '').trim().split(/\s+/)[0];
+  const greeting = firstName ? `Hey ${escapeHtmlLocal(firstName)},` : 'Hey,';
+  const kidSafe = kidFirstName ? escapeHtmlLocal(kidFirstName) : null;
+
+  const whatLine = kidSafe
+    ? `This month&rsquo;s $25 for ${kidSafe} didn&rsquo;t go through. Cards expire, banks get cautious. It happens, and nothing has changed on ${kidSafe}&rsquo;s end.`
+    : `This month&rsquo;s $25 for your sponsorship didn&rsquo;t go through. Cards expire, banks get cautious. It happens.`;
+
+  const html = wrapTransactionalEmail(`
+    <p style="margin-top: 0;">${greeting}</p>
+
+    <p>${whatLine}</p>
+
+    <p>Stripe will retry on its own, but if the card needs updating, this button takes you straight to it. No sign-in.</p>
+
+    <p style="text-align: center; margin: 28px 0;">
+      <a href="${updateCardUrl}" style="display: inline-block; background: #D4A843; color: #0d0d0d; font-weight: bold; text-decoration: none; padding: 14px 32px; font-size: 15px; letter-spacing: 0.05em;">
+        Update your card
+      </a>
+    </p>
+
+    <p>And if something else is going on, money is tight, life shifted, whatever it is, reply to this email and tell me. We&rsquo;ll figure it out together. I read every reply.</p>
+
+    <p>Kevin</p>
+  `);
+
+  return sendEmail({
+    to: { email: sponsorEmail, ...(sponsorName ? { name: sponsorName } : {}) },
+    subject: kidFirstName
+      ? `Your card didn't go through for ${kidFirstName}`
+      : `Your card didn't go through`,
+    html,
+  });
+}
+
+/**
+ * One save email when a subscription is fully canceled — whether the
+ * sponsor chose it or Stripe gave up after exhausting retries. We
+ * can't tell which from the deleted event alone, so the copy holds
+ * both doors open: thanks with no guilt if it was their call, a
+ * one-button way back if it wasn't.
+ */
+export async function sendSponsorshipEndedEmail(params: {
+  sponsorEmail: string;
+  sponsorName: string | null;
+  kidFirstName: string | null;
+  shirtNumber: number | null;
+}): Promise<EmailSendResult> {
+  const { sponsorEmail, sponsorName, kidFirstName, shirtNumber } = params;
+  const firstName = (sponsorName || '').trim().split(/\s+/)[0];
+  const greeting = firstName ? `Hey ${escapeHtmlLocal(firstName)},` : 'Hey,';
+  const kidSafe = kidFirstName ? escapeHtmlLocal(kidFirstName) : null;
+  const kidPageUrl = shirtNumber
+    ? `${SITE_URL}/children/${shirtNumber}`
+    : `${SITE_URL}/me`;
+
+  const body = kidSafe
+    ? `
+    <p>Your monthly sponsorship of ${kidSafe} has ended.</p>
+
+    <p>If that was your call, thank you for every month of it. The school days, the meals, the clinic visits ${kidSafe} had while you were sponsoring were real, and they happened because you showed up.</p>
+
+    <p>If it wasn&rsquo;t your call, an expired card or a bank decline can end a subscription quietly, then the way back is one button on ${kidSafe}&rsquo;s page.</p>
+
+    <p style="text-align: center; margin: 28px 0;">
+      <a href="${kidPageUrl}" style="display: inline-block; background: #D4A843; color: #0d0d0d; font-weight: bold; text-decoration: none; padding: 14px 32px; font-size: 15px; letter-spacing: 0.05em;">
+        Open ${kidSafe}&rsquo;s page
+      </a>
+    </p>
+
+    <p>Either way, ${kidSafe}&rsquo;s page stays yours to visit, and their letters and photos stay right where you left them.</p>`
+    : `
+    <p>Your monthly sponsorship has ended.</p>
+
+    <p>If that was your call, thank you for every month of it.</p>
+
+    <p>If it wasn&rsquo;t your call, an expired card or a bank decline can end a subscription quietly, then the way back is one click.</p>
+
+    <p style="text-align: center; margin: 28px 0;">
+      <a href="${kidPageUrl}" style="display: inline-block; background: #D4A843; color: #0d0d0d; font-weight: bold; text-decoration: none; padding: 14px 32px; font-size: 15px; letter-spacing: 0.05em;">
+        Come back any time
+      </a>
+    </p>`;
+
+  const html = wrapTransactionalEmail(`
+    <p style="margin-top: 0;">${greeting}</p>
+    ${body}
+    <p>If anything about this looks wrong, reply here and I&rsquo;ll sort it out personally.</p>
+    <p>Kevin</p>
+  `);
+
+  return sendEmail({
+    to: { email: sponsorEmail, ...(sponsorName ? { name: sponsorName } : {}) },
+    subject: kidFirstName
+      ? `Your sponsorship of ${kidFirstName} has ended`
+      : `Your sponsorship has ended`,
+    html,
+  });
+}
+
+/**
+ * Kevin's copy of a first-attempt payment failure. One per invoice
+ * (attempt 1 only) so a month of Smart Retries doesn't flood the
+ * inbox — the subscription.deleted path covers the terminal case.
+ */
+export async function sendKevinPaymentFailedAlert(params: {
+  sponsorEmail: string;
+  sponsorName: string | null;
+  kidLabel: string | null;
+  amountDollars: number | null;
+  stripeSubscriptionId: string;
+  nextRetryAt: Date | null;
+}): Promise<EmailSendResult> {
+  const {
+    sponsorEmail,
+    sponsorName,
+    kidLabel,
+    amountDollars,
+    stripeSubscriptionId,
+    nextRetryAt,
+  } = params;
+  const sponsorDisplay = sponsorName?.trim() || sponsorEmail;
+
+  const html = wrapTransactionalEmail(`
+    <p style="margin-top: 0;">A monthly payment failed on its first attempt. The sponsor got the card-update email; Stripe retries from here.</p>
+
+    <p><strong>Sponsor:</strong> ${escapeHtmlLocal(sponsorDisplay)}${
+    sponsorName ? ` &lt;${escapeHtmlLocal(sponsorEmail)}&gt;` : ''
+  }<br>
+    ${kidLabel ? `<strong>Kid:</strong> ${escapeHtmlLocal(kidLabel)}<br>` : ''}
+    ${
+      amountDollars != null
+        ? `<strong>Amount:</strong> $${amountDollars.toFixed(2)}<br>`
+        : ''
+    }
+    <strong>Subscription:</strong> ${escapeHtmlLocal(stripeSubscriptionId)}<br>
+    <strong>Next retry:</strong> ${
+      nextRetryAt ? nextRetryAt.toLocaleDateString('en-US') : 'none scheduled'
+    }</p>
+
+    <p style="color: #888; font-size: 12px;">No action needed unless the sponsor replies. If the retries all fail, the cancel path covers it.</p>
+  `);
+
+  return sendEmail({
+    to: { email: 'kevin@beanumber.org', name: 'Kevin' },
+    subject: `Payment failed (attempt 1): ${sponsorDisplay}${kidLabel ? ` → ${kidLabel}` : ''}`,
+    html,
+  });
+}
+
 // Local escape because email.ts doesn't already export one. Kept
 // module-private to avoid competing with per-file escapers elsewhere.
 function escapeHtmlLocal(input: string | null | undefined): string {

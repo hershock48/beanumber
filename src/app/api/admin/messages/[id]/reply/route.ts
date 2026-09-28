@@ -54,7 +54,10 @@ import { kidMessages, children, sponsorships } from '@/lib/db/schema';
 import { getAdminRole } from '@/lib/admin-session';
 import { sendEmail, sendKevinReplyAlert } from '@/lib/email';
 import { sendPush, resolveMobileUserIdForEmail } from '@/lib/push/send';
-import { stampHolderFirstLetterCycle } from '@/lib/penpal-cycle';
+import {
+  stampHolderFirstLetterCycle,
+  getViewerWriteStatus,
+} from '@/lib/penpal-cycle';
 
 const SITE_URL =
   process.env.NEXT_PUBLIC_SITE_URL || 'https://www.beanumber.org';
@@ -434,6 +437,39 @@ export async function POST(
       const greeting = firstWordOfName
         ? `Hey ${escapeHtml(firstWordOfName)},`
         : 'Hey,';
+      // Holder vs monthly changes the closing line. A monthly sponsor
+      // can write again whenever they want and the email says so. A
+      // holder just spent their included letter on the note this reply
+      // answers — telling THEM "write back whenever you want" promises
+      // a composer the kid page won't show them. This is also the
+      // highest-emotion moment in the whole product (the kid actually
+      // wrote back), so the holder variant states the trade plainly:
+      // the included cycle is complete, $25/month keeps the two of
+      // them writing, and the button for that sits on the same page
+      // as the letter (PenpalBoxSponsorCta renders it for holders).
+      // Default to the monthly copy on any lookup error — a wrong
+      // "write back whenever" beats a wrong paywall line for an
+      // actual monthly sponsor.
+      let writerStatus = 'monthly';
+      if (parent.childId) {
+        try {
+          writerStatus = await getViewerWriteStatus({
+            sponsorEmail: parent.sponsorEmail,
+            childRecordId: parent.childId,
+            childIdLegacy: parent.childIdLegacy,
+          });
+        } catch (statusErr) {
+          console.warn(
+            '[messages/reply] writer-status lookup failed (defaulting to monthly copy):',
+            statusErr instanceof Error ? statusErr.message : String(statusErr)
+          );
+        }
+      }
+      const isHolder =
+        writerStatus === 'holder_used' || writerStatus === 'holder_available';
+      const closingLine = isHolder
+        ? `<p>Your shirt included one letter out and one letter back, and this is the one back. If you want to keep writing with ${firstNameSafe}, sponsoring them is $25 a month, and the button for that is right on their page next to the letter.</p>`
+        : `<p>Write your penpal back whenever you want.</p>`;
       // Teaser only — no body preview. The reply itself lives on the
       // site so sponsors have to click through to read it. Keeps the
       // emotional pull ("[Kid] wrote you back") without giving away
@@ -451,7 +487,7 @@ export async function POST(
               Read ${firstNameSafe}&rsquo;s penpal letter
             </a>
           </p>
-          <p>Write your penpal back whenever you want.</p>
+          ${closingLine}
           <p>Kevin</p>
         `),
       });
