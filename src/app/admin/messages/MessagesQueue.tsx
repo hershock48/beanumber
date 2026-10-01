@@ -703,10 +703,11 @@ function MessageCard({
             <p className="text-sm text-[#c0392b] leading-relaxed">{error}</p>
           )}
 
-          {/* Actions — Kevin approval layer split (2026-07-10):
-              - awaiting_kevin: Kevin sees Approve / Decline. Simon's
-                translate + deliver buttons don't render — the note
-                isn't his to touch yet.
+          {/* Actions:
+              - awaiting_kevin: LEGACY (2026-07-10 → 2026-10-01). Only
+                rows that were already parked here when the approval
+                step came out still render Approve / Decline. New notes
+                never land in this state.
               - pending / translated: Simon's normal workflow. */}
           {message.status === 'awaiting_kevin' && (
             <div className="flex flex-wrap gap-2">

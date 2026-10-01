@@ -3,7 +3,10 @@
  *
  * Sponsor writes a short note to their kid. Lands in the
  * kid_messages table with status='pending' for Simon to review and
- * translate before delivery.
+ * translate before delivery. Simon is emailed on submit; Kevin gets
+ * an FYI copy. There is no approval step in between (removed
+ * 2026-10-01 — the 2026-07-10 'awaiting_kevin' gate held every note
+ * until Kevin clicked Approve, which made Kevin the bottleneck).
  *
  * Auth
  * ────
@@ -38,7 +41,7 @@ import { cookies } from 'next/headers';
 import { and, eq, inArray, ne, or, sql } from 'drizzle-orm';
 import { db } from '@/lib/db/client';
 import { kidMessages, sponsorships, children } from '@/lib/db/schema';
-import { sendKevinNoteAlert } from '@/lib/email';
+import { sendKevinNoteAlert, sendSimonNoteAlert } from '@/lib/email';
 import { SESSION } from '@/lib/constants';
 import { CANONICAL_ROSTER_MAX } from '@/lib/roster-config';
 import { resolveShirtNumberForClaim } from '@/lib/claim-resolve';
@@ -392,11 +395,11 @@ export async function POST(request: NextRequest) {
       and(
         sql`lower(${kidMessages.sponsorEmail}) = ${email}`,
         eq(kidMessages.childId, childRow.id),
-        // Includes 'awaiting_kevin' (2026-07-10) so the sponsor can't
-        // queue a second note while the first is still waiting for
-        // Kevin's approve/decline. The message-based cycle gate above
-        // already rejects a second free letter for holders, but this
-        // rate limit applies to monthly sponsors too.
+        // 'awaiting_kevin' is kept for rows written before 2026-10-01,
+        // when every note waited on Kevin's approval. New rows start
+        // at 'pending'. The message-based cycle gate above already
+        // rejects a second free letter for holders, but this rate
+        // limit applies to monthly sponsors too.
         inArray(kidMessages.status, ['awaiting_kevin', 'pending', 'translated'])
       )
     )
@@ -422,13 +425,11 @@ export async function POST(request: NextRequest) {
         childId: childRow.id,
         direction: 'sponsor_to_kid',
         bodyEn: rawBody,
-        // Kevin approval layer (2026-07-10). Every new sponsor→kid
-        // note comes in as 'awaiting_kevin' — the campus team does
-        // NOT see it until Kevin approves. Kevin's admin actions
-        // flip it to 'pending' (approved) or 'declined' (rejected).
-        // Historical rows may still be seeded 'pending' by legacy
-        // paths; the queue filter reads both.
-        status: 'awaiting_kevin',
+        // Straight to the campus queue. The 2026-07-10 approval
+        // layer wrote 'awaiting_kevin' here and held the note until
+        // Kevin clicked Approve; Kevin asked for that step to go
+        // (2026-10-01), so Simon sees the note the moment it lands.
+        status: 'pending',
         // Sponsor-attached photos (2026-07-08). Null when the sponsor
         // sent a text-only note, which is still the common case.
         attachments,
@@ -440,7 +441,7 @@ export async function POST(request: NextRequest) {
       })
       .returning({ id: kidMessages.id, status: kidMessages.status });
 
-    // Fire the admin alert to Kevin — fully non-fatal. A Gmail blip or
+    // Fire the FYI alert to Kevin — fully non-fatal. A Gmail blip or
     // a slow SendGrid retry must NOT take down the composer POST; the
     // sponsor's write is what matters. Errors are logged and swallowed.
     // Await it inside the try so we don't leak an unhandled rejection
@@ -479,13 +480,31 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Note: Simon alert was previously fired here on every POST.
-    // Under the 2026-07-10 Kevin-approval layer, the campus team
-    // should NOT be pinged until Kevin has approved — otherwise
-    // Simon might translate a note Kevin later declines.
-    // The alert is now sent from the admin PATCH action='kevin_approve'
-    // handler (src/app/api/admin/messages/[id]/route.ts) so Simon
-    // only hears about greenlit notes.
+    // Simon's alert fires on submit again (2026-10-01). Between
+    // 2026-07-10 and today it fired from the admin PATCH
+    // action='kevin_approve' handler, which is now only reachable for
+    // rows that were already waiting when the gate came out. Same
+    // non-fatal posture as Kevin's alert.
+    try {
+      await sendSimonNoteAlert({
+        noteId: inserted[0].id,
+        sponsorEmail: email,
+        sponsorName,
+        kidFirstName: childRow.firstName || 'the kid',
+        kidDisplayName:
+          childRow.displayName || childRow.firstName || 'the kid',
+        shirtNumber: childRow.shirtNumber ?? null,
+        bodyEn:
+          rawBody.length > 0
+            ? rawBody
+            : '(Handwritten letter uploaded. Print + deliver as-is.)',
+      });
+    } catch (err) {
+      console.warn(
+        '[sponsor/notes] Simon alert send failed (non-fatal):',
+        err instanceof Error ? err.message : String(err)
+      );
+    }
 
     return NextResponse.json({
       ok: true,

@@ -1191,22 +1191,22 @@ export const kidMessages = pgTable(
     bodyEn: text('body_en').notNull(),
     // Simon's translation for delivery. Nullable while pending.
     bodyTranslated: text('body_translated'),
-    // awaiting_kevin | pending | translated | delivered | declined
+    // pending | translated | delivered | declined, plus the legacy
+    // awaiting_kevin.
     //
-    // awaiting_kevin: sponsor just submitted; Kevin has NOT approved yet.
-    //   The campus team should not act on it. When Kevin approves →
-    //   'pending'. When Kevin declines → 'declined' + kevin_decline_note
-    //   populated + sponsor decline email fires.
-    // pending: Kevin approved. Campus team can translate.
+    // pending: sponsor submitted; Simon was emailed. Campus team can
+    //   translate.
     // translated: campus team has a translation ready to deliver.
     // delivered: kid received the letter.
     // declined: Kevin (or, historically, Simon) rejected the note. Row
     //   still exists but does not count against the holder cycle or
     //   render in the sponsor's thread.
-    //
-    // Default stays 'pending' on this column for backward compat with
-    // pre-2026-07-10 code paths; the sponsor notes POST explicitly
-    // writes 'awaiting_kevin' for new incoming rows.
+    // awaiting_kevin: LEGACY. Between 2026-07-10 and 2026-10-01 every
+    //   new note sat here until Kevin clicked Approve (→ 'pending',
+    //   Simon alerted) or Decline (→ 'declined' + kevin_decline_note).
+    //   Kevin removed that step on 2026-10-01; no code writes it any
+    //   more. The admin kevin_approve / kevin_decline actions remain so
+    //   any row still parked here can be moved on.
     status: text('status').notNull().default('pending'),
     // Simon's internal notes to himself/Kevin. Not shown to the
     // sponsor. Optional decline explanation lives here too.

@@ -1,6 +1,15 @@
 # Project state
 
-Last updated: September 14, 2026.
+Last updated: October 1, 2026.
+
+## 2026-10-01: Penpal notes go straight to Simon
+
+Kevin's approval step on sponsor→kid notes is gone. From 2026-07-10 until today every new note landed as `awaiting_kevin` and Simon was only emailed when Kevin clicked Approve in `/admin/messages`; Kevin was the bottleneck on every letter.
+
+- Both submit paths (`/api/sponsor/notes` and the mobile thread POST) now insert `status='pending'` and email Simon on submit. Kevin still gets his alert, reworded as an FYI.
+- The `kevin_approve` / `kevin_decline` admin actions and the "Awaiting Kevin" pill stay in place only for rows that were already parked in `awaiting_kevin` when this shipped. Nothing writes that status any more. Once those rows are cleared the UI branch is dead and can be deleted.
+- Sponsor-facing journey stepper (web + mobile) stage 2 relabeled "At the campus" (was "Reviewed"), since a new note now starts there.
+- No migration. Anything sitting in Awaiting Kevin on ship day still needs one click from Kevin; after that the queue is Simon's.
 
 ## 2026-09-14: Airtable is out of the codebase
 

@@ -1004,8 +1004,10 @@ export async function sendKevinNoteAlert(params: {
   // so this new one will be the first thing Kevin sees.
   const queueUrl = `${SITE_URL}/admin/messages`;
 
+  // FYI only. Since 2026-10-01 the note goes to Simon the moment it
+  // lands; nothing here waits on Kevin.
   const html = wrapTransactionalEmail(`
-    <p style="margin-top: 0;">A new note landed in the sponsor queue.</p>
+    <p style="margin-top: 0;">A new note landed in the sponsor queue. Simon has it already; nothing for you to approve.</p>
 
     <p><strong>From:</strong> ${escapeHtmlLocal(sponsorDisplay)}${
     sponsorName ? ` &lt;${escapeHtmlLocal(sponsorEmail)}&gt;` : ''

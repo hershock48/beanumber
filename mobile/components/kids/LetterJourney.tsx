@@ -1,13 +1,13 @@
 /**
  * <LetterJourney /> — the four-dot path a penpal note travels.
  *
- *   Sent → Reviewed → Translated → In {kid}'s hands
+ *   Sent → At the campus → Translated → In {kid}'s hands
  *
  * Rendered under the sponsor's MOST RECENT note while it's still in
  * flight (stage < 4). The psychology is the pizza-tracker effect:
  * a letter that takes two weeks to arrive feels broken when the app
  * is silent, and feels ALIVE when you can watch it move. Every stage
- * here is a real human doing a real thing — Kevin reads it, the
+ * here is a real human doing a real thing — the sponsor sends it, the
  * campus team receives it, a teacher translates it, a kid holds it.
  * The stepper is just those people made visible.
  *
@@ -33,7 +33,7 @@ const RING = 16;
 export function LetterJourney({ stage, kidFirstName }: Props) {
   const labels = [
     'Sent',
-    'Reviewed',
+    'At the campus',
     'Translated',
     `In ${kidFirstName}’s hands`,
   ];

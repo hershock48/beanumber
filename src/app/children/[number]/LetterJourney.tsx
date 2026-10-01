@@ -25,6 +25,7 @@
  */
 
 const STAGE_FOR_STATUS: Record<string, 1 | 2 | 3> = {
+  // awaiting_kevin is legacy (pre-2026-10-01); new notes start at 2.
   awaiting_kevin: 1,
   pending: 2,
   translated: 3,
@@ -45,7 +46,7 @@ export function LetterJourney({
   stage: 1 | 2 | 3;
   firstName: string;
 }) {
-  const labels = ['Sent', 'Reviewed', 'Translated', `In ${firstName}’s hands`];
+  const labels = ['Sent', 'At the campus', 'Translated', `In ${firstName}’s hands`];
 
   return (
     <div

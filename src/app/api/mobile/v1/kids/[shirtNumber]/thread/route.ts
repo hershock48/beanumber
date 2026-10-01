@@ -27,7 +27,7 @@ import { db } from '@/lib/db/client';
 import { kidMessages, sponsorships } from '@/lib/db/schema';
 import { getNoteThreadForSponsorAndChild } from '@/lib/db/queries';
 import { resolveShirtNumberForClaim } from '@/lib/claim-resolve';
-import { sendKevinNoteAlert } from '@/lib/email';
+import { sendKevinNoteAlert, sendSimonNoteAlert } from '@/lib/email';
 import type { Child } from '@/lib/db/schema';
 
 export const dynamic = 'force-dynamic';
@@ -473,10 +473,9 @@ async function postHandler(
       and(
         inArray(sql`lower(${kidMessages.sponsorEmail})`, viewerEmails),
         eq(kidMessages.childId, child.id),
-        // Kevin approval layer (2026-07-10). Extending awaiting_kevin
-        // into the rate-limit filter so a mobile writer can't queue
-        // two notes while the first is still waiting for Kevin.
-        // Mirrors src/app/api/sponsor/notes/route.ts.
+        // 'awaiting_kevin' covers rows written before 2026-10-01,
+        // when notes waited on Kevin's approval. New rows start at
+        // 'pending'. Mirrors src/app/api/sponsor/notes/route.ts.
         inArray(kidMessages.status, ['awaiting_kevin', 'pending', 'translated'])
       )
     )
@@ -500,10 +499,9 @@ async function postHandler(
         childId: child.id,
         direction: 'sponsor_to_kid',
         bodyEn: bodyText,
-        // Kevin approval layer (2026-07-10). Same as the web POST at
-        // /api/sponsor/notes — new mobile notes must go through
-        // Kevin before Simon sees them.
-        status: 'awaiting_kevin',
+        // Straight to the campus queue, same as the web POST at
+        // /api/sponsor/notes. The approval gate came out 2026-10-01.
+        status: 'pending',
       })
       .returning({
         id: kidMessages.id,
@@ -531,10 +529,23 @@ async function postHandler(
       );
     }
 
-    // Kevin approval layer (2026-07-10). Simon alert is no longer
-    // fired on POST — it now fires from the admin PATCH kevin_approve
-    // handler so Simon only hears about greenlit notes. Mirrors the
-    // web sponsor notes route.
+    // Simon alert — non-fatal. Fires on submit (2026-10-01); mirrors
+    // the web sponsor notes route.
+    try {
+      await sendSimonNoteAlert({
+        noteId: inserted[0].id,
+        sponsorEmail: noteEmail,
+        sponsorName: null,
+        kidFirstName: child.firstName || 'the kid',
+        kidDisplayName: child.displayName || child.firstName || 'the kid',
+        shirtNumber,
+        bodyEn: bodyText,
+      });
+    } catch (err) {
+      logger.warn(
+        `[mobile/thread] Simon alert send failed (non-fatal): ${err instanceof Error ? err.message : String(err)}`
+      );
+    }
 
     const created: MobileThreadMessage = {
       id: inserted[0].id,
