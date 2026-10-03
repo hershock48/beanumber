@@ -53,6 +53,7 @@ import { db } from '@/lib/db/client';
 import { kidMessages, children, sponsorships } from '@/lib/db/schema';
 import { getAdminRole } from '@/lib/admin-session';
 import { sendEmail, sendKevinReplyAlert } from '@/lib/email';
+import { signedKidPageUrl } from '@/lib/penpal-links';
 import { sendPush, resolveMobileUserIdForEmail } from '@/lib/push/send';
 import { stampHolderFirstLetterCycle } from '@/lib/penpal-cycle';
 
@@ -423,13 +424,21 @@ export async function POST(
       const firstNameSafe = escapeHtml(firstNamePlain);
       // Deep-link the email button to the reply card itself via the
       // #note-<id> anchor rendered on every NotesThread entry. The
-      // browser scrolls straight to the letter (with scroll-margin-top
-      // headroom) so the sponsor lands on the payoff instead of the
-      // top of the kid page. Fallback to /me for legacy sponsorships
-      // without a shirt number stays intact.
-      const kidPageUrl = parent.shirtNumber
-        ? `${SITE_URL}/children/${parent.shirtNumber}#note-${inserted[0].id}`
-        : `${SITE_URL}/me`;
+      // link is signed (src/lib/penpal-links.ts) so it drops the
+      // sponsor_session cookie on the way in: the thread only renders
+      // for a signed-in sponsor or holder, and a bare link opened on
+      // a phone or after the cookie expired showed the public page
+      // with no letter on it (2026-10-03). Fallback to /me for legacy
+      // sponsorships without a shirt number stays intact.
+      const kidPageUrl = await signedKidPageUrl({
+        sponsorEmail: parent.sponsorEmail,
+        child: {
+          id: parent.childId,
+          childId: parent.childIdLegacy,
+          shirtNumber: parent.shirtNumber,
+        },
+        anchor: `note-${inserted[0].id}`,
+      });
       const firstWordOfName = parent.sponsorName?.trim().split(/\s+/)[0];
       const greeting = firstWordOfName
         ? `Hey ${escapeHtml(firstWordOfName)},`

@@ -1,6 +1,10 @@
 # Project state
 
-Last updated: October 1, 2026.
+Last updated: October 3, 2026.
+
+## 2026-10-03: Penpal emails sign the sponsor in
+
+Leslie (Elvis's sponsor) clicked "Read Elvis's penpal letter" and saw nothing. The reply email and the "your note reached {kid}" email linked to a bare `/children/[N]`; the thread only renders for a signed-in sponsor or holder, and her cookie wasn't on that browser. Both emails now go through `/api/sponsor/recover/callback` with a 30-day HMAC token (`src/lib/penpal-links.ts`, same mechanism as the newsletter links) and the callback carries `?a=note-<id>` through as the `#note-<id>` anchor. Emails already sent still carry bare links; those sponsors sign in at `/signin` with their purchase email.
 
 ## 2026-10-01: Penpal notes go straight to Simon
 

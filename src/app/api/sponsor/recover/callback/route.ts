@@ -95,7 +95,13 @@ export async function GET(request: NextRequest) {
   // gate, and a forged intent param can't charge anyone anything.
   const intent = request.nextUrl.searchParams.get('intent');
   const intentSuffix = intent === 'sponsor' ? '&intent=sponsor' : '';
+  // ?a=note-<id> rides the link from the penpal emails
+  // (src/lib/penpal-links.ts) so the browser lands on the letter
+  // itself, not the top of the page. Strict allow-list: it becomes a
+  // URL fragment, nothing else.
+  const anchor = request.nextUrl.searchParams.get('a');
+  const hash = anchor && /^[A-Za-z0-9_-]{1,80}$/.test(anchor) ? `#${anchor}` : '';
   return NextResponse.redirect(
-    `${SITE_URL}/children/${shirtNumber}?just_signed_in=1${intentSuffix}`
+    `${SITE_URL}/children/${shirtNumber}?just_signed_in=1${intentSuffix}${hash}`
   );
 }

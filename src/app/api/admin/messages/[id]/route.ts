@@ -34,6 +34,7 @@ import {
   sendSimonNoteAlert,
 } from '@/lib/email';
 import { stampHolderFirstLetterCycle } from '@/lib/penpal-cycle';
+import { signedKidPageUrl } from '@/lib/penpal-links';
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.beanumber.org';
 const FROM_EMAIL = process.env.SENDGRID_FROM_EMAIL || 'Kevin@beanumber.org';
@@ -335,10 +336,18 @@ export async function PATCH(
   if (shouldNotify && (action === 'deliver' || isDeclineAction)) {
     try {
       const firstNameSafe = escapeHtml(message.firstName || 'your kid');
-      const shirtNumber = message.shirtNumber;
-      const kidPageUrl = shirtNumber
-        ? `${SITE_URL}/children/${shirtNumber}`
-        : `${SITE_URL}/me`;
+      // Signed so the click lands signed in (see penpal-links.ts);
+      // the thread the button promises only renders for a signed-in
+      // sponsor or holder.
+      const kidPageUrl = await signedKidPageUrl({
+        sponsorEmail: message.sponsorEmail,
+        child: {
+          id: message.childId,
+          childId: message.childIdLegacy,
+          shirtNumber: message.shirtNumber,
+        },
+        anchor: `note-${id}`,
+      });
       // Trim BEFORE splitting so a sponsor name of "  " doesn't
       // yield "Hey ," with the stray comma and space. Also escape
       // the fragment before it lands in the email HTML.
