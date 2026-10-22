@@ -29,6 +29,8 @@ import {
 // into the viewer-state strip + /signin. File kept for reference.
 import { OtherKidsAtCampus } from './OtherKidsAtCampus';
 import { ClaimThisNumberCard } from './ClaimThisNumberCard';
+import { ChristmasGiftCard } from './ChristmasGiftCard';
+import { CHRISTMAS, christmasClosesLabel, christmasIsOpen } from '@/lib/christmas';
 // RelationshipCard reinstated 2026-08-02 — the component was authored
 // as "the only ask the page makes" but fell out of the render tree in
 // the 2026-07-08 restructure, leaving signed-in holders with NO
@@ -2411,6 +2413,26 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
               />
             </div>
           )}
+        {/* ── Christmas at the campus ──
+            Seasonal. One pooled fund, same gift for every kid, photo
+            of this kid with theirs afterward. Shown to every viewer
+            state while the campaign is open (src/lib/christmas.ts);
+            memorial pages skip it. */}
+        {!child.departed_at && christmasIsOpen() && (
+          <div className="mt-12 md:mt-16 max-w-2xl mx-auto">
+            <ChristmasGiftCard
+              shirtNumber={Number(number)}
+              firstName={firstName}
+              year={CHRISTMAS.year}
+              kidCount={CHRISTMAS.kidCount}
+              giftLong={CHRISTMAS.giftLong}
+              amounts={CHRISTMAS.amounts}
+              perKidCost={CHRISTMAS.perKidCost}
+              closesOnLabel={christmasClosesLabel()}
+              overflowNote={CHRISTMAS.overflowNote}
+            />
+          </div>
+        )}
         {!child.departed_at && recentNewsletters.length > 0 && (
           <div className="mt-12 md:mt-16">
             <CampusNewsfeed

@@ -839,6 +839,72 @@ async function sendMerchConfirmationEmail(orderData: {
   console.log('[Webhook] Merch confirmation email sent to:', orderData.email);
 }
 
+/**
+ * Receipt for a Christmas at the campus gift. One pooled fund, same gift
+ * for every kid; the kid's number only tells the giver which page they
+ * gave from.
+ */
+async function sendChristmasGiftEmail(data: {
+  email: string;
+  name: string;
+  amount: number;
+  campaignYear: string;
+  shirtNumber?: string;
+  childFirstName?: string;
+  kidsCovered?: string;
+}): Promise<void> {
+  if (!data.email) {
+    console.log('[Webhook] No giver email, skipping christmas receipt');
+    return;
+  }
+  const fromEmail = process.env.SENDGRID_FROM_EMAIL || 'Kevin@beanumber.org';
+  const firstName = data.name.split(' ')[0] || 'Friend';
+  const kidsLine = data.kidsCovered && data.kidsCovered !== '1'
+    ? `That is Christmas for ${data.kidsCovered} kids.`
+    : 'That is Christmas for one kid.';
+  const pageLine = data.shirtNumber
+    ? ` Since you gave from #${data.shirtNumber}${data.childFirstName ? ` (${data.childFirstName})` : ''}'s page, that is where the photo will land.`
+    : '';
+  const dateStr = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      </head>
+      <body style="font-family: Georgia, 'Times New Roman', serif; line-height: 1.7; color: #333; max-width: 560px; margin: 0 auto; padding: 30px 20px;">
+        <p style="margin-top: 0;">Hey ${firstName},</p>
+        <p>${kidsLine} Every kid at Hope Bridge gets the same gift this year, bought in town by Simon&rsquo;s team and handed out before school closes for the holidays. The team photographs each kid with theirs and the pictures go up on the kids&rsquo; pages.${pageLine}</p>
+        <div style="background: #f5f0e8; border: 1px solid #e8e0d4; padding: 16px 20px; margin: 24px 0;">
+          <p style="margin: 0; font-size: 22px; font-weight: bold; color: #0d0d0d;">$${data.amount.toFixed(2)}</p>
+          <p style="margin: 4px 0 0 0; font-size: 14px; color: #555;">Christmas at the campus ${data.campaignYear} &middot; ${dateStr}</p>
+        </div>
+        <p style="font-size: 14px; color: #555;">This is your receipt. Be A Number, International is a 501(c)(3) public charity (EIN 93-1948872). No goods or services were provided in exchange for this gift. If the fund comes in higher than the gifts cost, the rest goes to the campus budget.</p>
+        <p>Thank you for this,<br><strong>Kevin</strong></p>
+        <hr style="border: none; border-top: 1px solid #e8e0d4; margin: 30px 0;">
+        <p style="font-size: 12px; color: #999; line-height: 1.5;">
+          Be A Number, International<br>
+          <a href="https://www.beanumber.org" style="color: #D4A843;">beanumber.org</a>
+        </p>
+      </body>
+    </html>
+  `;
+
+  const result = await sendEmail({
+    to: { email: data.email, name: data.name },
+    from: { email: fromEmail, name: 'Kevin at Be A Number' },
+    subject: `That's Christmas for the campus.`,
+    html,
+  });
+  if (!result.success) {
+    console.error('[Webhook] Christmas receipt email failed:', result.error);
+    return;
+  }
+  console.log('[Webhook] Christmas receipt sent to:', data.email);
+}
+
 // ---------------------------------------------------------------------------
 // Gift sponsorship emails (memo §11)
 // ---------------------------------------------------------------------------
@@ -1601,6 +1667,11 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
     // changes, no drip enrollment, no Fulfillment row — Kevin makes the
     // item by hand from the admin notification email and ships it.
     const isMerchPurchase = session.metadata?.order_type === 'merch_purchase';
+    // Christmas at the campus: one-time gift into the pooled Christmas
+    // fund (src/lib/christmas.ts). The kid's number in metadata is for
+    // the receipt and Kevin's email only; the money is not restricted
+    // to that kid. No sponsorship change, no drip.
+    const isChristmasGift = session.metadata?.order_type === 'christmas_gift';
 
     const donorArgs = {
       name,
@@ -2705,6 +2776,83 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
       // doesn't change the relationship structure.
 
       return { donorId, donationId, isMerchPurchase: true, merchType, shirtNumber };
+
+    } else if (isChristmasGift) {
+      // --- CHRISTMAS GIFT FLOW ---
+      const campaignYear = session.metadata?.campaign_year || String(new Date().getUTCFullYear());
+      const shirtNumber = session.metadata?.shirt_number || '';
+      const childFirstName = session.metadata?.child_first_name || '';
+      const kidsCovered = session.metadata?.kids_covered || '';
+
+      console.log(`[WH] S2: christmas flow, $${amount}${shirtNumber ? ` from #${shirtNumber}` : ''}`);
+
+      const donorId = await donorPromise;
+
+      const donationId = await upsertDonation(paymentIntentId, {
+        sessionId: session.id,
+        customerId: stripeCustomerId,
+        donorId,
+        amount,
+        currency,
+        donationDate,
+        isRecurring: false,
+        subscriptionId: null,
+        status,
+        email,
+        name,
+        organization: organization || undefined,
+        address,
+        donationSource: `Christmas ${campaignYear}`,
+        notes: `Christmas at the campus ${campaignYear}${kidsCovered ? `, ${kidsCovered} gift${kidsCovered === '1' ? '' : 's'}` : ''}${shirtNumber ? `, given from #${shirtNumber}${childFirstName ? ` (${childFirstName})` : ''}'s page` : ''}. Pooled, unrestricted.`,
+      });
+
+      let emailStatus = 'Sent';
+      try {
+        await sendChristmasGiftEmail({
+          email,
+          name,
+          amount,
+          campaignYear,
+          shirtNumber,
+          childFirstName,
+          kidsCovered,
+        });
+      } catch (err) {
+        console.error('[WH] Failed to send christmas gift email:', err);
+        emailStatus = 'Failed';
+      }
+
+      try {
+        await createCommunicationRecord({
+          email,
+          subject: `That's Christmas for the campus.`,
+          body: `Christmas ${campaignYear} gift of $${amount.toFixed(2)}${shirtNumber ? ` from #${shirtNumber}'s page` : ''}.`,
+          status: emailStatus,
+          stripePaymentIntentId: paymentIntentId,
+        });
+      } catch (err) {
+        console.error('[WH] Failed to create communication record (christmas):', err);
+      }
+
+      console.log('[WH] S5: admin notify (christmas)');
+      try {
+        const fromEmail = process.env.SENDGRID_FROM_EMAIL || 'Kevin@beanumber.org';
+        const adminEmail = process.env.ADMIN_NOTIFY_EMAIL || 'kevin@beanumber.org';
+        await sendEmail({
+          to: { email: adminEmail, name: 'Kevin' },
+          from: { email: fromEmail, name: 'BAN Orders' },
+          subject: `Christmas gift: $${amount.toFixed(2)}${shirtNumber ? ` from #${shirtNumber}` : ''}`,
+          html: `
+            <p><strong>${name || 'unknown giver'}</strong> gave <strong>$${amount.toFixed(2)}</strong> to Christmas at the campus ${campaignYear}${kidsCovered ? ` (${kidsCovered} gift${kidsCovered === '1' ? '' : 's'})` : ''}.</p>
+            <p>${shirtNumber ? `Given from #${shirtNumber}${childFirstName ? ` (${childFirstName})` : ''}'s page.` : 'Given from the donate page.'}</p>
+            <p><strong>Email:</strong> ${email}<br><strong>Stripe session:</strong> ${session.id}</p>
+          `,
+        });
+      } catch (err: any) {
+        console.error('[WH] christmas admin notify failed:', String(err?.message || err).slice(0, 200));
+      }
+
+      return { donorId, donationId, isChristmasGift: true, shirtNumber };
 
     } else if (isGiftSponsorship) {
       // --- GIFT SPONSORSHIP FLOW (memo §11) ---
