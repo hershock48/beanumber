@@ -3,13 +3,14 @@
 import { useEffect, useState } from 'react';
 
 /**
- * Christmas at the campus: the seasonal card on /[N].
+ * Christmas at the campus: the seasonal card on /[N] and on /christmas.
  *
  * Pooled fund, same gift for every kid (see src/lib/christmas.ts for
- * the reasoning). The card still speaks to THIS kid's page: "every
- * kid gets the same gift, {firstName} included," and after Christmas
- * Simon's team posts a photo of each kid with theirs, which is what
- * makes a shared fund feel personal.
+ * the reasoning). On a kid page the card still speaks to THIS kid:
+ * "every kid gets the same gift, {firstName} included," and after
+ * Christmas Simon's team posts a photo of each kid with theirs, which
+ * is what makes a shared fund feel personal. On /christmas there is
+ * no kid, so the copy speaks to the whole campus.
  *
  * Shown to everyone who can see the page (sponsor, holder, cold
  * visitor). Hidden on departed kids' pages and once the campaign
@@ -26,8 +27,9 @@ export function ChristmasGiftCard({
   closesOnLabel,
   overflowNote,
 }: {
-  shirtNumber: number;
-  firstName: string;
+  /** Omit both on /christmas, where there is no kid in view. */
+  shirtNumber?: number;
+  firstName?: string;
   year: number;
   kidCount: number;
   giftLong: string;
@@ -38,6 +40,7 @@ export function ChristmasGiftCard({
 }) {
   const [busy, setBusy] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const hasKid = Boolean(shirtNumber && firstName);
 
   // Coming back from Stripe via the browser's back button restores
   // this component from bfcache with the button still disabled.
@@ -64,7 +67,9 @@ export function ChristmasGiftCard({
       const res = await fetch('/api/create-christmas-checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount, shirtNumber, childFirstName: firstName }),
+        body: JSON.stringify(
+          hasKid ? { amount, shirtNumber, childFirstName: firstName } : { amount }
+        ),
       });
       const data = await res.json();
       if (!res.ok || !data.url) throw new Error(data.error || 'Could not start checkout.');
@@ -84,15 +89,20 @@ export function ChristmasGiftCard({
         className="text-2xl md:text-[28px] mb-3 leading-tight"
         style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
       >
-        Give Christmas to the whole campus. {firstName} included.
+        {hasKid
+          ? `Give Christmas to the whole campus. ${firstName} included.`
+          : 'Give Christmas to the whole campus.'}
       </h2>
       <p className="text-[#d8cfc1] text-sm md:text-base leading-relaxed mb-2">
         Every one of the {kidCount} kids at Hope Bridge gets the same gift this year: {giftLong}.
         Nobody opens more than anyone else, and nobody goes without.
       </p>
       <p className="text-[#d8cfc1] text-sm md:text-base leading-relaxed mb-5">
-        After Christmas, Simon&rsquo;s team photographs every kid with their gift and the picture
-        lands here on {firstName}&rsquo;s page. One gift is ${perKidCost}. Gifts close {closesOnLabel}.
+        After Christmas, Simon&rsquo;s team photographs every kid with their gift
+        {hasKid
+          ? ` and the picture lands here on ${firstName}’s page.`
+          : ' and each picture lands on that kid’s page.'}{' '}
+        One gift is ${perKidCost}. Gifts close {closesOnLabel}.
       </p>
 
       <div className="flex flex-col sm:flex-row gap-3 mb-4">
