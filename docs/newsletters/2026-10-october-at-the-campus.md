@@ -62,7 +62,7 @@ Paste this into the BodyHTML field. Plain `<p>`, `<h2>`, `<ul>` only, per docs/c
 <p>I do not have prices on any of these. When Simon sends them I will post the numbers.</p>
 
 <h2>Christmas</h2>
-<p>In November we are going to buy Christmas for the whole campus. Same gift for all 90 kids, and you will get a photo of yours holding theirs. More on that in a few weeks.</p>
+<p>This year we are buying Christmas for the whole campus. Same gift for all 90 kids, and you will get a photo of yours holding theirs. One gift is $15. If you have a kid, the Christmas card is on their page. If not, it is at <a href="https://www.beanumber.org/christmas">beanumber.org/christmas</a>.</p>
 
 <p>Every shirt and every $25 month goes into the budget that keeps these 90 kids in class. Thank you.</p>
 <p>Kevin</p>
@@ -75,7 +75,7 @@ Paste this into the BodyHTML field. Plain `<p>`, `<h2>`, `<ul>` only, per docs/c
 - The "What's next" section is deliberately not an ask. If you want any of the four needs to become a fundraising campaign, that is a restricted-gift decision (docs/claude/funding_model.md) and gets its own email, not a line in this one.
 - Left out of the YDO version on purpose: "Quarterly Community Impact," "youth empowerment," "community development platform," and the "Learning in Christ" tagline. Those are fine for YDO's report; BAN's voice rules ban or soften them.
 - "Twenty-five new kids" assumes the new learners will be added to the BAN roster. If some won't be (for example nursery kids YDO keeps off the roster), cut the third paragraph down to one sentence.
-- The Christmas section is a teaser only. The card goes live on kid pages when the Christmas branch is merged (docs/christmas-2026.md); the real ask is its own email around 1 November.
+- The Christmas section links to /christmas and to the card on each kid page, both live. A dedicated Christmas email can still go out in November.
 - Before sending: use "Send test" to get both variants in your inbox, then "Send to all." Sending posts it to /news and every kid page at the same moment.
 
 ---
