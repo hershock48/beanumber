@@ -90,7 +90,7 @@ async function handler(
       id: `sotm:${award.id}`,
       occurredOn: award.awardedAt,
       type: 'sotm',
-      title: `Student of the Month — ${gradeLabel}`,
+      title: `Student of the Month: ${gradeLabel}`,
       subtitle: award.reason || award.month,
     });
   }

@@ -76,8 +76,8 @@ export default function GiftLandingPage() {
             </h2>
             <p className="text-[#666] leading-relaxed mb-6">
               The full BAN experience as a gift: a numbered shirt shipped to your recipient, with a
-              specific kid&rsquo;s number pressed on the back. We&rsquo;re building this for the holiday window &mdash;
-              check back, or grab the digital gift sponsorship for now.
+              specific kid&rsquo;s number pressed on the back. We&rsquo;re building this for the holiday window.
+              Check back, or grab the digital gift sponsorship for now.
             </p>
             <div className="flex items-baseline gap-1 mb-5">
               <span
@@ -126,7 +126,7 @@ export default function GiftLandingPage() {
               </p>
               <p className="text-sm text-[#666] leading-relaxed">
                 We email your recipient a number and a link. They click through and meet the specific kid
-                that number belongs to &mdash; name, face, story.
+                that number belongs to: name, face, story.
               </p>
             </div>
             <div>

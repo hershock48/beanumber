@@ -76,12 +76,12 @@ export function SponsorIntentRunner({
       setPhase('error');
       setErrorMessage(
         data?.error ||
-          'Checkout didn’t start. The sponsor button below works — or tap here to retry.'
+          'Checkout didn’t start. The sponsor button below works, or tap here to retry.'
       );
     } catch (err) {
       setPhase('error');
       setErrorMessage(
-        err instanceof Error ? err.message : 'Network hiccup — tap to retry.'
+        err instanceof Error ? err.message : 'Network hiccup. Tap to retry.'
       );
     }
   }
@@ -128,7 +128,7 @@ export function SponsorIntentRunner({
             onClick={() => void launch()}
             className="inline-block bg-[#D4A843] text-[#0d0d0d] font-bold uppercase tracking-wider py-3 px-6 hover:bg-[#c49a3a] transition-colors"
           >
-            Sponsor {firstName} &mdash; $25/month
+            Sponsor {firstName}, $25/month
           </button>
         </div>
       )}

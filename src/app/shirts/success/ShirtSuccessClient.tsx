@@ -175,7 +175,7 @@ function ShippingConfirmation({
 
         <p className="text-base text-[#555] leading-relaxed max-w-md mx-auto mb-4">
           {multi
-            ? <>I press each one by hand and I&rsquo;ll get them in the mail as soon as I can. When they arrive, open the bag, look at the back of each shirt &mdash; there&rsquo;s a number pressed below the main design, and every number belongs to a real kid at the campus in Northern Uganda. Neither of us knows which numbers you got. Enter each one at beanumber.org to meet them.</>
+            ? <>I press each one by hand and I&rsquo;ll get them in the mail as soon as I can. When they arrive, open the bag, look at the back of each shirt. There&rsquo;s a number pressed below the main design, and every number belongs to a real kid at the campus in Northern Uganda. Neither of us knows which numbers you got. Enter each one at beanumber.org to meet them.</>
             : <>I press each one by hand and I&rsquo;ll get it in the mail as soon as I can. When it arrives, open the bag, find the number pressed on the back of the shirt, and look it up at beanumber.org. Neither of us knows what number you got until you do.</>}
         </p>
 
@@ -219,7 +219,7 @@ function ShippingConfirmation({
             password to keep track of.
           </p>
           <p className="text-[#888] text-xs leading-relaxed">
-            Cancel anytime &mdash; email Kevin@beanumber.org, no questions
+            Cancel anytime. Email Kevin@beanumber.org, no questions
             asked.
           </p>
         </div>
@@ -236,8 +236,8 @@ function ShippingConfirmation({
         <div className="space-y-4 text-left">
           <Step num="I">
             {multi
-              ? 'Your shirts are made to order — I press each one by hand and I’ll get them in the mail as soon as I can. A confirmation email is on its way to you now.'
-              : 'Your shirt is made to order — I press each one by hand and I’ll get it in the mail as soon as I can. A confirmation email is on its way to you now.'}
+              ? 'Your shirts are made to order. I press each one by hand and I’ll get them in the mail as soon as I can. A confirmation email is on its way to you now.'
+              : 'Your shirt is made to order. I press each one by hand and I’ll get it in the mail as soon as I can. A confirmation email is on its way to you now.'}
           </Step>
           <Step num="II">
             You&rsquo;ll get another email the day {multi ? 'they ship' : 'it ships'}, with tracking.
@@ -294,11 +294,11 @@ function ShippingConfirmation({
 
 const SHARE_MESSAGES: Record<string, string> = {
   shirt:
-    'I just bought a shirt from beanumber.org — every shirt is tied to a real kid in Northern Uganda. When it arrives, the number on the tag is my kid. Check it out.',
+    'I just bought a shirt from beanumber.org. Every shirt is tied to a real kid in Northern Uganda. When it arrives, the number on the tag is my kid. Check it out.',
   shirt_sponsor:
-    'I just bought a shirt and started sponsoring a child through beanumber.org — $25/month supports school, meals, and medical care at a campus in Northern Uganda. Worth a look.',
+    'I just bought a shirt and started sponsoring a child through beanumber.org. $25/month supports school, meals, and medical care at a campus in Northern Uganda. Worth a look.',
   sponsor:
-    'I just started sponsoring a child through beanumber.org — $25/month supports school, meals, and medical care at a campus in Northern Uganda. Worth a look.',
+    'I just started sponsoring a child through beanumber.org. $25/month supports school, meals, and medical care at a campus in Northern Uganda. Worth a look.',
 };
 
 function TellSomeone({ flow }: { flow: 'shirt' | 'shirt_sponsor' | 'sponsor' }) {
@@ -339,7 +339,7 @@ function TellSomeone({ flow }: { flow: 'shirt' | 'shirt_sponsor' | 'sponsor' }) 
             Tell someone
           </h3>
           <p className="text-[#666] text-sm leading-relaxed mb-4">
-            Know someone who&rsquo;d care about this? Share it however you want — text, DM, post.
+            Know someone who&rsquo;d care about this? Share it however you want: text, DM, post.
           </p>
           <button
             onClick={handleShare}

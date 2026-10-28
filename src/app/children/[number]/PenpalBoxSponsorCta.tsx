@@ -67,7 +67,7 @@ export function PenpalBoxSponsorCta({
   // reads cleaner than "Sponsor Joan too — $25/month" in the button.
   const label = loading
     ? 'Redirecting…'
-    : `Sponsor ${firstName} — $25/month`;
+    : `Sponsor ${firstName}, $25/month`;
 
   async function handleClick() {
     setLoading(true);

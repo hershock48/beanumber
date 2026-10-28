@@ -35,13 +35,13 @@ export default function GiftSuccessPage() {
           <ol className="space-y-3 text-[#555] leading-relaxed list-decimal pl-5">
             <li>Your recipient gets an email introducing them to a real child at the campus.</li>
             <li>They click through, see the child&rsquo;s name and photo, and read about their year.</li>
-            <li>They decide whether to continue at $25/month &mdash; entirely their call.</li>
+            <li>They decide whether to continue at $25/month, entirely their call.</li>
             <li>If they stay, their sponsorship belongs to them and we send them updates all year.</li>
           </ol>
         </div>
 
         <p className="text-sm text-[#888] leading-relaxed mb-8">
-          On behalf of the team at the campus &mdash; thank you. This gift just gave a child
+          On behalf of the team at the campus, thank you. This gift just gave a child
           their first month of school, meals, and medical care.
         </p>
 

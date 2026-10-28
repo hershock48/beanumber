@@ -85,7 +85,7 @@ export function AwardsTimeline({
                 &ldquo;{award.reason}&rdquo;
               </p>
               <p className="text-xs text-[#888] mt-2 not-italic">
-                &mdash; From the campus
+                From the campus
               </p>
             </li>
           );

@@ -177,7 +177,7 @@ export async function generateMetadata({
   if (!firstName) return { title: 'Meet a kid at the campus' };
   return {
     title: `Meet ${firstName}`,
-    description: `${firstName} is a real kid at a small school campus in Northern Uganda. Read their story — and if it moves you, be the one who keeps them in school.`,
+    description: `${firstName} is a real kid at a small school campus in Northern Uganda. Read their story, and if it moves you, be the one who keeps them in school.`,
     openGraph: {
       title: `Meet ${firstName} | Be A Number`,
       description: `${firstName} is a real kid at a small school campus in Northern Uganda.`,
@@ -340,7 +340,7 @@ export default async function MeetKidPage({
                 >
                   &ldquo;{f.ChildQuote}&rdquo;
                   <footer className="text-xs text-[#888] font-normal not-italic mt-2 uppercase tracking-wider">
-                    — {firstName}
+                    {firstName}
                   </footer>
                 </blockquote>
               )}
@@ -418,7 +418,7 @@ export default async function MeetKidPage({
                   </p>
                   <p className="text-sm text-[#555] leading-relaxed mb-4">
                     Every relationship at the campus starts with a
-                    Shirt. Get one — yours comes with a Number,
+                    Shirt. Get one: yours comes with a Number,
                     your Number is a Child, and you can add {firstName}{' '}
                     once you&rsquo;re on the campus.
                   </p>
@@ -487,7 +487,7 @@ export default async function MeetKidPage({
               </blockquote>
               {f.TeacherName && (
                 <p className="text-xs text-[#888] mt-3 uppercase tracking-wider">
-                  — {f.TeacherName}
+                  {f.TeacherName}
                 </p>
               )}
             </div>

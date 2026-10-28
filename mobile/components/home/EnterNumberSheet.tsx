@@ -45,7 +45,7 @@ export function EnterNumberSheet({ visible, onClose }: Props) {
   const handleGo = () => {
     const n = parseInt(value.trim(), 10);
     if (!Number.isFinite(n) || n <= 0 || String(n) !== value.trim()) {
-      setError('Numbers only — it’s printed on the back of the shirt.');
+      setError('Numbers only. It’s printed on the back of the shirt.');
       return;
     }
     close();

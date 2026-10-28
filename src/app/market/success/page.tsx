@@ -17,7 +17,7 @@ import Link from 'next/link';
 import { Logo } from '@/components/Logo';
 
 export const metadata: Metadata = {
-  title: 'Thank you — Be A Number',
+  title: 'Thank you | Be A Number',
   robots: { index: false, follow: false },
 };
 

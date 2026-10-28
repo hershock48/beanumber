@@ -128,7 +128,7 @@ export function CampusAtmosphere({ initialCampusNow, weather }: Props) {
       in Omoro right now
       {hasWeather && (
         <>
-          {' '}&mdash;{' '}
+          ,{' '}
           <span className="not-italic font-semibold text-[#3a2f24]">
             {weather!.temperatureF}&deg;F
           </span>

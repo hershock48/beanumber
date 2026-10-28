@@ -19,7 +19,7 @@ import { Metadata } from 'next';
 import { MarketCheckout } from './MarketCheckout';
 
 export const metadata: Metadata = {
-  title: 'Buy a Shirt — Be A Number',
+  title: 'Buy a Shirt | Be A Number',
   // Don't index this page — it's for in-person sales only
   robots: { index: false, follow: false },
 };

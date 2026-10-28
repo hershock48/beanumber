@@ -84,7 +84,7 @@ export function NotesThread({
         }}
       >
         <Text variant="h2" color="ink" style={{ flex: 1, paddingRight: 8 }}>
-          You and {kidFirstName} — penpal
+          You and {kidFirstName}: penpal
         </Text>
         {postmarkNumber != null ? (
           <Postmark shirtNumber={postmarkNumber} />
@@ -94,7 +94,7 @@ export function NotesThread({
       {lockedForHolder ? (
         <Card variant="large" style={{ marginTop: SPACING.m }}>
           <Text variant="body" color="ink">
-            Your penpal writes back — real notes, in {kidFirstName}'s own
+            Your penpal writes back: real notes, in {kidFirstName}'s own
             handwriting first, then typed up by the teacher.
           </Text>
           <Text
@@ -128,7 +128,7 @@ export function NotesThread({
           {freeLetterAvailable ? (
             <>
               <Text variant="body" color="ink">
-                Your shirt came with a letter to {kidFirstName} — and a
+                Your shirt came with a letter to {kidFirstName}, and a
                 letter back. It's ready to send, on us.
               </Text>
               <Text
@@ -136,8 +136,8 @@ export function NotesThread({
                 color="umber"
                 style={{ marginTop: SPACING.s }}
               >
-                {kidFirstName} reads it in their own language — the
-                campus team translates — and writes back to you.
+                {kidFirstName} reads it in their own language, the
+                campus team translates, and writes back to you.
               </Text>
             </>
           ) : (
@@ -184,7 +184,7 @@ export function NotesThread({
             >
               <Text variant="bodySmall" color="umber">
                 Want more than one letter? Monthly sponsors keep
-                writing — a penpal who writes back, monthly photos,
+                writing: a penpal who writes back, monthly photos,
                 report cards, campus updates. $25/month. Cancel
                 anytime.
               </Text>
@@ -259,7 +259,7 @@ export function NotesThread({
             <Card variant="large" style={{ marginTop: SPACING.l }}>
               <Text variant="body" color="ink">
                 That was the letter that came with your shirt. Keep
-                writing to {kidFirstName} — a penpal who writes back,
+                writing to {kidFirstName}: a penpal who writes back,
                 monthly photos, report cards, campus updates. $25/month.
                 Cancel anytime.
               </Text>

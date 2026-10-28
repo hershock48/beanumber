@@ -1155,7 +1155,7 @@ export async function generateMetadata({ params }: ChildPageProps) {
   if (child.reserved) {
     return {
       title: `Shirt #${number} is reserved`,
-      description: `Shirt #${number} is held for a live auction. Its number is connected to a specific child in Northern Uganda &mdash; the winner meets that child when the shirt arrives.`,
+      description: `Shirt #${number} is held for a live auction. Its number is connected to a specific child in Northern Uganda. The winner meets that child when the shirt arrives.`,
     };
   }
 
@@ -1241,7 +1241,7 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
             </h1>
 
             <p className="text-lg text-[#666] leading-relaxed max-w-xl mx-auto mb-4">
-              Double-check your Shirt tag &mdash; the Number is printed on the back.
+              Double-check your Shirt tag. The Number is printed on the back.
               If you&rsquo;re sure it&rsquo;s #{number}, reach out and we&rsquo;ll sort it out.
             </p>
 
@@ -1277,7 +1277,7 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
             <p className="text-[#666] leading-relaxed mb-4">
               Every Be A Number shirt has a unique number pressed on the back.
               That number belongs to a real child at our campus in Omoro District, Northern Uganda.
-              When you enter it here, you meet them &mdash; their name, their face, their story.
+              When you enter it here, you meet them: their name, their face, their story.
             </p>
             <p className="text-[#666] leading-relaxed">
               Your $25 gets you the shirt and starts their year at the campus: school,
@@ -1350,7 +1350,7 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
 
             <p className="text-lg text-[#666] leading-relaxed max-w-xl mx-auto mb-10">
               This number is held for a future live auction. Its number is connected to
-              a specific child in Northern Uganda &mdash; the winning bidder meets that
+              a specific child in Northern Uganda. The winning bidder meets that
               child when the shirt arrives, and their profile appears here once the
               shirt ships.
             </p>
@@ -1638,7 +1638,7 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
                 <span className="text-[15px] text-[#555]">
                   {justSignedIn
                     ? `#${number} is yours. ${firstName} too.`
-                    : `Welcome back — ${firstName} is yours.`}
+                    : `Welcome back. ${firstName} is yours.`}
                 </span>
               </div>
               <Link
@@ -1809,7 +1809,7 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
                   >
                     <Image
                       src={url}
-                      alt={`${displayName} — photo ${i + 1}`}
+                      alt={`${displayName}, photo ${i + 1}`}
                       fill
                       sizes="(max-width: 768px) 100vw, 50vw"
                       className="object-cover object-[center_top]"
@@ -1880,7 +1880,7 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
                 </p>
                 {(child.viewer_is_sponsor || child.viewer_is_holder) ? (
                   <p className="text-sm text-[#666] leading-relaxed mb-3">
-                    Your Number &mdash; #{number} &mdash; is being
+                    Your Number, #{number}, is being
                     reassigned to a new kid at the campus. We&rsquo;ll
                     email you when they&rsquo;re ready to meet.
                   </p>
@@ -2036,7 +2036,7 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
                 &ldquo;{child.child_quote}&rdquo;
               </p>
               <p className="mt-3 text-xs uppercase tracking-[0.2em] text-[#aaa]">
-                — {firstName}
+                {firstName}
               </p>
             </div>
           )}
@@ -2104,7 +2104,7 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
                   &ldquo;{child.teacher_quote}&rdquo;
                 </p>
                 {child.teacher_name && (
-                  <p className="mt-3 text-sm text-[#888]">— {child.teacher_name}</p>
+                  <p className="mt-3 text-sm text-[#888]">{child.teacher_name}</p>
                 )}
               </div>
             )}
@@ -2118,7 +2118,7 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
                 </p>
                 <p className="text-[#666] leading-relaxed">
                   We&rsquo;re gathering {firstName}&rsquo;s full profile
-                  from the campus in Omoro District right now — home,
+                  from the campus in Omoro District right now: home,
                   family, what they love, and a note from their teacher.
                   Sponsor them today and we&rsquo;ll send it to you as
                   soon as it&rsquo;s in our hands.

@@ -231,7 +231,7 @@ export default function RepDashboardContent() {
               className="text-xl text-[#0d0d0d]"
               style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
             >
-              #{rep.childNumber}{rep.childName ? ` \u2014 ${rep.childName}` : ''}
+              #{rep.childNumber}{rep.childName ? `, ${rep.childName}` : ''}
             </p>
             <a
               href={`/children/${rep.childNumber}`}

@@ -72,7 +72,7 @@ export default function MeTab() {
   const confirmDeleteAccount = () => {
     const hasSponsorships = (me?.sponsorships?.length ?? 0) > 0;
     const message = hasSponsorships
-      ? "You're signed out and your app account is removed. Your sponsorships keep running on your card — to stop them, cancel from Billing above (or email kevin@beanumber.org). This step doesn't touch your giving."
+      ? "You're signed out and your app account is removed. Your sponsorships keep running on your card. To stop them, cancel from Billing above (or email kevin@beanumber.org). This step doesn't touch your giving."
       : "You're signed out and your app account is removed. Sign back in anytime with the same email.";
     Alert.alert('Delete your Be A Number account?', message, [
       { text: 'Cancel', style: 'cancel' },
@@ -94,7 +94,7 @@ export default function MeTab() {
                   } catch (err) {
                     Alert.alert(
                       "Couldn't delete right now",
-                      'Try again in a moment. If it keeps failing, email kevin@beanumber.org — a person answers.'
+                      'Try again in a moment. If it keeps failing, email kevin@beanumber.org. A person answers.'
                     );
                     return;
                   }
@@ -270,7 +270,7 @@ export default function MeTab() {
                       `mailto:kevin@beanumber.org?subject=${encodeURIComponent(
                         'Update my card on file'
                       )}&body=${encodeURIComponent(
-                        `Hi Kevin — I'd like to update the card on my sponsorship. My account email is ${me.email}.`
+                        `Hi Kevin, I'd like to update the card on my sponsorship. My account email is ${me.email}.`
                       )}`
                     );
                   }}
@@ -292,7 +292,7 @@ export default function MeTab() {
                       `mailto:kevin@beanumber.org?subject=${encodeURIComponent(
                         'Cancel my sponsorship'
                       )}&body=${encodeURIComponent(
-                        `Hi Kevin — I need to cancel a sponsorship. My account email is ${me.email}.`
+                        `Hi Kevin, I need to cancel a sponsorship. My account email is ${me.email}.`
                       )}`
                     );
                   }}
@@ -322,7 +322,7 @@ export default function MeTab() {
                 style={{ marginTop: SPACING.s }}
               >
                 Deleting removes your app account. Sponsorships keep running on
-                your card — cancel those separately from Billing above.
+                your card. Cancel those separately from Billing above.
               </Text>
             </View>
 
@@ -341,7 +341,7 @@ export default function MeTab() {
                 color="umber"
                 style={{ marginTop: SPACING.m }}
               >
-                Questions about a charge? Write kevin@beanumber.org — a person
+                Questions about a charge? Write kevin@beanumber.org. A person
                 answers.
               </Text>
             </View>

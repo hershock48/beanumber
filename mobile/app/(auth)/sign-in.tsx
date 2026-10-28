@@ -176,7 +176,7 @@ export default function SignInScreen() {
     : 'Sign in to meet your kid.';
   const subhead = meetNumber
     ? `Meet them, make #${meetNumber} yours, and send the letter that came with your shirt. Your penpal writes back.`
-    : 'Every Be A Number shirt has a kid on the other end. Sign in and the number reveals who — then it’s yours, and the letter that came with your shirt is ready to send.';
+    : 'Every Be A Number shirt has a kid on the other end. Sign in and the number reveals who. Then it’s yours, and the letter that came with your shirt is ready to send.';
 
   return (
     <SafeAreaView style={styles.screen}>
@@ -285,7 +285,7 @@ export default function SignInScreen() {
                 color="umber"
                 style={{ fontFamily: 'Inter_500Medium' }}
               >
-                Dev sign-in (blank account — no kids yet)
+                Dev sign-in (blank account, no kids yet)
               </Text>
             </Pressable>
           ) : null}

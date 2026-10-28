@@ -67,7 +67,7 @@ export function LocationBlock() {
         >
           <p className="text-[15px] md:text-base text-[#444] leading-relaxed">
             The campus sits in <strong>Omoro District</strong>, in Northern
-            Uganda — about 230 miles north of the capital, Kampala. Northern
+            Uganda, about 230 miles north of the capital, Kampala. Northern
             Uganda spent two decades rebuilding after a long conflict that
             ended in 2006. Today the region is home to about 270,000 people,
             most of them farming families. Our six-acre school, clinic, and

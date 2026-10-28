@@ -208,7 +208,7 @@ function HomePageInner({ initialChildren }: { initialChildren: Child[] }) {
               lift from the 2026-07-16 conversion audit. */}
           <p className="text-lg md:text-xl text-[#FFF8F0]/80 mb-12 max-w-xl mx-auto leading-snug italic">
             The shirt is how you meet them.<br />
-            $25 a month — 83&cent; a day — is how you stay.
+            $25 a month, about 83&cent; a day, is how you stay.
           </p>
 
           {/* Welcome chip — appears only when the user has just
@@ -357,7 +357,7 @@ function HomePageInner({ initialChildren }: { initialChildren: Child[] }) {
               faces. */}
           <p className="text-[#777] max-w-lg mx-auto leading-relaxed text-lg">
             Every Number on every Shirt belongs to a real kid at a small school
-            in Northern Uganda. You don&rsquo;t choose them &mdash; the Number
+            in Northern Uganda. You don&rsquo;t choose them. The Number
             on your shirt decides who you meet.
           </p>
         </div>
@@ -422,7 +422,7 @@ function HomePageInner({ initialChildren }: { initialChildren: Child[] }) {
                     href="/shirts"
                     className="inline-block px-8 py-3.5 bg-[#D4A843] text-[#0d0d0d] font-bold uppercase tracking-wider text-sm hover:bg-[#c49a3a] transition-colors"
                   >
-                    Get a Shirt &mdash; meet yours
+                    Get a Shirt, meet yours
                   </Link>
                 </div>
               </div>
@@ -588,7 +588,7 @@ function HomePageInner({ initialChildren }: { initialChildren: Child[] }) {
               </div>
               <h3 className="text-lg font-semibold text-[#0d0d0d] mb-3">Stay With Them</h3>
               <p className="text-[#777] text-sm leading-relaxed">
-                For $25/month &mdash; about 83&cent; a day &mdash; you stay connected. Write to your Kid and see their handwritten replies, photos of your child through the year, a year-end report card, and the monthly campus newsletter.
+                For $25/month, about 83&cent; a day, you stay connected. Write to your Kid and see their handwritten replies, photos of your child through the year, a year-end report card, and the monthly campus newsletter.
               </p>
             </div>
           </div>

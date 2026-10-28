@@ -186,7 +186,7 @@ export default function KidPage() {
             color="umber"
             style={{ marginTop: SPACING.s }}
           >
-            Check your connection and try again — everything&rsquo;s
+            Check your connection and try again. Everything&rsquo;s
             still there.
           </Text>
           <Pressable
@@ -258,7 +258,7 @@ export default function KidPage() {
     ? monthsTogether(kid.bio.sponsoredSince) >= 2
       ? `${monthsTogether(kid.bio.sponsoredSince)} months with ${
           kid.firstName
-        } — since ${formatMonthYear(kid.bio.sponsoredSince)}.`
+        }, since ${formatMonthYear(kid.bio.sponsoredSince)}.`
       : `You've been ${kid.firstName}'s sponsor since ${formatMonthYear(
           kid.bio.sponsoredSince
         )}.`
@@ -418,7 +418,7 @@ export default function KidPage() {
               color="umber"
               style={{ marginTop: SPACING.xs }}
             >
-              — {kid.firstName}
+              {kid.firstName}
             </Text>
           </View>
         ) : null}
@@ -442,7 +442,7 @@ export default function KidPage() {
               color="umber"
               style={{ marginTop: SPACING.xs }}
             >
-              — {kid.teacherQuote.name || 'Their teacher'}
+              {kid.teacherQuote.name || 'Their teacher'}
               {kid.teacherQuote.name ? ', their teacher' : ''}
             </Text>
           </View>
@@ -561,7 +561,7 @@ export default function KidPage() {
                     ? 'the kid on the other end of my Number'
                     : 'a kid at the Be A Number campus in Uganda';
               void Share.share({
-                message: `Meet ${kid.firstName} — ${relationship}. ${API_BASE_URL}/meet/${kid.id}`,
+                message: `Meet ${kid.firstName}, ${relationship}. ${API_BASE_URL}/meet/${kid.id}`,
               });
             }}
             accessibilityRole="button"

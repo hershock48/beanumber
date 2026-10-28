@@ -191,7 +191,7 @@ function BackMark({ color, className = '' }: { color: string; className?: string
     WebkitMaskPosition: 'center',
     maskPosition: 'center',
   };
-  return <div className={className} style={maskStyle} aria-label="Be A Number — Change The World" />;
+  return <div className={className} style={maskStyle} aria-label="Be A Number, Change The World" />;
 }
 
 /**
@@ -458,7 +458,7 @@ function ShirtCard({ shirt, reversed }: { shirt: Shirt; reversed: boolean }) {
                 Pressed on the back, below the main design.
               </p>
               <p className="text-[#999]">
-                Sample shown &mdash; every shirt ships with a unique
+                Sample shown. Every shirt ships with a unique
                 number on the back. You meet the child when it arrives.
               </p>
             </div>
@@ -767,7 +767,7 @@ export default function ShirtsPageContent() {
           </p>
           <p className="text-lg text-[#777] max-w-xl mx-auto leading-relaxed">
             Heavyweight cotton, screen-printed, handmade to order. Every
-            Shirt ships with a unique Number pressed on the back &mdash;
+            Shirt ships with a unique Number pressed on the back,
             and that Number belongs to a real Kid at the campus
             in Northern Uganda.
           </p>
@@ -799,7 +799,7 @@ export default function ShirtsPageContent() {
             </h2>
             <p className="text-[#777] leading-relaxed max-w-lg mx-auto">
               Every Shirt carries a unique Number connected to a real Child in Northern Uganda.
-              $25 starts their year at the campus &mdash; school, meals, medical care.
+              $25 starts their year at the campus: school, meals, medical care.
               When the Shirt arrives, come here, enter your Number, and meet them.
               $25/month finishes their year and keeps you in their story.
             </p>

@@ -62,7 +62,7 @@ function statusLine(preview: KidCardNotePreview, firstName: string): string {
     case 'delivered':
       return `Your note reached the campus ${when}.`;
     case 'translated':
-      return `On its way — translated ${when}.`;
+      return `On its way, translated ${when}.`;
     case 'pending':
       return `Waiting to leave the campus (sent ${when}).`;
     case 'awaiting_kevin':

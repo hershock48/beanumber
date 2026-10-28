@@ -174,7 +174,7 @@ export default function MeetScreen() {
       if (err instanceof NumberClaimedError) {
         Alert.alert(
           `#${number} is already spoken for`,
-          `Someone else has already claimed this number. If you're the one holding the shirt, email kevin@beanumber.org — a person answers, and we'll get it sorted.`
+          `Someone else has already claimed this number. If you're the one holding the shirt, email kevin@beanumber.org. A person answers, and we'll get it sorted.`
         );
         setKid(prev =>
           prev
@@ -320,7 +320,7 @@ export default function MeetScreen() {
               kid.viewer.canClaim
                 ? claiming
                   ? 'Making it yours…'
-                  : `Keep #${number} — it's yours`
+                  : `Keep #${number}, it's yours`
                 : kid.viewer.canWriteNotes
                   ? `Send ${kid.firstName} a note`
                   : `Yes, sponsor ${kid.firstName}`
@@ -331,7 +331,7 @@ export default function MeetScreen() {
             // fixes both.
             primaryCaption={
               kid.viewer.canClaim
-                ? `Claiming makes this Number yours — and the letter that came with your shirt is ready to send. ${kid.firstName} writes back.`
+                ? `Claiming makes this Number yours, and the letter that came with your shirt is ready to send. ${kid.firstName} writes back.`
                 : undefined
             }
             onPrimaryPress={() => {

@@ -331,7 +331,7 @@ export function PenpalBox({
                   href="/shirts"
                   className="inline-block bg-[#D4A843] text-[#0d0d0d] font-bold uppercase tracking-wider py-4 px-8 hover:bg-[#c49a3a] transition-colors"
                 >
-                  Sponsor {firstName} &mdash; $25/month
+                  Sponsor {firstName}, $25/month
                 </Link>
               )}
             </div>
@@ -472,11 +472,11 @@ export function PenpalBox({
                     href={`/signin?n=${shirtNumber}&intent=sponsor`}
                     className="inline-block w-full max-w-xs text-center bg-[#D4A843] text-[#0d0d0d] font-bold uppercase tracking-wider py-4 px-8 hover:bg-[#c49a3a] transition-colors"
                   >
-                    Sponsor {firstName} &mdash; $25/month
+                    Sponsor {firstName}, $25/month
                   </Link>
                 )}
                 <p className="text-xs text-[#888] leading-relaxed max-w-xs text-center">
-                  Straight to checkout &mdash; the email you enter
+                  Straight to checkout. The email you enter
                   there connects #{shirtNumber} to you. Already
                   sponsoring monthly? Sign in below instead; nothing
                   new gets charged.
@@ -489,7 +489,7 @@ export function PenpalBox({
                 </Link>
                 <p className="text-xs text-[#888] leading-relaxed max-w-xs text-center">
                   Got the shirt with #{shirtNumber}? Signing in makes
-                  this page yours &mdash; and the letter included with
+                  this page yours, and the letter included with
                   your shirt is ready to send, sponsoring or not.
                 </p>
                 <p className="text-xs uppercase tracking-[0.15em] text-[#888] font-bold mt-2">

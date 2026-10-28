@@ -70,23 +70,23 @@ export function kidPresenceLine(
   const m = campusNow(now);
   const weekend = m.day === 0 || m.day === 6;
   if (m.isSunday && m.hour >= 8 && m.hour < 17) {
-    return `It’s Sunday at the campus — letter day. If ${firstName} has a reply for you, it’s moving today.`;
+    return `It’s Sunday at the campus, letter day. If ${firstName} has a reply for you, it’s moving today.`;
   }
   if (m.hour >= 6 && m.hour < 8) {
-    return `It’s just after sunrise in Omoro — ${firstName} is getting ready for the day.`;
+    return `It’s just after sunrise in Omoro. ${firstName} is getting ready for the day.`;
   }
   if (m.hour >= 8 && m.hour < 13) {
     return weekend
-      ? `It’s ${m.clock} in Omoro — ${firstName} is out playing about now.`
-      : `It’s ${m.clock} in Omoro — ${firstName} is in class right now.`;
+      ? `It’s ${m.clock} in Omoro. ${firstName} is out playing about now.`
+      : `It’s ${m.clock} in Omoro. ${firstName} is in class right now.`;
   }
   if (m.hour >= 13 && m.hour < 17) {
-    return `School’s out in Omoro — ${firstName} is probably on the pitch about now.`;
+    return `School’s out in Omoro. ${firstName} is probably on the pitch about now.`;
   }
   if (m.hour >= 17 && m.hour < 21) {
-    return `It’s evening in Omoro — dinner time for ${firstName} and the campus.`;
+    return `It’s evening in Omoro, dinner time for ${firstName} and the campus.`;
   }
-  return `It’s ${m.clock} in Omoro — ${firstName} is asleep.`;
+  return `It’s ${m.clock} in Omoro. ${firstName} is asleep.`;
 }
 
 /**
@@ -100,10 +100,10 @@ export function composerPresenceLine(
 ): string {
   const m = campusNow(now);
   if (m.isNight) {
-    return `It’s ${m.clock} in Omoro — ${firstName} is asleep. Your note will be waiting when the campus wakes up.`;
+    return `It’s ${m.clock} in Omoro. ${firstName} is asleep. Your note will be waiting when the campus wakes up.`;
   }
   if (m.isSunday) {
-    return `It’s Sunday at the campus — letter day. Good timing.`;
+    return `It’s Sunday at the campus, letter day. Good timing.`;
   }
   return `It’s ${m.clock} in Omoro. Notes travel in the Sunday batch.`;
 }

@@ -218,7 +218,7 @@ export async function POST(request: NextRequest) {
   } catch (err) {
     console.error('[MobileClaim] error:', err);
     return NextResponse.json(
-      { error: 'Claim failed — try again in a moment.' },
+      { error: 'Claim failed. Try again in a moment.' },
       { status: 500 }
     );
   }

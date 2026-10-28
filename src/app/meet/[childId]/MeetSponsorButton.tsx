@@ -83,7 +83,7 @@ export function MeetSponsorButton({
       >
         {state === 'loading'
           ? 'Opening checkout...'
-          : `Start sponsoring ${firstName} — $25/mo`}
+          : `Start sponsoring ${firstName}, $25/mo`}
       </button>
       {state === 'error' && errorMessage && (
         <p className="mt-3 text-xs text-[#a85a3a]">

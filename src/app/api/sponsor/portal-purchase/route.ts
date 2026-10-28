@@ -187,7 +187,7 @@ export async function POST(request: NextRequest) {
             currency: 'usd',
             product_data: {
               name: `REORDER · #${shirtNumber} · ${shirt.name} ${size}`,
-              description: `Reorder for ${sponsorName || 'an existing shirt-holder'}. Press #${shirtNumber} on the back — SAME number as their original shirt. Do NOT assign a new number, do NOT create a new sponsorship, do NOT change the kid pairing.`,
+              description: `Reorder for ${sponsorName || 'an existing shirt-holder'}. Press #${shirtNumber} on the back, SAME number as their original shirt. Do NOT assign a new number, do NOT create a new sponsorship, do NOT change the kid pairing.`,
             },
             unit_amount: SHIRT_PRICE * 100,
           },

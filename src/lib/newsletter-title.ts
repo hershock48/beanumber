@@ -35,7 +35,7 @@ export function buildCampusUpdateTitle(d: Date = new Date()): string {
 export function buildLegacyMonthTitle(d: Date = new Date()): string {
   const month = d.toLocaleString('en-US', { month: 'long', timeZone: AUTHOR_TZ });
   const year = d.toLocaleString('en-US', { year: 'numeric', timeZone: AUTHOR_TZ });
-  return `Campus update — ${month} ${year}`;
+  return `Campus update: ${month} ${year}`;
 }
 
 /**

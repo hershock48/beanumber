@@ -95,7 +95,7 @@ export function LetterJourney({ stage, kidFirstName }: Props) {
         }}
       >
         {labels[current - 1]}
-        {current === 3 ? ' — travels with the Sunday batch' : ''}
+        {current === 3 ? ', travels with the Sunday batch' : ''}
       </Text>
     </View>
   );

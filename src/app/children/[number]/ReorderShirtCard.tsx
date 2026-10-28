@@ -245,7 +245,7 @@ export function ReorderShirtCard({
           >
             {submitting
               ? 'Opening checkout…'
-              : `Reorder #${shirtNumber} — $25`}
+              : `Reorder #${shirtNumber}, $25`}
           </button>
 
           <p className="text-xs text-[#888] text-center leading-relaxed mt-4">

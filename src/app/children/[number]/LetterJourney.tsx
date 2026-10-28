@@ -85,7 +85,7 @@ export function LetterJourney({
       <p className="mt-2 text-xs text-[#888]">
         {labels[stage - 1]}
         {stage === 3 && (
-          <span className="text-[#aaa]"> — travels with the Sunday batch</span>
+          <span className="text-[#aaa]">, travels with the Sunday batch</span>
         )}
       </p>
     </div>
