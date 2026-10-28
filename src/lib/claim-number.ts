@@ -81,6 +81,7 @@ export async function bindOrCreateHolderClaim(
     status: 'Holder',
     sponsorshipStartDate: new Date().toISOString().slice(0, 10),
     claimedShirtNumber: shirtNumber,
+    actorType: 'sponsor',
   });
   // The legacy Airtable Holder row set AuthStatus=Active so the
   // deprecated email+code verify path still recognized it. The

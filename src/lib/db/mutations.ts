@@ -462,6 +462,10 @@ export interface CreateSponsorshipInput {
   // omit for co-sponsor adds and childless checkout rows — those
   // hold no number.
   claimedShirtNumber?: number | null;
+  // Who caused the row: 'webhook' for checkout, 'sponsor' for a claim
+  // the buyer made themselves, 'admin' for admin tools. Audit-log
+  // metadata only; defaults to 'webhook' for the existing callers.
+  actorType?: AuditActorType;
 }
 
 export async function createSponsorship(input: CreateSponsorshipInput) {
@@ -487,7 +491,7 @@ export async function createSponsorship(input: CreateSponsorshipInput) {
     table: 'sponsorships',
     recordId: inserted[0].id,
     action: 'INSERT',
-    actorType: 'webhook',
+    actorType: input.actorType ?? 'webhook',
     after: inserted[0] as Record<string, unknown>,
   });
   return inserted[0];

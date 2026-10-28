@@ -199,6 +199,7 @@ export async function POST(request: NextRequest) {
       sponsorshipStartDate: new Date().toISOString().slice(0, 10),
       childRevealedAt: new Date(),
       claimedShirtNumber: shirtNumber,
+      actorType: 'sponsor',
     });
     console.log(
       `[MobileClaim] Created Holder ${created.sponsorCode} on #${shirtNumber} ` +
