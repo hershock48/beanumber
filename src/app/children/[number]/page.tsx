@@ -24,9 +24,8 @@ import {
   getRecentCampusNewsletters,
   type CampusNewsletterEntry,
 } from '@/lib/newsletter-feed';
-// SponsorRecoveryForm import removed 2026-07-16 — the component
-// hasn't rendered on this page since the sign-in ask consolidated
-// into the viewer-state strip + /signin. File kept for reference.
+// SponsorRecoveryForm was retired 2026-07-16 (sign-in moved to
+// /signin) and deleted 2026-10-28; git history has it.
 import { OtherKidsAtCampus } from './OtherKidsAtCampus';
 import { ClaimThisNumberCard } from './ClaimThisNumberCard';
 import { ChristmasGiftCard } from './ChristmasGiftCard';
@@ -43,11 +42,8 @@ import { ClaimGate } from './ClaimGate';
 import { LocationBlock } from './LocationBlock';
 import { kidPresenceLine } from '@/lib/campus-time';
 import { YourKidsStrip } from '@/components/YourKidsStrip';
-// AlreadySponsoringBanner deprecated 2026-07-08 — Kevin consolidated
-// the top black banner into the slim strip that already lived below
-// the breadcrumb (see the anon branch of the viewer-state strip). The
-// component file stays in the tree for now in case we want to bring
-// that shimmer treatment back somewhere else.
+// AlreadySponsoringBanner was folded into the viewer-state strip
+// 2026-07-08 and deleted 2026-10-28; git history has it.
 import { AnonStripShimmer } from './AnonStripShimmer';
 import { RecentKidsTracker } from '@/components/RecentKidsTracker';
 import { MarkKidUpdatesSeen } from '@/components/MarkKidUpdatesSeen';
@@ -76,11 +72,9 @@ import {
   getViewerWriteStatus,
   type ViewerWriteStatus,
 } from '@/lib/penpal-cycle';
-// ShareKidCard import intentionally kept out — the component is
-// still on disk (src/app/children/[number]/ShareKidCard.tsx) and can
-// be re-imported when the "Take {firstName} with you" block is
-// re-enabled per Kevin's 2026-07-08 comment ("hide this part for
-// now... i dont love it").
+// ShareKidCard (the "Take {firstName} with you" block) was hidden
+// 2026-07-08 per Kevin ("hide this part for now... i dont love it")
+// and deleted 2026-10-28; git history has it if it comes back.
 import { resolveShirtToKid } from '@/lib/cycle';
 import { CANONICAL_ROSTER_MAX } from '@/lib/roster-config';
 import { db } from '@/lib/db/client';
@@ -2372,18 +2366,10 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
             above (right under the bio, before the acknowledgment
             box), matching Kevin's 2026-07-08 flow restructure. */}
 
-        {/* NOTE: the "Take {firstName} with you" / ShareKidCard block
-            used to render here, gated to sponsors + holders. Removed
-            2026-07-08 per Kevin ("hide this part for now... i dont
-            love it"). ShareKidCard component still exists — to
-            re-enable, restore the block below with a stronger
-            reason-to-share beat than "post the card on your feed."
-              {!child.departed_at &&
-                (child.viewer_is_sponsor || child.viewer_is_holder) && (
-                  <div className="mt-12 md:mt-16 ...">
-                    <ShareKidCard firstName={firstName} ... />
-                  </div>
-                )} */}
+        {/* The "Take {firstName} with you" share block rendered here
+            until 2026-07-08 (Kevin: "hide this part for now... i dont
+            love it"). ShareKidCard was deleted 2026-10-28; git history
+            has it if it comes back with a stronger reason to share. */}
 
         {/* ── Relationship card + public campus newsfeed ──────────
             The card frames the read for signed-in viewers: sponsors

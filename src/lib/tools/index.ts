@@ -17,17 +17,8 @@
  * which read Postgres.
  */
 
-// Export all tools from this directory
-export { sendEmailTool, type SendEmailInput, type SendEmailOutput } from './send-email';
-
-// Email notification tools
+// Email tools
 export {
-  sendUpdateNotificationTool,
-  type SendUpdateNotificationInput,
-  type SendUpdateNotificationOutput,
-  sendSponsorWelcomeTool,
-  type SendSponsorWelcomeInput,
-  type SendSponsorWelcomeOutput,
   sendCampusNewsletterTool,
   type SendCampusNewsletterInput,
   type SendCampusNewsletterOutput,
@@ -58,21 +49,7 @@ export {
   uploadToDriveTool,
   type UploadToDriveInput,
   type UploadToDriveOutput,
-  ensureChildDriveFolderTool,
-  type EnsureChildFolderInput,
-  type EnsureChildFolderOutput,
   ensurePeriodFolderTool,
   type EnsurePeriodFolderInput,
   type EnsurePeriodFolderOutput,
 } from './media';
-
-// Social media tools (direct posting only; the Airtable-backed
-// scheduling queue was retired 2026-09-14)
-export {
-  postToInstagramTool,
-  type PostToInstagramInput,
-  type PostToInstagramOutput,
-  postToFacebookTool,
-  type PostToFacebookInput,
-  type PostToFacebookOutput,
-} from './social';

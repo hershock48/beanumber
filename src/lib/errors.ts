@@ -99,15 +99,6 @@ export class ExternalServiceError extends AppError {
 }
 
 /**
- * Database error
- */
-export class DatabaseError extends ExternalServiceError {
-  constructor(message?: string) {
-    super('Airtable', message || ERROR_MESSAGES.AIRTABLE_ERROR);
-  }
-}
-
-/**
  * Payment processing error
  */
 export class PaymentError extends ExternalServiceError {

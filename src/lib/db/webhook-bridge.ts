@@ -118,16 +118,6 @@ async function findChildByLegacyId(legacyId: string | null | undefined) {
   return rows[0] ?? null;
 }
 
-async function findChildByShirtNumber(shirtNumber: number | null | undefined) {
-  if (shirtNumber == null) return null;
-  const rows = await db
-    .select()
-    .from(children)
-    .where(eq(children.shirtNumber, shirtNumber))
-    .limit(1);
-  return rows[0] ?? null;
-}
-
 // ─── Standard donation (one-time, /donate page, etc.) ────────────
 
 export interface MirrorDonationArgs {
@@ -369,43 +359,6 @@ export async function mirrorRefund(args: {
   refundedAt: Date;
 }) {
   return await markDonationRefunded(args);
-}
-
-// ─── Gift sponsorship: child assignment ──────────────────────────
-
-/**
- * For gift sponsorships, the recipient&rsquo;s child needs to be tagged
- * with the buyer info. Idempotent — second call updates the same row.
- */
-export async function mirrorGiftChildAssignment(args: {
-  shirtNumber: number;
-  recipientName: string;
-  recipientEmail: string;
-}) {
-  const child = await findChildByShirtNumber(args.shirtNumber);
-  if (!child) return null;
-  // Only claim the kid if no one&rsquo;s already on it. A gift assignment
-  // arriving after a real buyer has already claimed the shirt MUST
-  // NOT overwrite the original buyer&rsquo;s identity — that would erase
-  // the relationship the brand mechanic depends on. The shirt was
-  // already assigned; the gift either arrived too late or to the
-  // wrong number, and a human needs to look at it.
-  if (child.shirtBuyerEmail || child.shirtBuyerName) {
-    console.warn(
-      `[pg-mirror] gift child assignment skipped: shirt #${args.shirtNumber} already has buyer ${child.shirtBuyerEmail}`
-    );
-    return child.id;
-  }
-  await db
-    .update(children)
-    .set({
-      shirtBuyerName: args.recipientName,
-      shirtBuyerEmail: args.recipientEmail,
-      shirtAssignedAt: child.shirtAssignedAt ?? new Date(),
-      updatedAt: new Date(),
-    })
-    .where(eq(children.id, child.id));
-  return child.id;
 }
 
 // ─── Drip pipeline updates ───────────────────────────────────────
