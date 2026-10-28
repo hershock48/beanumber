@@ -110,7 +110,7 @@ export async function GET(request: NextRequest) {
       if (monthlyLines.length === 0) continue;
 
       // Hydrate the donor.
-      let donor =
+      const donor =
         (donation.donorId
           ? (await db.select().from(donors).where(eq(donors.id, donation.donorId)).limit(1))[0]
           : null) ||

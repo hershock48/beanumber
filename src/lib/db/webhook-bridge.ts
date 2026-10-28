@@ -199,7 +199,7 @@ export async function mirrorSponsorship(args: MirrorSponsorshipArgs) {
   // Look up donor by email — if the standard donor upsert ran in the
   // same handler, this is a fast hit. If the events come out of order,
   // create a stub donor here.
-  let donor = await db
+  const donor = await db
     .select({ id: donors.id })
     .from(donors)
     .where(sql`lower(${donors.email}) = ${args.sponsorEmail.toLowerCase()}`)

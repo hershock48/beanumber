@@ -2,9 +2,7 @@
 
 import { useState, useEffect } from 'react';
 
-interface DonationSectionProps {}
-
-export function DonationSection({}: DonationSectionProps) {
+export function DonationSection() {
   const [isLoading, setIsLoading] = useState(false);
   const [customAmount, setCustomAmount] = useState<string>('');
   const [isMonthly, setIsMonthly] = useState(true);

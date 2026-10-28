@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { AdminShell } from '../_components/AdminShell';
 
@@ -262,7 +263,7 @@ function _LegacyAdminNav({ showLogout, onLogout }: { showLogout?: boolean; onLog
   return (
     <nav>
       <div>
-        <a href="/" />
+        <Link href="/" />
         <div>
           <a href="/admin/dashboard">Updates</a>
           <a href="/admin/retention">Retention</a>

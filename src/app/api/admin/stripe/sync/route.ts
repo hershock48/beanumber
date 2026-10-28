@@ -245,7 +245,7 @@ export async function POST(request: NextRequest) {
         resolvedChildId = c[0]?.id || null;
       }
 
-      let existingSponsorship =
+      const existingSponsorship =
         (
           await db
             .select()
