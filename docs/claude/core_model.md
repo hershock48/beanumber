@@ -26,6 +26,7 @@ A first-time visitor with a shirt whose number was assigned but who has no Spons
    - **Existing Sponsorship for this email + child** → send magic-link recovery (sign-in).
    - **No Sponsorship for this child at all** → create Holder row, send magic link.
    - **Sponsorship exists for this child from a DIFFERENT email** → privacy-success response, log for admin review (someone else already owns the number).
+   - **This email already holds a DIFFERENT number and no fulfillment carries the typed one** → nothing minted; a confirmation email offers sign-in to the held number or a signed "yes, claim #N" link (`/api/sponsor/recover/confirm-claim`). Added 2026-10-28 after a typo minted a phantom Holder row; details in `known_gotchas.md`.
 3. They click the magic link. The callback drops the `sponsor_session` cookie. They're now signed in as the owner.
 4. From this moment, every visit to /[their number] is authenticated. They see the kid newsletter, the sponsor-only updates (if any), and — if their kid ever departs — they get the chooser + split-flap reveal.
 

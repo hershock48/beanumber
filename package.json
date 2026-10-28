@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test": "node scripts/run-tests.cjs",
     "export-donors": "tsx scripts/export-donors.ts",
     "migrate-csv": "tsx scripts/migrate-from-csv.ts",
     "migrate-csv-dry": "tsx scripts/migrate-from-csv.ts --dry-run",

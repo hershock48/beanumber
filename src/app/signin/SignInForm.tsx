@@ -270,6 +270,11 @@ export function SignInForm() {
     headline = 'We couldn’t find that sponsorship.';
     body =
       "Enter your email below — we'll send a one-tap link. If you're stuck, email Kevin.";
+  } else if (errorParam === 'number_claimed') {
+    // The confirm-claim callback found the number taken by another
+    // email between the confirmation email and the tap.
+    headline = 'That number is already claimed.';
+    body = `${arrivedWithNumber ? `#${params.get('n')}` : 'That number'} is linked to a different email. If that could be you, try the email you used when you got the shirt. Stuck? Email Kevin@beanumber.org and I'll sort it out.`;
   }
 
   return (

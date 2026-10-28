@@ -83,10 +83,79 @@ export function verifyRecoveryToken(
     const payload = JSON.parse(Buffer.from(b64Payload, 'base64url').toString());
     const nowSec = Math.floor(Date.now() / 1000);
     if (typeof payload?.e !== 'number' || payload.e < nowSec) return null;
+    // Kinded tokens (claim-confirm below) carry `k` and never a
+    // sponsor code. Refuse them here explicitly so the two token
+    // kinds can never be swapped, whatever fields they share.
+    if (payload?.k !== undefined) return null;
     if (typeof payload?.c !== 'string' || typeof payload?.n !== 'number') return null;
     // shirtNumber === 0 is the "no landing kid, redirect to /me"
     // sentinel — see makeRecoveryToken. Callers must handle it.
     return { sponsorCode: payload.c, shirtNumber: payload.n };
+  } catch {
+    return null;
+  }
+}
+
+// ─── Claim-confirm tokens ───────────────────────────────────────
+//
+// Second token kind, same secret and format. Minted by send-link when
+// an email that already holds a number types a DIFFERENT number with
+// no purchase trail behind it (see src/lib/claim-guard.ts). The token
+// rides the "yes, claim #N too" button in the confirmation email;
+// /api/sponsor/recover/confirm-claim verifies it and only then mints
+// the Holder row. Nothing is written when the email is sent.
+//
+// Payload: `{ k: 'claim', m: emailLower, n: shirtNumber, e: exp }`.
+// `k` is the kind discriminator: a claim token has no sponsor code,
+// so verifyRecoveryToken rejects it, and verifyClaimConfirmToken
+// rejects anything without k === 'claim'.
+
+const CLAIM_KIND = 'claim';
+
+export function makeClaimConfirmToken(
+  email: string,
+  shirtNumber: number,
+  ttlSeconds: number = DEFAULT_TTL_SECONDS
+): string {
+  const m = (email || '').trim().toLowerCase();
+  if (!m) throw new Error('makeClaimConfirmToken: email is required.');
+  if (!Number.isInteger(shirtNumber) || shirtNumber <= 0) {
+    throw new Error('makeClaimConfirmToken: shirtNumber must be a positive integer.');
+  }
+  const exp = Math.floor(Date.now() / 1000) + ttlSeconds;
+  const payload = JSON.stringify({ k: CLAIM_KIND, m, n: shirtNumber, e: exp });
+  const b64Payload = Buffer.from(payload).toString('base64url');
+  const sig = signPayload(b64Payload, getSecret());
+  return `${b64Payload}.${sig}`;
+}
+
+export function verifyClaimConfirmToken(
+  token: string | null | undefined
+): { email: string; shirtNumber: number } | null {
+  if (!token) return null;
+  const parts = token.split('.');
+  if (parts.length !== 2) return null;
+  const [b64Payload, sig] = parts;
+
+  let expectedSig: string;
+  try {
+    expectedSig = signPayload(b64Payload, getSecret());
+  } catch {
+    return null;
+  }
+  if (sig.length !== expectedSig.length) return null;
+  if (!crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expectedSig))) {
+    return null;
+  }
+
+  try {
+    const payload = JSON.parse(Buffer.from(b64Payload, 'base64url').toString());
+    const nowSec = Math.floor(Date.now() / 1000);
+    if (payload?.k !== CLAIM_KIND) return null;
+    if (typeof payload?.e !== 'number' || payload.e < nowSec) return null;
+    if (typeof payload?.m !== 'string' || !payload.m) return null;
+    if (!Number.isInteger(payload?.n) || payload.n <= 0) return null;
+    return { email: payload.m, shirtNumber: payload.n };
   } catch {
     return null;
   }
