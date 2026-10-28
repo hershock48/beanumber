@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
   const email = await getViewerEmail();
   if (!email) {
     return NextResponse.json(
-      { error: 'Sign in to write your penpal.' },
+      { error: 'Sign in to write to your kid.' },
       { status: 401 }
     );
   }

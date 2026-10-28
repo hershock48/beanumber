@@ -136,7 +136,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     return renderHtmlPage(
       `<h1>Unsubscribed.</h1>
        <p>We won't send any more marketing emails to <strong>${escapeHtml(email.trim().toLowerCase())}</strong>.</p>
-       <p>Transactional messages — sponsorship receipts, reveal notifications, and password-style confirmations — will still come through, because those aren't marketing. If you want those off too, just reply to this email.</p>`
+       <p>Transactional messages (sponsorship receipts, reveal notifications, and sign-in links) will still come through, because those aren't marketing. If you want those off too, reply to this email.</p>`
     );
   } catch (error) {
     logger.error('Unsubscribe GET failed', error as Error, {

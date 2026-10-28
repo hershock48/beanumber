@@ -487,7 +487,7 @@ function buildPayload(
       payload: {
         to: '',
         title: `${kid.firstName} is Student of the Month.`,
-        body: `${event.gradeLabel} · ${event.monthLabel}. Simon posted it to the whole campus.`,
+        body: `${event.gradeLabel} · ${event.monthLabel}. The campus posted it for everyone to see.`,
         data: {
           kind: 'kidSotm',
           deepLink: shirtRoute,

@@ -228,8 +228,8 @@ export async function sendSponsorWelcomeEmail(
   const childUrl = hasNumber ? `${siteUrl}/children/${shirtNumber}` : siteUrl;
   const childUrlLabel = hasNumber ? `beanumber.org/${shirtNumber}` : 'beanumber.org';
   const pageLine = hasNumber
-    ? `<p><strong>${childName}'s page is at <a href="${childUrl}" style="color: #D4A843;">${childUrlLabel}</a>.</strong> Bookmark it. That's where photos, updates, and letters from the campus show up over the year, and where you can pick up gear with their number on it. Your browser remembers you, so most of the time you'll just land on their page when you visit.</p>`
-    : `<p><strong>${childName}'s page lives at <a href="${childUrl}" style="color: #D4A843;">${childUrlLabel}</a></strong> — enter their number and you'll land right on it. Bookmark it. That's where photos, updates, and letters from the campus show up over the year. Your browser remembers you, so most of the time you'll just land on their page when you visit.</p>`;
+    ? `<p><strong>${childName}'s page is at <a href="${childUrl}" style="color: #D4A843;">${childUrlLabel}</a>.</strong> Bookmark it. That's where photos, updates, and letters from the campus show up over the year, and where you can pick up gear with their number on it. Your browser remembers you, so most of the time you'll land on their page when you visit.</p>`
+    : `<p><strong>${childName}'s page lives at <a href="${childUrl}" style="color: #D4A843;">${childUrlLabel}</a></strong>. Enter their number and you'll land right on it. Bookmark it. That's where photos, updates, and letters from the campus show up over the year. Your browser remembers you, so most of the time you'll land on their page when you visit.</p>`;
 
   // Kid by first name only in the Surface 13 paragraph — "Aaron's classroom"
   // reads human; "Aaron Ouma Joseph's classroom" reads formal.
@@ -242,9 +242,9 @@ export async function sendSponsorWelcomeEmail(
 
     <p><strong>Here&rsquo;s what you unlocked:</strong> you get a penpal, monthly photos, report cards, and campus updates. $25/month. ${childFirstName} is your penpal.</p>
 
-    <p>One thing happens fast on the other side of this. The minute you clicked the button, a note went to the team at the campus. Tomorrow morning over there &mdash; they&rsquo;re hours ahead of us &mdash; the team is going to tell ${childFirstName} they have a sponsor. They don&rsquo;t know your name yet. They&rsquo;re going to ask.</p>
+    <p>One thing happens fast on the other side of this. The minute you clicked the button, a note went to the team at the campus. Tomorrow morning over there, since they are hours ahead of us, the team is going to tell ${childFirstName} they have a sponsor. They don&rsquo;t know your name yet, and they&rsquo;re going to ask.</p>
 
-    <p style="background: #FFF8F0; border-left: 3px solid #D4A843; padding: 16px 20px; margin: 24px 0;"><strong>Reply to this email with your first penpal note for ${childFirstName}.</strong> One sentence. Two. Whatever feels right. We&rsquo;ll pass it on.</p>
+    <p style="background: #FFF8F0; border-left: 3px solid #D4A843; padding: 16px 20px; margin: 24px 0;"><strong>Reply to this email with your first penpal note for ${childFirstName}.</strong> A sentence or two is plenty. We&rsquo;ll pass it on.</p>
 
     ${pageLine}
 
@@ -323,7 +323,7 @@ export async function sendCampusNewsletterEmail(params: {
       </div>
       <hr style="border:none;border-top:1px solid #e8e0d4;margin:32px 0;">
       <p style="font-size:14px;color:#666;line-height:1.6;">
-        You're receiving this because you're a Be A Number sponsor. Updates about your kid show up on your kid's page &mdash; enter your Number at <a href="${siteRoot}" style="color:#D4A843;">beanumber.org</a> to get there. Or <a href="${unsubscribeUrl}" style="color:#999;">manage your emails</a>.
+        You're receiving this because you're a Be A Number sponsor. Updates about your kid show up on your kid's page. Enter your Number at <a href="${siteRoot}" style="color:#D4A843;">beanumber.org</a> to get there. Or <a href="${unsubscribeUrl}" style="color:#999;">manage your emails</a>.
       </p>
       <p style="font-size:12px;color:#999;text-align:center;margin-top:24px;">
         Be A Number, International &middot; 501(c)(3) Nonprofit<br>
@@ -445,7 +445,7 @@ export async function sendNewsletterNotificationEmail(params: {
   const html = wrapTransactionalEmail(`
     <p style="margin-top: 0;">Hey ${escapeHtml(firstName)},</p>
 
-    <p>The latest campus newsletter just went up &mdash; <strong>${escapeHtml(subject)}</strong>.</p>
+    <p>The latest campus newsletter went up: <strong>${escapeHtml(subject)}</strong>.</p>
 
     ${heroBlock}
 
@@ -455,9 +455,9 @@ export async function sendNewsletterNotificationEmail(params: {
 
     ${kidLines}
 
-    <p style="margin-top: 24px; font-size: 14px; color: #555;">Also worth exploring: your <strong>My Campus</strong> page at <a href="${siteUrl}/me" style="color: #D4A843;">beanumber.org/me</a>. We built it to make exploring the campus feel closer. Your ${kids.length === 1 ? 'kid is' : 'kids are'} front and center &mdash; but so are the other kids at the campus you haven&rsquo;t met yet, the school itself, and every newsletter I&rsquo;ve sent. A home base, not a dashboard. Poke around.</p>
+    <p style="margin-top: 24px; font-size: 14px; color: #555;">Also worth exploring: your <strong>My Campus</strong> page at <a href="${siteUrl}/me" style="color: #D4A843;">beanumber.org/me</a>. We built it to make exploring the campus feel closer. Your ${kids.length === 1 ? 'kid is' : 'kids are'} front and center, and so are the other kids at the campus you haven&rsquo;t met yet, the school itself, and every newsletter I&rsquo;ve sent. It is meant to feel like a home base, so poke around.</p>
 
-    <p style="margin-top: 24px; font-size: 14px; color: #888;">Reply to this email if anything&rsquo;s not loading or you want to write back to the campus &mdash; I read every one.</p>
+    <p style="margin-top: 24px; font-size: 14px; color: #888;">Reply to this email if anything&rsquo;s not loading or you want to write back to the campus. I read every one.</p>
 
     <p>Kevin</p>
   `);
@@ -503,7 +503,7 @@ export async function sendNewsletterNotificationEmailForNonSponsor(params: {
   const html = wrapTransactionalEmail(`
     <p style="margin-top: 0;">Hey ${escapeHtml(firstName)},</p>
 
-    <p>The latest campus newsletter just went up &mdash; <strong>${escapeHtml(subject)}</strong>. You&rsquo;re getting this because you bought a shirt, and I want you to see what&rsquo;s been happening on the ground.</p>
+    <p>The latest campus newsletter went up: <strong>${escapeHtml(subject)}</strong>. You&rsquo;re getting this because you bought a shirt, and I want you to see what&rsquo;s been happening on the ground.</p>
 
     ${heroBlock}
 
@@ -515,11 +515,11 @@ export async function sendNewsletterNotificationEmailForNonSponsor(params: {
       <a href="${siteUrl}" style="display: inline-block; background: #D4A843; color: #0d0d0d; font-weight: bold; text-transform: uppercase; letter-spacing: 0.05em; padding: 14px 28px; text-decoration: none; font-size: 13px;">Type your number</a>
     </p>
 
-    <p style="font-size: 14px; color: #555;">Don&rsquo;t have the shirt handy? Read it at <a href="${siteUrl}/news" style="color: #D4A843;">beanumber.org/news</a> &mdash; same story, without the kid-page framing.</p>
+    <p style="font-size: 14px; color: #555;">Don&rsquo;t have the shirt handy? Read it at <a href="${siteUrl}/news" style="color: #D4A843;">beanumber.org/news</a>, same story, without the kid-page framing.</p>
 
-    <p style="font-size: 14px; color: #555;">Once you&rsquo;ve met your kid, your <strong>My Campus</strong> page at <a href="${siteUrl}/me" style="color: #D4A843;">beanumber.org/me</a> opens up. Your kid&rsquo;s front and center &mdash; but so are the other kids at the campus, the school itself, and every newsletter I&rsquo;ve sent. We built it to make exploring the campus feel closer. Home base, not dashboard. Explore it.</p>
+    <p style="font-size: 14px; color: #555;">Once you&rsquo;ve met your kid, your <strong>My Campus</strong> page at <a href="${siteUrl}/me" style="color: #D4A843;">beanumber.org/me</a> opens up. Your kid&rsquo;s front and center, and so are the other kids at the campus, the school itself, and every newsletter I&rsquo;ve sent. We built it to make exploring the campus feel closer, so explore it.</p>
 
-    <p style="font-size: 14px; color: #555;">If reading this makes you want to become a monthly sponsor of the kid on your shirt, that&rsquo;s a $25-a-month decision and the sponsor button is right there on their page. No pressure &mdash; the work runs either way. Just wanted you to know the door is open.</p>
+    <p style="font-size: 14px; color: #555;">If reading this makes you want to become a monthly sponsor of the kid on your shirt, that&rsquo;s a $25-a-month decision and the sponsor button is right there on their page. No pressure, the work runs either way. The door is open.</p>
 
     <p>Kevin</p>
   `);
@@ -564,7 +564,7 @@ export async function sendNewsletterNotificationEmailForLegacyDonor(params: {
   const html = wrapTransactionalEmail(`
     <p style="margin-top: 0;">Hey ${escapeHtml(firstName)},</p>
 
-    <p>The latest campus newsletter just went up &mdash; <strong>${escapeHtml(subject)}</strong>. You gave to Be A Number at some point and stayed on the list, and I want you to see what&rsquo;s been happening on the ground.</p>
+    <p>The latest campus newsletter went up: <strong>${escapeHtml(subject)}</strong>. You gave to Be A Number at some point and stayed on the list, and I want you to see what&rsquo;s been happening on the ground.</p>
 
     ${heroBlock}
 
@@ -576,9 +576,9 @@ export async function sendNewsletterNotificationEmailForLegacyDonor(params: {
       <a href="${newsUrl}" style="display: inline-block; background: #D4A843; color: #0d0d0d; font-weight: bold; text-transform: uppercase; letter-spacing: 0.05em; padding: 14px 28px; text-decoration: none; font-size: 13px;">Read the newsletter</a>
     </p>
 
-    <p style="font-size: 14px; color: #555;">How this works: every shirt at <a href="${siteUrl}" style="color: #D4A843;">beanumber.org</a> is tied to a kid at the campus by number. Buy one, and you&rsquo;ll meet the kid attached to it when it arrives. From there, $25/mo sponsorship is optional &mdash; cancel anytime, runs the whole campus.</p>
+    <p style="font-size: 14px; color: #555;">How this works: every shirt at <a href="${siteUrl}" style="color: #D4A843;">beanumber.org</a> is tied to a kid at the campus by number. Buy one, and you&rsquo;ll meet the kid attached to it when it arrives. From there, $25/mo sponsorship is optional: cancel anytime, runs the whole campus.</p>
 
-    <p style="font-size: 14px; color: #555;">Every shirt buyer also gets a <strong>My Campus</strong> page &mdash; a real home base for exploring the campus. Your kid front and center, but also the other kids there, the school itself, every newsletter. We built it to make the connection feel closer. Take a peek at <a href="${siteUrl}/me" style="color: #D4A843;">beanumber.org/me</a> to see what that looks like.</p>
+    <p style="font-size: 14px; color: #555;">Every shirt buyer also gets a <strong>My Campus</strong> page, a real home base for exploring the campus. Your kid front and center, but also the other kids there, the school itself, every newsletter. We built it to make the connection feel closer. Take a peek at <a href="${siteUrl}/me" style="color: #D4A843;">beanumber.org/me</a> to see what that looks like.</p>
 
     <p>Kevin</p>
   `);
@@ -622,12 +622,12 @@ export async function sendLegacySponsorFreeShirtEmail(params: {
   const firstName = (recipientName || 'Friend').trim().split(/\s+/)[0] || 'Friend';
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.beanumber.org';
   const subject = newsletter
-    ? `A shirt for you, on us — plus this month at the campus`
+    ? `A shirt for you, on us, plus this month at the campus`
     : `A shirt for you, on us`;
 
   const newsletterBlock = newsletter
     ? `
-    <h2 style="font-size: 20px; margin: 0 0 12px 0;">First — this month at the campus</h2>
+    <h2 style="font-size: 20px; margin: 0 0 12px 0;">First, this month at the campus</h2>
     <p>The July update just went live: <strong>${escapeHtml(newsletter.title)}</strong>. Read the full thing at <a href="${escapeHtml(newsletter.newsUrl)}" style="color: #D4A843; font-weight: bold;">beanumber.org/news</a>.</p>
     ${
       newsletter.heroPhotoUrl
@@ -638,7 +638,7 @@ export async function sendLegacySponsorFreeShirtEmail(params: {
 
     <hr style="border: none; border-top: 1px solid #ddd; margin: 32px 0;">
 
-    <h2 style="font-size: 20px; margin: 0 0 12px 0;">And &mdash; a shirt for you, on us</h2>
+    <h2 style="font-size: 20px; margin: 0 0 12px 0;">And a shirt for you, on us</h2>
     `
     : '';
 
@@ -647,11 +647,11 @@ export async function sendLegacySponsorFreeShirtEmail(params: {
 
     ${newsletterBlock}
 
-    <p>Back when you signed up, our model let you pick a specific kid to sponsor &mdash; that&rsquo;s how you ended up with ${escapeHtml(kidFirstName)}, and ${escapeHtml(kidFirstName)} has stayed with you the whole time. Thank you for that.</p>
+    <p>Back when you signed up, our model let you pick a specific kid to sponsor. That&rsquo;s how you ended up with ${escapeHtml(kidFirstName)}, and ${escapeHtml(kidFirstName)} has stayed with you the whole time. Thank you for that.</p>
 
     <p>Since then we&rsquo;ve moved to a shirt-first model: every shirt sold at Be A Number ties its buyer to a kid by the number on the back. Hold-to-meet on beanumber.org, and the kid shows up. It&rsquo;s how we&rsquo;re building the connection now.</p>
 
-    <p>The old model didn&rsquo;t include a shirt. This one does &mdash; and we want to make that up to you. ${escapeHtml(kidFirstName)} stays yours, the sponsorship is unchanged, and now you&rsquo;ve got a shirt with ${escapeHtml(kidFirstName)}&rsquo;s number on the back to actually wear.</p>
+    <p>The old model didn&rsquo;t include a shirt. This one does, and we want to make that up to you. ${escapeHtml(kidFirstName)} stays yours, the sponsorship is unchanged, and now you&rsquo;ve got a shirt with ${escapeHtml(kidFirstName)}&rsquo;s number on the back to actually wear.</p>
 
     <p><strong>This is our thank-you. The shirt is free, shipping is on us, no charge at all.</strong></p>
 
@@ -659,9 +659,9 @@ export async function sendLegacySponsorFreeShirtEmail(params: {
       <span style="display: inline-block; background: #0d0d0d; color: #D4A843; font-family: 'SF Mono', Menlo, monospace; font-size: 18px; font-weight: bold; letter-spacing: 0.1em; padding: 16px 28px; border-radius: 4px;">${escapeHtml(promoCode)}</span>
     </p>
 
-    <p>Pick your style at <a href="${siteUrl}/shirts" style="color: #D4A843; font-weight: bold;">beanumber.org/shirts</a>, add to cart, and enter the code at checkout. Skip the &ldquo;continue monthly&rdquo; toggle &mdash; you&rsquo;re already sponsoring ${escapeHtml(kidFirstName)}.</p>
+    <p>Pick your style at <a href="${siteUrl}/shirts" style="color: #D4A843; font-weight: bold;">beanumber.org/shirts</a>, add to cart, and enter the code at checkout. Skip the &ldquo;continue monthly&rdquo; toggle. You&rsquo;re already sponsoring ${escapeHtml(kidFirstName)}.</p>
 
-<p>When it arrives, look at the number on the back, hit hold-to-meet on <strong>beanumber.org/&lt;that number&gt;</strong>, and ${escapeHtml(kidFirstName)} will be right there &mdash; the same kid you&rsquo;ve been sponsoring the whole time. Rock it, share it, and pull people into the story.</p>
+<p>When it arrives, look at the number on the back, hit hold-to-meet on <strong>beanumber.org/&lt;that number&gt;</strong>, and ${escapeHtml(kidFirstName)} will be right there, the same kid you&rsquo;ve been sponsoring the whole time. Wear it, and when someone asks about the number, tell them.</p>
 
     <p style="margin-top: 24px; font-size: 14px; color: #888;">Reply to this email if you hit any snag. The code is tied to your account, so it only works from ${escapeHtml(recipientEmail)} and only once.</p>
 
@@ -706,12 +706,12 @@ export async function sendLegacyDonorFreeShirtEmail(params: {
   const firstName = (recipientName || 'Friend').trim().split(/\s+/)[0] || 'Friend';
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.beanumber.org';
   const subject = newsletter
-    ? `A shirt on us — plus this month at the campus`
+    ? `A shirt on us, plus this month at the campus`
     : `A shirt on us`;
 
   const newsletterBlock = newsletter
     ? `
-    <h2 style="font-size: 20px; margin: 0 0 12px 0;">First — this month at the campus</h2>
+    <h2 style="font-size: 20px; margin: 0 0 12px 0;">First, this month at the campus</h2>
     <p>The July update just went live: <strong>${escapeHtml(newsletter.title)}</strong>. Read the full thing at <a href="${escapeHtml(newsletter.newsUrl)}" style="color: #D4A843; font-weight: bold;">beanumber.org/news</a>.</p>
     ${
       newsletter.heroPhotoUrl
@@ -722,7 +722,7 @@ export async function sendLegacyDonorFreeShirtEmail(params: {
 
     <hr style="border: none; border-top: 1px solid #ddd; margin: 32px 0;">
 
-    <h2 style="font-size: 20px; margin: 0 0 12px 0;">And &mdash; a shirt on us</h2>
+    <h2 style="font-size: 20px; margin: 0 0 12px 0;">And a shirt on us</h2>
     `
     : '';
 
@@ -731,9 +731,9 @@ export async function sendLegacyDonorFreeShirtEmail(params: {
 
     ${newsletterBlock}
 
-    <p>You&rsquo;ve been giving monthly to Be A Number for a long time &mdash; thank you. That kind of steady support is a big part of what got us this far.</p>
+    <p>You&rsquo;ve been giving monthly to Be A Number for a long time. Thank you. That kind of steady support is a big part of what got us this far.</p>
 
-    <p>We&rsquo;ve built out a shirt-first model since those early days. Every shirt sold at Be A Number ties its buyer to a specific kid by the number on the back. Hold-to-meet on beanumber.org, and the kid shows up. It&rsquo;s how the whole thing works now &mdash; and it&rsquo;s way more fun than clicking &ldquo;give.&rdquo;</p>
+    <p>We&rsquo;ve built out a shirt-first model since those early days. Every shirt sold at Be A Number ties its buyer to a specific kid by the number on the back. Hold-to-meet on beanumber.org, and the kid shows up. It&rsquo;s how the whole thing works now, and it&rsquo;s way more fun than clicking &ldquo;give.&rdquo;</p>
 
     <p>You&rsquo;ve been part of this a while and we want to make sure you&rsquo;re pulled all the way in.</p>
 
@@ -743,14 +743,14 @@ export async function sendLegacyDonorFreeShirtEmail(params: {
       <span style="display: inline-block; background: #0d0d0d; color: #D4A843; font-family: 'SF Mono', Menlo, monospace; font-size: 18px; font-weight: bold; letter-spacing: 0.1em; padding: 16px 28px; border-radius: 4px;">${escapeHtml(promoCode)}</span>
     </p>
 
-    <p>Pick your style at <a href="${siteUrl}/shirts" style="color: #D4A843; font-weight: bold;">beanumber.org/shirts</a>, add to cart, and enter the code at checkout. Skip the &ldquo;continue monthly&rdquo; toggle unless you want to layer another sponsorship on top &mdash; this code covers the shirt.</p>
+    <p>Pick your style at <a href="${siteUrl}/shirts" style="color: #D4A843; font-weight: bold;">beanumber.org/shirts</a>, add to cart, and enter the code at checkout. Skip the &ldquo;continue monthly&rdquo; toggle unless you want to layer another sponsorship on top. This code covers the shirt.</p>
 
-<p>When it arrives, look at the number on the back, hit hold-to-meet on <strong>beanumber.org/&lt;that number&gt;</strong>, and meet the kid it belongs to. Rock the shirt, share the story, and pull more people in.</p>
+<p>When it arrives, look at the number on the back, hit hold-to-meet on <strong>beanumber.org/&lt;that number&gt;</strong>, and meet the kid it belongs to. Wear it, and when someone asks about the number, tell them.</p>
 
     <p style="margin-top: 24px; font-size: 14px; color: #888;">Reply to this email if you hit any snag. ${
       maxRedemptions === 1
         ? 'The code is one-time use.'
-        : `The code works up to ${maxRedemptions} times &mdash; enough for the whole household.`
+        : `The code works up to ${maxRedemptions} times, enough for the whole household.`
     }</p>
 
     <p>Kevin</p>
@@ -905,7 +905,7 @@ export async function sendRecurringDonationThankYouEmail(
   const bodyMiddle = isSponsor
     ? `<p>Your monthly sponsorship of $${formattedAmount} was processed on ${dateStr}. That keeps ${childName} in school at the campus, eating two meals a day, with the on-site clinic when they need it.</p>
 
-    <p>${childName === 'your child' ? 'Your kid&rsquo;s' : `${childName}&rsquo;s`} page at <a href="${childUrl}" style="color: #D4A843;">${childUrlLabel}</a> is your place for them. When something new lands &mdash; a photo, a letter, a note from the teachers &mdash; I&rsquo;ll email you so you know to look. If you ever can&rsquo;t get back to the page, or you need to change or cancel your monthly for any reason, reply to this email or write me at <a href="mailto:Kevin@beanumber.org" style="color: #D4A843;">Kevin@beanumber.org</a> and I&rsquo;ll take care of it.</p>`
+    <p>${childName === 'your child' ? 'Your kid&rsquo;s' : `${childName}&rsquo;s`} page at <a href="${childUrl}" style="color: #D4A843;">${childUrlLabel}</a> is your place for them. When something new lands, a photo, a letter, a note from the teachers, I&rsquo;ll email you so you know to look. If you ever can&rsquo;t get back to the page, or you need to change or cancel your monthly for any reason, reply to this email or write me at <a href="mailto:Kevin@beanumber.org" style="color: #D4A843;">Kevin@beanumber.org</a> and I&rsquo;ll take care of it.</p>`
     : `<p>Your monthly donation of $${formattedAmount} was processed on ${dateStr}. It goes to the same place as last month: a six-acre campus in Northern Uganda with a school built for 380 kids, a medical clinic that has treated 700+ patients, and vocational training where 60 women are learning trades.</p>
 
     <p>If you ever want to see what your monthly support adds up to, the <a href="${SITE_URL}/impact" style="color: #D4A843;">impact page</a> has the full breakdown. And if you need to change or cancel your donation for any reason, reply to this email or write me at <a href="mailto:Kevin@beanumber.org" style="color: #D4A843;">Kevin@beanumber.org</a> and I&rsquo;ll take care of it.</p>`;
@@ -1102,7 +1102,7 @@ export async function sendSimonNoteAlert(params: {
 
   return sendEmail({
     to: { email: simonEmail, name: 'Simon' },
-    subject: `New penpal note for ${kidFirstName} — please translate`,
+    subject: `New penpal note for ${kidFirstName}, please translate`,
     html,
   });
 }
