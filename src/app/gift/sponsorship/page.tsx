@@ -37,8 +37,8 @@ export default function GiftSponsorshipPage() {
             Give them a child to know.
           </h1>
           <p className="text-base md:text-lg text-[#666] max-w-xl mx-auto leading-relaxed">
-            $25 covers a real child&rsquo;s first month at the campus and matches your recipient
-            to them. They&rsquo;ll get an email with their number, meet their child, and decide whether
+            $25 supports a real child&rsquo;s first month at the campus. Your recipient gets
+            a number, and the number is a kid. They&rsquo;ll get an email with their number, meet their child, and decide whether
             to stay at $25/month from there.
           </p>
         </div>

@@ -3,7 +3,7 @@
 import { useState } from 'react';
 
 const SHARE_MESSAGE =
-  'I just donated to beanumber.org — a nonprofit running a six-acre campus in Northern Uganda with a school, clinic, and vocational training.';
+  'I just donated to beanumber.org, a nonprofit running a six-acre campus in Northern Uganda with a school, clinic, and vocational training.';
 
 export function ShareButton() {
   const [copied, setCopied] = useState(false);

@@ -71,7 +71,7 @@ export class AppErrorBoundary extends React.Component<Props, State> {
           color="umber"
           style={{ marginTop: SPACING.m, textAlign: 'center' }}
         >
-          Not your fault. The campus is still there — let&apos;s get you
+          Not your fault. The campus is still there. Let&apos;s get you
           back to it.
         </Text>
         <Pressable

@@ -130,7 +130,7 @@ export default function SponsorWelcomePage() {
                   Tell someone
                 </h3>
                 <p className="text-[#666] text-sm leading-relaxed mb-4">
-                  Know someone who&rsquo;d care about this? Share it however you want — text, DM, post.
+                  Know someone who&rsquo;d care about this? Share it however you want: text, DM, post.
                 </p>
                 <ShareButton />
               </div>

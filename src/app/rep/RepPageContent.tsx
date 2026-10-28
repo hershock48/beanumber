@@ -535,7 +535,7 @@ export default function RepPageContent() {
                   value={formData.first_five}
                   onChange={e => setFormData(p => ({ ...p, first_five: e.target.value }))}
                   className="w-full border border-[#e8e0d4] bg-white px-4 py-3 text-[#0d0d0d] text-sm focus:outline-none focus:border-[#D4A843] transition-colors resize-none"
-                  placeholder="First names are fine. We're not contacting them — we want to know you've already thought about this."
+                  placeholder="First names are fine. We're not contacting them. We want to know you've already thought about this."
                 />
               </div>
 

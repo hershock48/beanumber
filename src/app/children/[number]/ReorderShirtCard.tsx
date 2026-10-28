@@ -126,7 +126,7 @@ export function ReorderShirtCard({
           <p className="text-[15px] text-[#333] leading-relaxed max-w-md mx-auto">
             Different color, an extra for the family, or a replacement.
             Same {firstName}. Same Number. Not a new sponsorship, not a
-            new kid &mdash; just another shirt.
+            new kid, another shirt with your Number on it.
           </p>
         </div>
 
@@ -245,12 +245,12 @@ export function ReorderShirtCard({
           >
             {submitting
               ? 'Opening checkout…'
-              : `Reorder #${shirtNumber} — $25`}
+              : `Reorder #${shirtNumber}, $25`}
           </button>
 
           <p className="text-xs text-[#888] text-center leading-relaxed mt-4">
-            Free shipping. Same Number gets pressed on the back &mdash;
-            not a new sponsorship, not a different kid. Just another
+            Free shipping. Same Number gets pressed on the back,
+            not a new sponsorship, not a different kid. Another
             shirt with #{shirtNumber} on it.
           </p>
         </div>

@@ -64,7 +64,7 @@ export function ClaimMatchCard({
       </h2>
       <p className="text-[#555] leading-relaxed mb-5">
         Your monthly sponsorship is already active. Tap below to link it to{' '}
-        {firstName} and unlock your sponsor view on this page &mdash; updates,
+        {firstName} and unlock your sponsor view on this page: updates,
         photos, and letters will land here over the coming months.
       </p>
       <button
@@ -77,7 +77,7 @@ export function ClaimMatchCard({
             : 'bg-[#D4A843] text-[#0d0d0d] hover:bg-[#c49a3a] cursor-pointer'
         }`}
       >
-        {state === 'submitting' ? 'Claiming…' : `Yes — claim ${firstName}`}
+        {state === 'submitting' ? 'Claiming…' : `Yes, claim ${firstName}`}
       </button>
       {state === 'error' && errorMessage && (
         <p className="text-sm text-red-600 mt-4">{errorMessage}</p>
@@ -85,7 +85,7 @@ export function ClaimMatchCard({
       <p className="text-xs text-[#999] mt-4 leading-relaxed">
         Not the right kid? Double-check the number on the back of your shirt
         and try that one instead. You can only claim one match per
-        subscription &mdash; tap carefully.
+        subscription. Tap carefully.
       </p>
     </div>
   );

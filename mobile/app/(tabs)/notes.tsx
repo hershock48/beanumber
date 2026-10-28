@@ -109,7 +109,7 @@ export default function NotesTab() {
           <View style={{ paddingHorizontal: SPACING.l, marginTop: SPACING.l }}>
             <Text variant="body" color="umber">
               Once you've met your Number's kid, this is where the letters
-              live — yours going out, theirs coming back.
+              live: yours going out, theirs coming back.
             </Text>
             <Pressable
               onPress={() => setLinkSheetOpen(true)}
@@ -282,7 +282,7 @@ function HolderRow({
         </Text>
       </View>
       <Text variant="body" color="ink" style={{ marginTop: SPACING.m }}>
-        Your penpal writes back — real notes, in {kid.firstName}'s own
+        Your penpal writes back: real notes, in {kid.firstName}'s own
         handwriting first, then typed up by the teacher.
       </Text>
       <Text variant="body" color="ink" style={{ marginTop: SPACING.m }}>

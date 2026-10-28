@@ -131,7 +131,7 @@ export default function KeepGoingScreen() {
         </Button>
         <View style={{ marginTop: SPACING.m, alignItems: 'center' }}>
           <Button variant="ghost" onPress={goKidPage}>
-            Not yet — meet {firstName} first
+            Not yet, meet {firstName} first
           </Button>
         </View>
       </View>

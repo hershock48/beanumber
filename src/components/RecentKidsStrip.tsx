@@ -117,7 +117,7 @@ export function RecentKidsStrip({
           Recently visited.
         </h2>
         <p className="text-sm text-[#888] mb-6 max-w-xl">
-          Pages you&rsquo;ve looked at on this device. Not your sponsorships — those live in the bar at the top.
+          Pages you&rsquo;ve looked at on this device. Not your sponsorships. Those live in the bar at the top.
         </p>
         <div className="flex gap-4 overflow-x-auto pb-3">
           {kids.map(kid => (

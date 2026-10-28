@@ -90,7 +90,7 @@ export default function Contact() {
                   <Link href="/" className="text-gray-900 font-medium hover:underline">
                     home page
                   </Link>
-                  {' '}to see how it works. Every numbered shirt is already connected to a specific kid at the campus &mdash; buy one and the number-to-name reveal happens when it arrives. Or email us directly to talk it through.
+                  {' '}to see how it works. Every numbered shirt is already connected to a specific kid at the campus. Buy one and the number-to-name reveal happens when it arrives. Or email us directly to talk it through.
                 </p>
               </div>
 

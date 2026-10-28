@@ -193,7 +193,7 @@ export function birthdayMilestone(
     return {
       kind: 'birthday-today',
       headline: `Today is ${kidFirstName}'s ${ordinal(age)} birthday.`,
-      body: `The campus knows. If you want to write your penpal, reply to any email from Kevin and it'll get to ${kidFirstName}.`,
+      body: `The campus knows. If you want to write to ${kidFirstName}, reply to any email from Kevin and it'll get there.`,
       priority: 100,
     };
   }
@@ -245,7 +245,7 @@ export function welcomeMilestone(
   return {
     kind: 'welcome',
     headline: `Welcome. ${kidFirstName} is yours now.`,
-    body: `The team knows you're here. First real updates from the campus land within your first month.`,
+    body: `The team knows you're here. Updates from the campus land here as they happen.`,
     priority: 5,
   };
 }
@@ -293,7 +293,7 @@ export function sotmCurrentMilestone(
   return {
     kind: 'sotm-current',
     headline: `${kidFirstName} is Student of the Month${gradeClause}.`,
-    body: trimmedReason ? `“${trimmedReason}” — the team at the campus` : null,
+    body: trimmedReason ? `“${trimmedReason}”, from the team at the campus` : null,
     // Beats every other milestone in the same window. If a kid has
     // a birthday AND is SOTM, the SOTM banner leads.
     priority: 200,

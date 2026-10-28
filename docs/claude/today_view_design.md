@@ -1,3 +1,5 @@
+> **Historical (Airtable era).** Written before the Postgres cutover of 2026-09-14. Tables, tool files and routes named below may no longer exist; the current map is docs/claude/architecture.md and the October 2026 audit is docs/audit-2026-10.md. Kept for the record, not as instructions.
+
 # Today View + Donor Profiles — Design Outline
 
 > The morning-ritual screen. Replaces the current task-card admin home with a person-centric, prioritized list of "here are the 8 things to do right now." Each item drills into a donor / sponsor profile page that gives Kevin every piece of context he needs to write something personal. The two surfaces are designed together — Today shows who to look at, the profile shows everything about them. One ritual, no bouncing between tabs.

@@ -1,6 +1,6 @@
 # Postgres migration — owning the stack
 
-**Status:** In progress. Site currently dark on API reads (Airtable workspace quota exhausted, Kevin not upgrading). Migration is BOTH the long-term right architecture AND the only path to bring the site back up.
+**Status:** Done. Postgres-only since 2026-09-14 (commit d5791a3). The rest of this file is the plan as written in June 2026; the audit_log trigger it describes was never built (audit rows are written app-side in `src/lib/db/mutations.ts`), and `actor_id` is text, not uuid.
 
 **Decision date:** June 19, 2026.
 

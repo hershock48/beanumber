@@ -288,26 +288,6 @@ export async function getViewerSponsorships(viewerEmail: string) {
     );
 }
 
-/**
- * All sponsorships pointing at a given child — admin tools (
- * reassignment, audit views) and the auto-reveal logic.
- */
-export async function getSponsorshipsForKid(childRecordId: string) {
-  return db
-    .select()
-    .from(sponsorships)
-    .where(
-      and(
-        eq(sponsorships.childId, childRecordId),
-        or(
-          eq(sponsorships.status, 'Active'),
-          eq(sponsorships.status, 'Holder'),
-          eq(sponsorships.status, 'Awaiting Sponsor')
-        )
-      )
-    );
-}
-
 export async function getSponsorshipBySponsorCode(code: string) {
   const rows = await db
     .select()
@@ -469,37 +449,6 @@ export async function isNumberClaimedOutsideEmails(
           eq(sponsorships.status, 'Holder')
         ),
         or(...numberMatches)
-      )
-    )
-    .limit(1);
-  return rows.length > 0;
-}
-
-/**
- * Is there an Active or Holder sponsorship on this child from ANY
- * email other than the one given? Used to block fraudulent second-
- * claim attempts on a number that&rsquo;s already been spoken for.
- */
-export async function isChildClaimedByOtherEmail(
-  child: { id: string; childId: string },
-  excludingEmail: string
-): Promise<boolean> {
-  if (!child.id && !child.childId) return false;
-  const emailLower = excludingEmail.toLowerCase();
-  const rows = await db
-    .select({ id: sponsorships.id })
-    .from(sponsorships)
-    .where(
-      and(
-        sql`lower(${sponsorships.sponsorEmail}) <> ${emailLower}`,
-        or(
-          eq(sponsorships.status, 'Active'),
-          eq(sponsorships.status, 'Holder')
-        ),
-        or(
-          eq(sponsorships.childId, child.id),
-          eq(sponsorships.childIdLegacy, child.childId)
-        )
       )
     )
     .limit(1);
@@ -917,15 +866,6 @@ export async function getDonationWithDonorByCheckoutSessionId(
   return rows[0] ?? null;
 }
 
-export async function getSubscriptionByStripeId(stripeSubscriptionId: string) {
-  const rows = await db
-    .select()
-    .from(subscriptions)
-    .where(eq(subscriptions.stripeSubscriptionId, stripeSubscriptionId))
-    .limit(1);
-  return rows[0] ?? null;
-}
-
 // ─── Batches (cycle math) ────────────────────────────────────────
 
 export async function listBatches() {
@@ -972,66 +912,6 @@ export async function getPublishedUpdatesForChild(child: {
     )
     .orderBy(desc(childUpdates.publishedAt));
 }
-
-/**
- * Every Sponsor Message a given sponsor has sent, newest first. Source
- * of truth is the `communications` table (EmailType='Sponsor Message');
- * this powers the "your side of the conversation" panel in the sponsor
- * portal timeline.
- */
-export async function getSponsorMessagesByCode(sponsorCode: string) {
-  if (!sponsorCode) return [];
-  return db
-    .select({
-      id: communications.id,
-      subject: communications.subject,
-      status: communications.status,
-      sendDate: communications.sendDate,
-      createdAt: communications.createdAt,
-    })
-    .from(communications)
-    .where(
-      and(
-        eq(communications.emailType, 'Sponsor Message'),
-        // Subject carries the sponsorCode prefix so we can filter on it
-        // without a dedicated column. See recordSponsorMessage().
-        sql`${communications.subject} LIKE ${`[${sponsorCode}]%`}`
-      )
-    )
-    .orderBy(desc(communications.createdAt));
-}
-
-/**
- * Was a sponsor-update request already submitted today for this code?
- * Used by /api/sponsor/request-update for idempotency — a double-tap
- * within the same UTC day is treated as the same request.
- */
-export async function getTodayPendingUpdateRequest(
-  sponsorCode: string,
-  child: { id: string; childId: string }
-) {
-  if (!sponsorCode) return null;
-  const startOfDay = new Date();
-  startOfDay.setUTCHours(0, 0, 0, 0);
-  const rows = await db
-    .select({ id: childUpdates.id })
-    .from(childUpdates)
-    .where(
-      and(
-        eq(childUpdates.sponsorCode, sponsorCode),
-        eq(childUpdates.requestedBySponsor, true),
-        or(
-          eq(childUpdates.childId, child.id),
-          eq(childUpdates.childIdLegacy, child.childId)
-        ),
-        sql`${childUpdates.requestedAt} >= ${startOfDay}`
-      )
-    )
-    .limit(1);
-  return rows[0] ?? null;
-}
-
-// ─── SOTM history ────────────────────────────────────────────────
 
 /**
  * All Student of the Month awards a kid has earned, newest first.
@@ -1459,13 +1339,6 @@ export interface MobileMineKidRow {
   createdAt: Date;
 }
 
-/** Single-email convenience wrapper — see getMobileMineKidsForEmails. */
-export async function getMobileMineKidsForEmail(
-  viewerEmail: string
-): Promise<MobileMineKidRow[]> {
-  return getMobileMineKidsForEmails(viewerEmail ? [viewerEmail] : []);
-}
-
 export async function getMobileMineKidsForEmails(
   viewerEmails: string[]
 ): Promise<MobileMineKidRow[]> {
@@ -1694,70 +1567,6 @@ export async function getCampusFeedSotm(args: {
 }
 
 /**
- * Every fulfillment row for a buyer email, joined to the kid whose
- * shirt number matches. Used by the sign-in self-heal path and the
- * one-off orphan backfill script to materialize Holder sponsorships
- * from a fulfillment when no sponsorship row exists yet.
- *
- * The kid join is nullable: pre-shipping fulfillments have no
- * `order_number` (Kevin hasn't reconciled a number from the stockpile
- * yet), so the child columns come back null. That's fine — the caller
- * still creates a childless Holder sponsorship so the buyer can sign
- * in and land on /me while they wait for the shirt.
- */
-export interface FulfillmentWithChildRow {
-  fulfillmentId: string;
-  orderNumber: number | null;
-  orderDate: Date | null;
-  createdAt: Date;
-  buyerName: string | null;
-  childId: string | null;
-  childIdLegacy: string | null;
-  childDisplayName: string | null;
-  childFirstName: string | null;
-  childLastInitial: string | null;
-  childShirtNumber: number | null;
-}
-
-export async function getFulfillmentsWithChildForBuyerEmail(
-  buyerEmail: string
-): Promise<FulfillmentWithChildRow[]> {
-  if (!buyerEmail) return [];
-  const emailLower = buyerEmail.toLowerCase();
-  const rows = await db
-    .select({
-      fulfillmentId: fulfillments.id,
-      orderNumber: fulfillments.orderNumber,
-      orderDate: fulfillments.orderDate,
-      createdAt: fulfillments.createdAt,
-      buyerName: fulfillments.buyerName,
-      childId: children.id,
-      childIdLegacy: children.childId,
-      childDisplayName: children.displayName,
-      childFirstName: children.firstName,
-      childLastInitial: children.lastInitial,
-      childShirtNumber: children.shirtNumber,
-    })
-    .from(fulfillments)
-    .leftJoin(children, eq(children.shirtNumber, fulfillments.orderNumber))
-    .where(sql`lower(${fulfillments.buyerEmail}) = ${emailLower}`)
-    .orderBy(desc(fulfillments.orderDate), desc(fulfillments.createdAt));
-  return rows.map(r => ({
-    fulfillmentId: r.fulfillmentId,
-    orderNumber: r.orderNumber,
-    orderDate: r.orderDate ? new Date(r.orderDate) : null,
-    createdAt: r.createdAt,
-    buyerName: r.buyerName,
-    childId: r.childId,
-    childIdLegacy: r.childIdLegacy,
-    childDisplayName: r.childDisplayName,
-    childFirstName: r.childFirstName,
-    childLastInitial: r.childLastInitial,
-    childShirtNumber: r.childShirtNumber,
-  }));
-}
-
-/**
  * The signed-in viewer's Buyer Home data. Purchase rows come from the
  * `fulfillments` table (source of truth for shirts shipped) with the
  * matching `donations.amount` when we can resolve the pair. Billing
@@ -1863,27 +1672,3 @@ export async function getExploreKids(args: {
   }));
 }
 
-/**
- * Total delivered notes count for a (sponsor, kid) pair. Used by
- * mobile /kids/mine to compute unread-updates count later — for now
- * we return a placeholder of 0 unread; when the read-state table
- * exists this helper will do the real math.
- */
-export async function countDeliveredKidReplies(args: {
-  sponsorEmail: string;
-  childRecordId: string;
-}): Promise<number> {
-  const email = args.sponsorEmail.toLowerCase();
-  if (!email || !args.childRecordId) return 0;
-  const rows = await db
-    .select({ n: sql<number>`count(*)::int` })
-    .from(kidMessages)
-    .where(
-      and(
-        sql`lower(${kidMessages.sponsorEmail}) = ${email}`,
-        eq(kidMessages.childId, args.childRecordId),
-        eq(kidMessages.direction, 'kid_to_sponsor')
-      )
-    );
-  return rows[0]?.n ?? 0;
-}

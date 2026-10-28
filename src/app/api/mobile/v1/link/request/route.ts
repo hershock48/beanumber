@@ -122,8 +122,8 @@ export async function POST(request: NextRequest) {
             </a>
           </p>
           <p style="color: #888; font-size: 13px;">
-            If you didn&rsquo;t request this, you can ignore this email
-            &mdash; nothing changes without the tap. Link is good for
+            If you didn&rsquo;t request this, you can ignore this email.
+            Nothing changes without the tap. Link is good for
             24 hours.
           </p>
           <hr style="border: none; border-top: 1px solid #e8e0d4; margin: 24px 0;">

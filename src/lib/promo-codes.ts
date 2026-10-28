@@ -119,7 +119,7 @@ export function canApplyPromoToCart(
   if (code.appliesTo === 'shirt-only' && cart.hasMonthly) {
     return {
       ok: false,
-      reason: `${code.code} applies to shirts only — remove the monthly opt-in or add it later from your kid's page.`,
+      reason: `${code.code} applies to shirts only. Remove the monthly opt-in or add it later from your kid's page.`,
     };
   }
   return { ok: true, code };

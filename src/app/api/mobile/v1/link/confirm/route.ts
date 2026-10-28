@@ -36,7 +36,7 @@ function page(title: string, body: string, deepLink?: string): NextResponse {
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>${title} — Be A Number</title>
+    <title>${title} | Be A Number</title>
   </head>
   <body style="font-family: Georgia, 'Times New Roman', serif; line-height: 1.7; color: #333; max-width: 560px; margin: 0 auto; padding: 40px 20px; background:#FFF8F0;">
     <h1 style="font-size: 24px; color: #0d0d0d;">${title}</h1>
@@ -59,7 +59,7 @@ export async function GET(request: NextRequest) {
   if (!verified) {
     return page(
       'This link has expired.',
-      'Email links are good for 24 hours. Open the Be A Number app and request a fresh one from the same screen — it takes ten seconds.'
+      'Email links are good for 24 hours. Open the Be A Number app and request a fresh one from the same screen. It takes ten seconds.'
     );
   }
 
@@ -83,14 +83,14 @@ export async function GET(request: NextRequest) {
     );
     return page(
       "You're connected.",
-      'Your shirts and sponsorships now show up in the Be A Number app under this email. Head back to the app — your kids are waiting.',
+      'Your shirts and sponsorships now show up in the Be A Number app under this email. Head back to the app. Your kids are waiting.',
       'beanumber:///?linked=1'
     );
   } catch (err) {
     console.error('[MobileLink] confirm error:', err);
     return page(
       'Something went sideways.',
-      'The link is valid but we hit a hiccup saving it. Try the link again in a minute — or email kevin@beanumber.org and a person will sort it.'
+      'The link is valid but we hit a hiccup saving it. Try the link again in a minute, or email kevin@beanumber.org and a person will sort it.'
     );
   }
 }

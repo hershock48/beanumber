@@ -29,7 +29,7 @@ export const metadata: Metadata = {
   alternates: { canonical: '/news' },
   title: 'Campus news',
   description:
-    'Monthly updates from the campus in Omoro District, Northern Uganda — what the school, clinic, and kids are doing this month.',
+    'Monthly updates from the campus in Omoro District, Northern Uganda: what the school, clinic, and kids are doing this month.',
   openGraph: {
     title: 'Campus news | Be A Number',
     description:
@@ -110,7 +110,7 @@ export default async function NewsPage({
           <p className="text-lg text-[#555] leading-relaxed">
             One letter a month from Kevin and the team in Omoro
             District. The school, the clinic, the cooks, the kids
-            &mdash; what&rsquo;s actually moving in Northern Uganda
+            : what&rsquo;s actually moving in Northern Uganda
             right now.
           </p>
         </div>

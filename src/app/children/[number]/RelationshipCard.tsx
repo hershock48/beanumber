@@ -60,8 +60,8 @@ export function RelationshipCard({
           You&rsquo;re already in this with {firstName}.
         </p>
         <p className="text-[#555] leading-relaxed text-base md:text-[17px] max-w-2xl">
-          What you&rsquo;re about to read &mdash; the campus, the
-          classrooms, the kids around {firstName} &mdash; runs because
+          What you&rsquo;re about to read, the campus, the
+          classrooms, the kids around {firstName}, runs because
           you and a handful of others keep showing up every month.
           Thank you for being one of {firstName}&rsquo;s people.
         </p>
@@ -113,7 +113,7 @@ export function RelationshipCard({
 
       <p className="text-xs text-[#999] mt-3">
         Your monthly $25 goes to the pool that funds the whole campus
-        &mdash; school, meals, the on-site clinic, teachers&rsquo;
+        : school, meals, the on-site clinic, teachers&rsquo;
         salaries. {firstName} is the face you stay close to.
       </p>
     </div>

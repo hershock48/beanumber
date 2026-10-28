@@ -187,7 +187,7 @@ export function SignInForm() {
           <p className="text-sm text-[#555] leading-relaxed">
             <span className="font-bold text-[#0d0d0d]">Not seeing it?</span>{' '}
             Check your spam folder. Sometimes the first email from us
-            lands there — mark it as safe and future links won&rsquo;t.
+            lands there. Mark it as safe and future links won&rsquo;t.
           </p>
         </div>
 
@@ -241,12 +241,12 @@ export function SignInForm() {
 
   let headline = 'Sign in.';
   let body =
-    'Enter your email. We send a one-tap link — no password to remember, no account to create. First time here? Same door: your first sign-in is your sign-up.';
+    'Enter your email. We send a one-tap link: no password to remember, no account to create. First time here? Same door: your first sign-in is your sign-up.';
 
   if (arrivedWithNumber) {
     headline = 'Make your Number yours.';
     body =
-      "Enter your email and we'll send a one-tap link — that's the whole thing. No password, no account to create. If you've never been here before, this is how you start; if you have, it signs you back in.";
+      "Enter your email and we'll send a one-tap link. That's the whole thing. No password, no account to create. If you've never been here before, this is how you start; if you have, it signs you back in.";
   }
 
   // Sponsor intent: they pressed the $25/mo button on the kid page.
@@ -269,7 +269,7 @@ export function SignInForm() {
   } else if (errorParam === 'unavailable') {
     headline = 'We couldn’t find that sponsorship.';
     body =
-      "Enter your email below — we'll send a one-tap link. If you're stuck, email Kevin.";
+      "Enter your email below. We'll send a one-tap link. If you're stuck, email Kevin.";
   } else if (errorParam === 'number_claimed') {
     // The confirm-claim callback found the number taken by another
     // email between the confirmation email and the tap.

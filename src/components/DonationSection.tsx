@@ -2,9 +2,7 @@
 
 import { useState, useEffect } from 'react';
 
-interface DonationSectionProps {}
-
-export function DonationSection({}: DonationSectionProps) {
+export function DonationSection() {
   const [isLoading, setIsLoading] = useState(false);
   const [customAmount, setCustomAmount] = useState<string>('');
   const [isMonthly, setIsMonthly] = useState(true);
@@ -90,7 +88,7 @@ export function DonationSection({}: DonationSectionProps) {
         <div className="bg-gray-900 text-white p-6 sm:p-8 md:p-12 rounded-lg">
           <h2 className="text-2xl sm:text-3xl font-bold mb-4 text-center">Support Our Work</h2>
           <p className="text-gray-200 mb-12 max-w-2xl mx-auto text-center leading-relaxed">
-            Your investment supports sustainable systems that generate measurable, long-term outcomes. 96–97% of all funding directly supports programs and community impact. We operate with a lean administrative structure and report all outcomes and financials annually.
+            Your gift goes to a six-acre campus in Northern Uganda: a school, a clinic, two meals a day, and job training, run by people from the community. We publish our financials every year.
           </p>
           
           {/* Donation Frequency Toggle */}

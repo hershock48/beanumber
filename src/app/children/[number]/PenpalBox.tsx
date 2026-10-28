@@ -313,7 +313,7 @@ export function PenpalBox({
             </p>
             <p className="text-[15px] text-[#333] leading-relaxed mb-6 max-w-md mx-auto">
               You get monthly photos, report cards, and campus
-              updates &mdash; and you and {firstName} keep writing.{' '}
+              updates, and you and {firstName} keep writing.{' '}
               <span className="font-bold text-[#0d0d0d]">$25/month.</span>{' '}
               Cancel anytime.
             </p>
@@ -331,7 +331,7 @@ export function PenpalBox({
                   href="/shirts"
                   className="inline-block bg-[#D4A843] text-[#0d0d0d] font-bold uppercase tracking-wider py-4 px-8 hover:bg-[#c49a3a] transition-colors"
                 >
-                  Sponsor {firstName} &mdash; $25/month
+                  Sponsor {firstName}, $25/month
                 </Link>
               )}
             </div>
@@ -416,12 +416,12 @@ export function PenpalBox({
               <div className="mb-6">
                 <p className="text-[16px] md:text-[17px] text-[#0d0d0d] leading-snug mb-3 font-semibold">
                   <span className="font-bold text-[#0d0d0d]">$25/month</span>{' '}
-                  covers {firstName}&rsquo;s school day.
+                  supports {firstName}&rsquo;s school day at the campus.
                 </p>
                 <p className="text-[14px] md:text-[15px] text-[#555] leading-relaxed">
-                  You get a real penpal on the other end &mdash; letters back
-                  and forth, monthly photos, report cards, and updates
-                  from the campus. Cancel anytime.
+                  You write from this page and their replies come back
+                  in their own handwriting, plus monthly photos, report
+                  cards, and updates from the campus. Cancel anytime.
                 </p>
               </div>
             ) : (
@@ -472,11 +472,11 @@ export function PenpalBox({
                     href={`/signin?n=${shirtNumber}&intent=sponsor`}
                     className="inline-block w-full max-w-xs text-center bg-[#D4A843] text-[#0d0d0d] font-bold uppercase tracking-wider py-4 px-8 hover:bg-[#c49a3a] transition-colors"
                   >
-                    Sponsor {firstName} &mdash; $25/month
+                    Sponsor {firstName}, $25/month
                   </Link>
                 )}
                 <p className="text-xs text-[#888] leading-relaxed max-w-xs text-center">
-                  Straight to checkout &mdash; the email you enter
+                  Straight to checkout. The email you enter
                   there connects #{shirtNumber} to you. Already
                   sponsoring monthly? Sign in below instead; nothing
                   new gets charged.
@@ -489,7 +489,7 @@ export function PenpalBox({
                 </Link>
                 <p className="text-xs text-[#888] leading-relaxed max-w-xs text-center">
                   Got the shirt with #{shirtNumber}? Signing in makes
-                  this page yours &mdash; and the letter included with
+                  this page yours, and the letter included with
                   your shirt is ready to send, sponsoring or not.
                 </p>
                 <p className="text-xs uppercase tracking-[0.15em] text-[#888] font-bold mt-2">

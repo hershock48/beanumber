@@ -64,7 +64,7 @@ export default function DonateSuccess() {
               </div>
               <div className="flex gap-3 items-start">
                 <span className="text-[#D4A843] font-bold flex-shrink-0 mt-0.5">&middot;</span>
-                <span>30 local jobs — cooks, teachers, nurses, mentors — sustained by this community</span>
+                <span>30 local jobs (cooks, teachers, nurses, mentors) sustained by this community</span>
               </div>
             </div>
           </div>
@@ -101,7 +101,7 @@ export default function DonateSuccess() {
                 <p className="text-[#666] text-sm leading-relaxed">
                   <a href="/shirts" className="text-[#0d0d0d] font-semibold underline hover:text-[#D4A843] transition-colors">Get a Shirt.</a>{' '}
                   Every Shirt carries a Number and every Number is a Child. $25/month supports school, meals, medical care, and a local
-                  mentor for the specific Kid whose Number you carry &mdash; you&rsquo;ll get photos, letters, and a year-end report card.
+                  mentor for the specific Kid whose Number you carry. You&rsquo;ll get photos, letters, and a year-end report card.
                 </p>
               </div>
               <div className="flex gap-4 items-start">
@@ -132,7 +132,7 @@ export default function DonateSuccess() {
                   Tell someone
                 </h3>
                 <p className="text-[#666] text-sm leading-relaxed mb-4">
-                  Know someone who&rsquo;d care about this? Share it however you want — text, DM, post.
+                  Know someone who&rsquo;d care about this? Share it however you want: text, DM, post.
                 </p>
                 <ShareButton />
               </div>

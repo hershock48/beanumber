@@ -1,5 +1,5 @@
 {
-  "name": "cursor",
+  "name": "beanumber",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -9,11 +9,6 @@
     "lint": "eslint",
     "test": "node scripts/run-tests.cjs",
     "export-donors": "tsx scripts/export-donors.ts",
-    "migrate-csv": "tsx scripts/migrate-from-csv.ts",
-    "migrate-csv-dry": "tsx scripts/migrate-from-csv.ts --dry-run",
-    "backfill-market": "tsx scripts/backfill-market-sales.ts",
-    "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
     "remotion:preview": "remotion studio src/remotion/index.ts",
     "remotion:render": "remotion render src/remotion/index.ts ImpactReport out/impact-report.mp4",
@@ -23,14 +18,9 @@
     "@remotion/cli": "^4.0.409",
     "@resvg/resvg-js": "^2.6.2",
     "sharp": "^0.35.5",
-    "@remotion/media-utils": "^4.0.409",
-    "@remotion/player": "^4.0.409",
     "@sendgrid/mail": "^8.1.3",
-    "@stripe/stripe-js": "^8.6.1",
     "@supabase/supabase-js": "^2.49.1",
-    "@types/canvas-confetti": "^1.9.0",
     "canvas-confetti": "^1.9.4",
-    "csv-parse": "^5.6.0",
     "drizzle-orm": "^0.36.4",
     "googleapis": "^170.1.0",
     "html-to-image": "^1.11.13",
@@ -39,10 +29,12 @@
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "remotion": "^4.0.409",
-    "stripe": "^20.1.2"
+    "stripe": "^20.1.2",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/canvas-confetti": "^1.9.0",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",

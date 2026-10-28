@@ -1,3 +1,5 @@
+> **Historical (Airtable era).** Written before the Postgres cutover of 2026-09-14. Tables, tool files and routes named below may no longer exist; the current map is docs/claude/architecture.md and the October 2026 audit is docs/audit-2026-10.md. Kept for the record, not as instructions.
+
 # Quick Deploy Commands
 
 Copy and paste these commands to deploy:

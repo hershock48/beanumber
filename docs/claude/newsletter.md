@@ -39,7 +39,7 @@ There is **no separate "publish to feed" step**. The Sent state IS the publish e
 
 ## Authoring a newsletter
 
-### File: Airtable `Newsletters` table
+### Where: the `newsletters` table, authored at `/admin/campus-update`
 
 Fields you fill in:
 
@@ -102,7 +102,7 @@ All other voice rules from `voice.md` still apply: direct, specific, personal, c
 ## Recipient lists — where they come from
 
 ### Sponsor list
-Sourced from `findAllSponsorsForNewsletter()` in `src/lib/airtable.ts`. Filter: `Status = Active OR AuthStatus = Active` on the Sponsorships table. Deduped by lowercased email. A sponsor with multiple Active sponsorships gets one email with all their kid links.
+Sourced from the recipient query in `src/lib/tools/email/send-campus-newsletter.ts`. Filter: `status = 'Active' OR auth_status = 'Active'` on `sponsorships`. Deduped by lowercased email. A sponsor with multiple Active sponsorships gets one email with all their kid links.
 
 **Ghost-sponsorship caution.** A Sponsorship row with `Status = Active` but no `StripeSubscriptionID` and no real Stripe payment behind it will be counted as a sponsor and produce a stray email + a stray kid link. Audit these by listing Sponsorships with no Stripe sub and verifying against the Donations table. The Stripe sync's claim-by-email path now backfills correctly, so this should be rare going forward.
 

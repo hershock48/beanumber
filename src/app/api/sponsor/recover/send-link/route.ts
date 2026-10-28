@@ -373,8 +373,8 @@ export async function POST(request: NextRequest) {
         const bodyLine = hasKid
           ? `Tap the button below to sign in. You&rsquo;ll land on ${found.firstName}&rsquo;s page. From there, the &ldquo;My Campus&rdquo; link in the nav has every kid you sponsor or hold.`
           : hasNumber
-          ? `Tap the button below to sign in. You&rsquo;ll land on your kid&rsquo;s page &mdash; #${found.shirtNumber} is yours. From there, the &ldquo;My Campus&rdquo; link in the nav has every kid you sponsor or hold.`
-          : `Tap the button below to sign in. Your shirt is being prepared &mdash; once your Number is stamped and shipped, the kid it belongs to will show up on your My Campus page.`;
+          ? `Tap the button below to sign in. You&rsquo;ll land on your kid&rsquo;s page. #${found.shirtNumber} is yours. From there, the &ldquo;My Campus&rdquo; link in the nav has every kid you sponsor or hold.`
+          : `Tap the button below to sign in. Your shirt is being prepared. Once your Number is stamped and shipped, the kid it belongs to will show up on your My Campus page.`;
         const html = `
           <!DOCTYPE html>
           <html>
@@ -391,7 +391,7 @@ export async function POST(request: NextRequest) {
                 </a>
               </p>
               <p style="color: #888; font-size: 13px;">
-                This device will remember you &mdash; no need to use
+                This device will remember you, no need to use
                 this link again unless you change devices or clear
                 cookies. Link is good for 24 hours.
               </p>
@@ -583,7 +583,7 @@ export async function POST(request: NextRequest) {
       `[Recovery] claim-path send: to=${email} #${shirtNumber} from=${fromEmail}`
     );
     const subject = isFreshClaim
-      ? `#${shirtNumber} is yours — open ${firstName}'s page`
+      ? `#${shirtNumber} is yours. Open ${firstName}'s page`
       : `Sign in to ${firstName}'s page`;
     const headline = isFreshClaim
       ? `#${shirtNumber} is yours now.`
@@ -597,7 +597,7 @@ export async function POST(request: NextRequest) {
       : `<p>Tap the button below to sign in and open
           ${firstName}&rsquo;s page on
           <a href="https://www.beanumber.org" style="color: #D4A843; font-weight: bold;">beanumber.org</a>.
-          This device will remember you &mdash; you won&rsquo;t need
+          This device will remember you, so you won&rsquo;t need
           the link again unless you change devices or clear your
           cookies.</p>`;
 

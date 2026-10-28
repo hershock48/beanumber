@@ -48,8 +48,12 @@ export async function GET(request: NextRequest) {
   const where =
     status === 'not-shipped'
       ? eq(fulfillments.shipping, 'Not Shipped')
+      // 'ready' used to require production='Done', a value nothing has
+      // written since the stockpile model (May 2026): shirts ship from
+      // pre-printed stock. fulfillment-csv fixed the same filter on
+      // 2026-07-17; this one kept returning zero rows. Unshipped is ready.
       : status === 'ready'
-        ? and(eq(fulfillments.production, 'Done'), eq(fulfillments.shipping, 'Not Shipped'))
+        ? eq(fulfillments.shipping, 'Not Shipped')
         : status === 'pending'
           ? eq(fulfillments.production, 'Pending')
           : undefined;

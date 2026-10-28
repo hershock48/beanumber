@@ -181,15 +181,15 @@ function shirtNurtureEmail(
         const recapPrefix = loc ? `Thanks for stopping by ${boothRef}` : `Thanks for stopping by the booth`;
 
         bodyParagraph = multi
-          ? `<p>${recapPrefix} — you walked away with ${numbers.length} shirts. A real kid is on the other side of each number printed on them. Neither of us knows who yet. Flip the shirts over. Find the numbers. Meet them at <a href="${SITE_URL}" style="color: #D4A843; font-weight: bold;">beanumber.org</a>.</p>`
-          : `<p>${recapPrefix} — you walked away with your shirt. A real kid is on the other side of the number printed on it. Neither of us knows who yet. Flip the shirt over. Find the number. Meet them at <a href="${SITE_URL}" style="color: #D4A843; font-weight: bold;">beanumber.org</a>.</p>`;
+          ? `<p>${recapPrefix}, you walked away with ${numbers.length} shirts. A real kid is on the other side of each number printed on them. Neither of us knows who yet. Flip the shirts over, find the numbers, and meet them at <a href="${SITE_URL}" style="color: #D4A843; font-weight: bold;">beanumber.org</a>.</p>`
+          : `<p>${recapPrefix}, you walked away with your shirt. A real kid is on the other side of the number printed on it. Neither of us knows who yet. Flip the shirt over, find the number, and meet them at <a href="${SITE_URL}" style="color: #D4A843; font-weight: bold;">beanumber.org</a>.</p>`;
         // No "P.S. take a picture when you open it" — they already opened
         // it at the booth. The breadcrumb back to Simon's side.
-        postscript = `<p style="color: #777; font-size: 14px; margin-top: 24px;">P.S. If you took a photo at the booth, send it back — we share those with the team at the campus so the kids see who&rsquo;s wearing their number.</p>`;
+        postscript = `<p style="color: #777; font-size: 14px; margin-top: 24px;">P.S. If you took a photo at the booth, send it back. We share those with the team at the campus so the kids see who&rsquo;s wearing their number.</p>`;
       } else {
         bodyParagraph = multi
-          ? `<p>Your shirts are in the mail. A real kid is on the other side of each number printed on them. Neither of us knows who yet. Open the bag. Find the numbers. Meet them at <a href="${SITE_URL}" style="color: #D4A843; font-weight: bold;">beanumber.org</a>.</p>`
-          : `<p>Your shirt&rsquo;s in the mail. A real kid is on the other side of the number printed on it. Neither of us knows who yet. Open the bag. Find the number. Meet them at <a href="${SITE_URL}" style="color: #D4A843; font-weight: bold;">beanumber.org</a>.</p>`;
+          ? `<p>Your shirts are in the mail. A real kid is on the other side of each number printed on them. Neither of us knows who yet. Open the bag, find the numbers, and meet them at <a href="${SITE_URL}" style="color: #D4A843; font-weight: bold;">beanumber.org</a>.</p>`
+          : `<p>Your shirt&rsquo;s in the mail. A real kid is on the other side of the number printed on it. Neither of us knows who yet. Open the bag, find the number, and meet them at <a href="${SITE_URL}" style="color: #D4A843; font-weight: bold;">beanumber.org</a>.</p>`;
         postscript = `<p style="color: #777; font-size: 14px; margin-top: 24px;">P.S. When you open it, take a picture. We send those to the team at the campus, and the kids see who&rsquo;s wearing their number.</p>`;
       }
 
@@ -298,7 +298,7 @@ function sponsorOnboardEmail(
             ? `<p><strong>${displayChildName ? `${displayChildName}’s` : 'Your'} page is at <a href="${childUrl}" style="color: #D4A843; font-weight: bold;">${childUrlLabel}</a>.</strong> Bookmark it. That&rsquo;s where penpal letters, photos, and campus updates show up. Your browser remembers you after your first visit, so there&rsquo;s no separate login to keep track of.</p>`
             : `<p><strong>Penpal letters, photos, and campus updates show up on your kid&rsquo;s page at <a href="${SITE_URL}" style="color: #D4A843; font-weight: bold;">beanumber.org</a>.</strong></p>`
           }
-          <p>If you ever want to write your penpal, reply to this email. The team on the ground handles delivery and translation. And if you ever can&rsquo;t get back to your page, write me at <a href="mailto:Kevin@beanumber.org" style="color: #D4A843; font-weight: bold;">Kevin@beanumber.org</a> and I&rsquo;ll sort it out.</p>
+          <p>If you ever want to write to ${displayChildName || 'your kid'}, reply to this email. The team on the ground handles delivery and translation. And if you ever can&rsquo;t get back to your page, write me at <a href="mailto:Kevin@beanumber.org" style="color: #D4A843; font-weight: bold;">Kevin@beanumber.org</a> and I&rsquo;ll sort it out.</p>
           <p>Kevin</p>
         `),
       };
@@ -308,9 +308,9 @@ function sponsorOnboardEmail(
         subject: "What to expect over the next few weeks",
         html: wrapEmail(`
           <p style="margin-top: 0;">Hey ${firstName},</p>
-          <p>Just wanted to give you a heads up on what to expect over the next few weeks.</p>
-          <p>The team on the ground in Uganda sends regular updates from the campus. ${displayChildName ? `You&rsquo;ll hear about ${displayChildName} specifically` : 'You&rsquo;ll hear about your child specifically'}: what they&rsquo;re studying, how they&rsquo;re doing in class, sometimes a photo or a penpal letter. Those updates show up on ${displayChildName ? `${displayChildName}&rsquo;s page` : 'your kid&rsquo;s page'} at <a href="${childUrl}" style="color: #D4A843; font-weight: bold;">${childUrlLabel}</a> and by email, and the first one usually comes within your first month.</p>
-          <p>If you want to write your penpal (${displayChildName || 'your child'}), open ${displayChildName ? `${displayChildName}&rsquo;s page` : 'their page'} and use the Penpal composer. The team reads every note, translates when needed, and hands it over in person.</p>
+          <p>Here&rsquo;s what to expect over the next few weeks.</p>
+          <p>The team on the ground in Uganda posts updates from the campus as things happen. ${displayChildName ? `You&rsquo;ll hear about ${displayChildName} specifically` : 'You&rsquo;ll hear about your child specifically'}: what they&rsquo;re studying, how they&rsquo;re doing in class, sometimes a photo or a penpal letter. Those updates show up on ${displayChildName ? `${displayChildName}&rsquo;s page` : 'your kid&rsquo;s page'} at <a href="${childUrl}" style="color: #D4A843; font-weight: bold;">${childUrlLabel}</a> and by email.</p>
+          <p>If you want to write to ${displayChildName || 'your child'}, open ${displayChildName ? `${displayChildName}&rsquo;s page` : 'their page'} and use the Penpal composer. The team reads every note, translates when needed, and hands it over in person.</p>
           <p>Kevin</p>
         `),
       };
@@ -320,7 +320,7 @@ function sponsorOnboardEmail(
         subject: "Checking in after your first month",
         html: wrapEmail(`
           <p style="margin-top: 0;">Hey ${firstName},</p>
-          <p>You&rsquo;ve been sponsoring for about a month now, so I just wanted to check in and let you know what your $25 supported this month: ${displayChildName ? `${displayChildName} went` : 'your child went'} to school every day, ate breakfast and lunch at the campus every day, and had a nurse available whenever they needed one. Same thing will happen next month because you&rsquo;re still here.</p>
+          <p>You&rsquo;ve been sponsoring for about a month now, so here&rsquo;s what your $25 supported this month: ${displayChildName ? `${displayChildName} went` : 'your child went'} to school every day, ate breakfast and lunch at the campus every day, and had a nurse available whenever they needed one. Same thing will happen next month because you&rsquo;re still here.</p>
           <p>One thing that really helps us grow: if you know someone who&rsquo;d be into what we do, send them a quick text. It doesn&rsquo;t need to be a whole thing, something like &ldquo;I sponsor a kid in Uganda through this org called Be A Number, you should check it out.&rdquo; That&rsquo;s genuinely how most of our sponsors find us.</p>
           <p>${displayChildName ? `${displayChildName}&rsquo;s page` : 'Your kid&rsquo;s page'} at <a href="${childUrl}" style="color: #D4A843; font-weight: bold;">${childUrlLabel}</a> has the latest updates whenever you want to check in.</p>
           <p>Kevin</p>
@@ -347,7 +347,7 @@ function donorConvertEmail(
         html: wrapEmail(`
           <p style="margin-top: 0;">Hey ${firstName},</p>
           <p>I wanted to follow up and let you know where your donation actually went, because I think that matters.</p>
-          <p>It went to the campus in Northern Uganda. One campus, one team on the ground. The budget supports school fees, meals, and medical care for the children there &mdash; you can know any of them by name. We&rsquo;re small on purpose, which means I can tell you exactly where your money ends up.</p>
+          <p>It went to the campus in Northern Uganda. One campus, one team on the ground. The budget supports school fees, meals, and medical care for the children there, and you can know any of them by name. We&rsquo;re small on purpose, which means I can tell you exactly where your money ends up.</p>
           <p>Thank you for trusting us with it.</p>
           <p>Kevin</p>
         `),
@@ -374,8 +374,8 @@ function donorConvertEmail(
         html: wrapEmail(`
           <p style="margin-top: 0;">Hey ${firstName},</p>
           <p>I&rsquo;ll stop showing up in your inbox after this one.</p>
-          <p>What you gave went to real kids. It supported meals, kept them in school, paid for a nurse on the days they needed one. That&rsquo;s where it landed. No overhead games, no admin layer between your gift and the kids who got fed.</p>
-          <p>If you ever want to go deeper, sponsoring a child for $25 a month connects you to one specific kid at the campus by name. You get letters, photos, and report cards from them. Or grab a shirt at <a href="${SITE_URL}/shirts" style="color: #D4A843; font-weight: bold;">beanumber.org/shirts</a> and the number on the back is your match.</p>
+          <p>What you gave went to real kids. It supported meals, kept them in school, and kept the nurse on campus on the days they needed one. That&rsquo;s where it landed, with no admin layer between your gift and the kids who got fed.</p>
+          <p>If you ever want to go deeper, sponsoring a child for $25 a month connects you to one specific kid at the campus by name. You get letters, photos, and report cards from them. Or grab a shirt at <a href="${SITE_URL}/shirts" style="color: #D4A843; font-weight: bold;">beanumber.org/shirts</a> and the number on the back is your kid.</p>
           <p style="text-align: center; margin: 24px 0;">
             <a href="${SITE_URL}/shirts" style="display: inline-block; background: #D4A843; color: #0d0d0d; font-weight: bold; text-decoration: none; padding: 14px 32px; font-size: 15px; letter-spacing: 0.05em;">GET A SHIRT</a>
           </p>
@@ -412,7 +412,7 @@ function shirtSponsorEmail(
                <p>When it arrives, check the back of the shirt. There&rsquo;s a number pressed below the main design, and that number belongs to a real child at our campus in Northern Uganda. You&rsquo;ll come back to the site, enter the number, and meet them.</p>`
           }
           <p>You also signed up for monthly sponsorship, which means your $25 a month is already at work. It supports school fees, two meals a day, and medical care at the campus, and that started the day you signed up. You&rsquo;re a sponsor right now, even before the ${multi ? 'shirts arrive' : 'shirt arrives'}.</p>
-          <p>Once you&rsquo;ve gotten your ${multi ? 'shirts' : 'shirt'} and entered the number on the site, your sponsor view unlocks right on that page &mdash; updates, photos, the whole thing. I want you to have the ${multi ? 'shirts' : 'shirt'} in hand first.</p>
+          <p>Once you&rsquo;ve gotten your ${multi ? 'shirts' : 'shirt'} and entered the number on the site, your sponsor view unlocks right on that page: updates, photos, the whole thing. I want you to have the ${multi ? 'shirts' : 'shirt'} in hand first.</p>
           <p>Kevin</p>
         `),
       };
@@ -490,7 +490,7 @@ function monthlyDonorEmail(
         html: wrapEmail(`
           <p style="margin-top: 0;">Hey ${firstName},</p>
           <p>I wanted to give you a better picture of how things work on the ground, since your monthly gift is part of what makes it all run.</p>
-          <p>Every child at the campus has a number, and that number goes on a shirt. When someone buys that shirt or sponsors that child, they get connected to a real kid by name. The sponsor gets a penpal, monthly photos, report cards, and campus updates. The kid knows their sponsor. It&rsquo;s not a big faceless program.</p>
+          <p>Every child at the campus has a number, and that number goes on a shirt. When someone buys that shirt or sponsors that child, they get connected to a real kid by name. The sponsor gets a penpal, monthly photos, report cards, and campus updates. The kid knows their sponsor. Nobody is a line in a spreadsheet here.</p>
           <p>Your monthly gift is what keeps the whole campus going: the meals, the teachers, the clinic. Without monthly donors, none of the rest of it would work.</p>
           <p>If you want a shirt with a specific kid&rsquo;s number on it, you can <a href="${SITE_URL}/shirts" style="color: #D4A843; font-weight: bold;">get one here</a>. The number-to-name reveal happens when the shirt arrives.</p>
           <p>Kevin</p>
@@ -504,7 +504,7 @@ function monthlyDonorEmail(
           <p style="margin-top: 0;">Hey ${firstName},</p>
           <p>Your monthly gift keeps the campus running, and I&rsquo;m thankful for it. One more thing I want to mention, then I&rsquo;ll let you go.</p>
           <p>Sponsorship is the other side of how people give to us. $25 a month connects you to one specific kid at the campus by name. The kid knows yours. You get letters, photos, and report cards from them. Same campus, same kids, plus a real relationship with one of them by name.</p>
-          <p>If you ever want to add that piece, you can get a Shirt at <a href="${SITE_URL}/shirts" style="color: #D4A843; font-weight: bold;">beanumber.org/shirts</a>. Every Shirt has a Number and every Number is a kid. No pressure if monthly giving is the right shape for you &mdash; what you&rsquo;re already giving keeps a lot of lights on.</p>
+          <p>If you ever want to add that piece, you can get a Shirt at <a href="${SITE_URL}/shirts" style="color: #D4A843; font-weight: bold;">beanumber.org/shirts</a>. Every Shirt has a Number and every Number is a kid. No pressure if monthly giving is the right shape for you. What you&rsquo;re already giving keeps a lot of lights on.</p>
           <p style="text-align: center; margin: 24px 0;">
             <a href="${SITE_URL}/shirts" style="display: inline-block; background: #D4A843; color: #0d0d0d; font-weight: bold; text-decoration: none; padding: 14px 32px; font-size: 15px; letter-spacing: 0.05em;">GET A SHIRT</a>
           </p>

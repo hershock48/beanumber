@@ -264,7 +264,7 @@ export default function TermsPage() {
               <p className="text-[#555] leading-relaxed mb-3">
                 If you want to share about your sponsorship publicly, please
                 do. Share the campus, the school, the programs, or a photo
-                of your numbered shirt. Just don&rsquo;t share photos or identifying
+                of your numbered shirt. Don&rsquo;t share photos or identifying
                 details of the specific child you sponsor.
               </p>
               <p className="text-[#555] leading-relaxed">

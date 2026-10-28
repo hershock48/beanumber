@@ -487,7 +487,7 @@ export function SendNoteComposer({
               onClick={() => setStage('composing')}
               className="inline-block bg-[#D4A843] hover:bg-[#c49a3a] text-[#0d0d0d] px-6 py-3 text-xs font-bold uppercase tracking-wider transition-colors"
             >
-              Write your penpal
+              Write to {firstName}
             </button>
           </div>
         )

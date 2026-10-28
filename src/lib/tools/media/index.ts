@@ -10,13 +10,6 @@ export {
   type UploadToDriveOutput,
 } from './upload-to-drive';
 
-// Folder management tools
-export {
-  ensureChildDriveFolderTool,
-  type EnsureChildFolderInput,
-  type EnsureChildFolderOutput,
-} from './ensure-child-folder';
-
 export {
   ensurePeriodFolderTool,
   type EnsurePeriodFolderInput,

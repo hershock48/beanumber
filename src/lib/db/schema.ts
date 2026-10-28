@@ -20,7 +20,8 @@
  *     is complete.
  *
  *   - created_at / updated_at: every table has them.
- *     updated_at is bumped by a trigger (see migration 0000).
+ *     updated_at is set by every write in mutations.ts; there is no
+ *     database trigger (none of the migrations define one).
  *
  *   - singleSelect-style fields: stored as text rather than Postgres
  *     enums. Postgres enums require a migration to add a new value,
@@ -445,8 +446,12 @@ export const donations = pgTable(
     stripeCustomerId: text('stripe_customer_id'),
 
     donationNote: text('donation_note'),
-    // singleSelect: 'Website' | 'Manual Entry' | 'Event' | 'Other'
-    // | 'Portal Repeat' | 'Sponsorship' | 'Shirt Order' | 'Shirt + Monthly'
+    // Free text. Values the code writes today: 'Website' | 'Manual Entry'
+    // | 'Event' | 'Other' | 'Portal Repeat' | 'Sponsorship' | 'Shirt Order'
+    // | 'Shirt + Monthly' | 'Website - Recurring' | 'Merch'
+    // | 'Gift Sponsorship' | 'Christmas <year>'. The only reader that
+    // branches on it needs exactly 'Shirt + Monthly' (claim-match and
+    // the kid page buyer context).
     donationSource: text('donation_source').default('Website'),
 
     createdAt: timestamp('created_at', { withTimezone: true })
@@ -1304,7 +1309,8 @@ export const kidMessages = pgTable(
     // document intent for the schema reader.
     // See CREATE UNIQUE INDEX kid_messages_active_per_sponsor_kid_idx
     //   ON kid_messages (lower(sponsor_email), child_id)
-    //   WHERE status IN ('pending', 'translated');
+    //   WHERE status IN ('awaiting_kevin', 'pending', 'translated');
+    // (migration 0015 widened the predicate to include awaiting_kevin)
     //
     // Second partial unique index (added 2026-07-06 with phase 3c
     // audit): one kid_to_sponsor reply per parent. Belt-and-suspenders

@@ -298,7 +298,7 @@ function ShirtRow({
               className="text-sm text-[#0d0d0d]"
               style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
             >
-              Stay with this one — $25/mo
+              Stay with this one, $25/mo
             </p>
             <p className="text-[11px] text-[#777] leading-relaxed">
               First charge 30 days from today. Cancel anytime.

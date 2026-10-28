@@ -290,6 +290,7 @@ export async function POST(request: NextRequest) {
         childRevealedAt: new Date(),
         visibleToSponsor: true,
         claimedShirtNumber: shirtNumber,
+        actorType: 'sponsor',
       });
     } catch (err) {
       console.error('[ClaimMatch] Sponsorship create failed:', err);

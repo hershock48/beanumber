@@ -500,8 +500,11 @@ async function sendThankYouEmail(donationData: {
   const amountStr = `$${donationData.amount.toFixed(2)}`;
   const dateStr = new Date(donationData.donationDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
 
+  // A monthly gift from /donate is monthly support, not a sponsorship.
+  // Sponsors hold a number and a kid (CLAUDE.md non-negotiable 2);
+  // this email goes to people who gave without either.
   const subject = donationData.isRecurring
-    ? 'You just became a monthly sponsor.'
+    ? 'You are giving monthly now. Thank you.'
     : 'Thank you. This matters.';
 
   const html = `
@@ -517,7 +520,7 @@ async function sendThankYouEmail(donationData: {
 
               <p>I wanted to say thank you personally. Your ${donationData.isRecurring ? 'monthly ' : ''}gift of ${amountStr} goes directly to the ground. To a six-acre campus in Northern Uganda with a school built for 380 kids, a medical clinic that has treated 700+ patients, and vocational training where 60 women are learning trades.</p>
 
-              ${donationData.isRecurring ? `<p>As a monthly sponsor, you\u2019re not just donating. You\u2019re becoming part of the system that keeps this community running. I\u2019ll make sure you hear from us regularly so you can see exactly what your support is doing.</p>` : `<p>Even a one-time gift moves the needle here. If you ever want to go deeper (sponsor a child, visit the campus, or just learn more about the work), I\u2019m always reachable.</p>`}
+              ${donationData.isRecurring ? `<p>Giving monthly makes you part of the system that keeps this community running. I\u2019ll make sure you hear from us regularly so you can see exactly what your support is doing.</p>` : `<p>Even a one-time gift moves the needle here. If you ever want to go deeper (sponsor a child, visit the campus, or learn more about the work), I\u2019m always reachable.</p>`}
 
               <p style="color: #999; font-size: 14px; margin-top: 24px; margin-bottom: 4px;">Your receipt:</p>
               <p style="font-size: 14px; color: #555; margin-top: 0;">
@@ -685,10 +688,10 @@ async function sendShirtConfirmationEmail(orderData: {
   // their child is.
   const revealBlock = orderData.isPortalRepeat
     ? `
-              <p>This one ships with <strong>#${orderData.shirtNumber || ''}</strong> pressed on the back &mdash; the same number you already know, connected to ${orderData.childDisplayName || 'your kid'}. Free shipping, no new sponsorship started, no new kid assigned.</p>
+              <p>This one ships with <strong>#${orderData.shirtNumber || ''}</strong> pressed on the back, the same number you already know, connected to ${orderData.childDisplayName || 'your kid'}. Free shipping, no new sponsorship, same kid.</p>
     `
     : `
-              <p>When it arrives, look at the back of the shirt. There&rsquo;s a number pressed below the main design, and that number belongs to a real child at the campus in Northern Uganda. Go to <a href="${siteUrl}" style="color: #D4A843; font-weight: bold;">beanumber.org</a>, enter your number, and meet them &mdash; their name, their face, their story.</p>
+              <p>When it arrives, look at the back of the shirt. There&rsquo;s a number pressed below the main design, and that number belongs to a real child at the campus in Northern Uganda. Go to <a href="${siteUrl}" style="color: #D4A843; font-weight: bold;">beanumber.org</a>, enter your number, and meet them: their name, their face, their story.</p>
               <p>Your $25 today supports school, meals, and medical care for the kids on that campus. The number on the shirt is your way in.</p>
     `;
 
@@ -703,7 +706,7 @@ async function sendShirtConfirmationEmail(orderData: {
 
               <p>You opted to keep sponsoring after this shirt, so another $25 will be charged each month going forward. It goes straight to school, meals, and medical care at the campus.</p>
 
-              <p>Once your shirt ships and you&rsquo;ve had a chance to meet the child on the back, I&rsquo;ll send you your sponsor code and portal access. That&rsquo;s where updates, photos, and letters will live going forward.</p>
+              <p>When the shirt arrives, enter the number on the back at <a href="${siteUrl}" style="color: #D4A843; font-weight: bold;">beanumber.org</a> and sign in with this email. Your sponsor view opens right there on the kid&rsquo;s page. That&rsquo;s where updates, photos, and letters live going forward.</p>
 
               <p>You can cancel anytime, no questions asked.</p>
     `
@@ -726,7 +729,7 @@ async function sendShirtConfirmationEmail(orderData: {
 
               <p style="margin-top: 0;">Hey ${firstName},</p>
 
-              <p>Your shirt is in the works &mdash; I&rsquo;m screen-printing it by hand, and I&rsquo;ll get it in the mail as soon as I can.</p>
+              <p>Your shirt is in the works. I&rsquo;m screen-printing it by hand, and I&rsquo;ll get it in the mail as soon as I can.</p>
 
               <p style="color: #999; font-size: 14px; margin-bottom: 4px;">Your order:</p>
               <p style="font-size: 15px; color: #555; margin-top: 0;">
@@ -739,7 +742,7 @@ async function sendShirtConfirmationEmail(orderData: {
 
               <hr style="border: none; border-top: 1px solid #e8e0d4; margin: 30px 0;">
 
-              <p style="color: #666; font-size: 14px; line-height: 1.6;">You&rsquo;re part of the BAN community now, so once a month you&rsquo;ll get a short update straight from the campus in Gulu &mdash; photos, progress, the small stuff. Unsubscribe anytime.</p>
+              <p style="color: #666; font-size: 14px; line-height: 1.6;">You&rsquo;re part of the BAN community now, so once a month you&rsquo;ll get a short update straight from the campus in Gulu: photos, progress, the small stuff. Unsubscribe anytime.</p>
 
               <p>Thanks for being part of this,<br>
               <strong>Kevin</strong></p>
@@ -969,7 +972,7 @@ async function sendGiftCardEmail(data: {
 
         <p style="text-align: center; color: #777; margin: 0 0 28px 0; font-size: 15px;">
           A real kid at the campus in Northern Uganda.<br>
-          Hey ${escapeHtml(recipientFirst)} — they&rsquo;re waiting for you to meet them.
+          Hey ${escapeHtml(recipientFirst)}, they&rsquo;re waiting for you to meet them.
         </p>
 
         ${messageBlock}
@@ -993,7 +996,7 @@ async function sendGiftCardEmail(data: {
         </p>
 
         <p style="color: #555; font-size: 15px; line-height: 1.7;">
-          Their first month at the campus is already covered &mdash; school fees, breakfast and
+          The gift supports their first month at the campus: school, breakfast and
           lunch every day, medical care if they need it. The gift was the introduction.
         </p>
 
@@ -1063,18 +1066,18 @@ async function sendGifterConfirmationEmail(data: {
 
         <p>
           Your gift sponsorship for <strong>${escapeHtml(data.recipientName)}</strong>
-          (${escapeHtml(data.recipientEmail)}) just went out. They&rsquo;re getting an email right now
-          with their matched child&rsquo;s number and a link to meet them.
+          (${escapeHtml(data.recipientEmail)}) went out. They&rsquo;re getting an email right now
+          with the number of the kid they&rsquo;re about to meet, and a link.
         </p>
 
         <p>
           What happens from here is entirely their call. They can decide to stay with the child
-          at $25/month, or they can just hold onto the introduction. Either way, the first
-          month at the campus is already covered because of you.
+          at $25/month, or they can hold onto the introduction. Either way, your gift supports
+          the child&rsquo;s first month at the campus.
         </p>
 
         <p>
-          On behalf of the team at the campus &mdash; thank you. This is the kind of gift
+          On behalf of the team at the campus, thank you. This is the kind of gift
           we don&rsquo;t take lightly.
         </p>
 
@@ -1275,15 +1278,15 @@ async function sendSponsorWelcomeEmail(data: {
 
               <p><strong>Here&rsquo;s what you unlocked:</strong> you get a penpal, monthly photos, report cards, and campus updates. $25/month. ${childFirstName} is your penpal.</p>
 
-              <p>One thing happens fast on the other side of this. The minute you clicked the button, we sent a note to Simon on the campus. Tomorrow morning over there &mdash; they&rsquo;re hours ahead of us &mdash; Simon is going to tell ${childFirstName} they have a sponsor. They don&rsquo;t know your name yet. They&rsquo;re going to ask.</p>
+              <p>One thing happens fast on the other side of this. The minute you clicked the button, a note went to the team at the campus. Tomorrow morning over there, since they are hours ahead of us, the team is going to tell ${childFirstName} they have a sponsor. They don&rsquo;t know your name yet, and they&rsquo;re going to ask.</p>
 
-              <p style="background: #FFF8F0; border-left: 3px solid #D4A843; padding: 16px 20px; margin: 24px 0;"><strong>Reply to this email with your first penpal note for ${childFirstName}.</strong> One sentence. Two. Whatever feels right. We&rsquo;ll pass it on.</p>
+              <p style="background: #FFF8F0; border-left: 3px solid #D4A843; padding: 16px 20px; margin: 24px 0;"><strong>Reply to this email with your first penpal note for ${childFirstName}.</strong> A sentence or two is plenty. We&rsquo;ll pass it on.</p>
 
               <p><strong>${data.childDisplayName}'s page is at <a href="${childUrl}" style="color: #D4A843;">${childUrlLabel}</a>.</strong> Bookmark it. That's where photos, updates, and penpal letters from the campus will show up over the year, and where you can pick up gear with their number on it. Your browser will remember you, so most of the time you'll land on your page when you visit.</p>
 
               <p>Here's what else to expect: a monthly newsletter from the campus in Gulu, photos of ${data.childDisplayName} every few months, and a year-end report card. You'll get an email each time your penpal writes back or something new lands on their page.</p>
 
-              <p>If you ever want to write your penpal, visit, change your monthly, or ask anything at all, reply here. I read every one.</p>
+              <p>If you ever want to write to ${childFirstName}, visit, change your monthly, or ask anything at all, reply here. I read every one.</p>
 
               <p>Thanks for being in their corner,<br>
               <strong>Kevin</strong></p>
@@ -3057,8 +3060,8 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
       try {
         await createCommunicationRecord({
           email,
-          subject: isRecurring ? 'You just became a monthly sponsor.' : 'Thank you. This matters.',
-          body: `${isRecurring ? 'Monthly sponsor' : 'One-time gift'} of $${amount.toFixed(2)}.`,
+          subject: isRecurring ? 'You are giving monthly now. Thank you.' : 'Thank you. This matters.',
+          body: `${isRecurring ? 'Monthly gift' : 'One-time gift'} of $${amount.toFixed(2)}.`,
           status: emailStatus,
           stripePaymentIntentId: paymentIntentId,
         });

@@ -201,7 +201,7 @@ async function handler(request: NextRequest): Promise<NextResponse> {
       id: `sotm:${s.id}`,
       publishedAt: new Date(s.awardedAt).toISOString(),
       kind: 'sotm',
-      title: `Student of the Month — ${label}`,
+      title: `Student of the Month: ${label}`,
       body: s.reason || s.month,
       photoUrl: s.childPhotoUrl ?? null,
       kidRef:

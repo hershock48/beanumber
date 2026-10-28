@@ -199,6 +199,7 @@ export async function POST(request: NextRequest) {
       sponsorshipStartDate: new Date().toISOString().slice(0, 10),
       childRevealedAt: new Date(),
       claimedShirtNumber: shirtNumber,
+      actorType: 'sponsor',
     });
     console.log(
       `[MobileClaim] Created Holder ${created.sponsorCode} on #${shirtNumber} ` +
@@ -217,7 +218,7 @@ export async function POST(request: NextRequest) {
   } catch (err) {
     console.error('[MobileClaim] error:', err);
     return NextResponse.json(
-      { error: 'Claim failed — try again in a moment.' },
+      { error: 'Claim failed. Try again in a moment.' },
       { status: 500 }
     );
   }

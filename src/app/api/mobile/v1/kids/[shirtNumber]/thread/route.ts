@@ -277,7 +277,7 @@ function statusTextFor(row: {
     case 'delivered':
       return 'Delivered at the campus';
     case 'translated':
-      return 'On its way — translated';
+      return 'On its way, translated';
     case 'declined':
       return 'Not delivered';
     case 'pending':
@@ -422,7 +422,7 @@ async function postHandler(
   const bodyText = (json.body ?? '').trim();
   if (bodyText.length < MIN_BODY) {
     throw new ValidationError(
-      'Your note is too short. Say a little more — the campus reads every one of these.'
+      'Your note is too short. Say a little more. The campus reads every one of these.'
     );
   }
   if (bodyText.length > MAX_BODY) {
@@ -452,7 +452,7 @@ async function postHandler(
     return NextResponse.json(
       {
         locked: true,
-        unlockCopy: `You've already sent the letter that came with your shirt. Sponsor ${name} at $25/month to keep writing — your penpal writes back.`,
+        unlockCopy: `You've already sent the letter that came with your shirt. Sponsor ${name} at $25/month to keep writing. Your penpal writes back.`,
       } satisfies MobileThreadLockedResponse,
       { status: 403 }
     );

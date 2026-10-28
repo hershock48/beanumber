@@ -446,7 +446,7 @@ export function RosterEditor({
       </div>
 
       {/* Departure (kid left the campus) — Simon nominates, Kevin
-          approves. Reversible. The kid stays in Airtable. */}
+          approves. Reversible. The kid stays in the database. */}
       <DepartureSection
         shirtNumber={shirtNumber}
         firstName={firstName}

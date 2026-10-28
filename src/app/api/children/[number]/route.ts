@@ -26,29 +26,10 @@ import { NextResponse } from 'next/server';
 import { getChildByShirtNumber } from '@/lib/db/queries';
 import type { Child } from '@/lib/db/schema';
 
+import { canonicalShirtNumber } from '@/lib/mobile/shirt-cycle';
+
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
-
-/**
- * Map a cycle shirt number to its canonical kid (shirts > 53). Mirrors
- * the formula in /api/children/route.ts and /children/[number]/page.tsx
- * so all three surfaces agree on what kid #67, #100, etc. show.
- *
- *   Era 1 (#54-150):  ((N - 54) % 52) + 2     → kid 2..53
- *   Era 2 (#151+):    ((N - 151) % 53) + 1    → kid 1..53
- *
- * Returns null for #1-53 (no cycle).
- */
-function canonicalShirtNumber(n: number): number | null {
-  // Upper bound at 300 (end of Batch 3) — without this the modulo
-  // math would happily map arbitrarily large N to a real kid. Do NOT
-  // bump past 300: the era formulas only describe Batches 1-3. Batch 4+
-  // (#301-450, opened 2026-07-18) resolves via the Batches table ONLY.
-  if (!Number.isFinite(n) || n < 1 || n > 300) return null;
-  if (n <= 53) return null;
-  if (n <= 150) return ((n - 54) % 52) + 2;
-  return ((n - 151) % 53) + 1;
-}
 
 function computeAge(dateOfBirth?: string | null): number | undefined {
   if (!dateOfBirth) return undefined;

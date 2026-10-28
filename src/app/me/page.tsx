@@ -604,7 +604,7 @@ export default async function MePage() {
               </p>
               <p className="text-[#666] mb-6 max-w-md mx-auto">
                 Get a Shirt. The Number on the back is a real kid at the
-                campus &mdash; you meet them when the shirt arrives.
+                campus. You meet them when the shirt arrives.
               </p>
               <div className="flex flex-col sm:flex-row gap-3 justify-center">
                 <Link
@@ -840,7 +840,7 @@ export default async function MePage() {
                     </p>
                     <p className="text-sm text-[#d8cfc1] leading-relaxed max-w-xl">
                       A few more kids from the campus. If you want to
-                      stay in another one&rsquo;s life, sponsor them &mdash;
+                      stay in another one&rsquo;s life, sponsor them:
                       you get a penpal, monthly photos, report cards, and
                       campus updates. $25/month, same as the kids you
                       already have.

@@ -144,16 +144,3 @@ export function shirtNumbersForKid(
   return out;
 }
 
-/**
- * Compatibility shim — resolves shirt N to a kid and returns that
- * kid's PRIMARY ShirtNumber via the provided lookup callback.
- * Returns null when the resolved kid has no primary ShirtNumber.
- */
-export async function canonicalShirtNumberFromBatches(
-  shirtNumber: number,
-  childrenLookup: (recordId: string) => Promise<number | null>
-): Promise<number | null> {
-  const resolved = await resolveShirtToKid(shirtNumber);
-  if (!resolved) return null;
-  return childrenLookup(resolved.childRecordId);
-}

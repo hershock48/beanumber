@@ -24,9 +24,8 @@ import {
   getRecentCampusNewsletters,
   type CampusNewsletterEntry,
 } from '@/lib/newsletter-feed';
-// SponsorRecoveryForm import removed 2026-07-16 — the component
-// hasn't rendered on this page since the sign-in ask consolidated
-// into the viewer-state strip + /signin. File kept for reference.
+// SponsorRecoveryForm was retired 2026-07-16 (sign-in moved to
+// /signin) and deleted 2026-10-28; git history has it.
 import { OtherKidsAtCampus } from './OtherKidsAtCampus';
 import { ClaimThisNumberCard } from './ClaimThisNumberCard';
 import { ChristmasGiftCard } from './ChristmasGiftCard';
@@ -43,11 +42,8 @@ import { ClaimGate } from './ClaimGate';
 import { LocationBlock } from './LocationBlock';
 import { kidPresenceLine } from '@/lib/campus-time';
 import { YourKidsStrip } from '@/components/YourKidsStrip';
-// AlreadySponsoringBanner deprecated 2026-07-08 — Kevin consolidated
-// the top black banner into the slim strip that already lived below
-// the breadcrumb (see the anon branch of the viewer-state strip). The
-// component file stays in the tree for now in case we want to bring
-// that shimmer treatment back somewhere else.
+// AlreadySponsoringBanner was folded into the viewer-state strip
+// 2026-07-08 and deleted 2026-10-28; git history has it.
 import { AnonStripShimmer } from './AnonStripShimmer';
 import { RecentKidsTracker } from '@/components/RecentKidsTracker';
 import { MarkKidUpdatesSeen } from '@/components/MarkKidUpdatesSeen';
@@ -76,12 +72,11 @@ import {
   getViewerWriteStatus,
   type ViewerWriteStatus,
 } from '@/lib/penpal-cycle';
-// ShareKidCard import intentionally kept out — the component is
-// still on disk (src/app/children/[number]/ShareKidCard.tsx) and can
-// be re-imported when the "Take {firstName} with you" block is
-// re-enabled per Kevin's 2026-07-08 comment ("hide this part for
-// now... i dont love it").
+// ShareKidCard (the "Take {firstName} with you" block) was hidden
+// 2026-07-08 per Kevin ("hide this part for now... i dont love it")
+// and deleted 2026-10-28; git history has it if it comes back.
 import { resolveShirtToKid } from '@/lib/cycle';
+import { canonicalShirtNumber } from '@/lib/mobile/shirt-cycle';
 import { CANONICAL_ROSTER_MAX } from '@/lib/roster-config';
 import { db } from '@/lib/db/client';
 import {
@@ -671,49 +666,14 @@ async function resolvePortalData(child: {
   return { latestChildUpdate };
 }
 
-/**
- * Cycle-number → canonical-kid resolver.
- *
- * BAN's roster has 53 real children (shirt numbers 1–53). Shirt
- * numbers 54+ are cycle records, looking up the canonical kid's
- * photo/bio at render time. Cycle records carry the kid's name +
- * status but typically lack the photo/bio fields, so /[number]
- * looks up the canonical record at render time and merges those
- * fields onto the cycle record. The cycle record's ShirtNumber
- * and ChildID stay authoritative — sponsorships/donations link to
- * the cycle record, not the canonical one.
- *
- * Two cycle eras live side by side:
- *
- *   Era 1 (#54–150): 52-wide cycle covering roster #2–53. Naume (#1)
- *     was excluded from the original cycle. So #54 = #2, #105 = #53,
- *     #106 = #2 (next loop), …, #150 = #46. Existing data ships
- *     against this formula and we don't disturb it.
- *
- *   Era 2 (#151 and up): 53-wide cycle covering the full roster
- *     #1–53. Naume is in from here on. So #151 = #1, #152 = #2, …,
- *     #203 = #53, #204 = #1 (next loop), and so on.
- *
- * Roster gap note: #47 has no real child enrolled. We populated its
- * Children record with a full copy of Asenath (#3) so /47 renders
- * exactly like /3. If Asenath's data ever changes, re-sync #47 in
- * Airtable too (cheap one-time copy, no special render path needed).
- */
-function canonicalShirtNumber(n: number): number | null {
-  // Hard upper bound: the highest opened Batch end (currently 300,
-  // end of Batch 3). Without this guard the modulo math would happily
-  // map any integer N to a real kid, so /children/1000000 would
-  // render someone's profile. Anything above the bound returns null
-  // and the page falls through to the 'we don't have a #X yet' view.
-  // Do NOT bump past 300: the era formulas below only describe
-  // Batches 1-3. Batch 4+ (opened 2026-07-18, #301-450) has its own
-  // snapshot order and resolves via the Batches table ONLY - if the
-  // table read fails, failing closed beats revealing the wrong kid.
-  if (!Number.isFinite(n) || n < 1 || n > 300) return null;
-  if (n <= 53) return null;
-  if (n <= 150) return ((n - 54) % 52) + 2;
-  return ((n - 151) % 53) + 1;
-}
+// Cycle-number to canonical-kid safety net. The Batches table is the
+// source of truth (resolveShirtToKid); this hardcoded era formula only
+// runs when a number has no batch, and it refuses anything past #300.
+// One copy for the whole app: src/lib/mobile/shirt-cycle.ts, tested in
+// tests/cycle.test.ts against the Batches math for every number 54..300.
+//
+// Roster gap note: #47 has no real child enrolled. Its children row is
+// a full copy of Asenath (#3) so /47 renders like /3.
 
 // Canonical roster max — see @/lib/roster-config. Anything past this
 // is a cycle number that MUST resolve to a canonical kid via the
@@ -1195,7 +1155,7 @@ export async function generateMetadata({ params }: ChildPageProps) {
   if (child.reserved) {
     return {
       title: `Shirt #${number} is reserved`,
-      description: `Shirt #${number} is held for a live auction. Its number is connected to a specific child in Northern Uganda &mdash; the winner meets that child when the shirt arrives.`,
+      description: `Shirt #${number} is held for a live auction. Its number is connected to a specific child in Northern Uganda. The winner meets that child when the shirt arrives.`,
     };
   }
 
@@ -1281,7 +1241,7 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
             </h1>
 
             <p className="text-lg text-[#666] leading-relaxed max-w-xl mx-auto mb-4">
-              Double-check your Shirt tag &mdash; the Number is printed on the back.
+              Double-check your Shirt tag. The Number is printed on the back.
               If you&rsquo;re sure it&rsquo;s #{number}, reach out and we&rsquo;ll sort it out.
             </p>
 
@@ -1317,13 +1277,13 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
             <p className="text-[#666] leading-relaxed mb-4">
               Every Be A Number shirt has a unique number pressed on the back.
               That number belongs to a real child at our campus in Omoro District, Northern Uganda.
-              When you enter it here, you meet them &mdash; their name, their face, their story.
+              When you enter it here, you meet them: their name, their face, their story.
             </p>
             <p className="text-[#666] leading-relaxed">
-              Your $25 gets you the shirt and starts their year at the campus &mdash; school,
+              Your $25 gets you the shirt and starts their year at the campus: school,
               meals, medical care. Continue at $25/month to finish their year and stay connected:
-              a monthly campus newsletter, photos, a handwritten letter from your matched child,
-              and a year-end report card.
+              a monthly campus newsletter, photos, letters from the kid on your shirt in their
+              own handwriting, and a year-end report card.
             </p>
           </div>
 
@@ -1340,7 +1300,7 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
             </h2>
             <p className="text-[#666] leading-relaxed max-w-lg mx-auto mb-8">
               Four designs. Four colors. Heavyweight cotton, screen-printed, handmade to order.
-              Every shirt starts a matched child&rsquo;s year at the campus &mdash; school, meals, medical care.
+              Every shirt starts a child&rsquo;s year at the campus: school, meals, medical care.
             </p>
             <Link
               href="/shirts"
@@ -1390,7 +1350,7 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
 
             <p className="text-lg text-[#666] leading-relaxed max-w-xl mx-auto mb-10">
               This number is held for a future live auction. Its number is connected to
-              a specific child in Northern Uganda &mdash; the winning bidder meets that
+              a specific child in Northern Uganda. The winning bidder meets that
               child when the shirt arrives, and their profile appears here once the
               shirt ships.
             </p>
@@ -1678,7 +1638,7 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
                 <span className="text-[15px] text-[#555]">
                   {justSignedIn
                     ? `#${number} is yours. ${firstName} too.`
-                    : `Welcome back — ${firstName} is yours.`}
+                    : `Welcome back. ${firstName} is yours.`}
                 </span>
               </div>
               <Link
@@ -1717,8 +1677,8 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
                     Sponsor {firstName} for $25/mo.
                   </span>{' '}
                   <span className="text-[#555]">
-                    Covers a full school day, plus a real penpal on
-                    the other end.
+                    Supports a full school day at the campus, and you
+                    get letters back.
                   </span>
                 </div>
                 {/* Wrap allows the primary CTA + secondary link to stack
@@ -1808,7 +1768,7 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
                 : 'Someone sponsored a child in your honor.'}
             </p>
             <p className="text-sm text-[#666] mt-2">
-              Their first month at the campus is already covered.
+              Their first month at the campus is supported.
               You&rsquo;ll meet them below.
             </p>
           </div>
@@ -1849,7 +1809,7 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
                   >
                     <Image
                       src={url}
-                      alt={`${displayName} — photo ${i + 1}`}
+                      alt={`${displayName}, photo ${i + 1}`}
                       fill
                       sizes="(max-width: 768px) 100vw, 50vw"
                       className="object-cover object-[center_top]"
@@ -1920,7 +1880,7 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
                 </p>
                 {(child.viewer_is_sponsor || child.viewer_is_holder) ? (
                   <p className="text-sm text-[#666] leading-relaxed mb-3">
-                    Your Number &mdash; #{number} &mdash; is being
+                    Your Number, #{number}, is being
                     reassigned to a new kid at the campus. We&rsquo;ll
                     email you when they&rsquo;re ready to meet.
                   </p>
@@ -2076,7 +2036,7 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
                 &ldquo;{child.child_quote}&rdquo;
               </p>
               <p className="mt-3 text-xs uppercase tracking-[0.2em] text-[#aaa]">
-                — {firstName}
+                {firstName}
               </p>
             </div>
           )}
@@ -2144,7 +2104,7 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
                   &ldquo;{child.teacher_quote}&rdquo;
                 </p>
                 {child.teacher_name && (
-                  <p className="mt-3 text-sm text-[#888]">— {child.teacher_name}</p>
+                  <p className="mt-3 text-sm text-[#888]">{child.teacher_name}</p>
                 )}
               </div>
             )}
@@ -2158,7 +2118,7 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
                 </p>
                 <p className="text-[#666] leading-relaxed">
                   We&rsquo;re gathering {firstName}&rsquo;s full profile
-                  from the campus in Omoro District right now — home,
+                  from the campus in Omoro District right now: home,
                   family, what they love, and a note from their teacher.
                   Sponsor them today and we&rsquo;ll send it to you as
                   soon as it&rsquo;s in our hands.
@@ -2372,18 +2332,10 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
             above (right under the bio, before the acknowledgment
             box), matching Kevin's 2026-07-08 flow restructure. */}
 
-        {/* NOTE: the "Take {firstName} with you" / ShareKidCard block
-            used to render here, gated to sponsors + holders. Removed
-            2026-07-08 per Kevin ("hide this part for now... i dont
-            love it"). ShareKidCard component still exists — to
-            re-enable, restore the block below with a stronger
-            reason-to-share beat than "post the card on your feed."
-              {!child.departed_at &&
-                (child.viewer_is_sponsor || child.viewer_is_holder) && (
-                  <div className="mt-12 md:mt-16 ...">
-                    <ShareKidCard firstName={firstName} ... />
-                  </div>
-                )} */}
+        {/* The "Take {firstName} with you" share block rendered here
+            until 2026-07-08 (Kevin: "hide this part for now... i dont
+            love it"). ShareKidCard was deleted 2026-10-28; git history
+            has it if it comes back with a stronger reason to share. */}
 
         {/* ── Relationship card + public campus newsfeed ──────────
             The card frames the read for signed-in viewers: sponsors

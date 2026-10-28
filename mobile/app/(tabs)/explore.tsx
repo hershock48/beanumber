@@ -134,7 +134,7 @@ export default function CampusTab() {
           style={{ marginTop: SPACING.l }}
         >
           Six acres in Northern Uganda. Simon Peter Wilobo and thirty
-          teachers, nurses, and mentors run the day — a nursery, a
+          teachers, nurses, and mentors run the day: a nursery, a
           primary school, an on-site clinic, vocational training for
           local women, and a lodge for sponsors who visit.
         </Text>
