@@ -28,6 +28,23 @@
  *      of promising an email that will never arrive. The claim
  *      attempt is logged for admin review.
  *
+ *      SECOND-CLAIM GUARD (2026-10-28). If this email ALREADY holds a
+ *      different number and has no fulfillment whose order_number is
+ *      the typed number, nothing is minted. Instead the email gets a
+ *      confirmation: a sign-in button for the number they hold, and
+ *      a signed "yes, claim #N too" button that lands on
+ *      /api/sponsor/recover/confirm-claim and mints the Holder row
+ *      only then. Why: on 2026-09-23 a sponsor holding #230 typed a
+ *      number by mistake and the site minted a second Holder row on
+ *      #260 for her email with no purchase behind it. That row sent
+ *      email-only sign-in to the wrong kid and would have blocked the
+ *      real holder of #260. Gift shirts, a spouse's email, found
+ *      shirts, and pre-cutover buyers hold nothing yet, so the guard
+ *      never fires for them; a second shirt with a stamped
+ *      fulfillment goes straight through; a second shirt without one
+ *      costs one tap from the inbox. Decision logic lives in
+ *      src/lib/claim-guard.ts, the write in src/lib/claim-number.ts.
+ *
  * Privacy: the endpoint returns `{ success: true }` for every branch
  * that involves an EMAIL lookup (sign-in, claim, no-account), so it
  * can't be used as an email-enumeration oracle. The one deliberate
@@ -47,21 +64,19 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { sendEmail } from '@/lib/email';
 import { getEmailConfig } from '@/lib/env';
-import { makeRecoveryToken } from '@/lib/recovery-tokens';
+import { makeClaimConfirmToken, makeRecoveryToken } from '@/lib/recovery-tokens';
 import {
-  findChildlessSponsorshipForEmail,
   findSponsorshipForEmailAndChild,
   findSponsorshipForEmailAndClaimedNumber,
   getMostRecentSponsorshipForEmail,
+  getPurchasesForEmail,
+  getViewerSponsorships,
   isNumberClaimedByOtherEmail,
 } from '@/lib/db/queries';
 import { resolveShirtNumberForClaim } from '@/lib/claim-resolve';
-import {
-  bindSponsorshipToChild,
-  createSponsorship,
-  materializeHolderSponsorshipsForBuyer,
-} from '@/lib/db/mutations';
-import { generateUniqueSponsorCode } from '@/lib/sponsor-codes';
+import { materializeHolderSponsorshipsForBuyer } from '@/lib/db/mutations';
+import { decideSecondClaim } from '@/lib/claim-guard';
+import { bindOrCreateHolderClaim } from '@/lib/claim-number';
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.beanumber.org';
 
@@ -115,6 +130,111 @@ function markSend(emailLower: string): void {
     }
   }
   recentSends.set(emailLower, now);
+}
+
+/**
+ * The second-claim confirmation email. Two buttons: sign in to the
+ * number this email already holds (the typo case, one tap to the
+ * right place), or confirm that the typed number is a second shirt
+ * (signed claim token; the row is minted only when it is tapped).
+ * Nothing is written before the tap. Returns after the send; a send
+ * failure is logged with the same ATTENTION tag as the other paths.
+ */
+async function sendSecondClaimConfirmEmail(args: {
+  email: string;
+  typedNumber: number;
+  heldNumbers: number[];
+}): Promise<void> {
+  const { email, typedNumber, heldNumbers } = args;
+  const emailLower = email.toLowerCase();
+
+  // Sign-in target: the same row email-only sign-in would pick, so
+  // the two paths agree on where "your number" lands.
+  const held = await getMostRecentSponsorshipForEmail(email);
+  if (!held?.sponsorCode) {
+    // heldNumbers was non-empty, so a row exists; this only happens
+    // if the two queries disagree. Log and bail rather than send a
+    // sign-in button that bounces.
+    console.error(
+      `[Recovery] ATTENTION second-claim guard: no sign-in row for ${email} although it holds #${heldNumbers.join(', #')}.`
+    );
+    return;
+  }
+  const heldNumber =
+    typeof held.shirtNumber === 'number' && held.shirtNumber > 0
+      ? held.shirtNumber
+      : heldNumbers[0];
+
+  let signInUrl: string;
+  let confirmUrl: string;
+  try {
+    const signInToken = makeRecoveryToken(held.sponsorCode, heldNumber);
+    const confirmToken = makeClaimConfirmToken(email, typedNumber);
+    signInUrl = `${SITE_URL}/api/sponsor/recover/callback?t=${encodeURIComponent(signInToken)}`;
+    confirmUrl = `${SITE_URL}/api/sponsor/recover/confirm-claim?t=${encodeURIComponent(confirmToken)}`;
+  } catch (err) {
+    console.error(
+      `[Recovery] ATTENTION second-claim token gen FAILED for ${email} #${typedNumber}:`,
+      err
+    );
+    return;
+  }
+
+  const heldLabel =
+    heldNumbers.length > 1
+      ? `#${heldNumbers.slice(0, -1).join(', #')} and #${heldNumbers[heldNumbers.length - 1]}`
+      : `#${heldNumber}`;
+  const heldKid = held.firstName ? ` (${held.firstName}&rsquo;s number)` : '';
+  const signInLabel = `Sign in to #${heldNumber}`;
+  const fromEmail = getEmailConfig().fromEmail;
+  const html = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      </head>
+      <body style="font-family: Georgia, 'Times New Roman', serif; line-height: 1.7; color: #333; max-width: 560px; margin: 0 auto; padding: 30px 20px;">
+        <p style="margin-top: 0;">Hey there,</p>
+        <p>You asked to claim #${typedNumber}, but this email already holds ${heldLabel}${heldKid}. Most of the time that means a mistyped number, so we held off on claiming #${typedNumber}.</p>
+        <p>If you were signing in, tap this and you&rsquo;ll land on your page.</p>
+        <p style="text-align: center; margin: 24px 0;">
+          <a href="${signInUrl}" style="display: inline-block; background: #D4A843; color: #0d0d0d; font-weight: bold; text-decoration: none; padding: 14px 32px; font-size: 15px; letter-spacing: 0.05em; text-transform: uppercase;">
+            ${signInLabel}
+          </a>
+        </p>
+        <p>If #${typedNumber} is on a second shirt, tap this instead and it becomes yours too.</p>
+        <p style="text-align: center; margin: 24px 0;">
+          <a href="${confirmUrl}" style="display: inline-block; background: #ffffff; color: #0d0d0d; font-weight: bold; text-decoration: none; padding: 13px 31px; font-size: 15px; letter-spacing: 0.05em; text-transform: uppercase; border: 1px solid #0d0d0d;">
+            Yes, claim #${typedNumber}
+          </a>
+        </p>
+        <p style="color: #888; font-size: 13px;">
+          Both links are good for 24 hours. If you didn&rsquo;t request this, ignore it and nothing changes.
+        </p>
+        <hr style="border: none; border-top: 1px solid #e8e0d4; margin: 24px 0;">
+        <p style="font-size: 12px; color: #999; line-height: 1.5;">
+          Be A Number, International<br>
+          <a href="https://www.beanumber.org" style="color: #D4A843;">beanumber.org</a>
+        </p>
+      </body>
+    </html>
+  `;
+  console.log(
+    `[Recovery] second-claim confirm send: to=${email} typed=#${typedNumber} held=#${heldNumber} from=${fromEmail}`
+  );
+  markSend(emailLower);
+  const result = await sendEmail({
+    to: { email, name: '' },
+    from: { email: fromEmail, name: 'Be A Number' },
+    subject: `Before we claim #${typedNumber}`,
+    html,
+  });
+  if (!result.success) {
+    console.error(
+      `[Recovery] ATTENTION second-claim confirm send FAILED for ${email} #${typedNumber}: ${result.error}`
+    );
+  }
 }
 
 export async function POST(request: NextRequest) {
@@ -329,7 +449,7 @@ export async function POST(request: NextRequest) {
       console.log(`[Recovery] #${shirtNumber} is reserved; nothing to send.`);
       return NextResponse.json(responseShape);
     }
-    const { displayName, firstName } = identity;
+    const { firstName } = identity;
     const childContext = {
       id: identity.childUuid ?? '',
       childId: identity.childIdLegacy,
@@ -348,10 +468,11 @@ export async function POST(request: NextRequest) {
     // 3. FIRST-TIME CLAIM PATH: no existing row for this email + kid.
     //    Order matters here:
     //      3a. Blocked — someone ELSE already claimed this number.
-    //      3b. Bind — this email has a childless sponsorship from a
-    //          cart+monthly / Shirt + Stay checkout; point it at the
-    //          kid instead of minting a duplicate row.
-    //      3c. Create — brand-new claimer, mint a Holder row.
+    //      3b. Guard: this email already holds a DIFFERENT number
+    //          and nothing ties the typed one to a purchase; send a
+    //          confirmation email, mint nothing.
+    //      3c. Write: bind a childless checkout row to the kid, or
+    //          mint a Holder row (src/lib/claim-number.ts).
     if (!sponsorCode) {
       // Per-NUMBER claim check (migration 0017). The old per-kid
       // check fired on legitimate claims whenever the kid had
@@ -380,83 +501,52 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ success: true, code: 'number_claimed' });
       }
 
-      // 3b. BIND PATH. Checkout creates cart+monthly / Shirt + Stay
-      // sponsorships with a blank child link (core_model.md §0 — the
-      // buyer claims, nobody matches). If this email has one of those
-      // rows, THIS claim is the moment it gets its kid. Binding keeps
-      // status, monthly amount, and the Stripe sub on one row —
-      // creating a Holder row here instead is how paying sponsors
-      // were ending up rendered as $0 Holders on their own kid.
-      try {
-        const childless = await findChildlessSponsorshipForEmail(email);
-        if (childless) {
-          const bound = await bindSponsorshipToChild({
-            sponsorshipId: childless.id,
-            childId: identity.childUuid,
-            childIdLegacy: identity.childIdLegacy,
-            childDisplayName: displayName,
-            claimedShirtNumber: shirtNumber,
-            actorType: 'sponsor',
-          });
-          sponsorCode = bound.sponsorCode;
-          isFreshClaim = true;
-          console.log(
-            `[Recovery] Bound childless ${childless.status} sponsorship`,
-            bound.sponsorCode,
-            `to #${shirtNumber} for`,
-            email
-          );
-        }
-      } catch (err) {
-        // Bind failed (row raced away, concurrent claim, DB error).
-        // Fall through to the Holder-create path — a duplicate row is
-        // recoverable by hand; a user with no way in is not.
-        console.error(
-          `[Recovery] Childless-bind failed for ${email} on #${shirtNumber}, falling back to Holder create:`,
-          err
+      // 3b. SECOND-CLAIM GUARD. Does this email already hold a
+      // different number? heldNumbers is claimed_shirt_number only:
+      // co-sponsor rows added via /meet carry NULL there, and holding
+      // a relationship is not holding a number. The purchase trail is
+      // fulfillments.order_number under this email; NULL rows are
+      // unreconciled shirts and prove nothing about which number.
+      const [viewerRows, purchases] = await Promise.all([
+        getViewerSponsorships(email),
+        getPurchasesForEmail(email),
+      ]);
+      const heldNumbers = viewerRows
+        .map(r => r.claimedShirtNumber)
+        .filter((n): n is number => typeof n === 'number' && n > 0);
+      const decision = decideSecondClaim({
+        typedNumber: shirtNumber,
+        heldNumbers,
+        fulfillmentNumbers: purchases.map(p => p.orderNumber),
+        confirmed: false,
+      });
+      if (decision.outcome === 'confirm') {
+        // Logged with the ATTENTION tag so Kevin can grep Vercel logs
+        // for every held-off claim and see whether it was a typo or a
+        // real second shirt (the confirm-claim route logs the tap).
+        console.warn(
+          `[Recovery] ATTENTION second-claim guard: ${email} typed #${shirtNumber} ` +
+            `but already holds #${heldNumbers.join(', #')} and has no fulfillment ` +
+            `with order_number=${shirtNumber}; sent confirm email, minted nothing.`
+        );
+        await sendSecondClaimConfirmEmail({
+          email,
+          typedNumber: shirtNumber,
+          heldNumbers,
+        });
+        return NextResponse.json(responseShape);
+      }
+      if (decision.reason === 'purchase_trail') {
+        console.log(
+          `[Recovery] second-claim guard passed on purchase trail: ${email} holds #${heldNumbers.join(', #')}, fulfillment order_number=${shirtNumber} found.`
         );
       }
-    }
 
-    if (!sponsorCode) {
+      // 3c. WRITE. Bind a childless checkout row or mint a Holder.
       try {
-        const created = await createSponsorship({
-          sponsorCode: await generateUniqueSponsorCode(),
-          sponsorEmail: email,
-          childId: identity.childUuid,
-          childIdLegacy: identity.childIdLegacy,
-          childDisplayName: displayName,
-          monthlyAmount: 0,
-          status: 'Holder',
-          sponsorshipStartDate: new Date().toISOString().slice(0, 10),
-          claimedShirtNumber: shirtNumber,
-        });
-        sponsorCode = created.sponsorCode;
-        // The legacy Airtable Holder row set AuthStatus=Active so the
-        // deprecated email+code verify path still recognized it. The
-        // createSponsorship helper doesn&rsquo;t take authStatus directly;
-        // patch it in a follow-up. Non-fatal on failure &mdash; the magic-
-        // link sign-in path doesn&rsquo;t check authStatus.
-        try {
-          const { db } = await import('@/lib/db/client');
-          const { sponsorships } = await import('@/lib/db/schema');
-          const { eq } = await import('drizzle-orm');
-          await db
-            .update(sponsorships)
-            .set({ authStatus: 'Active', updatedAt: new Date() })
-            .where(eq(sponsorships.id, created.id));
-        } catch (patchErr) {
-          console.warn(
-            '[Recovery] Holder authStatus patch failed (non-fatal):',
-            patchErr
-          );
-        }
-        console.log(
-          '[Recovery] Created Holder sponsorship:',
-          sponsorCode,
-          'for',
-          email
-        );
+        const written = await bindOrCreateHolderClaim(email, identity);
+        sponsorCode = written.sponsorCode;
+        isFreshClaim = true;
       } catch (err) {
         // Holder creation failed (DB error, FK violation, etc.). Log
         // and return privacy success so the user sees the expected
@@ -468,7 +558,6 @@ export async function POST(request: NextRequest) {
         );
         return NextResponse.json(responseShape);
       }
-      isFreshClaim = true;
     }
 
     // 4. Build + send the magic-link email.

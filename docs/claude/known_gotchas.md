@@ -135,6 +135,18 @@ Same 2026-06-07 session. I "fixed" Sam Banfield's missing newsletter segment by 
 
 Added 2026-06-08 as part of the number-holder claim flow (see `core_model.md` §0a). The `/api/sponsor/recover/send-link` endpoint and downstream code expect `Holder` to be a valid option on the `Sponsorships.Status` singleSelect. The Airtable metadata API cannot add singleSelect options — Kevin has to add it manually in the Airtable UI. Until added, Holder row creation silently 422s with INVALID_MULTIPLE_CHOICE_OPTIONS. The caller logs the failure but returns privacy-success to the user (no error surfaced), so the symptom is "claims silently never work." If a buyer claims and never sees a sponsor view, check this option first.
 
+### A typed number from an email that already holds a different number does NOT mint a row (2026-10-28)
+
+On 2026-09-23 a sponsor holding #230 signed in with a typed number and `/api/sponsor/recover/send-link` minted a second Holder row on #260 for her email, no purchase behind it. Email-only sign-in then landed her on the wrong kid (most-recent row wins), and the real holder of #260 would have been told `number_claimed`.
+
+The route now runs a second-claim guard (`src/lib/claim-guard.ts`) before the bind/create write (`src/lib/claim-number.ts`):
+
+- Email holds nothing (`claimed_shirt_number` NULL on every Active/Holder row) → claim goes through. Gift shirts, a spouse's email, found shirts, pre-cutover buyers are untouched. Co-sponsor rows from `/meet` carry NULL there and never count.
+- Email holds a different number AND has a `fulfillments.order_number` equal to the typed number → goes through (real second shirt with a trail).
+- Email holds a different number and no trail → nothing is written. The email gets "Before we claim #N": a sign-in button for the number they hold, and a signed "Yes, claim #N" button that lands on `/api/sponsor/recover/confirm-claim`, which re-runs the taken-by-someone-else check and only then binds or mints. The browser still sees `{ success: true }`, so nothing leaks about the email.
+
+What to know when debugging a "my claim never worked" report from someone who already holds a number: grep Vercel logs for `ATTENTION second-claim`. The send-link line says the guard fired; the confirm-claim line says whether they tapped. If `fulfillments.order_number` is NULL on their second shirt (Kevin does not always stamp it), the extra tap is expected, not a bug. Do not "fix" this by stamping numbers into fulfillments from the admin side; the buyer claims.
+
 ## Postgres migration traps (added 2026-06-22)
 
 ### Don't write to Airtable AND mutations.ts for the same row from the same code path
