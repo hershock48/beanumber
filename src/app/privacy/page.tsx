@@ -175,9 +175,9 @@ export default function PrivacyPage() {
               <p className="text-[#555] leading-relaxed text-lg mb-3">
                 <strong>Stripe</strong> processes your payments and holds your
                 card information on their secure, PCI-compliant systems.{' '}
-                <strong>Airtable</strong> holds our donor, sponsorship, and
-                child records.{' '}
-                <strong>Google (Gmail) and SendGrid</strong> send the
+                <strong>Supabase</strong> hosts the database that holds our
+                donor, sponsorship, and child records.{' '}
+                <strong>Google (Gmail)</strong> sends the
                 transactional and newsletter emails you receive from us.{' '}
                 <strong>Vercel</strong> hosts the website itself.
               </p>

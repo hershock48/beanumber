@@ -229,11 +229,11 @@ export default async function AdminHomePage() {
           </Card>
 
           {/* ── Card: Stripe sync ──────────────────────────────── */}
-          <Card label="Stripe → Airtable">
+          <Card label="Stripe sync">
             <Headline>Reconcile subscriptions.</Headline>
             <p className="mt-2 text-sm text-[#666]">
-              Pulls every Stripe subscription and ensures Airtable has a
-              matching Donor + Sponsorship row. Safe to re-run.
+              Pulls every Stripe subscription and ensures the database has
+              a matching Donor + Sponsorship row. Safe to re-run.
             </p>
             <Actions>
               <PrimaryLink href="/admin/stripe-sync">Open sync</PrimaryLink>

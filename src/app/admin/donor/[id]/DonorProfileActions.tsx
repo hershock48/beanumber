@@ -267,8 +267,8 @@ export function DonorProfileActions({
           </>
         ) : (
           <p className="text-sm text-[#888]">
-            No email on file for {donorFirstName}. Add one in Airtable and
-            reload to email from here.
+            No email on file for {donorFirstName}. Add one to the donor row
+            and reload to email from here.
           </p>
         )}
 
