@@ -48,9 +48,10 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { and, desc, eq, or, sql } from 'drizzle-orm';
+import { and, desc, eq, isNotNull, or, sql } from 'drizzle-orm';
 import { db } from '@/lib/db/client';
 import { kidMessages, children, sponsorships } from '@/lib/db/schema';
+import { listBatches, shirtNumbersForKid } from '@/lib/cycle';
 import { getAdminRole } from '@/lib/admin-session';
 import { sendEmail, sendKevinReplyAlert } from '@/lib/email';
 import { sendPush, resolveMobileUserIdForEmail } from '@/lib/push/send';
@@ -421,14 +422,51 @@ export async function POST(
     try {
       const firstNamePlain = parent.firstName || 'your kid';
       const firstNameSafe = escapeHtml(firstNamePlain);
+      // Land the sponsor on THEIR number for this kid, not the kid's
+      // roster number. Numbers cycle: Sunday is #28 on the roster, but
+      // the sponsor who bought #230 is recognized on /children/230
+      // (claimed_shirt_number match) and may not be on /children/28 if
+      // their row only carries the claimed number. Sending them to #28
+      // showed a page that didn't know them (Ashley, 2026-10-23). So:
+      // every number that resolves to this kid across the batches,
+      // intersected with the numbers this email has claimed; fall back
+      // to the roster number, then /me.
+      let landingNumber: number | null = parent.shirtNumber ?? null;
+      try {
+        const batches = await listBatches();
+        const numbersForKid = new Set<number>(
+          parent.childIdLegacy
+            ? shirtNumbersForKid(parent.childIdLegacy, batches).map(x => x.shirtNumber)
+            : []
+        );
+        if (parent.shirtNumber) numbersForKid.add(parent.shirtNumber);
+        const owned = await db
+          .select({ claimed: sponsorships.claimedShirtNumber })
+          .from(sponsorships)
+          .where(
+            and(
+              sql`lower(${sponsorships.sponsorEmail}) = lower(${parent.sponsorEmail})`,
+              or(eq(sponsorships.status, 'Active'), eq(sponsorships.status, 'Holder')),
+              isNotNull(sponsorships.claimedShirtNumber)
+            )
+          )
+          .orderBy(desc(sponsorships.createdAt));
+        const own = owned
+          .map(r => r.claimed)
+          .find((n): n is number => typeof n === 'number' && numbersForKid.has(n));
+        if (own) landingNumber = own;
+      } catch {
+        // Cycle lookup is best-effort; the roster number still works
+        // for every sponsorship whose row carries the child link.
+      }
       // Deep-link the email button to the reply card itself via the
       // #note-<id> anchor rendered on every NotesThread entry. The
       // browser scrolls straight to the letter (with scroll-margin-top
       // headroom) so the sponsor lands on the payoff instead of the
       // top of the kid page. Fallback to /me for legacy sponsorships
       // without a shirt number stays intact.
-      const kidPageUrl = parent.shirtNumber
-        ? `${SITE_URL}/children/${parent.shirtNumber}#note-${inserted[0].id}`
+      const kidPageUrl = landingNumber
+        ? `${SITE_URL}/children/${landingNumber}#note-${inserted[0].id}`
         : `${SITE_URL}/me`;
       const firstWordOfName = parent.sponsorName?.trim().split(/\s+/)[0];
       const greeting = firstWordOfName
