@@ -119,14 +119,14 @@ If something fails, check:
 - Vercel env vars are set in the right environment
 - The deploy after setting env vars actually went green
 - You completed step 7 (connecting once)
-- The donor has an email on file (Airtable Donors → Email Address)
+- The donor has an email on file (`donors.email`)
 
 ---
 
 ## Operational notes
 
 - **Refresh token lifetime.** Google's refresh tokens can expire if not used for 6+ months. If sends start failing with a 401, just revisit `/admin/connect-gmail` and reconnect — takes 10 seconds.
-- **Token storage.** The refresh token lives in Airtable's `AppSettings` table. Same security model as everything else in BAN (the Airtable PAT itself is the protected secret).
+- **Token storage.** The refresh token lives in the Postgres `app_settings` table (`src/lib/admin/settings.ts`). Same security model as everything else in BAN: the database credentials are the protected secret.
 - **Single-user.** The current setup assumes one admin (you) sends from one Gmail account. If you ever want Simon to be able to send from his own Gmail, we'll need to extend the AppSettings to be per-user.
 - **Reading replies.** Not implemented in v1. Replies come to your normal Gmail inbox; the admin doesn't surface them. We can add this in v2 with the `gmail.readonly` scope.
-- **Revoking access.** If you ever want to disconnect, go to https://myaccount.google.com/permissions and remove "Be A Number Admin." Then clear the AppSettings rows in Airtable.
+- **Revoking access.** If you ever want to disconnect, go to https://myaccount.google.com/permissions and remove "Be A Number Admin." Then clear the Gmail rows in `app_settings`.

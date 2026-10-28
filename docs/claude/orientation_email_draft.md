@@ -1,3 +1,5 @@
+> **Historical (Airtable era).** Written before the Postgres cutover of 2026-09-14. Tables, tool files and routes named below may no longer exist; the current map is docs/claude/architecture.md and the October 2026 audit is docs/audit-2026-10.md. Kept for the record, not as instructions.
+
 # Orientation email — draft
 
 > Use this to reset every sponsor/holder/recent-shirt-buyer on how to access their kid under the new model. Triggered by Christina Downer's note about the deprecated portal code. Voice-doc compliant: direct, specific, personal, no banned phrases.

@@ -1,6 +1,6 @@
-# Architecture — the code map
+# Architecture, the code map
 
-What lives where, what talks to what, and the patterns that are load-bearing. When in doubt about an unfamiliar file, search before assuming; this doc is the compass, not the map.
+What lives where, what talks to what, and the patterns that are load-bearing. When in doubt about an unfamiliar file, search before assuming; this doc is the compass, not the map. Corrected against the code on 2026-10-28 (docs/audit-2026-10.md).
 
 ## Top-level layout
 
@@ -9,182 +9,199 @@ beanumber/
 ├── src/
 │   ├── app/                    # Next.js App Router
 │   │   ├── page.tsx            # Homepage (server component)
-│   │   ├── HomePageContent.tsx # Client component for carousel
+│   │   ├── HomePageContent.tsx # Client component for the carousel
 │   │   ├── layout.tsx          # Root layout, global metadata
-│   │   ├── children/[number]/  # Child profile — number-to-name reveal
-│   │   ├── shirts/             # Catalog + product pages
-│   │   ├── sponsorship/        # Sponsorship landing
-│   │   ├── sponsor/            # Sponsor portal (magic-link auth)
-│   │   ├── admin/              # Admin dashboard
+│   │   ├── children/[number]/  # Kid page: the number-to-name reveal, the sponsor surface
+│   │   ├── meet/[childId]/     # Public per-kid page, no number
+│   │   ├── me/                 # My Campus: every kid the viewer sponsors or holds
+│   │   ├── signin/             # Magic-link sign-in (email in, one tap)
+│   │   ├── shirts/, market/    # Catalog; in-person booth checkout
+│   │   ├── christmas/, gift/   # Seasonal pooled fund; gift sponsorship (unlinked, see audit H2)
+│   │   ├── campus/, news/      # Signed-in roster browse; published newsletters
+│   │   ├── sponsor/            # Redirect stubs to /signin plus /sponsor/welcome (Stripe return)
+│   │   ├── rep/                # Founding Cohort applications and dashboard
+│   │   ├── admin/              # Admin OS (middleware-gated)
 │   │   ├── api/                # Route handlers (see below)
-│   │   ├── donate, founder, impact, governance,
-│   │   │   contact, privacy, terms, partnerships,
-│   │   │   reports, ydo/       # Content pages
-│   │   └── globals.css         # Tailwind entry
-│   └── lib/                    # Server-side helpers
+│   │   ├── donate, founder, impact, governance, contact,
+│   │   │   privacy, terms, partnerships, reports, ydo/   # Content pages
+│   │   └── globals.css         # Tailwind v4 entry (no tailwind.config file)
+│   ├── components/             # Shared client/server components
+│   ├── lib/                    # Server-side helpers (see below)
+│   └── remotion/               # Impact report and reel videos
+├── mobile/                     # Expo app (own package)
+├── drizzle/                    # Hand-written SQL migrations, 0000 to 0020
 ├── docs/claude/                # These files
+├── tests/                      # node:test files, run by `npm test`
+├── scripts/                    # export-donors, print-preview, run-tests
 ├── public/                     # Static assets
-└── (Next config, Tailwind config, tsconfig, etc.)
+└── next.config.ts, drizzle.config.ts, eslint.config.mjs, postcss.config.mjs, tsconfig.json
 ```
 
 ## Routes that matter
 
 ### Public pages
 
-- `/` — Homepage. Hero, horizontal children carousel (client component at `HomePageContent.tsx`), footer CTA. Photo is required to appear in the carousel; shirt-number badge is removed on the home tile (lives on the profile page instead).
-- `/children/[number]` — The profile page. This is where the number-to-name reveal lands when a shirt arrives. April 15 redesign adds structured intake blocks (ChildQuote pull-quote, Home/Family/Loves labeled blocks, Teacher quote, specific $25-does prose). Falls back to `Notes` if intake isn't filled. Fetches via `getChildByShirtNumber` in `src/lib/tools/children/`.
-- `/shirts` — Catalog. Product cards with pre-checkout monthly sponsorship toggle (full-width tappable, gold border when active). The toggle drives the branch in `/api/create-shirt-checkout`.
-- `/sponsorship` — Landing page. CTA redirects to Stripe Checkout via `/api/create-sponsor-checkout`.
-- `/donate` — One-time donation form. POSTs to `/api/create-checkout`.
-- `/founder`, `/impact`, `/governance`, `/contact`, `/privacy`, `/terms`, `/partnerships`, `/reports`, `/ydo` — Content-only.
+- `/`: homepage. Hero, horizontal kid carousel (client component at `HomePageContent.tsx`), footer CTA. A kid needs a photo to appear in the carousel.
+- `/children/[number]`: the kid page. Where the number-to-name reveal lands when a shirt arrives, and the sponsor surface once the viewer is recognised. Reads through `getChildByShirtNumber` in `src/lib/db/queries.ts` for canonical numbers (1 to 53) and the Batches resolver in `src/lib/cycle.ts` for everything above, with the hardcoded era formula in `src/lib/mobile/shirt-cycle.ts` as the fallback (tested in `tests/cycle.test.ts`).
+- `/meet/[childId]`: public per-kid page keyed by the legacy ChildID; the indexable kid surface. Its Sponsor button is signed-in only.
+- `/shirts`: catalog from `src/lib/products.ts`. Every button posts to `/api/create-cart-checkout`; the monthly opt-in rides as a cart line flag.
+- `/market`: booth checkout, posts to `/api/create-market-cart-checkout`.
+- `/signin`: the only sign-in. Email in, magic link out, via `/api/sponsor/recover/send-link`.
+- `/me`: My Campus. Every Active or Holder sponsorship for the signed-in email.
+- `/sponsorship` is a 301 to `/shirts` (`next.config.ts`). `/campus` is sign-in gated.
+- `/donate`: one-time or monthly gift, posts to `/api/create-checkout`.
+- `/founder`, `/impact`, `/governance`, `/contact`, `/privacy`, `/terms`, `/partnerships`, `/reports/*`, `/ydo/*`, `/news/*`: content.
 
-### Sponsor surface (NOT a separate portal — it's on the kid page)
+### The sponsor surface is the kid page, not a portal
 
-**As of June 2026, there is no separate sponsor portal.** All sponsor-only content (updates, letters, report cards, shop-your-number reorders, subscription management, messaging) renders inline on `/[number]` when the viewer is recognized as that kid's sponsor.
+There is no separate sponsor portal. Everything sponsor-only (notes thread and composer, personal updates, report cards and letters, awards, shirt reorders) renders inline on `/children/[N]` when the viewer is recognised, and `/me` lists all of their kids.
 
-Sponsor recognition mechanism:
-- The `sponsor_session` cookie is a 30-day signed JSON blob: `{ email, sponsorCode, expires }`.
-- `/[number]/page.tsx` reads the cookie via `getViewerSponsorCode()`, fetches the kid's Sponsorship record, and sets `viewerIsSponsor = (viewerCode === sponsorship.SponsorCode)`. That boolean drives every conditional render on the page — the $25/mo CTA hides, the sponsor-only content unhides.
-- The cookie gets set by exactly three endpoints:
-  - `POST /api/sponsor/recover/callback` — HMAC-signed auto-login link in sponsor newsletter emails. This is the primary path.
-  - `POST /api/sponsor/claim-match` — "Claim this match" button on `/[number]`, used when a sponsor's shirt arrives and they visit their assigned number for the first time.
-  - `POST /api/sponsor/verify` — Manual email + sponsorCode form at `/sponsor/login`. **Deprecated surface, kept for fallback only. Do not link to it from new code.**
+Recognition:
+- The `sponsor_session` cookie is a plain JSON blob `{ email, sponsorCode, expires }`, `httpOnly`, 365 days (`SESSION.MAX_AGE_DAYS` in `src/lib/constants.ts`). It is not signed; the magic-link token that mints it is (`src/lib/recovery-tokens.ts`, HMAC with `CRON_SECRET`).
+- The kid page reads the cookie's email and asks "does this email own a sponsorship of this kid, or hold this number" (`findSponsorshipByEmailForChild` in `page.tsx`, `claimed_shirt_number` first). Active with `monthly_amount > 0` is a sponsor; Active with $0 or Holder is a holder. That split drives every conditional render.
+- The cookie is set by three endpoints: `GET /api/sponsor/recover/callback` (the magic link; also the landing for `confirm-claim`), `POST /api/sponsor/claim-match` (Shirt + Stay buyers with a `ban_buyer_session` cookie claiming their first kid), and the mobile API's own token flow (`src/lib/mobile-auth.ts`, bearer JWT, not this cookie).
+- Claims go through `src/lib/claim-resolve.ts` (number to identity), `src/lib/claim-guard.ts` (second-claim guard, pure), `src/lib/claim-number.ts` (bind a childless checkout row or mint a Holder).
 
-Deprecated routes (still in code but should not be the primary path):
-- `/sponsor/login` — Manual login form. Deprecated. Kept only as fallback.
-- `/sponsor/[code]` — Old dedicated dashboard page. Deprecated. Functionality is now inlined on `/[number]`.
-- `/sponsor/welcome` — Post-login landing. Deprecated.
+The code-keyed portal (`/sponsor/login`, `/sponsor/[code]`, `/api/sponsor/verify`, `SponsorDashboard`) was deleted on 2026-10-28. The two page paths remain as redirects to `/signin`. `/sponsor/welcome` stays because it is the Stripe `success_url` for sponsor checkout.
 
 ### Admin
 
-- `/admin/dashboard` — Top-level admin.
-- `/admin/sponsors`, `/admin/updates`, `/admin/newsletter`, `/admin/retention` — Specific subpages. Gated by admin auth (see `src/lib/auth.ts`).
+- `/admin` is the home (the Today view). Tabs in `src/app/admin/_components/AdminShell.tsx`: roster, review queue, messages, fulfillment, newsletter (`/admin/campus-update`), donors, batches, settings. `/admin/dashboard`, `/admin/updates/submit`, `/admin/retention` and `/admin/sponsors` exist but are not in the nav (see the audit, "verify with Kevin").
+- Gating: `middleware.ts` checks the HMAC-signed `ban_admin_session` cookie (`src/lib/admin-session-edge.ts`) for every `/admin/*` page. `/api/admin/*` handlers call `requireAdminAuth` from `src/lib/auth.ts`, which accepts that cookie or an `X-Admin-Token` header.
 
 ### API routes (all under `/api`)
 
-**Checkout creation (4 routes, all server-side):**
+**Checkout creation (server side; each has its own line-item shape, metadata contract and success URL):**
 
-- `POST /api/create-checkout` — One-time donation. `billing_address_collection: 'required'`. Metadata includes donor name, email, optional message.
-- `POST /api/create-shirt-checkout` — Shirt purchase. Branches on `continueMonthly` flag: if true, creates a subscription-mode session with shirt as one-time line item + $25/mo recurring; if false, pure payment-mode session for the shirt only.
-- `POST /api/create-sponsor-checkout` — Direct sponsorship signup from the child page. Subscription mode, $25/mo, metadata carries shirt number for child linkage.
-- `/api/sponsorship/*` — Subscription management from the portal (cancel, pause, update card, swap child).
+- `POST /api/create-cart-checkout` and `/api/create-market-cart-checkout`: shirts, `order_type: 'cart'`. Subscription mode when any line carries the monthly opt-in, payment mode otherwise.
+- `POST /api/create-sponsor-checkout`: $25/mo from a kid page or `/meet`, `order_type: 'sponsorship'`. Requires a session or the fresh-buyer one-tap context; otherwise 401 with `redirect: '/shirts'` (non-negotiable 4).
+- `POST /api/create-checkout`: `/donate`, one-time or monthly.
+- `POST /api/create-christmas-checkout`: the pooled Christmas fund, `order_type: 'christmas_gift'`.
+- `POST /api/create-gift-checkout`: gift sponsorship, `order_type: 'gift_sponsorship'`. The surface is unlinked and assigns a kid at purchase; see docs/audit-2026-10.md H2.
+- `POST /api/sponsor/portal-purchase`: a sponsor reordering a shirt with their own number, `order_type: 'portal_repeat'`.
 
 **Webhook:**
 
-- `POST /api/webhooks/stripe`: The single most load-bearing file in the repo at `src/app/api/webhooks/stripe/route.ts` (~3,250 lines, Postgres-only since 2026-09-14). Verifies signature with `STRIPE_WEBHOOK_SECRET`, dispatches on event type:
-  - `checkout.session.completed` — creates Donation record, sends thank-you email, notifies admin (email only, no SMS), creates Sponsorship record if applicable, links to Donor (creates if new).
-  - `customer.subscription.created` / `.updated` / `.deleted`: upserts the `subscriptions` row, moves the donor onto the right drip pipeline on `.created`, cancels sponsorships on `.deleted`.
-  - `invoice.payment_succeeded`: records each monthly renewal as a `donations` row (via `tools/donation/process-recurring-payment.ts`) and sends the renewal thank-you.
-  - `charge.refunded` — flags Donation as refunded.
+- `POST /api/webhooks/stripe` (`src/app/api/webhooks/stripe/route.ts`, about 3,400 lines, Postgres-only since 2026-09-14). Verifies the signature with `STRIPE_WEBHOOK_SECRET`, then:
+  - `checkout.session.completed`: idempotent on the payment intent (a `donations` row already there means a retry). Branches on `order_type`: cart, sponsorship, shirt, shirt_plus_monthly (legacy, no caller mints these any more), portal_repeat, merch_purchase, christmas_gift, gift_sponsorship, plain donation. Writes fulfillments (in-house queue or Printful), the donation, a sponsorship row where the model says so (cart + monthly gets a childless Active row that the buyer's claim later binds), the drip enrolment, and the customer and admin emails.
+  - `customer.subscription.created` / `.updated` / `.deleted`: upserts the `subscriptions` row, moves the donor onto a drip pipeline on `.created`, flips sponsorships on `.deleted`.
+  - `invoice.payment_succeeded`: each monthly renewal becomes a `donations` row (`src/lib/tools/donation/process-recurring-payment.ts`) plus the renewal thank-you.
+  - `charge.refunded`: marks the donation refunded.
+- `POST /api/webhooks/printful`: shipped and status events for the dropship line.
 
-**Cron (hit by Vercel Cron):**
+**Cron (vercel.json):**
 
-- `/api/cron/drip` — Daily drip email dispatch. Queries Donors where `DripPipeline` is set and `DripNextSend` ≤ today. Sends the next email in the pipeline, advances `DripStage`, sets the next `DripNextSend` based on per-pipeline gap arrays. Clears drip fields when the sequence completes. 5 pipelines, 17 total emails.
-- `/api/cron/newsletter`: Sends any newsletter whose scheduled send time has passed.
-- `/api/cron/push-drain` and `/api/cron/sunday-batch`: mobile push delivery and the weekly batch snapshot.
+- `/api/cron/newsletter` daily 13:00 UTC: sends any newsletter whose scheduled time has passed.
+- `/api/cron/drip` daily 14:00 UTC: next email for every donor whose `drip_next_send` has arrived. Six pipelines, templates inline in the route.
+- `/api/cron/push-drain` daily 12:00 UTC: delivers queued pushes.
+- `/api/cron/sunday-batch` Sundays 13:00 UTC: the letter-day push to monthly sponsors with the app.
 
-The `publish-scheduled` (social queue) and `compliance` (child-update reminder) crons were deleted on 2026-09-14; both read Airtable and nothing else.
+All four take `CRON_SECRET` as a bearer token or `?secret=`.
 
-**Admin:**
+**Sponsor:**
 
-- `/api/admin/drip-preview` — Sends all 17 drip emails to kevin@beanumber.org with `[PIPELINE X/Y]` subject prefixes. Temporary — delete after review.
-- `/api/admin/updates/notify` — Sends update notification to a sponsor (requires admin auth).
+- `/api/sponsor/recover/send-link`, `/callback`, `/confirm-claim`: sign-in and claim.
+- `/api/sponsor/claim-match`, `/reveal`, `/notes`, `/notes/photo`, `/portal-purchase`, `/logout`.
 
-**Utility:**
+**Mobile:** `/api/mobile/v1/*` (auth, kids, claim, campus feed, newsletter, push, deferred links, account linking). Bearer-token auth, CORS opened in `middleware.ts`.
 
-- `/api/health` — Health check endpoint.
-- `/api/unsubscribe` — One-click unsubscribe using signed token from `src/lib/unsubscribe-token.ts`.
+**Other:** `/api/unsubscribe` (signed token from `src/lib/unsubscribe-token.ts`), `/api/session/status`, `/api/buyer-session`, `/api/shirts/order-status`, `/api/health/links` (link checker, not scheduled), `/api/rep/*` (cohort), `/api/news/*`, `/api/me/*`.
 
 ## Key libraries in `src/lib/`
 
-### `src/lib/db/` — Postgres data-access layer (source of truth as of July 2026)
+### `src/lib/db/`: the Postgres data-access layer
 
-Postgres is the only data store. The public site reads through `db/queries.ts`; the webhook writes through `db/webhook-bridge.ts` and `db/mutations.ts`. Airtable was retired in August 2026 and the last code paths that called it were removed on 2026-09-14. If you find anything that still expects an `AIRTABLE_*` variable, it is drift; remove it.
+Postgres on Supabase is the only data store. Airtable was retired in August 2026 and the last code that called it was removed on 2026-09-14.
 
-- `db/schema.ts`: Drizzle table definitions. Source of truth for the database. Changes go HERE first, then a matching hand-written SQL file lands in `/drizzle` (`NNNN_name.sql`, idempotent with `IF NOT EXISTS`) that Kevin runs in the Supabase SQL editor. `drizzle-kit generate` only tracked 0000 and 0001; everything after is hand-written. Conventions: UUID PKs, `airtable_id` text kept on the migrated tables for cross-reference, every queryable column indexed, singleSelect-style stored as text not Postgres enums (easier to evolve).
-- `db/client.ts` — Drizzle + `postgres` driver. Single module-level connection. `prepare:false, max:1` required for Supabase's transaction-mode pooler.
-- `db/queries.ts`: Every read the public site needs. Backwards-compat join keys (child UUID + legacy ChildID text) so lookups work for rows that only carry the legacy id.
-- `db/mutations.ts` — Every write the webhook/admin makes. Idempotent on natural keys. Every mutation auto-writes a row to `audit_log` with a computed `changed_fields` jsonb diff.
-- `db/webhook-bridge.ts`: The Stripe webhook calls into this. Every function is wrapped in `mirrorToPostgres(label, fn)` at the call site so a Postgres error logs (`[pg-mirror] ✗ label`) without failing the Stripe response, which would make Stripe retry every side effect. Bridge re-resolves the donor by email inside each call, so out-of-order events work (a donation that arrives before the donor row just creates a stub donor). The "mirror" naming is from the June 2026 dual-write window; these are now the only writes.
+- `db/schema.ts`: Drizzle table definitions, the source of truth for the shape of the database. A change goes here first, then a hand-written SQL file in `drizzle/` (`NNNN_name.sql`, idempotent, `IF NOT EXISTS`) that Kevin runs in the Supabase SQL editor. Never run `drizzle-kit generate` or `migrate`; `drizzle/meta` is stale and the npm scripts for both were removed (see `drizzle.config.ts`). Conventions: UUID PKs, `airtable_id` kept on migrated tables for cross-reference, status fields as text not enums, partial unique indexes applied in SQL and documented in comments because Drizzle cannot express them.
+- `db/client.ts`: Drizzle over the `postgres` driver, lazy, `prepare: false`, pool of 5, for the transaction-mode pooler.
+- `db/queries.ts`: every read the site needs. Email lookups always compare `lower(email)`. Kid joins match both the UUID FK and the legacy ChildID text.
+- `db/mutations.ts`: every write, idempotent on natural keys, each one writing an `audit_log` row with a `changed_fields` diff.
+- `db/webhook-bridge.ts`: what the Stripe webhook writes through. Each call is wrapped in `mirrorToPostgres(label, fn)` so a database error logs instead of failing the Stripe response (which would make Stripe retry every side effect). The "mirror" name is from the June 2026 dual-write window; these are the only writes now.
 
-- `cohort-members.ts`: The Founding Cohort program behind `/rep` (applications, magic-link sign-in, referral stats). Table `cohort_members`, migration `drizzle/0018`.
-- `products.ts`: the catalog. Every product, price, color, size, and who fulfills it (`inhouse` tees, `printful` seasonal pieces). Checkout validates against it and prices come from it.
-- `printful/`: the dropship line (2026-09-14). `client.ts` is the API wrapper, `orders.ts` submits a fulfillment row (assigns the number, builds print-file URLs, posts the order), `print-files.ts` renders the front and back files with resvg, `catalog-variants.ts` is the generated variant-id map. Webhook receiver at `/api/webhooks/printful`, print routes at `/print/*`. Full runbook in `docs/printful.md`.
-- `shirt-numbers.ts`: number assignment for Printful pieces (lowest free number in the Active batch, under an advisory lock) and the stocked-numbers list (numbers printed on in-house tees, never issued to Printful). Migration `drizzle/0019`.
-- `auth.ts` — Sponsor session cookie helpers (`getViewerSponsorCode`, `verifySessionForCode`) and admin token verification. The "sponsor portal" comments in here are outdated — sponsor auth now gates content on `/[number]`, not a dedicated portal route.
-- `email.ts` — `sendEmail()` abstraction that tries Gmail OAuth2 first, falls back to SendGrid if Gmail isn't configured. In production, Gmail is active. Contains several template functions (`sendSponsorWelcomeEmail`, `sendDonationReceiptEmail`, etc.) that still use old copy and need a voice.md rewrite. All transactional email routes through this file.
-- `gmail.ts` — Gmail OAuth2 send implementation. Builds raw MIME messages, handles plain-text-only mode, refresh token flow. This is the active email provider in production.
-- `googledrive.ts` — Google Workspace integration for admin workflows (not customer-facing).
-- `meta.ts` — OG/Twitter card metadata builders.
-- `rate-limit.ts` — In-memory rate limiter for public endpoints.
-- `unsubscribe-token.ts` — HMAC-signed unsubscribe tokens.
-- `validation.ts` — Zod schemas for route input validation.
-- `logger.ts` — Structured logger. Use `log.info`, `log.warn`, `log.error` — do not `console.log`.
-- `errors.ts` — Typed error classes + `toResponse()` helpers for consistent API error shape.
-- `env.ts` — Validated environment variable loader. If a var is missing, fail at import, not at request time.
-- `constants.ts` — Magic numbers (sponsorship amount, shirt price, etc.). Change once, propagate.
+### Identity and the number
 
-### `src/lib/tools/` — the reusable data layer
+- `roster-config.ts`: `CANONICAL_ROSTER_MAX = 53`.
+- `cycle.ts`: the Batches resolver. `resolveShirtToKid(N)` is `(N - batch.start) mod snapshot.length` inside the batch that covers N; `shirtNumbersForKid` is the per-kid footprint.
+- `mobile/shirt-cycle.ts`: the hardcoded era formula for #54 to #300, the fallback when a number has no batch. One copy, imported by the kid page, the JSON kid endpoint and the claim resolver.
+- `claim-resolve.ts`, `claim-guard.ts`, `claim-number.ts`: see the sponsor surface above.
+- `recovery-tokens.ts`: the two signed token kinds (recovery, claim-confirm), 24 hours.
+- `sponsor-relationship.ts`: `getViewerEmail` and `getViewerSponsorshipForChild` for pages other than the kid page.
+- `sponsor-codes.ts`: `generateUniqueSponsorCode`, database-checked.
 
-- `tools/index.ts` — Barrel export. Import domain helpers from here.
-- `tools/donation/`: `process-recurring-payment.ts` (monthly renewals into `donations`) and `reconcile-subscriptions.ts` (Stripe vs `sponsorships`, behind `/api/admin/reconciliation`).
-- `tools/email/`: `send-campus-newsletter.ts` (the live one), plus the sponsor welcome and update-notification senders.
-- `tools/media/`: Google Drive folder and upload helpers for the intake route.
-- `tools/social/`: Direct posting to Instagram and Facebook via the Meta Graph API.
-- `tools/health/`: Link checker behind `/api/health/links`.
-- `tools/send-email.ts` — Lower-level send that `email.ts` wraps. Rarely import directly.
-- `tools/_template.ts` — Starter file for a new tool module.
+### Everything else
 
-The `children`, `compliance`, `updates` and `sponsors` tool families, and the social scheduling queue, were deleted on 2026-09-14. They only talked to Airtable and backed the per-child quarterly review workflow that was retired with it.
+- `auth.ts`: `requireAdminAuth` / `verifyAdminToken` for admin API routes and `requireMobileAuth` for the mobile API. Sponsor sessions are not here.
+- `admin-session.ts`, `admin-session-edge.ts`: the HMAC-signed admin cookie, Node and Edge flavours.
+- `email.ts`: `sendEmail()` tries Gmail (OAuth2, `gmail.ts`) and fails over to SendGrid only if `SENDGRID_API_KEY` is set. Production has only Gmail. Template functions for the newsletter notifications, the sponsor welcome used by claim-match, update notifications, the renewal thank-you and the admin alerts. Note: the Stripe webhook, the drip cron and several admin routes still build their own HTML and pass their own From address (audit H4).
+- `gmail/`: the second Gmail sender, authorised through `/admin/connect-gmail` with tokens in `app_settings`; used only by the donor send-email route.
+- `products.ts`: the catalog; prices and fulfilment source (`inhouse` tees, `printful` seasonal pieces).
+- `printful/`: the dropship line (client, order submission, print files, variant map). Runbook in `docs/printful.md`.
+- `shirt-numbers.ts`: number assignment for Printful pieces under an advisory lock, plus the stocked-numbers list.
+- `christmas.ts`: the seasonal campaign constants and open/closed logic.
+- `penpal-cycle.ts`: the one-included-letter rule for holders, read from `kid_messages`.
+- `push/`: Expo push delivery with per-user caps and quiet hours.
+- `mobile-auth.ts`, `mobile-users.ts`, `mobile-viewer.ts`, `mobile-link-tokens.ts`: the app's auth and account linking.
+- `deferred-link.ts`: fingerprint helpers for install deep links.
+- `cohort-members.ts`: the Founding Cohort (`/rep`), table `cohort_members`, migration 0018 (not yet applied in production as of 2026-10-28).
+- `newsletter-feed.ts`, `newsletter-title.ts`, `homepage-roster.ts`, `milestones.ts`, `campus-time.ts`, `grades.ts`, `omoro.ts`, `updates-seen.ts`, `storage.ts` (Supabase Storage uploads), `attachments.ts`, `promo-codes.ts`, `free-shipping-window.ts`, `unsubscribe-token.ts`, `logger.ts` (the export is `logger`), `errors.ts`, `validation.ts` (hand-rolled validators; zod schemas live inline in routes), `env.ts` (nothing is required at import; `getEmailConfig()` is the one source of the From address), `constants.ts`.
+
+### `src/lib/tools/`
+
+- `tools/donation/`: `process-recurring-payment.ts` and `reconcile-subscriptions.ts` (behind `/api/admin/reconciliation`).
+- `tools/email/send-campus-newsletter.ts`: the newsletter send, with the sponsor and non-sponsor recipient lists.
+- `tools/media/`: Google Drive folder and upload helpers for the child-update intake route.
+- `tools/health/check-links.ts`: the link checker.
 
 ## Patterns that are load-bearing
 
 ### The reveal gate
 
-The core brand mechanic is: number on the shirt → name of the child, revealed after purchase. Until `ChildRevealedAt` is set on the Sponsorship record, sponsor-only views render a "lockbox" state (redacted photo, first initial, no name). Any code that renders child data in a sponsor-recognized view MUST check reveal status before exposing identifying info. Shortcutting this breaks the brand. (Note: as of June 2026 the "sponsor portal" surface is the kid page `/[number]` itself, not a separate `/sponsor/[code]` route — see "Sponsor surface" above.)
+Number on the shirt, then the name. Until `child_revealed_at` is set on the sponsorship, sponsor-only views stay locked, and the kid page runs Hold-to-Meet for anyone who is not already recognised. The `RevealBeacon` on the kid page posts to `/api/sponsor/reveal` to stamp it.
 
-### The four checkout routes are four, not one
+### Separate checkout routes stay separate
 
-Don't try to unify `create-checkout`, `create-shirt-checkout`, `create-sponsor-checkout`, and `sponsorship/*` into a single polymorphic route. Each has a different line-item shape, a different metadata contract, and a different success URL. The webhook handler reads metadata to dispatch; keeping creation routes separate is what keeps the metadata contract readable.
+Each creation route has a different line-item shape, metadata contract and success URL, and the webhook dispatches on `order_type`. Do not fold them into one polymorphic route.
 
-### Webhook as the only write path for donations
+### The webhook is the only write path for money
 
-All Donation/Sponsorship records are written by the Stripe webhook, never by the checkout creation routes. Reason: checkout creation can fire and the user can bounce. We only record a donation when Stripe confirms money moved. This is correct and non-negotiable.
+Donation and sponsorship rows are written by the Stripe webhook, never by the checkout creation routes. A session can be created and abandoned; we record money when Stripe says it moved.
 
-### Email through `sendEmail()` abstraction
+### Email goes through `sendEmail()`
 
-Every outgoing email — transactional, admin notification, cron-driven — goes through `src/lib/email.ts`. Commit `5b8e42a` refactored this; do not reintroduce direct `sgMail.send()` calls in route handlers.
+Every outgoing email goes through `src/lib/email.ts`. No direct provider calls in route handlers.
 
-### Reads go through `db/queries.ts`, writes through `db/mutations.ts`
+### Reads in `queries.ts`, writes in `mutations.ts`
 
-A route that needs a new read adds a function to `queries.ts`; a new write goes in `mutations.ts` so it gets the audit-log row and the natural-key idempotency for free. Reaching for `db` directly inside a route is the exception, not the pattern.
+A new read is a function in `queries.ts`; a new write is a function in `mutations.ts` so it gets the audit row and the natural-key idempotency. Reaching for `db` inside a route is the exception.
 
 ### Typed metadata on Stripe sessions
 
-Every checkout session sets `metadata` with known keys (`kind`, `shirtNumber`, `donorEmail`, etc.). The webhook reads these to dispatch. If you add a new checkout flow, extend the metadata type in the webhook handler's switch, don't shove arbitrary keys.
+Every checkout session sets known metadata keys (`order_type` first). The webhook reads them to dispatch. A new flow extends the switch; it does not invent keys ad hoc.
 
 ### Structured intake with fallback
 
-The `/children/[number]` page checks `hasStructured` (any of HomeVillage, FamilyContext, Loves, ChildQuote, TeacherQuote) and renders the new design if any are present, falling back to the legacy Notes field if none are. This is the pattern for any future schema rollout: conditional render, never block on 100% data.
+The kid page renders the structured blocks (home village, family, loves, quote, teacher quote) when any are present and falls back to the legacy notes field when none are. Conditional render, never block on complete data.
 
 ## Integrations
 
-- **Stripe** — Test mode and live mode are different environments. `hershock48` dashboard owns both. Webhook secret differs per endpoint; there's currently a stale endpoint somewhere in the dashboard causing 400 signature-verification failures (see `project_state.md`).
-- **Supabase**: Postgres 17 (project `ttsnwphctjcbtiyijmdf`) via the transaction-mode pooler, plus three public Storage buckets for kid, update and newsletter photos. Env: `DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`.
-- **Gmail OAuth2** — Active email provider. All transactional email (thank-you, drip, admin notification, newsletter, magic link) sends through Gmail API via `src/lib/gmail.ts`. Credentials: `GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`, `GMAIL_REFRESH_TOKEN` in Vercel env.
-- **SendGrid** — Inactive fallback in `src/lib/email.ts`. Code exists but Gmail takes priority when configured. SendGrid API key is in env but not used in production.
-- **Vercel** — Two projects under team `kevins-projects-ec116b76`: `beanumber` (prod, `prj_IwSgQIaCFpVrkmjydT1HcLvufYeO`, serves `www.beanumber.org`) and `beanumber-live` (`prj_vuBv3enBM2LxEBYFMqaupqcRbcAn`, not currently prod). Auto-deploy on push to `main`.
-- **GitHub** — Repo `hershock48/beanumber`. Single `main` branch, no feature-branch workflow. Kevin ships from `main`.
+- **Stripe**: test and live are separate environments; the `hershock48` dashboard owns both. One webhook endpoint per mode, each with its own secret in Vercel.
+- **Supabase**: Postgres 17 (project `ttsnwphctjcbtiyijmdf`) through the transaction-mode pooler, plus public Storage buckets for kid, update and newsletter photos. Env: `DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_ANON_KEY`, `SUPABASE_ATTACHMENTS_BUCKET`.
+- **Gmail OAuth2**: the email provider. `GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`, `GMAIL_REFRESH_TOKEN`, `GMAIL_USER_EMAIL`, `GMAIL_FROM_EMAIL`, `GMAIL_FROM_NAME`.
+- **SendGrid**: code path exists as a failover; no SendGrid variables are set in production.
+- **Printful**: dropship for seasonal pieces; see `docs/printful.md`.
+- **Vercel**: project `beanumber` serves `www.beanumber.org`; auto-deploys from `main`. The apex redirects to www in both `vercel.json` and `next.config.ts`.
+- **GitHub**: `hershock48/beanumber`. Work lands on `main` through short-lived branches and PRs.
 
-## Tailwind conventions
+## Tailwind
 
-Custom colors and spacing are in `tailwind.config.ts`. The palette in `voice.md` is authoritative: cream `#FFF8F0` background, sand `#e8e0d4` borders, gold `#D4A843` accent, near-black `#0d0d0d` body, mid-gray `#777` secondary. Lora serif for headings (600 weight), system sans for body. When adding new components, reach for these before inventing new values.
+Tailwind v4 through `@tailwindcss/postcss`; there is no `tailwind.config` file, the palette is used as literal classes. The palette in `voice.md` is authoritative: cream `#FFF8F0` background, sand `#e8e0d4` borders, gold `#D4A843` accent, near-black `#0d0d0d` body, mid-gray `#777` secondary. Lora serif for headings (600 weight), system sans for body.
 
 ## Deep linking
 
 Unified across four surfaces so a shirt QR, an email link, a push notification, and a bare URL all land on the same in-app screen.
 
-### Route table (contract — appears in QRs, emails, push payloads)
+### Route table (contract: appears in QRs, emails, push payloads)
 
 | Web URL                                    | App route             |
 |--------------------------------------------|-----------------------|
@@ -200,63 +217,47 @@ The custom-scheme fallback is for push payloads and dev/testing.
 
 ### Delivery surfaces
 
-- **iOS Universal Links** — driven by the AASA at `/.well-known/apple-app-site-association` (served by `src/app/.well-known/apple-app-site-association/route.ts`). App bundle ID + Apple team ID are `APPLE_BUNDLE_ID` + `APPLE_TEAM_ID` in Vercel env. Both are required; the route returns 500 if either is missing so a broken deploy fails loudly instead of silently serving a bad file. `mobile/app.json` sets `ios.associatedDomains: ["applinks:beanumber.org", "applinks:www.beanumber.org"]` and `ios.bundleIdentifier: "org.beanumber.app"`.
-- **Android App Links** — driven by the Digital Asset Links file at `/.well-known/assetlinks.json` (served by `src/app/.well-known/assetlinks.json/route.ts`). Env: `ANDROID_PACKAGE_NAME` + `ANDROID_APP_SHA256`. The SHA-256 fingerprint comes from `eas credentials` for the RELEASE build — debug builds have a different fingerprint. `mobile/app.json` sets `android.package: "org.beanumber.app"` and `android.intentFilters` covering every path in the table above.
-- **Custom scheme** — `mobile/app.json` sets `scheme: "beanumber"`. Push notifications emit `beanumber://<path>` in the `data.deepLink` field; the push handler in `mobile/hooks/usePushDeepLinks.ts` routes them.
+- **iOS Universal Links**: driven by the AASA at `/.well-known/apple-app-site-association` (served by `src/app/.well-known/apple-app-site-association/route.ts`). App bundle ID and Apple team ID are `APPLE_BUNDLE_ID` and `APPLE_TEAM_ID` in Vercel env. Both are required; the route returns 500 if either is missing so a broken deploy fails loudly. `mobile/app.json` sets `ios.associatedDomains: ["applinks:beanumber.org", "applinks:www.beanumber.org"]` and `ios.bundleIdentifier: "org.beanumber.app"`.
+- **Android App Links**: driven by the Digital Asset Links file at `/.well-known/assetlinks.json` (served by `src/app/.well-known/assetlinks.json/route.ts`). Env: `ANDROID_PACKAGE_NAME` and `ANDROID_APP_SHA256`. The SHA-256 fingerprint comes from `eas credentials` for the RELEASE build; debug builds have a different fingerprint. `mobile/app.json` sets `android.package: "org.beanumber.app"` and `android.intentFilters` covering every path in the table above.
+- **Custom scheme**: `mobile/app.json` sets `scheme: "beanumber"`. Push notifications emit `beanumber://<path>` in the `data.deepLink` field; the push handler in `mobile/hooks/usePushDeepLinks.ts` routes them.
 
 ### Client-side plumbing
 
 Three hooks run in the root layout, each attached to a different event source:
 
-- `usePushDeepLinks` (unchanged) — notification-response listener.
-- `useWebDeepLinks` — expo-linking initial-URL + `addEventListener('url')`. Handles universal-link and custom-scheme taps.
-- `useDeferredLink` — first-open only. Hits `/api/mobile/v1/deferred-link/resolve` with (IP + UA) fingerprint; routes if a match is found.
+- `usePushDeepLinks`: notification-response listener.
+- `useWebDeepLinks`: expo-linking initial URL plus `addEventListener('url')`. Handles universal-link and custom-scheme taps.
+- `useDeferredLink`: first open only. Hits `/api/mobile/v1/deferred-link/resolve` with the (IP + UA) fingerprint; routes if a match is found.
 
-All three route through the same normalizer in `mobile/lib/deepLink.ts` (`parseIncomingUrl` + `routeFor`). The route allow-list is enforced there — anything outside the table above returns null, so `/admin/*` and `/api/*` can't sneak into the app.
+All three route through the same normaliser in `mobile/lib/deepLink.ts` (`parseIncomingUrl` plus `routeFor`). The route allow-list is enforced there; anything outside the table above returns null, so `/admin/*` and `/api/*` cannot sneak into the app.
 
 ### Deferred-link fallback
 
-When a shirt QR scan hits `beanumber.org/meet/[N]` on a mobile device that DOESN'T have the app installed, the smart-open banner on `/children/[N]` (rendered when the server-side UA sniff detects iOS/Android) offers "Open in Be A Number." Tapping it:
+When a shirt QR scan hits `beanumber.org/meet/[N]` on a phone without the app, the smart-open banner on `/children/[N]` (rendered when the server-side UA sniff detects iOS or Android, and only when `MOBILE_APP_LIVE=1`) offers "Open in Be A Number." Tapping it:
 
-1. `POST /api/mobile/v1/deferred-link/stamp` with `{ targetPath: "/meet/N", shirtNumber: N, source: "children_banner" }`. Server hashes `(client IP + normalized UA)` and inserts a row into `pending_deferred_links` with `expires_at = now + 10min`.
-2. Client tries `beanumber://meet/N` (fires the app if installed).
-3. If that's still visible after 1.2s, redirects to the App Store / Play Store — the store URL carries `?ct=meet_N` as a campaign token for the belt-and-suspenders SKAdNetwork path (documented, not built).
-4. On first-open, the app calls `POST /api/mobile/v1/deferred-link/resolve` with the same fingerprint (computed server-side from the request headers). If a live row matches (unconsumed + not expired), the endpoint marks it consumed and returns `targetPath`. The app routes there.
+1. `POST /api/mobile/v1/deferred-link/stamp` with `{ targetPath: "/meet/N", shirtNumber: N, source: "children_banner" }`. The server hashes (client IP + normalised UA) and inserts a row into `pending_deferred_links` with `expires_at = now + 10min`. That table comes from `drizzle/0008`, which had not been applied in production as of 2026-10-28.
+2. The client tries `beanumber://meet/N` (fires the app if installed).
+3. If the page is still visible after 1.2s, it redirects to the App Store or Play Store with `?ct=meet_N` as a campaign token.
+4. On first open, the app calls `POST /api/mobile/v1/deferred-link/resolve` with the same fingerprint. If a live row matches, the endpoint marks it consumed and returns `targetPath`.
 
-The hold-to-meet ritual is preserved regardless of how the number arrives. `/meet/[N]` in the app always runs the HoldButton. Nothing bypasses the hold. (See `mobile/app/meet/[number].tsx`.)
+The hold-to-meet ritual is preserved regardless of how the number arrives. `/meet/[N]` in the app always runs the HoldButton.
 
 ### Files
 
-Web:
-- `src/app/.well-known/apple-app-site-association/route.ts` — AASA JSON
-- `src/app/.well-known/assetlinks.json/route.ts` — Android Digital Asset Links
-- `src/app/api/mobile/v1/deferred-link/stamp/route.ts` — write pending row
-- `src/app/api/mobile/v1/deferred-link/resolve/route.ts` — claim pending row
-- `src/lib/deferred-link.ts` — fingerprint + UA helpers
-- `src/lib/db/schema.ts` — `pendingDeferredLinks` table
-- `drizzle/0008_pending_deferred_links.sql` — migration
-- `src/app/children/[number]/MobileAppBanner.tsx` — client banner
-- `src/app/children/[number]/page.tsx` — server-side UA detect + banner render
+Web: `src/app/.well-known/apple-app-site-association/route.ts`, `src/app/.well-known/assetlinks.json/route.ts`, `src/app/api/mobile/v1/deferred-link/{stamp,resolve}/route.ts`, `src/lib/deferred-link.ts`, `src/lib/db/schema.ts` (`pendingDeferredLinks`), `drizzle/0008_pending_deferred_links.sql`, `src/app/children/[number]/MobileAppBanner.tsx`, `src/app/children/[number]/page.tsx`.
 
-Mobile:
-- `mobile/app.json` — scheme, associatedDomains, intentFilters, bundle IDs
-- `mobile/lib/deepLink.ts` — `parseIncomingUrl`, `routeFor`, `resolveIncomingUrl`
-- `mobile/hooks/useWebDeepLinks.ts` — expo-linking listener
-- `mobile/hooks/useDeferredLink.ts` — first-open resolver
-- `mobile/app/_layout.tsx` — bridge wiring
+Mobile: `mobile/app.json`, `mobile/lib/deepLink.ts`, `mobile/hooks/useWebDeepLinks.ts`, `mobile/hooks/useDeferredLink.ts`, `mobile/app/_layout.tsx`.
 
 ### Test
 
 ```bash
-curl -H "Accept: application/json" \
-  https://beanumber.org/.well-known/apple-app-site-association | jq .
-curl -H "Accept: application/json" \
-  https://beanumber.org/.well-known/assetlinks.json | jq .
+curl -H "Accept: application/json" https://beanumber.org/.well-known/apple-app-site-association | jq .
+curl -H "Accept: application/json" https://beanumber.org/.well-known/assetlinks.json | jq .
 ```
 
 ## When you don't know where something lives
 
 - Run `git log --oneline -20` for recent context.
 - `grep` the repo for a route path, field name, or symbol. The codebase is not huge.
-- Check `src/lib/tools/index.ts` for the canonical export list.
 - If you're about to touch the webhook, reread the whole route file first. It's long but linear.
+- `docs/audit-2026-10.md` lists what was dead, what drifted, and what is still open.
