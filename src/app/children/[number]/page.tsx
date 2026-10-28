@@ -76,6 +76,7 @@ import {
 // 2026-07-08 per Kevin ("hide this part for now... i dont love it")
 // and deleted 2026-10-28; git history has it if it comes back.
 import { resolveShirtToKid } from '@/lib/cycle';
+import { canonicalShirtNumber } from '@/lib/mobile/shirt-cycle';
 import { CANONICAL_ROSTER_MAX } from '@/lib/roster-config';
 import { db } from '@/lib/db/client';
 import {
@@ -665,49 +666,14 @@ async function resolvePortalData(child: {
   return { latestChildUpdate };
 }
 
-/**
- * Cycle-number → canonical-kid resolver.
- *
- * BAN's roster has 53 real children (shirt numbers 1–53). Shirt
- * numbers 54+ are cycle records, looking up the canonical kid's
- * photo/bio at render time. Cycle records carry the kid's name +
- * status but typically lack the photo/bio fields, so /[number]
- * looks up the canonical record at render time and merges those
- * fields onto the cycle record. The cycle record's ShirtNumber
- * and ChildID stay authoritative — sponsorships/donations link to
- * the cycle record, not the canonical one.
- *
- * Two cycle eras live side by side:
- *
- *   Era 1 (#54–150): 52-wide cycle covering roster #2–53. Naume (#1)
- *     was excluded from the original cycle. So #54 = #2, #105 = #53,
- *     #106 = #2 (next loop), …, #150 = #46. Existing data ships
- *     against this formula and we don't disturb it.
- *
- *   Era 2 (#151 and up): 53-wide cycle covering the full roster
- *     #1–53. Naume is in from here on. So #151 = #1, #152 = #2, …,
- *     #203 = #53, #204 = #1 (next loop), and so on.
- *
- * Roster gap note: #47 has no real child enrolled. We populated its
- * Children record with a full copy of Asenath (#3) so /47 renders
- * exactly like /3. If Asenath's data ever changes, re-sync #47 in
- * Airtable too (cheap one-time copy, no special render path needed).
- */
-function canonicalShirtNumber(n: number): number | null {
-  // Hard upper bound: the highest opened Batch end (currently 300,
-  // end of Batch 3). Without this guard the modulo math would happily
-  // map any integer N to a real kid, so /children/1000000 would
-  // render someone's profile. Anything above the bound returns null
-  // and the page falls through to the 'we don't have a #X yet' view.
-  // Do NOT bump past 300: the era formulas below only describe
-  // Batches 1-3. Batch 4+ (opened 2026-07-18, #301-450) has its own
-  // snapshot order and resolves via the Batches table ONLY - if the
-  // table read fails, failing closed beats revealing the wrong kid.
-  if (!Number.isFinite(n) || n < 1 || n > 300) return null;
-  if (n <= 53) return null;
-  if (n <= 150) return ((n - 54) % 52) + 2;
-  return ((n - 151) % 53) + 1;
-}
+// Cycle-number to canonical-kid safety net. The Batches table is the
+// source of truth (resolveShirtToKid); this hardcoded era formula only
+// runs when a number has no batch, and it refuses anything past #300.
+// One copy for the whole app: src/lib/mobile/shirt-cycle.ts, tested in
+// tests/cycle.test.ts against the Batches math for every number 54..300.
+//
+// Roster gap note: #47 has no real child enrolled. Its children row is
+// a full copy of Asenath (#3) so /47 renders like /3.
 
 // Canonical roster max — see @/lib/roster-config. Anything past this
 // is a cycle number that MUST resolve to a canonical kid via the
