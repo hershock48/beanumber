@@ -513,7 +513,7 @@ export const ImpactReelVideo: React.FC<ImpactReelVideoProps> = ({ stats }) => {
       <Sequence from={75} durationInFrames={55}>
         <StatSlam
           number="60"
-          context="Women Empowered"
+          context="Women trained"
           emoji="👩‍🎓"
           color="#FF6B9D"
           subtext="With real job skills"

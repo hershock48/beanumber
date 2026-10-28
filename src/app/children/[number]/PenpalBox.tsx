@@ -313,7 +313,7 @@ export function PenpalBox({
             </p>
             <p className="text-[15px] text-[#333] leading-relaxed mb-6 max-w-md mx-auto">
               You get monthly photos, report cards, and campus
-              updates &mdash; and you and {firstName} keep writing.{' '}
+              updates, and you and {firstName} keep writing.{' '}
               <span className="font-bold text-[#0d0d0d]">$25/month.</span>{' '}
               Cancel anytime.
             </p>
@@ -416,12 +416,12 @@ export function PenpalBox({
               <div className="mb-6">
                 <p className="text-[16px] md:text-[17px] text-[#0d0d0d] leading-snug mb-3 font-semibold">
                   <span className="font-bold text-[#0d0d0d]">$25/month</span>{' '}
-                  covers {firstName}&rsquo;s school day.
+                  supports {firstName}&rsquo;s school day at the campus.
                 </p>
                 <p className="text-[14px] md:text-[15px] text-[#555] leading-relaxed">
-                  You get a real penpal on the other end &mdash; letters back
-                  and forth, monthly photos, report cards, and updates
-                  from the campus. Cancel anytime.
+                  You write from this page and their replies come back
+                  in their own handwriting, plus monthly photos, report
+                  cards, and updates from the campus. Cancel anytime.
                 </p>
               </div>
             ) : (

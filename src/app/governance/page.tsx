@@ -130,7 +130,7 @@ export default function Governance() {
           <section className="mb-12">
             <h2 className="text-2xl font-bold text-gray-900 mb-6">Financial Stewardship</h2>
             <p className="text-gray-700 leading-relaxed">
-              We run lean so that most of your money goes directly to programs. With just 3.3% in administrative costs, we stretch every dollar while staying accountable and ready to grow responsibly.
+              We run lean so that most of your money goes directly to programs. Administrative costs were 3.3% in 2025, and we stay accountable while growing responsibly.
             </p>
           </section>
         </div>

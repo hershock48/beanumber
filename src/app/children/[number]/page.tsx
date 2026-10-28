@@ -1320,10 +1320,10 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
               When you enter it here, you meet them &mdash; their name, their face, their story.
             </p>
             <p className="text-[#666] leading-relaxed">
-              Your $25 gets you the shirt and starts their year at the campus &mdash; school,
+              Your $25 gets you the shirt and starts their year at the campus: school,
               meals, medical care. Continue at $25/month to finish their year and stay connected:
-              a monthly campus newsletter, photos, a handwritten letter from your matched child,
-              and a year-end report card.
+              a monthly campus newsletter, photos, letters from the kid on your shirt in their
+              own handwriting, and a year-end report card.
             </p>
           </div>
 
@@ -1340,7 +1340,7 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
             </h2>
             <p className="text-[#666] leading-relaxed max-w-lg mx-auto mb-8">
               Four designs. Four colors. Heavyweight cotton, screen-printed, handmade to order.
-              Every shirt starts a matched child&rsquo;s year at the campus &mdash; school, meals, medical care.
+              Every shirt starts a child&rsquo;s year at the campus: school, meals, medical care.
             </p>
             <Link
               href="/shirts"
@@ -1717,8 +1717,8 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
                     Sponsor {firstName} for $25/mo.
                   </span>{' '}
                   <span className="text-[#555]">
-                    Covers a full school day, plus a real penpal on
-                    the other end.
+                    Supports a full school day at the campus, and you
+                    get letters back.
                   </span>
                 </div>
                 {/* Wrap allows the primary CTA + secondary link to stack
@@ -1808,7 +1808,7 @@ export default async function ChildProfilePage({ params, searchParams }: ChildPa
                 : 'Someone sponsored a child in your honor.'}
             </p>
             <p className="text-sm text-[#666] mt-2">
-              Their first month at the campus is already covered.
+              Their first month at the campus is supported.
               You&rsquo;ll meet them below.
             </p>
           </div>

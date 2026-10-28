@@ -569,7 +569,7 @@ function ShirtCard({ shirt, reversed }: { shirt: Shirt; reversed: boolean }) {
                   className="text-base text-[#0d0d0d]"
                   style={{ fontFamily: 'var(--font-lora), serif', fontWeight: 600 }}
                 >
-                  Become their penpal.
+                  Stay in their life.
                 </p>
                 <p className="text-xs font-bold uppercase tracking-wider text-[#D4A843] whitespace-nowrap">
                   +$25/mo
@@ -577,8 +577,8 @@ function ShirtCard({ shirt, reversed }: { shirt: Shirt; reversed: boolean }) {
               </div>
               <p className="text-sm text-[#555] leading-snug">
                 The shirt is how you meet them. Monthly sponsorship is how you
-                stay: you get a penpal, monthly photos, report cards, and
-                campus updates. $25/month.
+                stay: write to your Kid and see their handwritten replies,
+                plus photos, report cards, and campus updates. $25 a month.
               </p>
             </div>
 
@@ -821,15 +821,15 @@ export default function ShirtsPageContent() {
             {[
               {
                 q: 'What actually happens when I buy a Shirt?',
-                a: "You pick your color and size, and we ship you a hand-printed Shirt with a unique Number pressed on the back. That Number belongs to a real Child enrolled in our program in Northern Uganda. When the Shirt arrives, you flip it over, read your Number off the back, come back to the site, enter it, and meet them: their name, their face, their story. $25 supports school, meals, and medical care at the campus. $25/month makes it real: you get a penpal, monthly photos, report cards, and campus updates.",
+                a: "You pick your color and size, and we ship you a hand-printed Shirt with a unique Number pressed on the back. That Number belongs to a real Child enrolled in our program in Northern Uganda. When the Shirt arrives, you flip it over, read your Number off the back, come back to the site, enter it, and meet them: their name, their face, their story. $25 supports school, meals, and medical care at the campus. $25 a month is how you stay: write to your Kid and see their handwritten replies, plus photos, report cards, and campus updates.",
               },
               {
                 q: 'Where does the $25 actually go?',
-                a: 'Your $25/month supports the campus where your kid goes to school, eats two meals a day, and gets medical care through the on-site clinic. The campus runs on the combined support of every sponsor — that\'s what also keeps the 60 women in vocational training, the medical outreach that has served 700+ patients, and the construction apprenticeships going. You\'re not paying line items on one child\'s bill. You\'re supporting the ecosystem that keeps them in school.',
+                a: 'Your $25/month supports the campus where your kid goes to school, eats two meals a day, and gets medical care through the on-site clinic. The campus runs on the combined support of every sponsor. That\'s what also keeps the 60 women in vocational training, the medical outreach that has served 700+ patients, and the construction apprenticeships going. You\'re not paying line items on one child\'s bill. You\'re supporting the ecosystem that keeps them in school.',
               },
               {
                 q: 'Can I pick my Number?',
-                a: 'No. And that\'s by design. Numbers are assigned in order so every Child gets a sponsor, not just the ones with the best photos. The whole idea of Be A Number is turning something impersonal (being reduced to a number) into something deeply personal. Your Number isn\'t random. It\'s someone\'s name waiting to be learned.',
+                a: 'No. And that\'s by design. Numbers go out in order, so every Child gets met, not only the ones with the best photos. The whole idea of Be A Number is turning something impersonal (being reduced to a number) into something deeply personal. Your Number isn\'t random. It\'s someone\'s name waiting to be learned.',
               },
               {
                 q: 'Who\'s on the ground doing this work?',

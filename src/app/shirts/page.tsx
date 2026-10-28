@@ -32,7 +32,7 @@ const faqJsonLd = {
       name: 'Can I pick my Number?',
       acceptedAnswer: {
         '@type': 'Answer',
-        text: 'No. Numbers are assigned in order so every Child gets a sponsor, not just the ones with the best photos. Your Number isn\'t random — it\'s someone\'s name waiting to be learned.',
+        text: 'No. Numbers go out in order, so every Child gets met, not only the ones with the best photos. Your Number isn\'t random. It\'s someone\'s name waiting to be learned.',
       },
     },
     {

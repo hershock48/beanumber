@@ -162,7 +162,7 @@ export function GiftSponsorshipForm() {
         </button>
 
         <p className="text-center text-xs text-[#aaa] mt-3 leading-relaxed">
-          Their first month is covered. Continuation is their choice &mdash; no obligation, ever.
+          Their first month at the campus is supported. Continuing is their choice, no obligation, ever.
         </p>
       </div>
     </form>

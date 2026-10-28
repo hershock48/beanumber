@@ -6,7 +6,7 @@ import { BANFooter } from '@/components/BANFooter';
 export const metadata: Metadata = {
   title: 'Gift a Sponsorship',
   description:
-    'Sponsor a child in someone else’s honor. They meet a real kid at the campus in Northern Uganda — a name, a face, a story. No pressure to continue, just an invitation.',
+    'Sponsor a child in someone else’s honor. They meet a real kid at the campus in Northern Uganda: a name, a face, a story. No pressure to continue. It is an invitation.',
 };
 
 export default function GiftLandingPage() {
@@ -46,8 +46,8 @@ export default function GiftLandingPage() {
             </h2>
             <p className="text-[#666] leading-relaxed mb-6">
               $25 supports a child&rsquo;s first month at the campus. The person you&rsquo;re gifting to
-              gets an email introducing them to a specific kid whose first month they&rsquo;re covering.
-              They can stay at $25/month if they want to &mdash; entirely their choice, no obligation.
+              gets an email introducing them to a specific kid whose first month at the campus their gift supports.
+              They can stay at $25/month if they want to, entirely their choice, no obligation.
             </p>
             <div className="flex items-baseline gap-1 mb-5">
               <span
@@ -112,8 +112,8 @@ export default function GiftLandingPage() {
                 You give $25.
               </p>
               <p className="text-sm text-[#666] leading-relaxed">
-                Pick who it&rsquo;s for, write a quick note if you want, and check out. The first month is
-                covered immediately.
+                Pick who it&rsquo;s for, write a quick note if you want, and check out. The gift goes to work at the
+                campus the same day.
               </p>
             </div>
             <div>
@@ -138,15 +138,15 @@ export default function GiftLandingPage() {
                 They decide.
               </p>
               <p className="text-sm text-[#666] leading-relaxed">
-                $25/month to stay with the child all year, or just keep the introduction. The relationship
-                belongs to them now &mdash; no pressure, no guilt-trip, cancel anytime.
+                $25/month to stay with the child all year, or keep the introduction. The relationship
+                belongs to them now: no pressure, no guilt-trip, cancel anytime.
               </p>
             </div>
           </div>
         </section>
 
         <p className="text-center text-xs text-[#aaa] mt-10 max-w-2xl mx-auto leading-relaxed">
-          Your $25 is tax-deductible. If your recipient continues at $25/month, those donations are their own
+          Your $25 is tax-deductible to the extent allowed by law. If your recipient continues at $25/month, those donations are their own
           and they receive separate receipts.
         </p>
       </main>
